@@ -1,20 +1,76 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Helper to get the WhatsApp account and its token from DB
-async function getAccount() {
-  return prisma.whatsAppAccount.findFirst({ orderBy: { createdAt: "desc" } });
+// Helper to resolve current tenant session from cookie or agent user
+async function resolveInboxSession() {
+  const cookieStore = require("next/headers").cookies;
+  const wmUser = (await cookieStore()).get("wm_user")?.value;
+  let userRole = "SALES";
+  let userEmail = "";
+  let userName = "Agent";
+  let clientId: string | null = null;
+
+  if (wmUser) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(wmUser));
+      userRole = parsed.role || "SALES";
+      userEmail = parsed.email || "";
+      userName = parsed.name || "Agent";
+      if (parsed.clientId) {
+        clientId = parsed.clientId;
+      }
+    } catch (e) {}
+  }
+
+  if (!clientId && userEmail) {
+    const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: userEmail } }).catch(() => null);
+    if (agent?.clientId) {
+      clientId = agent.clientId;
+      if (agent.name) userName = agent.name;
+    } else {
+      const client = await prisma.whatsAppClient.findFirst({
+        where: { OR: [{ contactEmail: userEmail }, { adminEmail: userEmail }] }
+      }).catch(() => null);
+      if (client) {
+        clientId = client.id;
+        userName = client.businessName + " Admin";
+      }
+    }
+  }
+
+  const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'MANAGER';
+  return { userRole, userEmail, userName, clientId, isAdmin };
+}
+
+// Helper to get Meta credentials prioritizing tenant's own API tokens
+async function getAccountCredentials(clientId?: string | null) {
+  if (clientId) {
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } }).catch(() => null);
+    if (client?.metaAccessToken && client?.phoneId) {
+      return {
+        token: client.metaAccessToken,
+        phoneId: client.phoneId,
+        businessName: client.businessName
+      };
+    }
+  }
+  const account = await prisma.whatsAppAccount.findFirst({ orderBy: { createdAt: "desc" } }).catch(() => null);
+  return {
+    token: account?.accessToken || process.env.META_WHATSAPP_TOKEN || "",
+    phoneId: account?.phoneId || process.env.META_PHONE_NUMBER_ID || "",
+    businessName: account?.name || "What-In"
+  };
 }
 
 // --- GET --------------------------------------------------------------------
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action") || "chats";
+  const session = await resolveInboxSession();
 
-  // -- 1. GET ALL CHATS -----------------------------------------------------
+  // -- 1. GET ALL CHATS (CLIENT SCOPED) -------------------------------------
   if (action === "chats") {
     try {
-      // Auto-delete media older than 30 days by clearing database mediaUrl field
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       prisma.whatsAppMessage.updateMany({
@@ -26,25 +82,16 @@ export async function GET(req: NextRequest) {
           mediaUrl: null
         }
       }).catch(err => console.error("[Auto-Delete Media Old 30 Days Error]:", err));
-      // Filtering logic based on cookies
-      const cookieStore = require("next/headers").cookies;
-      const wmUser = (await cookieStore()).get("wm_user")?.value;
-      let userRole = "SALES";
-      let userEmail = "";
-      if (wmUser) {
-        try {
-          const parsed = JSON.parse(wmUser);
-          userRole = parsed.role || "SALES";
-          userEmail = parsed.email || "";
-        } catch (e) {}
-      }
 
-      const isAdmin = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'MANAGER';
       const where: any = {};
 
-      if (!isAdmin) {
-        if (userEmail) {
-          const emp = await prisma.employee.findFirst({ where: { user: { email: userEmail } } });
+      if (session.clientId) {
+        where.clientId = session.clientId;
+      }
+
+      if (!session.isAdmin) {
+        if (session.userEmail) {
+          const emp = await prisma.employee.findFirst({ where: { user: { email: session.userEmail } } });
           if (emp) {
             where.assignedEmployeeId = emp.id;
           } else {
@@ -54,6 +101,7 @@ export async function GET(req: NextRequest) {
           where.assignedEmployeeId = "00000000-0000-0000-0000-000000000000";
         }
       }
+
       const search = searchParams.get("search");
       if (search) {
         where.customer = {
@@ -149,7 +197,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // -- 2. GET MESSAGES FOR A PHONE -----------------------------------------
+  // -- 2. GET MESSAGES FOR A CONVERSATION (CLIENT SCOPED) ---------------------
   if (action === "messages") {
     const phone = searchParams.get("phone");
     const convId = searchParams.get("convId");
@@ -160,12 +208,18 @@ export async function GET(req: NextRequest) {
       let conversation: any = null;
 
       if (convId) {
-        conversation = await prisma.whatsAppConversation.findUnique({ where: { id: convId } });
+        conversation = await prisma.whatsAppConversation.findFirst({
+          where: {
+            id: convId,
+            ...(session.clientId ? { clientId: session.clientId } : {})
+          }
+        });
       } else {
         const rawDigits = String(phone).replace(/\D/g, "");
         const last10 = rawDigits.slice(-10);
         const customer = await prisma.customer.findFirst({
           where: {
+            ...(session.clientId ? { clientId: session.clientId } : {}),
             OR: [
               { mobile: rawDigits },
               { whatsappNumber: rawDigits },
@@ -176,7 +230,10 @@ export async function GET(req: NextRequest) {
         });
         if (customer) {
           conversation = await prisma.whatsAppConversation.findFirst({
-            where: { customerId: customer.id },
+            where: {
+              customerId: customer.id,
+              ...(session.clientId ? { clientId: session.clientId } : {})
+            },
           });
         }
       }
@@ -185,7 +242,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: true, messages: [] });
       }
 
-      // Reset unread count
       await prisma.whatsAppConversation.update({
         where: { id: conversation.id },
         data: { unreadCount: 0 },
@@ -217,14 +273,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-    // -- 4. GET CONVERSATION DETAIL BY ID --------------------------------------
+  // -- 4. GET CONVERSATION DETAIL BY ID (CLIENT SCOPED) ---------------------
   if (action === "detail") {
     const convId = searchParams.get("convId");
     if (!convId) return NextResponse.json({ error: "convId required" }, { status: 400 });
     
     try {
-      const conversation = await prisma.whatsAppConversation.findUnique({
-        where: { id: convId },
+      const conversation = await prisma.whatsAppConversation.findFirst({
+        where: {
+          id: convId,
+          ...(session.clientId ? { clientId: session.clientId } : {})
+        },
         include: {
           account: true,
           customer: {
@@ -243,57 +302,9 @@ export async function GET(req: NextRequest) {
       });
       
       if (!conversation) {
-        return NextResponse.json({ success: false, error: "Conversation not found" }, { status: 404 });
+        return NextResponse.json({ success: false, error: "Conversation not found or unauthorized" }, { status: 404 });
       }
 
-      // Auto-heal customer phone numbers using verified Meta incoming message ID (wamid) or standard E.164
-      if (conversation.customerId && conversation.customer) {
-        let realPhone: string | null = null;
-
-        // 1. Try to extract verified E.164 phone directly from incoming customer message metaMessageId (wamid)
-        const incomingWithWamid = conversation.messages?.find(
-          (m: any) => m.senderType === 'CUSTOMER' && m.metaMessageId && m.metaMessageId.startsWith('wamid.HBg')
-        );
-        if (incomingWithWamid?.metaMessageId) {
-          const match = incomingWithWamid.metaMessageId.match(/^wamid\.HBg[A-Za-z]([A-Za-z0-9+/=]{8,30})/);
-          if (match) {
-            try {
-              const buf = Buffer.from(match[1], 'base64');
-              const str = buf.toString('latin1');
-              const digitsMatch = str.match(/\d{10,15}/);
-              if (digitsMatch) realPhone = digitsMatch[0];
-            } catch {}
-          }
-        }
-
-        const rawPhone = (conversation.customer.whatsappNumber || conversation.customer.mobile || '').replace(/\D/g, '');
-
-        if (realPhone && realPhone !== rawPhone) {
-          console.log(`[Auto-Heal Phone] Updating customer ${conversation.customerId} from ${rawPhone} to verified Meta phone ${realPhone}`);
-          await prisma.customer.update({
-            where: { id: conversation.customerId },
-            data: {
-              whatsappNumber: realPhone,
-              mobile: realPhone
-            }
-          }).catch(() => {});
-          conversation.customer.whatsappNumber = realPhone;
-          conversation.customer.mobile = realPhone;
-        } else if (rawPhone.length === 10 && /^[6-9]/.test(rawPhone)) {
-          const fullIndianPhone = `91${rawPhone}`;
-          await prisma.customer.update({
-            where: { id: conversation.customerId },
-            data: {
-              whatsappNumber: fullIndianPhone,
-              mobile: fullIndianPhone
-            }
-          }).catch(() => {});
-          conversation.customer.whatsappNumber = fullIndianPhone;
-          conversation.customer.mobile = fullIndianPhone;
-        }
-      }
-
-      // Reset unread count when viewed
       if (conversation.unreadCount > 0) {
         await prisma.whatsAppConversation.update({
           where: { id: convId },
@@ -301,61 +312,11 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      // Mark the last incoming customer message as SEEN/READ in Meta WhatsApp API
-      const lastIncoming = conversation.messages
-        .slice()
-        .reverse()
-        .find((m) => m.senderType === "CUSTOMER" && m.metaMessageId);
-
-      if (lastIncoming && conversation.account?.accessToken && conversation.account?.phoneId) {
-        const token = conversation.account.accessToken;
-        const phoneId = conversation.account.phoneId;
-        try {
-          const url = `https://graph.facebook.com/v20.0/${phoneId}/messages`;
-          await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              messaging_product: "whatsapp",
-              status: "read",
-              message_id: lastIncoming.metaMessageId
-            })
-          });
-          console.log(`[Mark Read] Marked message ${lastIncoming.metaMessageId} as read`);
-        } catch (e) {
-          console.error("[Mark Read Error] Failed to mark read in Meta:", e);
-        }
-      }
-
-      // Consolidate and sync tags between conversation and customer (filtering legacy auto-tags)
-      const isAutoTag = (t: string) => {
-        const l = t.toLowerCase().trim();
-        return l === 'whatsapp lead' || l === 'auto created';
-      };
-
       const mergedTagsList = Array.from(new Set([
         ...(conversation.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean),
         ...(conversation.customer?.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean),
-      ])).filter(t => !isAutoTag(t));
+      ])).filter(t => t.toLowerCase() !== 'whatsapp lead' && t.toLowerCase() !== 'auto created');
       const mergedTagsStr = mergedTagsList.join(', ');
-
-      // Clean up legacy auto-tags from database
-      if (conversation.tags !== mergedTagsStr) {
-        await prisma.whatsAppConversation.update({
-          where: { id: convId },
-          data: { tags: mergedTagsStr }
-        }).catch(() => {});
-      }
-
-      if (conversation.customerId && conversation.customer?.tags !== mergedTagsStr) {
-        await prisma.customer.update({
-          where: { id: conversation.customerId },
-          data: { tags: mergedTagsStr }
-        }).catch(() => {});
-      }
 
       const formatted = {
         ...conversation,
@@ -369,11 +330,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-
-  // -- 3. GET AI EXECUTION LOGS ---------------------------------------------
+  // -- 3. GET AI EXECUTION LOGS (CLIENT SCOPED) -----------------------------
   if (action === "executions") {
     try {
       const executions = await prisma.whatsAppAILog.findMany({
+        where: session.clientId ? { clientId: session.clientId } : {},
         orderBy: { createdAt: "desc" },
         take: 150,
       });
@@ -413,16 +374,7 @@ export async function GET(req: NextRequest) {
 // --- POST --------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = require("next/headers").cookies;
-    const wmUser = (await cookieStore()).get("wm_user")?.value;
-    let userName = "Agent";
-    if (wmUser) {
-      try {
-        const parsed = JSON.parse(wmUser);
-        if (parsed.name) userName = parsed.name;
-      } catch (e) {}
-    }
-
+    const session = await resolveInboxSession();
     const body = await req.json();
     const { action: postAction, phone, ai_paused, text, media_url, template_name, template_params, type, chat_status, convId } = body;
 
@@ -443,13 +395,17 @@ export async function POST(req: NextRequest) {
     if (postAction === "toggle_ai") {
       let conversation: any = null;
       if (convId) {
-        conversation = await prisma.whatsAppConversation.findUnique({ where: { id: convId } });
+        conversation = await prisma.whatsAppConversation.findFirst({
+          where: { id: convId, ...(session.clientId ? { clientId: session.clientId } : {}) }
+        });
       } else {
         const customer = await prisma.customer.findFirst({
-          where: { OR: phoneFilter },
+          where: { ...(session.clientId ? { clientId: session.clientId } : {}), OR: phoneFilter },
         });
         if (customer) {
-          conversation = await prisma.whatsAppConversation.findFirst({ where: { customerId: customer.id } });
+          conversation = await prisma.whatsAppConversation.findFirst({
+            where: { customerId: customer.id, ...(session.clientId ? { clientId: session.clientId } : {}) }
+          });
         }
       }
       if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
@@ -465,13 +421,17 @@ export async function POST(req: NextRequest) {
     if (postAction === "set_status") {
       let conversation: any = null;
       if (convId) {
-        conversation = await prisma.whatsAppConversation.findUnique({ where: { id: convId } });
+        conversation = await prisma.whatsAppConversation.findFirst({
+          where: { id: convId, ...(session.clientId ? { clientId: session.clientId } : {}) }
+        });
       } else {
         const customer = await prisma.customer.findFirst({
-          where: { OR: phoneFilter },
+          where: { ...(session.clientId ? { clientId: session.clientId } : {}), OR: phoneFilter },
         });
         if (customer) {
-          conversation = await prisma.whatsAppConversation.findFirst({ where: { customerId: customer.id } });
+          conversation = await prisma.whatsAppConversation.findFirst({
+            where: { customerId: customer.id, ...(session.clientId ? { clientId: session.clientId } : {}) }
+          });
         }
       }
       if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
@@ -485,33 +445,33 @@ export async function POST(req: NextRequest) {
 
     // -- C. Send Message / Template -------------------------------------------
     if (postAction === "send_message" || postAction === "send_template") {
-      // Find or create conversation
-      const customer = await prisma.customer.findFirst({
-        where: { OR: phoneFilter },
+      let customer = await prisma.customer.findFirst({
+        where: { ...(session.clientId ? { clientId: session.clientId } : {}), OR: phoneFilter },
       });
 
       let conversation: any = null;
       if (customer) {
-        conversation = await prisma.whatsAppConversation.findFirst({ where: { customerId: customer.id } });
+        conversation = await prisma.whatsAppConversation.findFirst({
+          where: { customerId: customer.id, ...(session.clientId ? { clientId: session.clientId } : {}) }
+        });
       }
 
-      // Get WhatsApp account for token
-      const account = await getAccount();
-      const token = account?.accessToken || process.env.META_WHATSAPP_TOKEN;
-      const phoneId = account?.phoneId || process.env.META_PHONE_NUMBER_ID;
+      const creds = await getAccountCredentials(session.clientId || conversation?.clientId);
+      const token = creds.token;
+      const phoneId = creds.phoneId;
 
       if (!token || !phoneId) {
-        return NextResponse.json({ error: "WhatsApp API Token not configured. Please set in Settings." }, { status: 500 });
+        return NextResponse.json({ error: "WhatsApp API credentials not configured for this organization." }, { status: 500 });
       }
 
-      // Handle internal note (no Meta API call)
+      // Handle internal note
       if (type === "internal_note") {
         if (conversation) {
           await prisma.whatsAppMessage.create({
             data: {
               conversationId: conversation.id,
               senderType: "AGENT",
-              senderName: userName,
+              senderName: session.userName,
               messageType: "TEXT",
               content: text || "",
               status: "DELIVERED",
@@ -564,7 +524,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, error: errMsg }, { status: 500 });
       }
 
-      // Save message to DB
       const displayContent =
         type === "template" || postAction === "send_template"
           ? `[TEMPLATE SENT: ${template_name}]`
@@ -579,7 +538,7 @@ export async function POST(req: NextRequest) {
           data: {
             conversationId: conversation.id,
             senderType: "AGENT",
-            senderName: userName,
+            senderName: session.userName,
             messageType: type?.toUpperCase() || "TEXT",
             content: displayContent,
             mediaUrl: media_url || null,
@@ -608,15 +567,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// --- DELETE CONVERSATION ----------------------------------------------------
+// --- DELETE CONVERSATION (CLIENT SCOPED) ------------------------------------
 export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const convId = searchParams.get("convId");
   if (!convId) return NextResponse.json({ error: "convId required" }, { status: 400 });
   
   try {
-    await prisma.whatsAppConversation.delete({
-      where: { id: convId }
+    const session = await resolveInboxSession();
+    await prisma.whatsAppConversation.deleteMany({
+      where: {
+        id: convId,
+        ...(session.clientId ? { clientId: session.clientId } : {})
+      }
     });
     return NextResponse.json({ success: true, message: "Conversation deleted successfully" });
   } catch (err: any) {

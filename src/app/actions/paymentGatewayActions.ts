@@ -20,7 +20,7 @@ async function getSessionClient() {
           if (client) return client;
         }
         const clientByEmail = await prisma.whatsAppClient.findFirst({
-          where: { OR: [{ email: parsed.email }, { phone: parsed.phone || parsed.email }] }
+          where: { OR: [{ contactEmail: parsed.email }, { adminEmail: parsed.email }, { contactPhone: parsed.phone || parsed.email }] }
         });
         if (clientByEmail) return clientByEmail;
       }
@@ -39,7 +39,7 @@ export async function getPaymentGatewaySettings() {
       cashfreeAppId: client.cashfreeAppId || '',
       cashfreeSecretKey: client.cashfreeSecretKey || '',
       merchantUpiId: client.merchantUpiId || '',
-      merchantUpiName: client.merchantUpiName || client.businessName || client.companyName || '',
+      merchantUpiName: client.merchantUpiName || client.businessName || '',
     };
   }
 
@@ -106,46 +106,8 @@ export async function savePaymentGatewaySettings(data: {
         cashfreeSecretKey: data.cashfreeSecretKey,
         merchantUpiId: data.merchantUpiId,
         merchantUpiName: data.merchantUpiName,
-      }
+      },
     });
   }
   return { success: true };
-}
-
-/** Helper used by flow engine to get active gateway creds */
-export async function getActiveGateway(clientId?: string) {
-  let client = null;
-  if (clientId) {
-    client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
-  }
-  if (!client) {
-    client = await getSessionClient();
-  }
-  if (client) {
-    const activeGateway = client.activeGateway;
-    if (!activeGateway) return null;
-    return {
-      gateway: activeGateway,
-      razorpayKeyId: client.razorpayKeyId || '',
-      razorpayKeySecret: client.razorpayKeySecret || '',
-      cashfreeAppId: client.cashfreeAppId || '',
-      cashfreeSecretKey: client.cashfreeSecretKey || '',
-      merchantUpiId: client.merchantUpiId || '',
-      merchantUpiName: client.merchantUpiName || client.businessName || client.companyName || '',
-    };
-  }
-
-  const globalSettings = await prisma.whatsAppSettings.findFirst().catch(() => null);
-  const activeGateway = globalSettings?.activeGateway;
-  if (!activeGateway) return null;
-
-  return {
-    gateway: activeGateway,
-    razorpayKeyId: globalSettings?.razorpayKeyId || '',
-    razorpayKeySecret: globalSettings?.razorpayKeySecret || '',
-    cashfreeAppId: globalSettings?.cashfreeAppId || '',
-    cashfreeSecretKey: globalSettings?.cashfreeSecretKey || '',
-    merchantUpiId: globalSettings?.merchantUpiId || '',
-    merchantUpiName: globalSettings?.merchantUpiName || '',
-  };
 }

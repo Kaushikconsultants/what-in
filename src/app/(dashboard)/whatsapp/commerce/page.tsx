@@ -6,17 +6,17 @@ import Link from "next/link";
 import { getShopifyCredentialsAction, syncShopifyProductsAction, getProductsAction, createProductAction, toggleProductVisibilityAction } from "@/app/actions/whatsAppPlatformActions";
 
 // Mock Data
-const MOCK_PRODUCTS = [
-  { id: 1, name: "Premium Cotton T-Shirt", sku: "TS-PCT-01", price: 899, compareAt: 1299, cost: 450, inventory: 342, status: "Active" },
-  { id: 2, name: "Slim Fit Denim Jeans", sku: "DN-SFJ-04", price: 1999, compareAt: 2499, cost: 950, inventory: 128, status: "Active" },
-  { id: 3, name: "Casual Linen Button-Down", sku: "SH-CLB-12", price: 1499, compareAt: 1899, cost: 700, inventory: 45, status: "Low Stock" },
-  { id: 4, name: "Heavyweight Pullover Hoodie", sku: "HD-HPH-02", price: 2299, compareAt: 2999, cost: 1100, inventory: 0, status: "Out of Stock" },
-  { id: 5, name: "Athletic Performance Shorts", sku: "SH-APS-09", price: 799, compareAt: 1099, cost: 350, inventory: 512, status: "Active" },
+const MOCK_PRODUCTS: any[] = [
+  { id: 1, name: "Premium Cotton T-Shirt", sku: "TS-PCT-01", price: 899, compareAt: 1299, cost: 450, inventory: 342, status: "Active", description: "", collection: "All" },
+  { id: 2, name: "Slim Fit Denim Jeans", sku: "DN-SFJ-04", price: 1999, compareAt: 2499, cost: 950, inventory: 128, status: "Active", description: "", collection: "All" },
+  { id: 3, name: "Casual Linen Button-Down", sku: "SH-CLB-12", price: 1499, compareAt: 1899, cost: 700, inventory: 45, status: "Low Stock", description: "", collection: "All" },
+  { id: 4, name: "Heavyweight Pullover Hoodie", sku: "HD-HPH-02", price: 2299, compareAt: 2999, cost: 1100, inventory: 0, status: "Out of Stock", description: "", collection: "All" },
+  { id: 5, name: "Athletic Performance Shorts", sku: "SH-APS-09", price: 799, compareAt: 1099, cost: 350, inventory: 512, status: "Active", description: "", collection: "All" },
 ];
 
 export default function ProductsCommercePage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [products, setProducts] = useState(MOCK_PRODUCTS);
+  const [products, setProducts] = useState<any[]>(MOCK_PRODUCTS);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [selectedCollection, setSelectedCollection] = useState("all");
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);

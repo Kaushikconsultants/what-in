@@ -12,7 +12,7 @@ export async function GET() {
         ]
       },
       include: {
-        Employee: true
+        employee: true
       }
     });
 

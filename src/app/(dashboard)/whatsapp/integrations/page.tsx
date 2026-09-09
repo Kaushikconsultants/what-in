@@ -74,6 +74,7 @@ export default function IntegrationsHubPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [token, setToken] = useState("");
   const [webhookToken, setWebhookToken] = useState("whatin_whatsapp_secure_webhook_token_2026");
+  const [webhookEndpoint, setWebhookEndpoint] = useState("/api/whatsapp/webhook");
   const [showToken, setShowToken] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -170,6 +171,7 @@ export default function IntegrationsHubPage() {
         setPhoneNumber(resWA.credentials.phoneNumber || "");
         setToken(resWA.credentials.accessToken || "");
         setWebhookToken(resWA.credentials.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026");
+        if (resWA.credentials.webhookUrl) setWebhookEndpoint(resWA.credentials.webhookUrl);
         setIsConnected(resWA.isConnected || false);
       }
       if (resShopify.success && resShopify.credentials) {
@@ -684,7 +686,7 @@ const reloadTeams = async () => {
                   <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-2">Webhook Configuration</h4>
                   <p className="text-xs text-indigo-700 dark:text-indigo-400/80 mb-3">Set this callback URL in your Meta App Dashboard:</p>
                   <code className="block w-full p-3 bg-white dark:bg-slate-900 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-mono font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    {typeof window !== "undefined" ? `${window.location.origin}/api/whatsapp/webhook` : "https://your-domain.com/api/whatsapp/webhook"}
+                    {typeof window !== "undefined" ? `${window.location.origin}${webhookEndpoint}` : `https://what-in.tinkal.in${webhookEndpoint}`}
                   </code>
                   <p className="text-xs text-indigo-700 dark:text-indigo-400/80">Verify Token: <strong className="text-indigo-900 dark:text-indigo-300">{webhookToken}</strong></p>
                 </div>

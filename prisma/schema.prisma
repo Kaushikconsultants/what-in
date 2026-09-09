@@ -252,6 +252,8 @@ model Customer {
   id              String   @id @default(uuid())
   organizationId  String?
   organization    Organization? @relation(fields: [organizationId], references: [id])
+  clientId        String?
+  client          WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   businessName    String
   contactPerson   String
   mobile          String
@@ -1332,6 +1334,8 @@ model WhatsAppConversation {
   id                 String   @id @default(uuid())
   accountId          String
   account            WhatsAppAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  clientId           String?
+  client             WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   customerId         String
   customer           Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -1397,6 +1401,8 @@ model WhatsAppMessage {
 
 model WhatsAppTemplate {
   id               String   @id @default(uuid())
+  clientId         String?
+  client           WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name             String   // e.g., "order_confirmation_v2"
   category         String   @default("MARKETING") // MARKETING, UTILITY, AUTHENTICATION
   language         String   @default("en_US")
@@ -1417,6 +1423,8 @@ model WhatsAppTemplate {
 
 model WhatsAppReplyItem {
   id          String   @id @default(uuid())
+  clientId    String?
+  client      WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   title       String
   category    String   @default("Quick Reply") // Quick Reply, Pitch, Catalog, Payment, Support, Dispatch
   shortcut    String   // e.g. "/catalog", "/price", "/payment", "/followup"
@@ -1430,6 +1438,8 @@ model WhatsAppReplyItem {
 
 model WhatsAppAutomationRule {
   id           String   @id @default(uuid())
+  clientId     String?
+  client       WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name         String
   trigger      String   // NEW_MESSAGE, NEW_LEAD, KEYWORD_RECEIVED, PAYMENT_RECEIVED, ORDER_CREATED, NO_RESPONSE_24H
   conditions   String?  // JSON string (customerType, stage, tag, orderValue, location)
@@ -1442,6 +1452,8 @@ model WhatsAppAutomationRule {
 
 model WhatsAppChatbotFlow {
   id             String   @id @default(uuid())
+  clientId       String?
+  client         WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name           String
   triggerKeyword String?
   nodesJson      String   // Detailed node tree (Start, Message, Question, Buttons, Catalog, Payment, CRM action, Transfer)
@@ -1453,6 +1465,8 @@ model WhatsAppChatbotFlow {
 
 model WhatsAppForm {
   id             String   @id @default(uuid())
+  clientId       String?
+  client         WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   title          String
   description    String?
   fieldsJson     String   // Dynamic CRM field mapping (Name, Phone, Email, Company, Requirement, Quantity, Budget, GST)
@@ -1481,6 +1495,8 @@ model WhatsAppFormSubmission {
 
 model WhatsAppCampaign {
   id              String   @id @default(uuid())
+  clientId        String?
+  client          WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name            String
   templateId      String
   segmentId       String?
@@ -1545,6 +1561,8 @@ model WhatsAppCampaignQueue {
 
 model WhatsAppSegment {
   id           String   @id @default(uuid())
+  clientId     String?
+  client       WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name         String   // High Value, Inactive 90 Days, New Leads, Repeat Buyers, Wholesale
   criteriaJson String
   contactCount Int      @default(0)
@@ -1554,6 +1572,8 @@ model WhatsAppSegment {
 
 model WhatsAppPaymentLink {
   id             String   @id @default(uuid())
+  clientId       String?
+  client         WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   conversationId String
   conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -1637,12 +1657,16 @@ model BroadcastRead {
 // ---------------------------------------------------------
 model WhatsAppFlowState {
   id            String   @id @default(uuid())
-  phone         String   @unique
+  clientId      String?
+  client        WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  phone         String
   flowId        String
   currentNodeId String
   variables     String   @default("{}")  // JSON: captured user inputs
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@unique([clientId, phone])
 }
 
 // ---------------------------------------------------------
@@ -1650,6 +1674,8 @@ model WhatsAppFlowState {
 // ---------------------------------------------------------
 model WhatsAppAILog {
   id           String   @id @default(uuid())
+  clientId     String?
+  client       WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   phone        String
   userMessage  String
   aiReply      String?
@@ -1712,8 +1738,10 @@ model WhatsAppSettings {
 // ---------------------------------------------------------
 model WhatsAppCannedResponse {
   id         String   @id @default(uuid())
+  clientId   String?
+  client     WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   title      String
-  shortcut   String?  @unique
+  shortcut   String?
   content    String
   category   String?  @default("General")
   headerText String?
@@ -2010,6 +2038,22 @@ model WhatsAppClient {
 
   payments           WhatsAppClientPayment[]
   agents             WhatsAppAgentUser[]
+  conversations      WhatsAppConversation[]
+  customers          Customer[]
+  templates          WhatsAppTemplate[]
+  replyItems         WhatsAppReplyItem[]
+  automationRules    WhatsAppAutomationRule[]
+  chatbots           WhatsAppChatbotFlow[]
+  forms              WhatsAppForm[]
+  campaigns          WhatsAppCampaign[]
+  segments           WhatsAppSegment[]
+  paymentLinks       WhatsAppPaymentLink[]
+  cannedResponses    WhatsAppCannedResponse[]
+  metaFlows          WhatsAppMetaFlow[]
+  chatbotLogs        WhatsAppChatbotLog[]
+  integrations       WhatsAppIntegration[]
+  flowStates         WhatsAppFlowState[]
+  aiLogs             WhatsAppAILog[]
 }
 
 model WhatsAppClientPayment {
@@ -2051,6 +2095,8 @@ model WhatsAppAnnouncement {
 
 model WhatsAppMetaFlow {
   id          String   @id @default(uuid())
+  clientId    String?
+  client      WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name        String
   flowId      String
   description String?
@@ -2070,6 +2116,8 @@ model WhatsAppTag {
 
 model WhatsAppChatbotLog {
   id             String   @id @default(uuid())
+  clientId       String?
+  client         WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   phone          String
   conversationId String?
   nodeId         String
@@ -2083,6 +2131,8 @@ model WhatsAppChatbotLog {
 
 model WhatsAppIntegration {
   id        String   @id @default(uuid())
+  clientId  String?
+  client    WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name      String
   url       String
   token     String?

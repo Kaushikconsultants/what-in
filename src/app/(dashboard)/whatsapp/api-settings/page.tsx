@@ -291,48 +291,6 @@ export default function WhatsAppAPISettingsPage() {
     }
   };
 
-  const handleSaveSLASettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingSLA(true);
-    setSlaResultMsg(null);
-    const res = await saveWhatsAppSettingsAction({
-      workingHoursStart,
-      workingHoursEnd,
-      slaWarningMinutes: slaMinutes,
-      autoAssignStrategy
-    });
-    setSavingSLA(false);
-    if (res.success) {
-      setSlaResultMsg({ success: true, text: "✓ SLA and Work hours targets configured!" });
-    } else {
-      setSlaResultMsg({ success: false, text: "Error: " + res.error });
-    }
-  };
-
-  const handleCreateCRMContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingCRM(true);
-    setCrmResultMsg(null);
-    const res = await createCRMCustomerAction({
-      contactPerson: newContactName,
-      mobile: newContactPhone,
-      customerType: newContactType
-    });
-    setSavingCRM(false);
-    if (res.success) {
-      setCrmResultMsg({ success: true, text: `✓ Customer "${newContactName}" registered successfully!` });
-      setNewContactName("");
-      setNewContactPhone("");
-      // reload contacts
-      const resCRM = await getCRMCustomersAction();
-      if (resCRM.success && resCRM.customers) {
-        setCrmContacts(resCRM.customers);
-      }
-    } else {
-      setCrmResultMsg({ success: false, text: "Error: " + res.error });
-    }
-  };
-
   const handleSaveEditAgent = async (agentId: string) => {
     setSavingEdit(true);
     try {

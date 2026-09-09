@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
       try {
         const ffmpeg = require("ffmpeg-static");
-        await new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
           exec(`"${ffmpeg}" -i "${inputPath}" -codec:a libmp3lame -qscale:a 2 "${outputPath}"`, (error, stdout, stderr) => {
             if (error) {
               console.error("[FFmpeg Transcode Error]:", error, stderr);

@@ -115,6 +115,7 @@ export async function createClientAction(data: {
     const initialStatus = data.initialStatus || "ACTIVE";
     const now = new Date();
     const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const generatedVerifyToken = data.webhookVerifyToken?.trim() || `whsec_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
 
     const client = await prisma.whatsAppClient.create({
       data: {
@@ -133,7 +134,7 @@ export async function createClientAction(data: {
         wabaId: data.wabaId || "",
         phoneId: data.phoneId || "",
         metaAccessToken: data.metaAccessToken || "",
-        webhookVerifyToken: data.webhookVerifyToken || "",
+        webhookVerifyToken: generatedVerifyToken,
         phoneNumber: data.phoneNumber || "",
         shopifyDomain: data.shopifyDomain || "",
         shopifyToken: data.shopifyToken || "",
@@ -163,6 +164,45 @@ export async function createClientAction(data: {
       }
     });
 
+    // Seed default starter Chatbot Flow for this client
+    await prisma.whatsAppChatbotFlow.create({
+      data: {
+        clientId: client.id,
+        name: "Welcome & FAQ Flow",
+        triggerKeyword: "HI, HELLO, START, MENU",
+        nodesJson: JSON.stringify([
+          { id: "node_1", type: "TRIGGER", title: "Trigger Keyword", text: "HI, HELLO, START, MENU", outputPort: "node_2" },
+          { id: "node_2", type: "TEXT", title: "Welcome Greeting", text: `Welcome to ${data.businessName}! 👋 How can we help you today?`, outputPort: "node_3" },
+          {
+            id: "node_3",
+            type: "CHOICE",
+            title: "Main Options",
+            text: "Please select an option below:",
+            choices: [
+              { id: "c1", text: "Explore Products", targetNode: "node_4" },
+              { id: "c2", text: "Track My Order", targetNode: "node_5" },
+              { id: "c3", text: "Talk to Agent", targetNode: "node_6" }
+            ]
+          },
+          { id: "node_4", type: "TEXT", title: "Catalog", text: "Check out our latest collections and offers!", outputPort: null },
+          { id: "node_5", type: "TEXT", title: "Order Help", text: "Please share your order number so we can look it up.", outputPort: null },
+          { id: "node_6", type: "TEXT", title: "Agent Connecting", text: "Connecting you with an agent right away. Please hold on.", outputPort: null }
+        ]),
+        isActive: true,
+        executionCount: 0
+      }
+    }).catch(() => {});
+
+    // Seed default starter Canned Responses for this client
+    await prisma.whatsAppCannedResponse.createMany({
+      data: [
+        { clientId: client.id, title: "Return Policy", shortcut: "/return", content: "Our return policy is 7 days from the date of delivery. Items must be unwashed and unworn. Can I help you initiate a return?" },
+        { clientId: client.id, title: "Shipping Time", shortcut: "/shipping", content: "Standard shipping takes 3-5 business days. You will receive a tracking link as soon as your order is dispatched." },
+        { clientId: client.id, title: "Greeting", shortcut: "/hi", content: `Hi there! Welcome to ${data.businessName} 👋 How can I help you today?` },
+        { clientId: client.id, title: "Discount Code", shortcut: "/discount", content: "Use code WELCOME10 at checkout for 10% off your purchase!" },
+      ]
+    }).catch(() => {});
+
     // If initial status is ACTIVE, record an initial payment entry
     if (initialStatus === "ACTIVE" && Number(data.monthlyFee) > 0) {
       await prisma.whatsAppClientPayment.create({
@@ -181,7 +221,7 @@ export async function createClientAction(data: {
     let webhookRegistration: { success: boolean; error?: string } = { success: false };
     if (data.wabaId && data.metaAccessToken) {
       webhookRegistration = await registerMetaWebhook(data.wabaId, data.metaAccessToken, client.webhookClientId);
-      const verifyToken = `wm_${client.webhookClientId.slice(0, 8)}`;
+      const verifyToken = generatedVerifyToken || `wm_${client.webhookClientId.slice(0, 8)}`;
       await prisma.whatsAppClient.update({
         where: { id: client.id },
         data: { webhookVerifyToken: verifyToken }

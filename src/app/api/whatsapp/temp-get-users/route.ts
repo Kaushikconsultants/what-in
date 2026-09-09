@@ -8,14 +8,14 @@ export async function GET() {
     const users = await prisma.user.findMany({
       select: {
         id: true,
+        name: true,
         email: true,
         role: true,
         password: true, // hashed password to see if it matches seeded ones
-        employeeId: true,
         employee: {
           select: {
-            name: true,
-            role: true
+            id: true,
+            designation: true
           }
         }
       }

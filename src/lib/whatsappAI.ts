@@ -445,7 +445,7 @@ export async function sendWhatsAppProductCards(toPhone: string, cards: any[]) {
   }
 }
 
-export async function handleIncomingAILogic(senderPhone: string, userText: string, historyLines: string[], conversationId?: string) {
+export async function handleIncomingAILogic(senderPhone: string, userText: string, historyLines: string[], conversationId?: string, clientIdOverride?: string | null) {
   let brandName = "Espon Clothing";
   let brandDomain = "www.espon.in";
   let brandPhone = "+91 7206066678";
@@ -459,12 +459,21 @@ export async function handleIncomingAILogic(senderPhone: string, userText: strin
   let activeCombos: any[] = [];
 
   try {
-    if (conversationId && conversationId !== "internal-ai-hook") {
+    if (clientIdOverride) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: { OR: [{ id: clientIdOverride }, { webhookClientId: clientIdOverride }] }
+      }).catch(() => null);
+    }
+
+    if (!client && conversationId && conversationId !== "internal-ai-hook") {
       const conv = await prisma.whatsAppConversation.findUnique({
         where: { id: conversationId },
         include: { account: true }
       });
-      if (conv?.account?.phoneId || conv?.account?.businessAccountId) {
+      if (conv?.clientId) {
+        client = await prisma.whatsAppClient.findUnique({ where: { id: conv.clientId } }).catch(() => null);
+      }
+      if (!client && (conv?.account?.phoneId || conv?.account?.businessAccountId)) {
         client = await prisma.whatsAppClient.findFirst({
           where: {
             OR: [
@@ -475,7 +484,7 @@ export async function handleIncomingAILogic(senderPhone: string, userText: strin
           }
         });
       }
-    } else {
+    } else if (!client) {
       const cleanPhone = senderPhone.replace(/\D/g, '').slice(-10);
       const conv = await prisma.whatsAppConversation.findFirst({
         where: {
@@ -488,7 +497,10 @@ export async function handleIncomingAILogic(senderPhone: string, userText: strin
         },
         include: { account: true }
       });
-      if (conv?.account?.phoneId || conv?.account?.businessAccountId) {
+      if (conv?.clientId) {
+        client = await prisma.whatsAppClient.findUnique({ where: { id: conv.clientId } }).catch(() => null);
+      }
+      if (!client && (conv?.account?.phoneId || conv?.account?.businessAccountId)) {
         client = await prisma.whatsAppClient.findFirst({
           where: {
             OR: [
@@ -512,8 +524,8 @@ export async function handleIncomingAILogic(senderPhone: string, userText: strin
     legacySetting = legacy;
     activeCombos = combos;
 
-    if (client?.businessName || client?.companyName) {
-      brandName = client.businessName || client.companyName;
+    if (client?.businessName) {
+      brandName = client.businessName;
     } else if (company?.companyName) brandName = company.companyName;
     else if (acc?.name) brandName = acc.name;
 
@@ -525,11 +537,11 @@ export async function handleIncomingAILogic(senderPhone: string, userText: strin
       brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     }
 
-    if (client?.phone) brandPhone = client.phone;
+    if (client?.phoneNumber || client?.contactPhone) brandPhone = client.phoneNumber || client.contactPhone;
     else if (company?.mobile) brandPhone = company.mobile;
     else if (acc?.phoneNumber) brandPhone = acc.phoneNumber;
 
-    if (client?.email) brandEmail = client.email;
+    if (client?.contactEmail || client?.adminEmail) brandEmail = client.contactEmail || client.adminEmail;
     else if (company?.email) brandEmail = company.email;
     
     if (company?.address) brandAddress = `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim();

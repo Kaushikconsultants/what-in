@@ -3,12 +3,15 @@
 import { prisma } from "@/lib/prisma";
 import { seedWhatsAppPlatformData } from "@/lib/seedWhatsApp";
 import { revalidatePath } from "next/cache";
-import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey } from "@/lib/phoneUtils";
+import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey, resolveWhatsAppDispatchPhone } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 
 export async function getWhatsAppChatbotLogsAction(phone: string) {
   try {
-    const whereClause = phone ? { phone } : {};
+    const client = await getActiveSessionClient();
+    const whereClause: any = {};
+    if (phone) whereClause.phone = phone;
+    if (client) whereClause.clientId = client.id;
     const logs = await prisma.whatsAppChatbotLog.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
@@ -48,6 +51,10 @@ export async function getActiveSessionClient() {
           const client = await prisma.whatsAppClient.findUnique({ where: { id: agent.clientId } }).catch(() => null);
           if (client) return client;
         }
+        const clientByEmail = await prisma.whatsAppClient.findFirst({
+          where: { OR: [{ contactEmail: parsed.email }, { adminEmail: parsed.email }] }
+        }).catch(() => null);
+        if (clientByEmail) return clientByEmail;
       }
     }
   } catch {}
@@ -144,7 +151,11 @@ export async function getWhatsAppConversations(filters: ConversationFilterOption
     } else if (userEmail) {
       currentEmployee = await prisma.employee.findFirst({ where: { user: { email: userEmail } } });
     }
-  const where: any = {};
+    const activeClient = await getActiveSessionClient();
+    const where: any = {};
+    if (activeClient) {
+      where.clientId = activeClient.id;
+    }
 
     if (filters.search && filters.search.trim()) {
       const q = filters.search.trim();
@@ -208,16 +219,14 @@ export async function getWhatsAppConversations(filters: ConversationFilterOption
             businessName: true,
             contactPerson: true,
             mobile: true,
-            email: true,
-            city: true,
-            state: true,
+            whatsappNumber: true,
+            billingAddress: true,
+            shippingAddress: true,
             customerType: true,
             status: true,
             leadStage: true,
             temperature: true,
-            tags: true,
-            totalOrders: true,
-            totalPurchaseValue: true
+            tags: true
           }
         },
         assignedEmployee: {
@@ -259,6 +268,7 @@ export async function getWhatsAppConversations(filters: ConversationFilterOption
 export async function getWhatsAppConversationById(id: string) {
   await ensureSeeded();
   try {
+    const activeClient = await getActiveSessionClient();
     console.log(`[getWhatsAppConversationById] Fetching conv ${id}`);
     const conversation = await prisma.whatsAppConversation.findUnique({
       where: { id },
@@ -282,6 +292,10 @@ export async function getWhatsAppConversationById(id: string) {
     if (!conversation) {
       console.log(`[getWhatsAppConversationById] Conversation ${id} not found in DB`);
       return { success: false, error: "Conversation not found" };
+    }
+
+    if (activeClient && conversation.clientId && conversation.clientId !== activeClient.id) {
+      return { success: false, error: "Unauthorized: Access denied to conversation of another organization" };
     }
 
     console.log(`[getWhatsAppConversationById] Found conv ${id}, fetching session`);
@@ -415,11 +429,20 @@ export async function sendWhatsAppMessageAction(data: {
 
     let metaMessageId = null;
     let messageStatus = 'SENT';
+    let metaErrorDetails: any = null;
 
     // Call Meta API if it's an outbound message and not an internal note
     if (!data.isInternalNote && data.senderType !== 'CUSTOMER') {
-      const token = conversation.account?.accessToken;
-      const phoneId = conversation.account?.phoneId;
+      let token = conversation.account?.accessToken;
+      let phoneId = conversation.account?.phoneId;
+
+      if (conversation.clientId) {
+        const client = await prisma.whatsAppClient.findUnique({ where: { id: conversation.clientId } }).catch(() => null);
+        if (client?.metaAccessToken && client?.phoneId) {
+          token = client.metaAccessToken;
+          phoneId = client.phoneId;
+        }
+      }
 
       if (token && phoneId && token.length > 20) {
         const url = `https://graph.facebook.com/v20.0/${phoneId}/messages`;
@@ -505,7 +528,7 @@ export async function sendWhatsAppMessageAction(data: {
         }
 
 
-        let metaErrorDetails: any = null;
+        metaErrorDetails = null;
         try {
            const response = await fetch(url, {
              method: 'POST',
@@ -886,7 +909,7 @@ export async function generateWhatsAppPaymentLinkAction(data: {
     const cashfreeAppId = client?.cashfreeAppId || creds?.cashfreeAppId;
     const cashfreeSecretKey = client?.cashfreeSecretKey || creds?.cashfreeSecretKey;
     const merchantUpiId = client?.merchantUpiId || creds?.merchantUpiId;
-    const merchantUpiName = client?.merchantUpiName || creds?.merchantUpiName || client?.businessName || client?.companyName || 'What-In';
+    const merchantUpiName = client?.merchantUpiName || creds?.merchantUpiName || client?.businessName || 'What-In';
 
     const domain = process.env.NEXTAUTH_URL || 'https://what-in.tinkal.in';
     let paymentUrl = `${domain}/pay`;
@@ -1033,7 +1056,7 @@ export async function getWhatsAppDashboardMetrics() {
       prisma.whatsAppTemplate.count({ where: { status: 'APPROVED' } }).catch(() => 0),
       prisma.whatsAppCampaign.count({ where: { status: 'COMPLETED' } }).catch(() => 0),
       prisma.product.count({ where: { status: 'Active' } }).catch(() => 0),
-      prisma.order.aggregate({ _sum: { totalAmount: true } }).catch(() => ({ _sum: { totalAmount: 0 } }))
+      prisma.order.aggregate({ _sum: { totalValue: true } }).catch(() => ({ _sum: { totalValue: 0 } }))
     ]);
 
     const isConnected = isWhatsAppApiConfigured(account, client);
@@ -1041,7 +1064,7 @@ export async function getWhatsAppDashboardMetrics() {
       ? (account?.status || "CONNECTED")
       : "NOT CONNECTED (Setup Required)";
 
-    const totalRevenue = revenueResult?._sum?.totalAmount || 0;
+    const totalRevenue = revenueResult?._sum?.totalValue || 0;
 
     return {
       success: true,
@@ -1205,6 +1228,8 @@ export async function getWhatsAppApiCredentialsAction() {
     const phoneNumber = client?.phoneNumber || account?.phoneNumber || "";
     const accessToken = client?.metaAccessToken || account?.accessToken || "";
     const webhookVerifyToken = client?.webhookVerifyToken || account?.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026";
+    const webhookClientId = client?.webhookClientId || "";
+    const webhookUrl = client?.customWebhookUrl || (client?.webhookClientId ? `/api/whatsapp/webhook/${client.webhookClientId}` : "/api/whatsapp/webhook");
     const status = isConnected ? (account?.status || "CONNECTED") : "NOT CONNECTED (Setup Required)";
 
     return {
@@ -1219,6 +1244,8 @@ export async function getWhatsAppApiCredentialsAction() {
         businessManagerId: managerId,
         accessToken,
         webhookVerifyToken,
+        webhookClientId,
+        webhookUrl,
         status
       }
     };
@@ -1775,7 +1802,7 @@ export async function getMetaUploadHandle(accessToken: string, appIdOrWabaId: st
         'file_offset': '0',
         'Content-Type': mimeType
       },
-      body: imageBuffer
+      body: new Uint8Array(imageBuffer)
     });
     const binaryJson = await binaryRes.json();
     if (binaryJson.h) {
@@ -3071,7 +3098,11 @@ export async function saveWhatsAppReplyItemAction(data: any) {
 export async function getWhatsAppAutomationRules() {
   try {
     await ensureSeeded();
-    const rules = await prisma.whatsAppAutomationRule.findMany({ orderBy: { createdAt: 'desc' } });
+    const activeClient = await getActiveSessionClient();
+    const rules = await prisma.whatsAppAutomationRule.findMany({
+      where: activeClient ? { clientId: activeClient.id } : {},
+      orderBy: { createdAt: 'desc' }
+    });
     return { success: true, rules };
   } catch (e: any) {
     return { success: false, error: e.message, rules: [] };
@@ -3081,7 +3112,11 @@ export async function getWhatsAppAutomationRules() {
 export async function getWhatsAppChatbotFlows() {
   try {
     await ensureSeeded();
-    const flows = await prisma.whatsAppChatbotFlow.findMany({ orderBy: { updatedAt: 'desc' } });
+    const activeClient = await getActiveSessionClient();
+    const flows = await prisma.whatsAppChatbotFlow.findMany({
+      where: activeClient ? { clientId: activeClient.id } : {},
+      orderBy: { updatedAt: 'desc' }
+    });
     return { success: true, flows };
   } catch (e: any) {
     return { success: false, error: e.message, flows: [] };
@@ -3096,6 +3131,7 @@ export async function saveWhatsAppChatbotFlowAction(data: {
   isActive?: boolean;
 }) {
   try {
+    const activeClient = await getActiveSessionClient();
     let flow;
     if (data.id) {
       flow = await prisma.whatsAppChatbotFlow.update({
@@ -3111,6 +3147,7 @@ export async function saveWhatsAppChatbotFlowAction(data: {
     } else {
       flow = await prisma.whatsAppChatbotFlow.create({
         data: {
+          clientId: activeClient?.id || null,
           name: data.name,
           triggerKeyword: data.triggerKeyword || "HI, HELLO, CATALOG",
           nodesJson: data.nodesJson,
@@ -3158,6 +3195,7 @@ export async function renameWhatsAppChatbotFlowAction(id: string, name: string) 
 
 export async function duplicateWhatsAppChatbotFlowAction(id: string) {
   try {
+    const activeClient = await getActiveSessionClient();
     const existing = await prisma.whatsAppChatbotFlow.findUnique({
       where: { id }
     });
@@ -3168,6 +3206,7 @@ export async function duplicateWhatsAppChatbotFlowAction(id: string) {
 
     const cloned = await prisma.whatsAppChatbotFlow.create({
       data: {
+        clientId: activeClient?.id || existing.clientId || null,
         name: `${existing.name} (Copy)`,
         triggerKeyword: existing.triggerKeyword,
         nodesJson: existing.nodesJson,
@@ -3199,7 +3238,11 @@ export async function toggleWhatsAppChatbotFlowStatusAction(id: string, isActive
 export async function getWhatsAppForms() {
   try {
     await ensureSeeded();
-    const forms = await prisma.whatsAppForm.findMany({ orderBy: { createdAt: 'desc' } });
+    const activeClient = await getActiveSessionClient();
+    const forms = await prisma.whatsAppForm.findMany({
+      where: activeClient ? { clientId: activeClient.id } : {},
+      orderBy: { createdAt: 'desc' }
+    });
     return { success: true, forms };
   } catch (e: any) {
     return { success: false, error: e.message, forms: [] };
@@ -3208,7 +3251,9 @@ export async function getWhatsAppForms() {
 
 export async function getWhatsAppCampaigns() {
   try {
+    const activeClient = await getActiveSessionClient();
     const campaigns = await prisma.whatsAppCampaign.findMany({
+      where: activeClient ? { clientId: activeClient.id } : {},
       orderBy: { createdAt: 'desc' },
       include: {
         queues: {
@@ -3257,7 +3302,10 @@ export async function getWhatsAppCampaigns() {
       };
     });
 
-    const segments = await prisma.whatsAppSegment.findMany({ orderBy: { createdAt: 'desc' } });
+    const segments = await prisma.whatsAppSegment.findMany({
+      where: activeClient ? { clientId: activeClient.id } : {},
+      orderBy: { createdAt: 'desc' }
+    });
     return { success: true, campaigns: enrichedCampaigns, segments };
   } catch (e: any) {
     return { success: false, error: e.message, campaigns: [], segments: [] };
@@ -3271,8 +3319,10 @@ export async function createWhatsAppBroadcastCampaign(data: {
   totalAudience: number;
 }) {
   try {
+    const activeClient = await getActiveSessionClient();
     const campaign = await prisma.whatsAppCampaign.create({
       data: {
+        clientId: activeClient?.id || null,
         name: data.name,
         templateId: data.templateId,
         segmentId: data.segmentId,
@@ -3691,7 +3741,7 @@ export async function launchWhatsAppBroadcastAction(data: {
 
       const customers = await prisma.customer.findMany({
         where: whereClause,
-        select: { id: true, mobile: true, whatsappNumber: true, contactPerson: true, businessName: true, city: true },
+        select: { id: true, mobile: true, whatsappNumber: true, contactPerson: true, businessName: true, shippingAddress: true },
         take: 5000
       });
 
@@ -3701,7 +3751,7 @@ export async function launchWhatsAppBroadcastAction(data: {
         return {
           toPhone: formatted,
           customerName: c.contactPerson || c.businessName || 'Customer',
-          customerCity: c.city || 'India'
+          customerCity: c.shippingAddress || 'India'
         };
       }).filter(q => q.toPhone && q.toPhone.length >= 10);
     }
@@ -3790,7 +3840,7 @@ export async function getWhatsAppAudienceSegments() {
           contactPerson: true,
           mobile: true,
           whatsappNumber: true,
-          city: true,
+          shippingAddress: true,
           tags: true,
           status: true,
           customerType: true
@@ -3911,12 +3961,12 @@ export async function getBroadcastCampaignAnalyticsAction(campaignId: string) {
               customerId: { in: customerIds },
               createdAt: { gte: campaign.createdAt }
             },
-            select: { id: true, customerId: true, totalAmount: true, createdAt: true }
+            select: { id: true, customerId: true, totalValue: true, createdAt: true }
           });
 
           if (attributedOrders.length > 0) {
             totalOrders = Math.max(totalOrders, attributedOrders.length);
-            const sumRevenue = attributedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+            const sumRevenue = attributedOrders.reduce((sum, o) => sum + (o.totalValue || 0), 0);
             totalRevenue = Math.max(totalRevenue, sumRevenue);
           }
         }
@@ -4122,7 +4172,7 @@ export async function exportWhatsAppConversationsCSV() {
       `"${(c.customer?.businessName || c.customer?.contactPerson || "").replace(/"/g, '""')}"`,
       `"${c.customer?.mobile || ""}"`,
       `"${c.leadStatus || ""}"`,
-      `"${c.priority || ""}"`,
+      `"${(c as any).priority || c.slaStatus || ""}"`,
       `"${c.assignedEmployee?.user?.name || ""}"`,
       `"${(c.lastMessageText || "").replace(/"/g, '""')}"`,
       `"${c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : ""}"`
@@ -4298,7 +4348,9 @@ export async function uploadMediaToMetaAction(formData: FormData) {
 // ---------------------------------------------------------
 export async function getWhatsAppCannedResponsesAction() {
   try {
+    const activeClient = await getActiveSessionClient();
     let responses = await prisma.whatsAppCannedResponse.findMany({
+      where: activeClient ? { clientId: activeClient.id } : {},
       orderBy: { title: 'asc' }
     });
 
@@ -4306,13 +4358,14 @@ export async function getWhatsAppCannedResponsesAction() {
     if (responses.length === 0) {
       await prisma.whatsAppCannedResponse.createMany({
         data: [
-          { title: "Return Policy", shortcut: "/return", content: "Our return policy is 7 days from the date of delivery. Items must be unwashed and unworn. Can I help you initiate a return?" },
-          { title: "Shipping Time", shortcut: "/shipping", content: "Standard shipping takes 3-5 business days. You will receive a tracking link as soon as your order is dispatched." },
-          { title: "Greeting", shortcut: "/hi", content: "Hi there! 👋 How can I help you today?" },
-          { title: "Discount Code", shortcut: "/discount", content: "Use code ESPON10 at checkout for 10% off your next purchase!" },
+          { clientId: activeClient?.id || null, title: "Return Policy", shortcut: "/return", content: "Our return policy is 7 days from the date of delivery. Items must be unwashed and unworn. Can I help you initiate a return?" },
+          { clientId: activeClient?.id || null, title: "Shipping Time", shortcut: "/shipping", content: "Standard shipping takes 3-5 business days. You will receive a tracking link as soon as your order is dispatched." },
+          { clientId: activeClient?.id || null, title: "Greeting", shortcut: "/hi", content: "Hi there! 👋 How can I help you today?" },
+          { clientId: activeClient?.id || null, title: "Discount Code", shortcut: "/discount", content: "Use code ESPON10 at checkout for 10% off your next purchase!" },
         ]
       });
       responses = await prisma.whatsAppCannedResponse.findMany({
+        where: activeClient ? { clientId: activeClient.id } : {},
         orderBy: { title: 'asc' }
       });
     }
@@ -4327,7 +4380,9 @@ export async function getWhatsAppCannedResponsesAction() {
 // ---------------------------------------------------------
 export async function getWhatsAppAILogsAction(search = '', statusFilter = 'ALL') {
   try {
+    const activeClient = await getActiveSessionClient();
     const where: any = {};
+    if (activeClient) where.clientId = activeClient.id;
     if (statusFilter !== 'ALL') where.status = statusFilter;
     if (search) {
       where.OR = [
@@ -4631,8 +4686,10 @@ export async function createWhatsAppCannedResponseAction(data: {
   buttons?: any;
 }) {
   try {
+    const activeClient = await getActiveSessionClient();
     const res = await prisma.whatsAppCannedResponse.create({
       data: {
+        clientId: activeClient?.id || null,
         title: data.title,
         shortcut: data.shortcut.startsWith('/') ? data.shortcut : `/${data.shortcut}`,
         content: data.content,
@@ -4640,7 +4697,7 @@ export async function createWhatsAppCannedResponseAction(data: {
         footerText: data.footerText || null,
         mediaUrl: data.mediaUrl || null,
         mediaType: data.mediaType || null,
-        buttons: data.buttons ? JSON.stringify(data.buttons) : null,
+        buttons: (data.buttons ? JSON.parse(JSON.stringify(data.buttons)) : undefined) as any,
       }
     });
     return { success: true, response: res };
@@ -4670,7 +4727,7 @@ export async function updateWhatsAppCannedResponseAction(id: string, data: {
         footerText: data.footerText || null,
         mediaUrl: data.mediaUrl || null,
         mediaType: data.mediaType || null,
-        buttons: data.buttons ? JSON.stringify(data.buttons) : null,
+        buttons: (data.buttons ? JSON.parse(JSON.stringify(data.buttons)) : undefined) as any,
       }
     });
     return { success: true, response: res };
@@ -5556,7 +5613,7 @@ export async function processCampaignQueueAction(campaignId: string) {
 
         // Media Header parameter support (Image/Video/Document)
         if (activeTemplate?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(activeTemplate.headerType.toUpperCase())) {
-          const mediaUrl = activeTemplate.headerMediaUrl || activeTemplate.headerContent;
+          const mediaUrl = (activeTemplate as any).headerMediaUrl || activeTemplate.headerContent;
           if (mediaUrl && mediaUrl.startsWith('http')) {
             const hType = activeTemplate.headerType.toLowerCase();
             components.push({
@@ -5683,17 +5740,19 @@ export async function processCampaignQueueAction(campaignId: string) {
             if (!customer) {
               customer = await prisma.customer.create({
                 data: {
+                  clientId: campaign.clientId || undefined,
                   businessName: item.customerName || "Customer",
                   contactPerson: item.customerName || "Customer",
                   mobile: phone,
                   whatsappNumber: phone,
-                  city: item.customerCity || "India"
+                  shippingAddress: item.customerCity || "India"
                 }
               });
             }
 
             conv = await prisma.whatsAppConversation.create({
               data: {
+                clientId: campaign.clientId || undefined,
                 accountId: account.id,
                 customerId: customer.id,
                 status: "OPEN",
@@ -5712,7 +5771,7 @@ export async function processCampaignQueueAction(campaignId: string) {
                 messageType: 'TEMPLATE',
                 content: displayContent,
                 status: 'SENT',
-                whatsappMessageId: metaMsgId || undefined,
+                metaMessageId: metaMsgId || undefined,
                 sentAt: new Date()
               }
             });
@@ -5947,7 +6006,7 @@ function compileMetaFlowJson(name: string, screenName: string, ctaText: string, 
     fields = JSON.parse(fieldsJsonStr || '[]');
   } catch (_) {}
 
-  const children = fields.map((f: any, idx: number) => {
+  const children: any[] = fields.map((f, idx: number) => {
     const fieldId = `field_${idx}`;
     if (f.type === 'select') {
       return {
@@ -6493,7 +6552,7 @@ export async function toggleContactCrmStatusAction(customerId: string, markDone:
             whatsappNumber: customer.whatsappNumber || customer.mobile,
             tags: customer.tags || '',
             createdAt: customer.createdAt,
-            city: customer.city || '',
+            city: (customer as any).city || customer.shippingAddress || '',
             source: 'WhatsApp Contacts Hub'
           };
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -7628,10 +7687,10 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
       categories: categories.map(c => c.name),
       combos: combos.map(c => ({
         id: c.id,
-        name: c.combo_name,
+        name: c.product_title || `Combo of ${c.combo_count}`,
         price: c.combo_price,
         discountCode: c.discount_code,
-        productsCount: (c.products as any)?.length || 2
+        productsCount: c.combo_count || 2
       })),
       brandDomain,
       stats: {
