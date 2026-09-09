@@ -20,11 +20,11 @@ import { useRouter } from "next/navigation";
 
 const PLANS = ["TRIAL", "STARTER", "GROWTH", "ENTERPRISE", "CUSTOM"];
 
-const STATUS_COLORS: Record<string, { bg: string; border: string; color: string; label: string }> = {
-  ACTIVE:   { bg: "#f0fdf4", border: "#bbf7d0", color: "#166534", label: "Active" },
-  TRIAL:    { bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af", label: "Trial" },
-  PAST_DUE: { bg: "#fffbeb", border: "#fde68a", color: "#92400e", label: "Past Due" },
-  BLOCKED:  { bg: "#fef2f2", border: "#fecaca", color: "#991b1b", label: "Blocked" },
+const STATUS_CONFIG: Record<string, { bg: string; border: string; color: string; dot: string; label: string }> = {
+  ACTIVE:   { bg: "#f0fdf4", border: "#bbf7d0", color: "#166534", dot: "#22c55e", label: "Active" },
+  TRIAL:    { bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af", dot: "#3b82f6", label: "Trial" },
+  PAST_DUE: { bg: "#fffbeb", border: "#fde68a", color: "#92400e", dot: "#f59e0b", label: "Past Due" },
+  BLOCKED:  { bg: "#fef2f2", border: "#fecaca", color: "#991b1b", dot: "#ef4444", label: "Blocked" },
 };
 
 const PAYMENT_METHODS = [
@@ -40,7 +40,11 @@ export default function OwnerClientsPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const router = useRouter();
+
+  // Active dropdown menu for row actions
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
 
   // Modals state
   const [showAdd, setShowAdd] = useState(false);
@@ -115,6 +119,10 @@ export default function OwnerClientsPage() {
         else { sessionStorage.setItem("owner_authed", "1"); load(); }
       }).catch(() => router.push("/owner/login"));
     }
+
+    const handleClickOutside = () => setOpenActionMenuId(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
   }, []);
 
   const load = async () => {
@@ -357,80 +365,171 @@ export default function OwnerClientsPage() {
     if (diffDays > 7) {
       return { text: dateFormatted, sub: `Due in ${diffDays} days`, color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" };
     } else if (diffDays > 0) {
-      return { text: dateFormatted, sub: `Due in ${diffDays} day${diffDays > 1 ? "s" : ""}`, color: "#b45309", bg: "#fffbeb", border: "#fde68a" };
+      return { text: dateFormatted, sub: `Due in ${diffDays}d`, color: "#b45309", bg: "#fffbeb", border: "#fde68a" };
     } else if (diffDays === 0) {
       return { text: dateFormatted, sub: `Due Today`, color: "#c2410c", bg: "#fff7ed", border: "#fed7aa" };
     } else {
-      return { text: dateFormatted, sub: `Overdue by ${Math.abs(diffDays)} days`, color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" };
+      return { text: dateFormatted, sub: `Overdue ${Math.abs(diffDays)}d`, color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" };
     }
   };
 
-  const filtered = clients.filter(c =>
-    c.businessName?.toLowerCase().includes(search.toLowerCase()) ||
-    c.contactEmail?.toLowerCase().includes(search.toLowerCase()) ||
-    c.contactPhone?.includes(search)
-  );
+  // Filter logic
+  const filtered = clients.filter(c => {
+    const matchesSearch =
+      c.businessName?.toLowerCase().includes(search.toLowerCase()) ||
+      c.contactEmail?.toLowerCase().includes(search.toLowerCase()) ||
+      c.contactPhone?.includes(search);
+
+    if (!matchesSearch) return false;
+    if (statusFilter === "ALL") return true;
+    return c.subscriptionStatus === statusFilter;
+  });
 
   const webhookBase = "https://what-in.tinkal.in";
 
+  // Summary counts
+  const totalCount = clients.length;
+  const activeCount = clients.filter(c => c.subscriptionStatus === "ACTIVE").length;
+  const pastDueCount = clients.filter(c => c.subscriptionStatus === "PAST_DUE").length;
+  const trialCount = clients.filter(c => c.subscriptionStatus === "TRIAL").length;
+  const blockedCount = clients.filter(c => c.subscriptionStatus === "BLOCKED").length;
+
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Header */}
-      <header style={{ background: "#ffffff", borderBottom: "1px solid #e2e8f0", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(79,70,229,0.25)" }}>👑</div>
+      {/* Top Sticky Header */}
+      <header style={{ background: "#ffffff", borderBottom: "1px solid #e2e8f0", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(79,70,229,0.25)" }}>👑</div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Owner Console</h1>
-            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>What-In SaaS Management</p>
+            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>Owner Console</h1>
+            <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>What-In SaaS Management</p>
           </div>
         </div>
-        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
           {[
             { label: "Dashboard", href: "/owner", icon: "📊" },
             { label: "Clients", href: "/owner/clients", icon: "🏢" },
             { label: "Announcements", href: "/owner/announcements", icon: "📢" },
             { label: "Plans", href: "/owner/plans", icon: "💎" },
-          ].map(item => (
-            <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: item.href === "/owner/clients" ? "#eef2ff" : "transparent", border: item.href === "/owner/clients" ? "1px solid #c7d2fe" : "1px solid transparent", color: item.href === "/owner/clients" ? "#4f46e5" : "#64748b", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
-              {item.icon} {item.label}
-            </Link>
-          ))}
+          ].map(item => {
+            const active = item.href === "/owner/clients";
+            return (
+              <Link key={item.href} href={item.href} style={{ padding: "7px 12px", borderRadius: "8px", background: active ? "#eef2ff" : "transparent", border: active ? "1px solid #c7d2fe" : "1px solid transparent", color: active ? "#4f46e5" : "#64748b", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>{item.icon}</span> {item.label}
+              </Link>
+            );
+          })}
+          <button onClick={() => { sessionStorage.removeItem("owner_authed"); fetch("/api/owner/auth", { method: "DELETE" }).then(() => router.push("/owner/login")); }} style={{ marginLeft: "8px", padding: "7px 12px", borderRadius: "8px", background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
+            Sign Out
+          </button>
         </nav>
       </header>
 
-      <main style={{ padding: "32px", maxWidth: "1560px", margin: "0 auto" }}>
-        {/* Top Action Bar */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
+      <main style={{ padding: "28px", maxWidth: "1600px", margin: "0 auto" }}>
+        {/* Page Title & Onboard Button */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "14px" }}>
           <div>
-            <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>Client & Subscription Management</h2>
-            <p style={{ color: "#64748b", fontSize: "14px", margin: 0 }}>Onboard clients, record recurring monthly payments, track Meta health & quotas, and manage access.</p>
+            <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: "0 0 2px 0", letterSpacing: "-0.4px" }}>Client & Subscription Management</h2>
+            <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>Onboard clients, record recurring monthly payments, track Meta health & quotas, and manage access.</p>
           </div>
-          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search business, email, phone..." style={{ padding: "10px 16px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", width: "260px", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }} />
-            <button onClick={handleOpenAdd} style={{ padding: "10px 22px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
-              ➕ Onboard New Client
-            </button>
+          <button onClick={handleOpenAdd} style={{ padding: "10px 20px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
+            <span>➕</span> Onboard New Client
+          </button>
+        </div>
+
+        {/* Filter & Search Bar */}
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "12px 16px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+          {/* Status Tabs */}
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+            {[
+              { id: "ALL", label: "All Clients", count: totalCount },
+              { id: "ACTIVE", label: "Active", count: activeCount, color: "#16a34a" },
+              { id: "PAST_DUE", label: "Past Due", count: pastDueCount, color: "#d97706" },
+              { id: "TRIAL", label: "Trial", count: trialCount, color: "#2563eb" },
+              { id: "BLOCKED", label: "Blocked", count: blockedCount, color: "#dc2626" },
+            ].map(tab => {
+              const active = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    background: active ? "#eef2ff" : "#f8fafc",
+                    border: `1px solid ${active ? "#c7d2fe" : "#e2e8f0"}`,
+                    color: active ? "#4f46e5" : "#475569",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 0.15s"
+                  }}
+                >
+                  <span>{tab.label}</span>
+                  <span style={{ fontSize: "11px", padding: "1px 6px", borderRadius: "999px", background: active ? "#4f46e5" : "#e2e8f0", color: active ? "white" : "#64748b" }}>
+                    {tab.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search Box */}
+          <div style={{ position: "relative", width: "280px" }}>
+            <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "#94a3b8" }}>🔍</span>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search business, email, phone..."
+              style={{
+                width: "100%",
+                padding: "8px 12px 8px 34px",
+                background: "#f8fafc",
+                border: "1px solid #cbd5e1",
+                borderRadius: "8px",
+                color: "#0f172a",
+                fontSize: "12px",
+                outline: "none",
+                boxSizing: "border-box"
+              }}
+            />
           </div>
         </div>
 
-        {/* Clients Table */}
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+        {/* Clean Clients Table */}
+        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", tableLayout: "auto" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
-                  {["Client & Credentials", "Plan", "Status", "Monthly Fee", "Quotas & Usage", "Next Due Date", "Meta & Webhook", "Actions"].map(h => (
-                    <th key={h} style={{ padding: "14px 16px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                  ))}
+                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                  <th style={{ padding: "12px 18px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "260px" }}>Client & Account</th>
+                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "150px" }}>Plan & Fee</th>
+                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "120px" }}>Status</th>
+                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "150px" }}>Due Date</th>
+                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "190px" }}>Quotas & Usage</th>
+                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "160px" }}>Meta Integration</th>
+                  <th style={{ padding: "12px 18px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right", minWidth: "260px" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} style={{ padding: "50px", textAlign: "center", color: "#64748b" }}>Loading clients & subscriptions...</td></tr>
+                  <tr>
+                    <td colSpan={7} style={{ padding: "48px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
+                      Loading clients & subscriptions...
+                    </td>
+                  </tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={8} style={{ padding: "50px", textAlign: "center", color: "#64748b" }}>No clients found. Click <b>Onboard New Client</b> above to get started! 🚀</td></tr>
+                  <tr>
+                    <td colSpan={7} style={{ padding: "48px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
+                      No clients found. Click <b>Onboard New Client</b> above to get started! 🚀
+                    </td>
+                  </tr>
                 ) : filtered.map(client => {
-                  const s = STATUS_COLORS[client.subscriptionStatus] || STATUS_COLORS.TRIAL;
+                  const s = STATUS_CONFIG[client.subscriptionStatus] || STATUS_CONFIG.TRIAL;
                   const due = formatDueDate(client.currentPeriodEnd);
                   const webhookUrl = client.customWebhookUrl || `${webhookBase}/api/whatsapp/webhook/${client.webhookClientId}`;
 
@@ -442,126 +541,221 @@ export default function OwnerClientsPage() {
                   const aiUsed = client.aiRepliesUsedCount || 0;
                   const aiPercent = Math.min(100, Math.round((aiUsed / aiQuota) * 100));
 
+                  const initialLetter = (client.businessName || "C").charAt(0).toUpperCase();
+
                   return (
-                    <tr key={client.id} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.2s" }}>
-                      {/* Client info & Login Pass */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px", marginBottom: "2px" }}>{client.businessName}</div>
-                        <div style={{ color: "#64748b", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span>📧 {client.contactEmail}</span>
-                        </div>
-                        {client.adminPassword && (
-                          <div style={{ marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "6px", background: "#f8fafc", padding: "3px 8px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-                            <span style={{ fontSize: "11px", color: "#4f46e5", fontWeight: 700 }}>🔑 {client.adminPassword}</span>
-                            <button onClick={() => navigator.clipboard.writeText(client.adminPassword)} title="Copy password" style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "10px", padding: 0 }}>📋</button>
+                    <tr key={client.id} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }}>
+                      {/* 1. Client & Account */}
+                      <td style={{ padding: "14px 18px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#eef2ff", border: "1px solid #c7d2fe", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "14px", flexShrink: 0 }}>
+                            {initialLetter}
                           </div>
-                        )}
+                          <div>
+                            <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px", lineHeight: 1.3 }}>
+                              {client.businessName}
+                            </div>
+                            <div style={{ color: "#64748b", fontSize: "12px", marginTop: "2px" }}>
+                              {client.contactEmail}
+                            </div>
+                            {client.adminPassword && (
+                              <div style={{ marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "5px", background: "#f8fafc", padding: "2px 7px", borderRadius: "5px", border: "1px solid #e2e8f0" }}>
+                                <span style={{ fontSize: "11px", color: "#4f46e5", fontWeight: 700 }}>🔑 {client.adminPassword}</span>
+                                <button
+                                  onClick={() => { navigator.clipboard.writeText(client.adminPassword); alert("Password copied!"); }}
+                                  title="Copy initial login password"
+                                  style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "10px", padding: 0 }}
+                                >
+                                  📋
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
-                      {/* Plan */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <span style={{ padding: "4px 10px", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: "6px", color: "#4f46e5", fontSize: "12px", fontWeight: 800 }}>
+                      {/* 2. Plan & Fee */}
+                      <td style={{ padding: "14px 14px" }}>
+                        <div style={{ display: "inline-block", padding: "3px 8px", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: "6px", color: "#4f46e5", fontSize: "11px", fontWeight: 800 }}>
                           {client.subscriptionPlan}
-                        </span>
+                        </div>
+                        <div style={{ fontSize: "13px", fontWeight: 800, color: "#16a34a", marginTop: "3px" }}>
+                          ₹{client.monthlyFee?.toLocaleString()}<span style={{ fontSize: "11px", fontWeight: 500, color: "#64748b" }}>/mo</span>
+                        </div>
                       </td>
 
-                      {/* Status */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <span style={{ padding: "4px 10px", background: s.bg, border: `1px solid ${s.border}`, borderRadius: "6px", color: s.color, fontSize: "12px", fontWeight: 800, display: "inline-block" }}>
+                      {/* 3. Status */}
+                      <td style={{ padding: "14px 14px" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 9px", background: s.bg, border: `1px solid ${s.border}`, borderRadius: "999px", color: s.color, fontSize: "11px", fontWeight: 800 }}>
+                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: s.dot }} />
                           {s.label}
                         </span>
                       </td>
 
-                      {/* Fee */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <div style={{ color: "#16a34a", fontWeight: 800, fontSize: "15px" }}>₹{client.monthlyFee?.toLocaleString()}</div>
-                        <span style={{ fontSize: "11px", color: "#64748b" }}>per month</span>
+                      {/* 4. Due Date */}
+                      <td style={{ padding: "14px 14px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: 800, color: "#0f172a" }}>
+                          {due.text}
+                        </div>
+                        <div style={{ display: "inline-block", padding: "2px 6px", background: due.bg, border: `1px solid ${due.border}`, borderRadius: "4px", fontSize: "10px", fontWeight: 700, color: due.color, marginTop: "2px" }}>
+                          {due.sub}
+                        </div>
                       </td>
 
-                      {/* Quotas & Limits */}
-                      <td style={{ padding: "14px 16px", minWidth: "180px" }}>
+                      {/* 5. Quotas & Usage */}
+                      <td style={{ padding: "14px 14px" }}>
                         {/* Messages Progress */}
-                        <div style={{ marginBottom: "6px" }}>
+                        <div style={{ marginBottom: "5px" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, color: "#475569", marginBottom: "2px" }}>
-                            <span>💬 Msgs: {msgUsed.toLocaleString()} / {msgQuota.toLocaleString()}</span>
+                            <span>💬 {msgUsed.toLocaleString()} / {msgQuota.toLocaleString()}</span>
                             <span>{msgPercent}%</span>
                           </div>
-                          <div style={{ height: "5px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
+                          <div style={{ height: "4px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
                             <div style={{ height: "100%", width: `${msgPercent}%`, background: msgPercent > 90 ? "#ef4444" : "#4f46e5", borderRadius: "999px" }} />
                           </div>
                         </div>
-                        {/* AI Replies Progress */}
+                        {/* AI Progress */}
                         <div>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, color: "#475569", marginBottom: "2px" }}>
-                            <span>🤖 AI: {aiUsed.toLocaleString()} / {aiQuota.toLocaleString()}</span>
+                            <span>🤖 {aiUsed.toLocaleString()} / {aiQuota.toLocaleString()}</span>
                             <span>{aiPercent}%</span>
                           </div>
-                          <div style={{ height: "5px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
+                          <div style={{ height: "4px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
                             <div style={{ height: "100%", width: `${aiPercent}%`, background: aiPercent > 90 ? "#ef4444" : "#10b981", borderRadius: "999px" }} />
                           </div>
                         </div>
                       </td>
 
-                      {/* Next Due Date & Countdown */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <div style={{ display: "inline-block", padding: "5px 10px", background: due.bg, borderRadius: "8px", border: `1px solid ${due.border}` }}>
-                          <div style={{ fontSize: "12px", fontWeight: 800, color: due.color }}>{due.text}</div>
-                          <div style={{ fontSize: "10px", color: due.color, opacity: 0.9, marginTop: "1px", fontWeight: 600 }}>{due.sub}</div>
-                        </div>
-                      </td>
-
-                      {/* Webhook & Meta Status */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <code style={{ fontSize: "10px", color: "#475569", background: "#f1f5f9", padding: "3px 6px", borderRadius: "4px", maxWidth: "140px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{webhookUrl}</code>
-                          <button onClick={() => navigator.clipboard.writeText(webhookUrl)} style={{ background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: "5px", color: "#4f46e5", cursor: "pointer", fontSize: "11px", padding: "3px 7px" }} title="Copy Webhook URL">📋</button>
-                        </div>
+                      {/* 6. Meta Integration */}
+                      <td style={{ padding: "14px 14px" }}>
                         {client.phoneId && client.metaAccessToken ? (
-                          <button onClick={() => handleCheckMetaHealth(client)} disabled={checkingMetaId === client.id} style={{ marginTop: "4px", padding: "2px 8px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", color: "#166534", fontSize: "10px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
-                            {checkingMetaId === client.id ? "Checking..." : "🩺 Live Meta Check"}
+                          <button
+                            onClick={() => handleCheckMetaHealth(client)}
+                            disabled={checkingMetaId === client.id}
+                            style={{ padding: "3px 8px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", color: "#166534", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                          >
+                            <span>{checkingMetaId === client.id ? "⏳" : "🩺"}</span>
+                            <span>{checkingMetaId === client.id ? "Checking..." : "Live Health"}</span>
                           </button>
                         ) : (
-                          <span style={{ fontSize: "10px", color: "#94a3b8", display: "block", marginTop: "3px" }}>⚠️ Missing API Keys</span>
+                          <span style={{ fontSize: "11px", color: "#d97706", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            ⚠️ Missing API Keys
+                          </span>
                         )}
+                        <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "4px" }}>
+                          <code style={{ fontSize: "10px", color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "1px 5px", borderRadius: "4px", maxWidth: "110px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+                            {webhookUrl}
+                          </code>
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(webhookUrl); alert("Webhook URL copied!"); }}
+                            title="Copy webhook URL"
+                            style={{ background: "none", border: "none", color: "#4f46e5", cursor: "pointer", fontSize: "10px", padding: 0 }}
+                          >
+                            📋
+                          </button>
+                        </div>
                       </td>
 
-                      {/* Action Buttons */}
-                      <td style={{ padding: "14px 16px" }}>
-                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", minWidth: "260px" }}>
-                          {/* Receive / Mark Payment */}
-                          <button onClick={() => handleOpenPayment(client)} style={{ padding: "6px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", color: "#166534", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
-                            💳 Receive Payment
+                      {/* 7. Actions (Clean single-line suite) */}
+                      <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: "6px", position: "relative" }}>
+                          {/* Primary: Receive Payment */}
+                          <button
+                            onClick={() => handleOpenPayment(client)}
+                            style={{ padding: "6px 12px", background: "#16a34a", border: "none", borderRadius: "7px", color: "white", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px", boxShadow: "0 1px 2px rgba(22,163,74,0.2)" }}
+                          >
+                            <span>💳</span> Pay / Renew
                           </button>
 
-                          {/* Receipts & Invoices */}
-                          <button onClick={() => handleOpenReceipts(client)} style={{ padding: "6px 10px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", color: "#1e40af", fontSize: "11px", fontWeight: 700, cursor: "pointer" }} title="View Payment Receipts & History">
-                            🧾 Receipts
+                          {/* Secondary: Login */}
+                          <button
+                            onClick={() => handleGhostLogin(client)}
+                            disabled={impersonating === client.id}
+                            title="Log into client dashboard"
+                            style={{ padding: "6px 10px", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "7px", color: "#6d28d9", fontSize: "12px", fontWeight: 700, cursor: impersonating === client.id ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                          >
+                            <span>👻</span> {impersonating === client.id ? "..." : "Login"}
                           </button>
 
-                          {/* Ghost Login */}
-                          <button onClick={() => handleGhostLogin(client)} disabled={impersonating === client.id} style={{ padding: "6px 10px", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "8px", color: "#6d28d9", fontSize: "11px", fontWeight: 700, cursor: "pointer" }} title="Login directly into client dashboard">
-                            {impersonating === client.id ? "..." : "👻 Login"}
+                          {/* Action Icon: Edit */}
+                          <button
+                            onClick={() => handleOpenEdit(client)}
+                            title="Edit Plan, Quotas & Password"
+                            style={{ width: "30px", height: "30px", borderRadius: "7px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#334155", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                          >
+                            ✏️
                           </button>
 
-                          {/* Edit / Password Reset / Quota */}
-                          <button onClick={() => handleOpenEdit(client)} style={{ padding: "6px 10px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#334155", fontSize: "11px", fontWeight: 700, cursor: "pointer" }} title="Edit Client, Quotas & Reset Password">
-                            ✏️ Edit
+                          {/* Action Icon: Receipts */}
+                          <button
+                            onClick={() => handleOpenReceipts(client)}
+                            title="Payment History & Invoices"
+                            style={{ width: "30px", height: "30px", borderRadius: "7px", background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e40af", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                          >
+                            🧾
                           </button>
 
-                          {/* Block / Unblock */}
-                          <button onClick={() => handleToggleBlock(client)} style={{ padding: "6px 10px", background: client.subscriptionStatus === "BLOCKED" ? "#f0fdf4" : "#fffbeb", border: client.subscriptionStatus === "BLOCKED" ? "1px solid #bbf7d0" : "1px solid #fde68a", borderRadius: "8px", color: client.subscriptionStatus === "BLOCKED" ? "#166534" : "#92400e", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
-                            {client.subscriptionStatus === "BLOCKED" ? "🔓 Unblock" : "🔒 Block"}
+                          {/* More Options Dropdown Toggle */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOpenActionMenuId(openActionMenuId === client.id ? null : client.id); }}
+                            title="More actions"
+                            style={{ width: "30px", height: "30px", borderRadius: "7px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#475569", fontSize: "14px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                          >
+                            ⋯
                           </button>
 
-                          {/* Register Meta Webhook */}
-                          <button onClick={() => handleRegisterWebhook(client)} disabled={registeringWebhook === client.id} title="Auto-register Meta webhook" style={{ padding: "6px 8px", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "8px", color: "#6d28d9", fontSize: "11px", fontWeight: 700, cursor: registeringWebhook === client.id ? "not-allowed" : "pointer" }}>
-                            {registeringWebhook === client.id ? "⏳" : "🔗"}
-                          </button>
+                          {/* Dropdown Menu */}
+                          {openActionMenuId === client.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                position: "absolute",
+                                right: 0,
+                                top: "36px",
+                                background: "#ffffff",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: "10px",
+                                padding: "6px",
+                                boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
+                                zIndex: 100,
+                                minWidth: "180px",
+                                textAlign: "left",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "2px"
+                              }}
+                            >
+                              <button
+                                onClick={() => { setOpenActionMenuId(null); handleRegisterWebhook(client); }}
+                                style={{ width: "100%", padding: "7px 10px", background: "none", border: "none", borderRadius: "6px", color: "#0f172a", fontSize: "12px", fontWeight: 600, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                              >
+                                <span>🔗</span> Auto-Register Webhook
+                              </button>
 
-                          {/* Delete */}
-                          <button onClick={() => handleDelete(client)} style={{ padding: "6px 8px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }} title="Delete Client">
-                            🗑️
-                          </button>
+                              <button
+                                onClick={() => { setOpenActionMenuId(null); handleToggleBlock(client); }}
+                                style={{ width: "100%", padding: "7px 10px", background: "none", border: "none", borderRadius: "6px", color: client.subscriptionStatus === "BLOCKED" ? "#16a34a" : "#d97706", fontSize: "12px", fontWeight: 600, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                              >
+                                <span>{client.subscriptionStatus === "BLOCKED" ? "🔓" : "🔒"}</span>
+                                <span>{client.subscriptionStatus === "BLOCKED" ? "Unblock Client" : "Block Access"}</span>
+                              </button>
+
+                              <div style={{ height: "1px", background: "#f1f5f9", margin: "4px 0" }} />
+
+                              <button
+                                onClick={() => { setOpenActionMenuId(null); handleDelete(client); }}
+                                style={{ width: "100%", padding: "7px 10px", background: "none", border: "none", borderRadius: "6px", color: "#dc2626", fontSize: "12px", fontWeight: 600, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "#fef2f2")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+                              >
+                                <span>🗑️</span> Delete Client
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -731,7 +925,7 @@ export default function OwnerClientsPage() {
               <div>
                 <button type="button" onClick={() => setShowMetaFields(p => !p)} style={{ width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#475569", padding: "10px 14px", cursor: "pointer", fontSize: "12px", fontWeight: 700, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>{showMetaFields ? "▲ Hide" : "▼ Show"} Meta / Shopify API Keys (Optional)</span>
-                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Can be set later</span>
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Can be configured later</span>
                 </button>
                 {showMetaFields && (
                   <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", padding: "14px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
@@ -739,7 +933,8 @@ export default function OwnerClientsPage() {
                       { label: "WABA ID", key: "wabaId", placeholder: "WhatsApp Business Account ID" },
                       { label: "Phone Number ID", key: "phoneId", placeholder: "Meta Phone Number ID" },
                       { label: "Phone Number", key: "phoneNumber", placeholder: "+91 99999 00000" },
-                      { label: "Meta Access Token", key: "metaAccessToken", placeholder: "EAAB..." },
+                      { label: "Meta Access Token", key: "metaAccessToken", placeholder: "Permanent access token" },
+                      { label: "Webhook Verify Token", key: "webhookVerifyToken", placeholder: "Custom verify token" },
                       { label: "Shopify Domain", key: "shopifyDomain", placeholder: "store.myshopify.com" },
                       { label: "Shopify Token", key: "shopifyToken", placeholder: "shpat_..." },
                     ].map(f => (
@@ -754,12 +949,12 @@ export default function OwnerClientsPage() {
 
               <div>
                 <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Internal Notes</label>
-                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Any onboarding notes, custom requirements..." style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", minHeight: "60px", resize: "vertical", boxSizing: "border-box" }} />
+                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="e.g. Onboarded via client referral" style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none", minHeight: "50px", resize: "vertical", boxSizing: "border-box" }} />
               </div>
 
-              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
-                <button type="submit" style={{ flex: 1, padding: "13px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, cursor: "pointer", fontSize: "14px", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
-                  Create & Activate Client
+              <div style={{ display: "flex", gap: "10px", marginTop: "6px" }}>
+                <button type="submit" style={{ flex: 1, padding: "13px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
+                  🚀 Create Client & Launch Account
                 </button>
                 <button type="button" onClick={() => setShowAdd(false)} style={{ padding: "13px 20px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", color: "#64748b", cursor: "pointer", fontSize: "14px" }}>
                   Cancel
@@ -770,32 +965,40 @@ export default function OwnerClientsPage() {
         </div>
       )}
 
-      {/* ======================= MODAL: ONBOARD SUCCESS (COPY CREDENTIALS) ======================= */}
+      {/* ======================= MODAL: ONBOARD SUCCESS ======================= */}
       {addSuccessInfo && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", border: "1px solid #bbf7d0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "480px", textAlign: "center", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ fontSize: "48px", marginBottom: "12px" }}>🎉</div>
-            <h3 style={{ color: "#15803d", fontSize: "22px", fontWeight: 800, margin: "0 0 6px 0" }}>Client Onboarded!</h3>
-            <p style={{ color: "#64748b", fontSize: "13px", margin: "0 0 20px 0" }}>Share these login credentials with your client. They will be prompted to set their own permanent password upon login.</p>
+          <div style={{ background: "#ffffff", border: "1px solid #bbf7d0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "500px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
+            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+              <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: "#dcfce7", color: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", margin: "0 auto 12px" }}>
+                🎉
+              </div>
+              <h3 style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a", margin: "0 0 4px 0" }}>Client Onboarded Successfully!</h3>
+              <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>Send these login credentials to your client to access their WhatsApp CRM dashboard.</p>
+            </div>
 
-            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "18px", textAlign: "left", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "18px", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
               <div>
-                <span style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>Login URL</span>
-                <div style={{ fontSize: "13px", color: "#4f46e5", fontWeight: 700 }}>{addSuccessInfo.loginUrl}</div>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Business</span>
+                <div style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a" }}>{addSuccessInfo.businessName}</div>
               </div>
               <div>
-                <span style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>Admin Email</span>
-                <div style={{ fontSize: "14px", color: "#0f172a", fontWeight: 800 }}>{addSuccessInfo.email}</div>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Login Portal</span>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#4f46e5" }}>{addSuccessInfo.loginUrl}</div>
               </div>
               <div>
-                <span style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>Initial Password</span>
-                <div style={{ fontSize: "15px", color: "#4f46e5", fontWeight: 800 }}>{addSuccessInfo.password}</div>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Admin Email</span>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a" }}>{addSuccessInfo.email}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Temporary Password</span>
+                <div style={{ fontSize: "16px", fontWeight: 900, color: "#16a34a", letterSpacing: "1px" }}>{addSuccessInfo.password}</div>
               </div>
             </div>
 
             <div style={{ display: "flex", gap: "10px" }}>
               <button onClick={() => {
-                const text = `🎉 *Welcome to What-In Platform!*\n\nHere are your admin login credentials:\n🌐 *Login URL:* ${addSuccessInfo.loginUrl}\n📧 *Email:* ${addSuccessInfo.email}\n🔑 *Initial Password:* ${addSuccessInfo.password}\n\nPlease login and connect your WhatsApp Business Account.`;
+                const text = `🎉 Welcome to What-In WhatsApp Platform!\n\nHere are your dashboard access credentials:\n\n📱 Login URL: ${addSuccessInfo.loginUrl}\n📧 Email: ${addSuccessInfo.email}\n🔑 Password: ${addSuccessInfo.password}\n\nUpon your first login, you will be prompted to set your permanent private password.`;
                 navigator.clipboard.writeText(text);
                 alert("✅ Credentials message copied to clipboard! You can now paste it into WhatsApp.");
               }} style={{ flex: 1, padding: "12px", background: "linear-gradient(135deg, #16a34a, #15803d)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>

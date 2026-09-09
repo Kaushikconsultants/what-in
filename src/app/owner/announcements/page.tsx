@@ -78,49 +78,61 @@ export default function OwnerAnnouncementsPage() {
     else alert("Error: " + res.error);
   };
 
+  const handleLogout = async () => {
+    sessionStorage.removeItem("owner_authed");
+    await fetch("/api/owner/auth", { method: "DELETE" });
+    router.push("/owner/login");
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Header */}
-      <header style={{ background: "#ffffff", borderBottom: "1px solid #e2e8f0", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(79,70,229,0.25)" }}>👑</div>
+      {/* Top Sticky Header */}
+      <header style={{ background: "#ffffff", borderBottom: "1px solid #e2e8f0", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(79,70,229,0.25)" }}>👑</div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Owner Console</h1>
-            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>What-In SaaS Management</p>
+            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>Owner Console</h1>
+            <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>What-In SaaS Management</p>
           </div>
         </div>
-        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
           {[
             { label: "Dashboard", href: "/owner", icon: "📊" },
             { label: "Clients", href: "/owner/clients", icon: "🏢" },
             { label: "Announcements", href: "/owner/announcements", icon: "📢" },
             { label: "Plans", href: "/owner/plans", icon: "💎" },
-          ].map(item => (
-            <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: item.href === "/owner/announcements" ? "#eef2ff" : "transparent", border: item.href === "/owner/announcements" ? "1px solid #c7d2fe" : "1px solid transparent", color: item.href === "/owner/announcements" ? "#4f46e5" : "#64748b", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
-              {item.icon} {item.label}
-            </Link>
-          ))}
+          ].map(item => {
+            const active = item.href === "/owner/announcements";
+            return (
+              <Link key={item.href} href={item.href} style={{ padding: "7px 12px", borderRadius: "8px", background: active ? "#eef2ff" : "transparent", border: active ? "1px solid #c7d2fe" : "1px solid transparent", color: active ? "#4f46e5" : "#64748b", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>{item.icon}</span> {item.label}
+              </Link>
+            );
+          })}
+          <button onClick={handleLogout} style={{ marginLeft: "8px", padding: "7px 12px", borderRadius: "8px", background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
+            Sign Out
+          </button>
         </nav>
       </header>
 
-      <main style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
+      <main style={{ padding: "28px", maxWidth: "1200px", margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "14px" }}>
           <div>
-            <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>📢 Global In-App Announcements</h2>
-            <p style={{ color: "#64748b", fontSize: "14px", margin: 0 }}>Broadcast maintenance alerts, system notices, and new feature updates live across all client dashboards.</p>
+            <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: "0 0 2px 0", letterSpacing: "-0.4px" }}>📢 Global In-App Announcements</h2>
+            <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>Broadcast maintenance alerts, system notices, and new feature updates live across all client dashboards.</p>
           </div>
-          <button onClick={() => setShowAdd(true)} style={{ padding: "11px 22px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
-            ➕ Broadcast Announcement
+          <button onClick={() => setShowAdd(true)} style={{ padding: "10px 20px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
+            <span>➕</span> Broadcast Announcement
           </button>
         </div>
 
         {/* Announcements List */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           {loading ? (
-            <div style={{ padding: "50px", textAlign: "center", color: "#64748b" }}>Loading announcements...</div>
+            <div style={{ padding: "50px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>Loading announcements...</div>
           ) : announcements.length === 0 ? (
-            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "48px", textAlign: "center", color: "#64748b" }}>
-              <div style={{ fontSize: "40px", marginBottom: "10px" }}>📢</div>
+            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "48px", textAlign: "center", color: "#64748b" }}>
+              <div style={{ fontSize: "36px", marginBottom: "10px" }}>📢</div>
               <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: "0 0 4px 0" }}>No Active Announcements</h3>
               <p style={{ fontSize: "13px", margin: 0 }}>Click <b>Broadcast Announcement</b> to publish a notice across all client accounts.</p>
             </div>
@@ -128,14 +140,14 @@ export default function OwnerAnnouncementsPage() {
             announcements.map(a => {
               const typeCfg = TYPE_CONFIG[a.type] || TYPE_CONFIG.INFO;
               return (
-                <div key={a.id} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div key={a.id} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", flex: 1, minWidth: "300px" }}>
-                    <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: typeCfg.bg, border: `1px solid ${typeCfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>
+                    <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: typeCfg.bg, border: `1px solid ${typeCfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>
                       {typeCfg.icon}
                     </div>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a" }}>{a.title}</span>
+                        <span style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a" }}>{a.title}</span>
                         <span style={{ padding: "2px 8px", background: typeCfg.bg, border: `1px solid ${typeCfg.border}`, color: typeCfg.text, borderRadius: "6px", fontSize: "11px", fontWeight: 800, textTransform: "uppercase" }}>
                           {typeCfg.label}
                         </span>
@@ -152,10 +164,10 @@ export default function OwnerAnnouncementsPage() {
 
                   {/* Actions */}
                   <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <button onClick={() => handleToggle(a)} style={{ padding: "8px 14px", background: a.isActive ? "#fffbeb" : "#f0fdf4", border: a.isActive ? "1px solid #fde68a" : "1px solid #bbf7d0", borderRadius: "8px", color: a.isActive ? "#92400e" : "#166534", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
+                    <button onClick={() => handleToggle(a)} style={{ padding: "7px 12px", background: a.isActive ? "#fffbeb" : "#f0fdf4", border: a.isActive ? "1px solid #fde68a" : "1px solid #bbf7d0", borderRadius: "8px", color: a.isActive ? "#92400e" : "#166534", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
                       {a.isActive ? "Pause Notice" : "Activate Notice"}
                     </button>
-                    <button onClick={() => handleDelete(a.id)} style={{ padding: "8px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", color: "#dc2626", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
+                    <button onClick={() => handleDelete(a.id)} style={{ padding: "7px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", color: "#dc2626", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
                       🗑️
                     </button>
                   </div>
