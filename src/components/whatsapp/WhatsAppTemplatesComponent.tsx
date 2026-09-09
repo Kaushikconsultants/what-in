@@ -125,10 +125,10 @@ export default function WhatsAppTemplatesComponent() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "most_used" | "highest_read" | "alphabetical">("newest");
   
   // Dynamic Brand Details & Intelligence from Database
-  const [brandName, setBrandName] = useState("Espon Clothing");
-  const [brandDomain, setBrandDomain] = useState("www.espon.in");
-  const [brandPhone, setBrandPhone] = useState("+91 7206066678");
-  const [brandEmail, setBrandEmail] = useState("clothingespon@gmail.com");
+  const [brandName, setBrandName] = useState("What-In Business");
+  const [brandDomain, setBrandDomain] = useState("what-in.tinkal.in");
+  const [brandPhone, setBrandPhone] = useState("");
+  const [brandEmail, setBrandEmail] = useState("support@what-in.tinkal.in");
   const [hasAiKnowledge, setHasAiKnowledge] = useState(true);
   const [productsCount, setProductsCount] = useState<number>(0);
   const [combosCount, setCombosCount] = useState<number>(0);
@@ -239,22 +239,22 @@ export default function WhatsAppTemplatesComponent() {
       id: "card_1",
       mediaUrl: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80",
       headerType: "IMAGE",
-      title: "Espon Performance Tee",
-      bodyText: "₹899 • Breathable 4-way stretch fabric",
+      title: "Featured Product 1",
+      bodyText: "High quality premium selection",
       buttons: [
-        { type: "URL", text: "Buy Now", url: "https://what-in.tinkal.in/products/tee", urlType: "STATIC" },
-        { type: "URL", text: "Explore More", url: "https://what-in.tinkal.in/collections/all", urlType: "STATIC" }
+        { type: "URL", text: "Buy Now", url: "https://what-in.tinkal.in", urlType: "STATIC" },
+        { type: "URL", text: "Explore More", url: "https://what-in.tinkal.in", urlType: "STATIC" }
       ]
     },
     {
       id: "card_2",
       mediaUrl: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&auto=format&fit=crop&q=80",
       headerType: "IMAGE",
-      title: "Espon Pro Shorts",
-      bodyText: "₹1,199 • Zipper pockets & sweat-wicking",
+      title: "Featured Product 2",
+      bodyText: "Exclusive special offer",
       buttons: [
-        { type: "URL", text: "Buy Now", url: "https://what-in.tinkal.in/products/shorts", urlType: "STATIC" },
-        { type: "URL", text: "Explore More", url: "https://what-in.tinkal.in/collections/all", urlType: "STATIC" }
+        { type: "URL", text: "Buy Now", url: "https://what-in.tinkal.in", urlType: "STATIC" },
+        { type: "URL", text: "Explore More", url: "https://what-in.tinkal.in", urlType: "STATIC" }
       ]
     }
   ]);

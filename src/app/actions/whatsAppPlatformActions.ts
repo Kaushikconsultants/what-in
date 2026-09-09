@@ -34,17 +34,27 @@ async function ensureSeeded() {
 
 export async function getMetaApiCredentials() {
   try {
-    const account = await prisma.whatsAppAccount.findFirst();
+    const client = await prisma.whatsAppClient.findFirst().catch(() => null);
+    const account = await prisma.whatsAppAccount.findFirst().catch(() => null);
+
+    const phoneId = client?.phoneId || account?.phoneId || '';
+    const token = client?.metaAccessToken || account?.accessToken || '';
+    const wabaId = client?.wabaId || account?.businessAccountId || '';
+    const phoneNumber = client?.phoneNumber || account?.phoneNumber || '';
+    const businessName = client?.businessName || account?.name || '';
+
     return {
-      phoneId: account?.phoneId || '',
-      token: account?.accessToken || '',
-      accessToken: account?.accessToken || '',
-      wabaId: account?.businessAccountId || '',
-      businessAccountId: account?.businessAccountId || '',
-      isConnected: Boolean(account?.accessToken && account?.phoneId)
+      phoneId,
+      token,
+      accessToken: token,
+      wabaId,
+      businessAccountId: wabaId,
+      phoneNumber,
+      businessName,
+      isConnected: Boolean(token && phoneId)
     };
   } catch (e) {
-    return { phoneId: '', token: '', accessToken: '', wabaId: '', businessAccountId: '', isConnected: false };
+    return { phoneId: '', token: '', accessToken: '', wabaId: '', businessAccountId: '', phoneNumber: '', businessName: '', isConnected: false };
   }
 }
 
@@ -5585,36 +5595,34 @@ export async function getMetaPhoneHealthAndLimitsAction() {
     const creds = await getMetaApiCredentials();
     const optedOutCount = await prisma.customer.count({
       where: { marketingOptOut: true }
-    });
+    }).catch(() => 0);
 
     if (!creds || !creds.isConnected) {
+      const client = await prisma.whatsAppClient.findFirst().catch(() => null);
+      const account = await prisma.whatsAppAccount.findFirst().catch(() => null);
       return {
         success: true,
         isConnected: false,
-        qualityRating: "UNKNOWN",
-        status: "DISCONNECTED",
-        verifiedName: "WhatsApp Account",
-        dailyLimitTier: "10,000 / 24h",
-        throughput: 80,
+        qualityRating: "NOT_CONFIGURED",
+        status: "NOT_CONNECTED",
+        verifiedName: client?.businessName || account?.name || "WhatsApp Business Account",
+        displayPhoneNumber: client?.phoneNumber || account?.phoneNumber || "Not Configured",
+        dailyLimitTier: "--",
+        throughput: 0,
         optedOutCount
       };
     }
 
-    const [clientRec, accountRec] = await Promise.all([
-      prisma.client.findFirst(),
-      prisma.whatsAppAccount.findFirst()
-    ]);
-    const fallbackBrandName = clientRec?.businessName || accountRec?.name || "Espon";
-
     let qualityRating = "GREEN";
     let status = "CONNECTED";
-    let verifiedName = fallbackBrandName;
+    let verifiedName = creds.businessName || "WhatsApp Business";
+    let displayPhoneNumber = creds.phoneNumber || "Connected";
     let dailyLimitTier = "10,000 / 24h";
     let throughput = 80;
 
     try {
       const phoneRes = await fetch(
-        `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=quality_rating,status,verified_name,code_verification_status,throughput,is_official_business_account`,
+        `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=display_phone_number,quality_rating,status,verified_name,code_verification_status,throughput,is_official_business_account`,
         {
           headers: { Authorization: `Bearer ${creds.accessToken}` }
         }
@@ -5624,6 +5632,7 @@ export async function getMetaPhoneHealthAndLimitsAction() {
         if (pData.quality_rating) qualityRating = pData.quality_rating.toUpperCase();
         if (pData.status) status = pData.status;
         if (pData.verified_name) verifiedName = pData.verified_name;
+        if (pData.display_phone_number) displayPhoneNumber = pData.display_phone_number;
         if (pData.throughput?.level) throughput = pData.throughput.level;
       }
     } catch (e) {
@@ -5636,6 +5645,7 @@ export async function getMetaPhoneHealthAndLimitsAction() {
       qualityRating,
       status,
       verifiedName,
+      displayPhoneNumber: displayPhoneNumber || creds.phoneNumber || "Connected",
       dailyLimitTier,
       throughput,
       optedOutCount
@@ -7181,7 +7191,8 @@ export async function exportAllWhatsAppContactsAction() {
 // ---------------------------------------------------------
 export async function getWhatsAppBrandDetailsAction() {
   try {
-    const [settings, company, account, legacySetting, org, productsCount, combosCount] = await Promise.all([
+    const [client, settings, company, account, legacySetting, org, productsCount, combosCount] = await Promise.all([
+      prisma.whatsAppClient.findFirst().catch(() => null),
       prisma.whatsAppSettings.findFirst().catch(() => null),
       prisma.companySettings.findFirst().catch(() => null),
       prisma.whatsAppAccount.findFirst().catch(() => null),
@@ -7191,23 +7202,25 @@ export async function getWhatsAppBrandDetailsAction() {
       prisma.shopifyCombo.count({ where: { is_active: true } }).catch(() => 0)
     ]);
 
-    const brandName = company?.companyName || org?.name || account?.name || "Espon Clothing";
+    const brandName = client?.businessName || company?.companyName || org?.name || account?.name || "What-In Platform";
     
-    // Resolve public storefront domain (never fallback to raw internal myshopify admin domain)
+    // Resolve public storefront domain
     let brandDomain = "what-in.tinkal.in";
-    if (company?.website) {
+    if (client?.shopifyDomain) {
+      brandDomain = client.shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+    } else if (company?.website) {
       brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
     } else if (company?.shopifyStoreDomain) {
       const rawDomain = company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
       brandDomain = rawDomain.includes("what-in") ? "what-in.tinkal.in" : rawDomain;
     }
 
-    const phoneNumber = company?.mobile || company?.phone || account?.phoneNumber || "+91 7206066678";
-    const brandEmail = company?.email || org?.email || `support@${brandDomain}`;
+    const phoneNumber = client?.phoneNumber || client?.contactPhone || company?.mobile || company?.phone || account?.phoneNumber || "Not Configured";
+    const brandEmail = client?.contactEmail || company?.email || org?.email || `support@${brandDomain}`;
     const brandAddress = company?.address 
       ? `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim()
-      : (company?.city || "Rohtak, Haryana, India");
-    const gstin = company?.gstin || org?.gstin || "06AAHCE7721Q1Z4";
+      : (company?.city || "");
+    const gstin = company?.gstin || org?.gstin || "";
 
     const hasAiKnowledge = !!(settings?.aiKnowledgeBase || legacySetting?.knowledge_base);
     const knowledgeLength = (settings?.aiKnowledgeBase?.length || 0) + (legacySetting?.knowledge_base?.length || 0);
@@ -7229,13 +7242,18 @@ export async function getWhatsAppBrandDetailsAction() {
   } catch (e: any) {
     return { 
       success: false, 
-      brandName: "Espon Clothing", 
-      brandDomain: "what-in.tinkal.in", 
-      phoneNumber: "+91 7206066678", 
-      brandPhone: "+91 7206066678",
-      brandEmail: "clothingespon@gmail.com",
-      brandAddress: "Rohtak, Haryana, India",
-      hasAiKnowledge: true
+      error: e.message,
+      brandName: "What-In Platform",
+      brandDomain: "what-in.tinkal.in",
+      phoneNumber: "Not Configured",
+      brandPhone: "Not Configured",
+      brandEmail: "support@what-in.tinkal.in",
+      brandAddress: "",
+      gstin: "",
+      hasAiKnowledge: false,
+      knowledgeLength: 0,
+      productsCount: 0,
+      combosCount: 0
     };
   }
 }
