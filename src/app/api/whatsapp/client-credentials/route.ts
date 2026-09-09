@@ -1,9 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const client = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" } });
+    let clientId: string | undefined;
+    const userCookie = req.cookies.get("wm_user")?.value;
+    if (userCookie) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(userCookie));
+        if (parsed?.clientId) clientId = parsed.clientId;
+        else if (parsed?.email) {
+          const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: parsed.email } });
+          if (agent?.clientId) clientId = agent.clientId;
+        }
+      } catch {}
+    }
+
+    if (!clientId) {
+      const urlClientId = req.nextUrl.searchParams.get("clientId");
+      if (urlClientId) clientId = urlClientId;
+    }
+
+    let client = null;
+    if (clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+    }
+
+    if (!client) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: { subscriptionStatus: { not: "BLOCKED" } },
+        orderBy: { createdAt: "desc" }
+      });
+      if (!client) {
+        client = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" } });
+      }
+    }
+
     if (!client) {
       // Fall back to WhatsAppAccount
       const account = await prisma.whatsAppAccount.findFirst();
@@ -27,9 +59,14 @@ export async function GET() {
       phoneNumber: client.phoneNumber || "",
       shopifyDomain: client.shopifyDomain || "",
       shopifyToken: client.shopifyToken || "",
-      webhookUrl: `https://what-in.tinkal.in/api/whatsapp/webhook/${client.webhookClientId}`,
+      webhookUrl: client.customWebhookUrl || `https://what-in.tinkal.in/api/whatsapp/webhook/${client.webhookClientId}`,
       isClientBound: true,
       clientId: client.id,
+      businessName: client.businessName,
+      monthlyMessageQuota: client.monthlyMessageQuota || 5000,
+      monthlyAiQuota: client.monthlyAiQuota || 500,
+      messagesUsedCount: client.messagesUsedCount || 0,
+      aiRepliesUsedCount: client.aiRepliesUsedCount || 0
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -39,10 +76,27 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { wabaId, phoneId, metaAccessToken, webhookVerifyToken, phoneNumber, shopifyDomain, shopifyToken } = body;
+    const { wabaId, phoneId, metaAccessToken, webhookVerifyToken, phoneNumber, shopifyDomain, shopifyToken, clientId: bodyClientId } = body;
     
-    // Update WhatsAppClient record
-    const client = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" } });
+    let clientId = bodyClientId;
+    if (!clientId) {
+      const userCookie = req.cookies.get("wm_user")?.value;
+      if (userCookie) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(userCookie));
+          if (parsed?.clientId) clientId = parsed.clientId;
+        } catch {}
+      }
+    }
+
+    let client = null;
+    if (clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+    }
+    if (!client) {
+      client = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "desc" } });
+    }
+
     if (client) {
       await prisma.whatsAppClient.update({
         where: { id: client.id },
