@@ -711,7 +711,7 @@ export default function WhatsAppAPISettingsPage() {
               </div>
               <div>
                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Email Address</label>
-                <input type="email" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} required placeholder="e.g. agent@what-inn.tikal.in" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <input type="email" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} required placeholder="e.g. agent@what-in.tinkal.in" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
               <div>
                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Password</label>

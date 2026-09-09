@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",
-      allowedOrigins: ["what-inn.tikal.in", "*.railway.app", "localhost:3000"]
+      allowedOrigins: ["what-in.tinkal.in", "*.railway.app", "localhost:3000"]
     }
   }
 };

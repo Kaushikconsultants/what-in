@@ -40,7 +40,7 @@ export async function getOwnerClientsAction() {
 async function registerMetaWebhook(wabaId: string, accessToken: string, webhookClientId: string): Promise<{ success: boolean; error?: string }> {
   if (!wabaId || !accessToken) return { success: false, error: "Missing WABA ID or access token" };
   try {
-    const appUrl = "https://what-inn.tikal.in";
+    const appUrl = "https://what-in.tinkal.in";
     const callbackUrl = `${appUrl}/api/whatsapp/webhook/${webhookClientId}`;
     const verifyToken = `wm_${webhookClientId.slice(0, 8)}`;
     
@@ -243,7 +243,7 @@ export async function getClientMetaCredentialsAction(clientId?: string) {
       phoneNumber: client.phoneNumber || "",
       shopifyDomain: client.shopifyDomain || "",
       shopifyToken: client.shopifyToken || "",
-      webhookUrl: `https://what-inn.tikal.in/api/whatsapp/webhook/${client.webhookClientId}`,
+      webhookUrl: `https://what-in.tinkal.in/api/whatsapp/webhook/${client.webhookClientId}`,
       clientId: client.id,
       webhookClientId: client.webhookClientId,
     };
@@ -291,7 +291,7 @@ export async function registerWebhookForClientAction(clientId: string) {
       await prisma.whatsAppClient.update({ where: { id: clientId }, data: { webhookVerifyToken: verifyToken } });
     }
     
-    const appUrl = "https://what-inn.tikal.in";
+    const appUrl = "https://what-in.tinkal.in";
     return {
       ...result,
       webhookUrl: `${appUrl}/api/whatsapp/webhook/${client.webhookClientId}`,

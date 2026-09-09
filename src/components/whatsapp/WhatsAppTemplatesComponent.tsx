@@ -175,8 +175,8 @@ export default function WhatsAppTemplatesComponent() {
             title: `${res.brandName} Performance Tee`,
             bodyText: "₹899 • Breathable 4-way stretch fabric",
             buttons: [
-              { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "what-inn.tikal.in"}/products/tee`, urlType: "STATIC" },
-              { type: "URL", text: "Explore More", url: `https://${res.brandDomain || "what-inn.tikal.in"}/collections/all`, urlType: "STATIC" }
+              { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "what-in.tinkal.in"}/products/tee`, urlType: "STATIC" },
+              { type: "URL", text: "Explore More", url: `https://${res.brandDomain || "what-in.tinkal.in"}/collections/all`, urlType: "STATIC" }
             ]
           },
           {
@@ -186,7 +186,7 @@ export default function WhatsAppTemplatesComponent() {
             title: `${res.brandName} Pro Shorts`,
             bodyText: "₹1,199 • Zipper pockets & sweat-wicking",
             buttons: [
-              { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "what-inn.tikal.in"}/products/shorts`, urlType: "STATIC" },
+              { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "what-in.tinkal.in"}/products/shorts`, urlType: "STATIC" },
               { type: "PHONE_NUMBER", text: "Call Us", phone_number: res.phoneNumber || res.brandPhone || "+917206066878" }
             ]
           }
@@ -242,8 +242,8 @@ export default function WhatsAppTemplatesComponent() {
       title: "Espon Performance Tee",
       bodyText: "₹899 • Breathable 4-way stretch fabric",
       buttons: [
-        { type: "URL", text: "Buy Now", url: "https://what-inn.tikal.in/products/tee", urlType: "STATIC" },
-        { type: "URL", text: "Explore More", url: "https://what-inn.tikal.in/collections/all", urlType: "STATIC" }
+        { type: "URL", text: "Buy Now", url: "https://what-in.tinkal.in/products/tee", urlType: "STATIC" },
+        { type: "URL", text: "Explore More", url: "https://what-in.tinkal.in/collections/all", urlType: "STATIC" }
       ]
     },
     {
@@ -253,8 +253,8 @@ export default function WhatsAppTemplatesComponent() {
       title: "Espon Pro Shorts",
       bodyText: "₹1,199 • Zipper pockets & sweat-wicking",
       buttons: [
-        { type: "URL", text: "Buy Now", url: "https://what-inn.tikal.in/products/shorts", urlType: "STATIC" },
-        { type: "URL", text: "Explore More", url: "https://what-inn.tikal.in/collections/all", urlType: "STATIC" }
+        { type: "URL", text: "Buy Now", url: "https://what-in.tinkal.in/products/shorts", urlType: "STATIC" },
+        { type: "URL", text: "Explore More", url: "https://what-in.tinkal.in/collections/all", urlType: "STATIC" }
       ]
     }
   ]);

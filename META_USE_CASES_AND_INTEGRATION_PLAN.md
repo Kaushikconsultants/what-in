@@ -197,7 +197,7 @@ graph LR
 6. Click **Generate Token** and copy the generated `EAA...` string.
 
 ### Step 3: Configure Token in What-In Platform
-1. Log in to your What-In Dashboard (`what-inn.tikal.in`).
+1. Log in to your What-In Dashboard (`what-in.tinkal.in`).
 2. Navigate to **WhatsApp Hub** -> **Integrations** (or **Settings**).
 3. Under **Meta Conversions API (CAPI)**:
    - Ensure the Pixel ID is set to `1386264563245511`.
@@ -243,7 +243,7 @@ A dedicated field-by-field guide has been compiled in:
 To ensure that multiple organizations, clients, or branches can operate simultaneously without messages ever mixing between tenants:
 
 1. **Client-Dedicated Webhook URLs**:
-   - WhatsApp: `https://what-inn.tikal.in/api/whatsapp/webhook/[clientId]`
+   - WhatsApp: `https://what-in.tinkal.in/api/whatsapp/webhook/[clientId]`
 2. **Client-Unique Verification Secrets**:
    - Each client generates a distinct verify secret automatically based on their unique `webhookClientId`:
      - Verification Secret: `wm_<first_8_chars_of_webhookClientId>`

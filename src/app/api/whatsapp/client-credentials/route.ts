@@ -15,7 +15,7 @@ export async function GET() {
         phoneNumber: account?.phoneNumber || "",
         shopifyDomain: "",
         shopifyToken: "",
-        webhookUrl: `https://what-inn.tikal.in/api/whatsapp/webhook`,
+        webhookUrl: `https://what-in.tinkal.in/api/whatsapp/webhook`,
         isClientBound: false,
       });
     }
@@ -27,7 +27,7 @@ export async function GET() {
       phoneNumber: client.phoneNumber || "",
       shopifyDomain: client.shopifyDomain || "",
       shopifyToken: client.shopifyToken || "",
-      webhookUrl: `https://what-inn.tikal.in/api/whatsapp/webhook/${client.webhookClientId}`,
+      webhookUrl: `https://what-in.tinkal.in/api/whatsapp/webhook/${client.webhookClientId}`,
       isClientBound: true,
       clientId: client.id,
     });

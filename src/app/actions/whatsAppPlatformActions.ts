@@ -833,7 +833,7 @@ export async function generateWhatsAppPaymentLinkAction(data: {
   try {
     const creds = await prisma.whatsAppSettings.findFirst();
     const gw = creds?.activeGateway;
-    const domain = process.env.NEXTAUTH_URL || 'https://what-inn.tikal.in';
+    const domain = process.env.NEXTAUTH_URL || 'https://what-in.tinkal.in';
     let paymentUrl = `${domain}/pay`;
 
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
@@ -871,7 +871,7 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       const cfData = await cfRes.json();
       if (cfData.link_url) paymentUrl = cfData.link_url;
     } else if (gw === 'UPI' && creds?.merchantUpiId) {
-      const domain = process.env.NEXTAUTH_URL || 'https://what-inn.tikal.in';
+      const domain = process.env.NEXTAUTH_URL || 'https://what-in.tinkal.in';
       paymentUrl = `${domain}/pay?pa=${encodeURIComponent(creds.merchantUpiId)}&pn=${encodeURIComponent(creds.merchantUpiName || 'Espon')}&am=${data.amount}&tn=${encodeURIComponent(data.description)}`;
 
       const upiLink = `upi://pay?pa=${encodeURIComponent(creds.merchantUpiId)}&pn=${encodeURIComponent(creds.merchantUpiName || 'Espon')}&am=${data.amount}&cu=INR&tn=${encodeURIComponent(data.description)}`;
@@ -1689,7 +1689,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
   try {
     const creds = await getMetaApiCredentials();
     const brandDetails = await getWhatsAppBrandDetailsAction();
-    const brandDomain = brandDetails.brandDomain || 'what-inn.tikal.in';
+    const brandDomain = brandDetails.brandDomain || 'what-in.tinkal.in';
     const brandPhone = (brandDetails as any).brandPhone || (brandDetails as any).phoneNumber || '+917404388242';
     
     let templateName = data.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
@@ -2294,7 +2294,7 @@ function extractProductsFromPrompt(prompt: string, activeProducts: any[] = []): 
         mrp,
         primaryImage: img,
         handle: slug,
-        productUrl: `https://what-inn.tikal.in/products/${slug}`
+        productUrl: `https://what-in.tinkal.in/products/${slug}`
       });
     }
   }
@@ -2635,7 +2635,7 @@ export async function generateAITemplateAction(prompt: string, context?: {
     ]);
 
     const brandName = context?.brandName || company?.companyName || organization?.name || account?.name || "Espon Clothing";
-    const brandDomain = context?.brandDomain || (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.shopifyStoreDomain ? (company.shopifyStoreDomain.includes('what-in') ? 'what-inn.tikal.in' : company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()) : "what-inn.tikal.in"));
+    const brandDomain = context?.brandDomain || (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.shopifyStoreDomain ? (company.shopifyStoreDomain.includes('what-in') ? 'what-in.tinkal.in' : company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()) : "what-in.tinkal.in"));
     const brandPhone = company?.mobile || (company as any)?.phone || account?.phoneNumber || "+91 7206066678";
     const brandEmail = company?.email || organization?.email || `support@${brandDomain}`;
     const brandAddress = company?.address 
@@ -4867,7 +4867,7 @@ export async function resubmitCarouselTemplateAction(templateName: string) {
     });
 
     const brandDetails = await getWhatsAppBrandDetailsAction();
-    const brandDomain = brandDetails.brandDomain || 'what-inn.tikal.in';
+    const brandDomain = brandDetails.brandDomain || 'what-in.tinkal.in';
 
     let rawCards: any[] = [];
     if (template?.carouselCards) {
@@ -7194,12 +7194,12 @@ export async function getWhatsAppBrandDetailsAction() {
     const brandName = company?.companyName || org?.name || account?.name || "Espon Clothing";
     
     // Resolve public storefront domain (never fallback to raw internal myshopify admin domain)
-    let brandDomain = "what-inn.tikal.in";
+    let brandDomain = "what-in.tinkal.in";
     if (company?.website) {
       brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
     } else if (company?.shopifyStoreDomain) {
       const rawDomain = company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
-      brandDomain = rawDomain.includes("what-in") ? "what-inn.tikal.in" : rawDomain;
+      brandDomain = rawDomain.includes("what-in") ? "what-in.tinkal.in" : rawDomain;
     }
 
     const phoneNumber = company?.mobile || company?.phone || account?.phoneNumber || "+91 7206066678";
@@ -7230,7 +7230,7 @@ export async function getWhatsAppBrandDetailsAction() {
     return { 
       success: false, 
       brandName: "Espon Clothing", 
-      brandDomain: "what-inn.tikal.in", 
+      brandDomain: "what-in.tinkal.in", 
       phoneNumber: "+91 7206066678", 
       brandPhone: "+91 7206066678",
       brandEmail: "clothingespon@gmail.com",
@@ -7262,13 +7262,13 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
       prisma.whatsAppAccount.findFirst().catch(() => null)
     ]);
 
-    // Resolve customer-facing website domain (e.g. what-inn.tikal.in)
-    let brandDomain = "what-inn.tikal.in";
+    // Resolve customer-facing website domain (e.g. what-in.tinkal.in)
+    let brandDomain = "what-in.tinkal.in";
     if (company?.website) {
       brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
     } else if (company?.shopifyStoreDomain) {
       const rawDomain = company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
-      brandDomain = rawDomain.includes("what-in") ? "what-inn.tikal.in" : rawDomain;
+      brandDomain = rawDomain.includes("what-in") ? "what-in.tinkal.in" : rawDomain;
     }
 
     const where: any = {
@@ -7448,7 +7448,7 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
       products: [],
       categories: [],
       combos: [],
-      brandDomain: "what-inn.tikal.in",
+      brandDomain: "what-in.tinkal.in",
       stats: { totalProducts: 0, inStockProducts: 0, categoriesCount: 0 }
     };
   }

@@ -5,7 +5,7 @@ const VAPID_PUBLIC_KEY = "BB-KZlpv_rpNWxWRhy0qmhKvmRPSD54y7BKlbA07xsuRbUlEbDLASe
 const VAPID_PRIVATE_KEY = "yWJ-C37EvnvQMHhHuwWSwCiOn3Ni7x5Rt3pywRbdjso";
 
 webPush.setVapidDetails(
-  "mailto:support@what-inn.tikal.in",
+  "mailto:support@what-in.tinkal.in",
   VAPID_PUBLIC_KEY,
   VAPID_PRIVATE_KEY
 );

@@ -119,7 +119,7 @@ export default function OwnerClientsPage() {
     c.contactEmail.toLowerCase().includes(search.toLowerCase())
   );
 
-  const webhookBase = "https://what-inn.tikal.in";
+  const webhookBase = "https://what-in.tinkal.in";
 
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 100%)" }}>

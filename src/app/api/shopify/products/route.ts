@@ -5,7 +5,7 @@ export async function GET() {
   try {
     // 1. Get company settings for shopify store domain
     const settings = await prisma.companySettings.findFirst();
-    const domain = settings?.shopifyStoreDomain || "what-inn.tikal.in";
+    const domain = settings?.shopifyStoreDomain || "what-in.tinkal.in";
 
     // 2. Fetch products from database
     let products = await prisma.product.findMany({
