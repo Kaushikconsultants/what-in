@@ -5,12 +5,11 @@ import { getOwnerDashboardStatsAction, syncSubscriptionStatusesAction } from "@/
 import Link from "next/link";
 
 export default function OwnerDashboardPage() {
-  const [stats, setStats] = useState<any>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // Client-side auth guard — check sessionStorage first (fast), then cookie
     const authed = sessionStorage.getItem("owner_authed");
     if (authed === "1") {
       loadStats();
@@ -25,7 +24,7 @@ export default function OwnerDashboardPage() {
   const loadStats = async () => {
     await syncSubscriptionStatusesAction();
     const res = await getOwnerDashboardStatsAction();
-    if (res.success) setStats(res.stats);
+    if (res.success) setData(res);
     setLoading(false);
   };
 
@@ -35,67 +34,156 @@ export default function OwnerDashboardPage() {
     router.push("/owner/login");
   };
 
+  const stats = data?.stats;
+  const clients = data?.clients || [];
+
   const statCards = [
     { label: "Total Clients", value: stats?.total ?? "—", icon: "🏢", color: "#7c3aed", bg: "rgba(124,58,237,0.1)" },
-    { label: "Active", value: stats?.active ?? "—", icon: "✅", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
-    { label: "Past Due", value: stats?.pastDue ?? "—", icon: "⏰", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
-    { label: "Blocked", value: stats?.blocked ?? "—", icon: "🔒", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
-    { label: "Trial", value: stats?.trial ?? "—", icon: "🧪", color: "#3b82f6", bg: "rgba(59,130,246,0.1)" },
-    { label: "MRR", value: stats?.mrr != null ? "₹" + stats.mrr.toLocaleString() : "—", icon: "💰", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
+    { label: "Active Subscriptions", value: stats?.active ?? "—", icon: "✅", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
+    { label: "Past Due / Expiring", value: stats?.pastDue ?? "—", icon: "⏰", color: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+    { label: "Blocked Access", value: stats?.blocked ?? "—", icon: "🔒", color: "#ef4444", bg: "rgba(239,68,68,0.1)" },
+    { label: "Free Trial", value: stats?.trial ?? "—", icon: "🧪", color: "#3b82f6", bg: "rgba(59,130,246,0.1)" },
+    { label: "Monthly Recurring (MRR)", value: stats?.mrr != null ? "₹" + stats.mrr.toLocaleString() : "—", icon: "💰", color: "#10b981", bg: "rgba(16,185,129,0.1)" },
   ];
 
+  // Find clients due in the next 7 days or past due
+  const now = new Date();
+  const upcomingRenewals = clients.filter((c: any) => {
+    if (!c.currentPeriodEnd) return false;
+    const due = new Date(c.currentPeriodEnd);
+    const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays <= 7 || c.subscriptionStatus === "PAST_DUE" || c.subscriptionStatus === "BLOCKED";
+  });
+
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 100%)", padding: "0" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 100%)", color: "#f8fafc", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       {/* Header */}
       <header style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", backdropFilter: "blur(20px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
           <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #7c3aed, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", boxShadow: "0 0 20px rgba(124,58,237,0.3)" }}>👑</div>
           <div>
             <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#f8fafc", letterSpacing: "-0.3px" }}>Owner Console</h1>
-            <p style={{ margin: 0, fontSize: "12px", color: "#475569" }}>What-In SaaS Management</p>
+            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>What-In SaaS Management</p>
           </div>
         </div>
-        <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           {[
             { label: "Dashboard", href: "/owner", icon: "📊" },
             { label: "Clients", href: "/owner/clients", icon: "🏢" },
             { label: "Plans", href: "/owner/plans", icon: "💎" },
           ].map(item => (
-            <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: item.href === "/owner" ? "rgba(124,58,237,0.2)" : "transparent", border: item.href === "/owner" ? "1px solid rgba(124,58,237,0.3)" : "1px solid transparent", color: "#94a3b8", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s" }}>
+            <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: item.href === "/owner" ? "rgba(124,58,237,0.25)" : "transparent", border: item.href === "/owner" ? "1px solid rgba(124,58,237,0.4)" : "1px solid transparent", color: item.href === "/owner" ? "#c084fc" : "#94a3b8", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
               {item.icon} {item.label}
             </Link>
           ))}
-          <button onClick={handleLogout} style={{ marginLeft: "8px", padding: "8px 14px", borderRadius: "10px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={handleLogout} style={{ marginLeft: "12px", padding: "8px 14px", borderRadius: "10px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
             Sign Out
           </button>
         </nav>
       </header>
 
-      <main style={{ padding: "32px" }}>
-        <div style={{ marginBottom: "28px" }}>
-          <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#f1f5f9", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>Dashboard Overview</h2>
-          <p style={{ color: "#475569", fontSize: "14px", margin: 0 }}>Monitor all client accounts and subscription health</p>
+      <main style={{ padding: "32px", maxWidth: "1500px", margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
+          <div>
+            <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#f1f5f9", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>Dashboard Overview</h2>
+            <p style={{ color: "#64748b", fontSize: "14px", margin: 0 }}>Monitor all client accounts, recurring revenues, and upcoming renewals</p>
+          </div>
+          <div style={{ display: "flex", gap: "12px" }}>
+            <Link href="/owner/clients" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "11px 20px", background: "linear-gradient(135deg, #7c3aed, #4f46e5)", borderRadius: "10px", color: "white", textDecoration: "none", fontWeight: 700, fontSize: "13px", boxShadow: "0 4px 15px rgba(124,58,237,0.3)" }}>
+              ➕ Onboard New Client
+            </Link>
+            <Link href="/owner/plans" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "11px 18px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", color: "#94a3b8", textDecoration: "none", fontWeight: 600, fontSize: "13px" }}>
+              💎 Pricing Plans
+            </Link>
+          </div>
         </div>
 
         {/* Stats Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "16px", marginBottom: "32px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "16px", marginBottom: "32px" }}>
           {statCards.map(card => (
             <div key={card.label} style={{ background: card.bg, border: `1px solid ${card.color}30`, borderRadius: "16px", padding: "20px", position: "relative", overflow: "hidden" }}>
-              <div style={{ fontSize: "28px", marginBottom: "8px" }}>{card.icon}</div>
-              <div style={{ fontSize: "32px", fontWeight: 900, color: card.color, letterSpacing: "-1px" }}>{loading ? "..." : card.value}</div>
-              <div style={{ fontSize: "13px", color: "#64748b", fontWeight: 600, marginTop: "2px" }}>{card.label}</div>
+              <div style={{ fontSize: "26px", marginBottom: "8px" }}>{card.icon}</div>
+              <div style={{ fontSize: "28px", fontWeight: 900, color: card.color, letterSpacing: "-0.5px" }}>{loading ? "..." : card.value}</div>
+              <div style={{ fontSize: "13px", color: "#94a3b8", fontWeight: 600, marginTop: "2px" }}>{card.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Quick Actions */}
-        <div style={{ display: "flex", gap: "16px" }}>
-          <Link href="/owner/clients" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 24px", background: "linear-gradient(135deg, #7c3aed, #4f46e5)", borderRadius: "12px", color: "white", textDecoration: "none", fontWeight: 700, fontSize: "14px", boxShadow: "0 4px 20px rgba(124,58,237,0.3)" }}>
-            ➕ Onboard New Client
-          </Link>
-          <Link href="/owner/plans" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "14px 24px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", color: "#94a3b8", textDecoration: "none", fontWeight: 600, fontSize: "14px" }}>
-            💎 Manage Plans
-          </Link>
+        {/* Upcoming Renewals & Action Widget */}
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px" }}>
+          {/* Renewals Alert */}
+          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div>
+                <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#f1f5f9", margin: 0 }}>⏰ Renewals & Invoices Due</h3>
+                <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>Clients needing payment renewal or currently past due</p>
+              </div>
+              <Link href="/owner/clients" style={{ fontSize: "12px", color: "#a78bfa", textDecoration: "none", fontWeight: 700 }}>
+                View All Clients →
+              </Link>
+            </div>
+
+            {loading ? (
+              <div style={{ padding: "30px", textAlign: "center", color: "#64748b" }}>Checking renewals...</div>
+            ) : upcomingRenewals.length === 0 ? (
+              <div style={{ padding: "30px", textAlign: "center", color: "#10b981", background: "rgba(16,185,129,0.05)", borderRadius: "12px", border: "1px solid rgba(16,185,129,0.15)" }}>
+                ✨ All clients are currently active and up to date! No immediate dues.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {upcomingRenewals.map((c: any) => {
+                  const due = new Date(c.currentPeriodEnd);
+                  const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  const isOverdue = diffDays < 0;
+
+                  return (
+                    <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "rgba(255,255,255,0.03)", border: `1px solid ${isOverdue ? "rgba(239,68,68,0.3)" : "rgba(245,158,11,0.3)"}`, borderRadius: "12px", flexWrap: "wrap", gap: "10px" }}>
+                      <div>
+                        <div style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "14px" }}>{c.businessName}</div>
+                        <div style={{ fontSize: "12px", color: "#94a3b8" }}>{c.contactEmail} • Fee: <b style={{ color: "#10b981" }}>₹{c.monthlyFee?.toLocaleString()}/mo</b></div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: isOverdue ? "#ef4444" : "#f59e0b", padding: "4px 10px", background: isOverdue ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)", borderRadius: "6px" }}>
+                          {isOverdue ? `Overdue by ${Math.abs(diffDays)}d` : diffDays === 0 ? "Due Today" : `Due in ${diffDays}d`}
+                        </span>
+                        <Link href="/owner/clients" style={{ padding: "6px 12px", background: "linear-gradient(135deg, #10b981, #059669)", borderRadius: "8px", color: "white", textDecoration: "none", fontSize: "12px", fontWeight: 700 }}>
+                          💳 Collect
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Quick SaaS Health & Links */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "16px", padding: "20px" }}>
+              <h4 style={{ fontSize: "14px", fontWeight: 800, color: "#f1f5f9", margin: "0 0 12px 0" }}>🚀 Quick Portal Links</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <a href="/login" target="_blank" style={{ padding: "10px 14px", background: "rgba(255,255,255,0.04)", borderRadius: "8px", color: "#c084fc", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>📱 Client Login Portal</span>
+                  <span style={{ fontSize: "11px", color: "#64748b" }}>/login ↗</span>
+                </a>
+                <Link href="/owner/clients" style={{ padding: "10px 14px", background: "rgba(255,255,255,0.04)", borderRadius: "8px", color: "#e2e8f0", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>🏢 Manage Client Credentials</span>
+                  <span style={{ fontSize: "11px", color: "#64748b" }}>→</span>
+                </Link>
+                <Link href="/owner/plans" style={{ padding: "10px 14px", background: "rgba(255,255,255,0.04)", borderRadius: "8px", color: "#e2e8f0", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>💎 Configure Tier Pricing</span>
+                  <span style={{ fontSize: "11px", color: "#64748b" }}>→</span>
+                </Link>
+              </div>
+            </div>
+
+            <div style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.1), rgba(79,70,229,0.1))", border: "1px solid rgba(124,58,237,0.25)", borderRadius: "16px", padding: "20px" }}>
+              <h4 style={{ fontSize: "14px", fontWeight: 800, color: "#c084fc", margin: "0 0 6px 0" }}>💡 WhatsApp SaaS Tip</h4>
+              <p style={{ fontSize: "12px", color: "#94a3b8", margin: 0, lineHeight: 1.5 }}>
+                When you onboard a new client, you can immediately copy their credentials to WhatsApp. When they login, they will be guided to connect their Meta WhatsApp Business API keys.
+              </p>
+            </div>
+          </div>
         </div>
       </main>
     </div>
