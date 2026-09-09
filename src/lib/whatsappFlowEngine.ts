@@ -817,8 +817,33 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
     // ── PAY_LINK / PAY_COLLECT: generate real payment link
     if (type === 'PAY_LINK' || type === 'PAY_COLLECT' || type === 'CATALOG_PAYMENT') {
       try {
-        const creds = await prisma.whatsAppSettings.findFirst();
-        const gw = creds?.activeGateway;
+        let client: any = null;
+        if (conversationId) {
+          const conv = await prisma.whatsAppConversation.findUnique({
+            where: { id: conversationId },
+            include: { account: true }
+          });
+          if (conv?.account?.phoneId || conv?.account?.businessAccountId) {
+            client = await prisma.whatsAppClient.findFirst({
+              where: {
+                OR: [
+                  ...(conv.account.phoneId ? [{ phoneId: conv.account.phoneId }] : []),
+                  ...(conv.account.businessAccountId ? [{ wabaId: conv.account.businessAccountId }] : []),
+                  ...(conv.account.phoneNumber ? [{ phoneNumber: conv.account.phoneNumber }] : [])
+                ]
+              }
+            });
+          }
+        }
+        const creds = await prisma.whatsAppSettings.findFirst().catch(() => null);
+        const gw = client?.activeGateway || creds?.activeGateway;
+        const razorpayKeyId = client?.razorpayKeyId || creds?.razorpayKeyId;
+        const razorpayKeySecret = client?.razorpayKeySecret || creds?.razorpayKeySecret;
+        const cashfreeAppId = client?.cashfreeAppId || creds?.cashfreeAppId;
+        const cashfreeSecretKey = client?.cashfreeSecretKey || creds?.cashfreeSecretKey;
+        const merchantUpiId = client?.merchantUpiId || creds?.merchantUpiId;
+        const merchantUpiName = client?.merchantUpiName || creds?.merchantUpiName || client?.businessName || client?.companyName || 'What-In';
+
         const amount = parseFloat(node.amount) || 1500;
         const desc = node.paymentDescription || 'Payment';
         const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
@@ -827,8 +852,8 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
         });
         let payUrl: string | null = null;
 
-        if (gw === 'RAZORPAY' && creds?.razorpayKeyId && creds?.razorpayKeySecret) {
-          const auth = Buffer.from(`${creds.razorpayKeyId}:${creds.razorpayKeySecret}`).toString('base64');
+        if (gw === 'RAZORPAY' && razorpayKeyId && razorpayKeySecret) {
+          const auth = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString('base64');
           const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
             method: 'POST',
             headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' },
@@ -843,10 +868,10 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
           });
           const rzpData = await rzpRes.json();
           if (rzpData.short_url) payUrl = rzpData.short_url;
-        } else if (gw === 'CASHFREE' && creds?.cashfreeAppId && creds?.cashfreeSecretKey) {
+        } else if (gw === 'CASHFREE' && cashfreeAppId && cashfreeSecretKey) {
           const cfRes = await fetch('https://api.cashfree.com/pg/links', {
             method: 'POST',
-            headers: { 'x-api-version': '2023-08-01', 'x-client-id': creds.cashfreeAppId, 'x-client-secret': creds.cashfreeSecretKey, 'Content-Type': 'application/json' },
+            headers: { 'x-api-version': '2023-08-01', 'x-client-id': cashfreeAppId, 'x-client-secret': cashfreeSecretKey, 'Content-Type': 'application/json' },
             body: JSON.stringify({
               link_id: `wm_${Date.now()}`,
               link_amount: amount,
@@ -857,9 +882,9 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
           });
           const cfData = await cfRes.json();
           if (cfData.link_url) payUrl = cfData.link_url;
-        } else if (gw === 'UPI' && creds?.merchantUpiId) {
-          const upiId = creds.merchantUpiId;
-          const payeeName = creds.merchantUpiName || 'Espon';
+        } else if (gw === 'UPI' && merchantUpiId) {
+          const upiId = merchantUpiId;
+          const payeeName = merchantUpiName;
           const domain = process.env.NEXTAUTH_URL || 'https://what-in.tinkal.in';
           payUrl = `${domain}/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&tn=${encodeURIComponent(desc)}`;
 

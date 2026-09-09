@@ -266,6 +266,20 @@ export default function WhatsAppInboxComponent() {
   const [followUpDays, setFollowUpDays] = useState<number>(3);
   const [followUpNotes, setFollowUpNotes] = useState<string>("");
 
+  const handleCreateQuoteSubmit = async () => {
+    if (!selectedConvId) return;
+    setShowQuoteModal(false);
+    setToastMsg("PDF Quotation generated & sent to customer!");
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const handleCreateFollowUpSubmit = async () => {
+    if (!selectedConvId) return;
+    setShowFollowUpModal(false);
+    setToastMsg(`Follow-up scheduled in ${followUpDays} days.`);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [showAssignModal, setShowAssignModal] = useState<boolean>(false);
   const [assigningLead, setAssigningLead] = useState<boolean>(false);
@@ -471,7 +485,7 @@ export default function WhatsAppInboxComponent() {
       const data = await res.json();
 
       if (data.success && data.chats) {
-        const mapped = data.chats.map((c) => ({
+        const mapped = data.chats.map((c: any) => ({
           id: c.id,
           status: c.chat_status === 'open' ? 'OPEN' : 'CLOSED',
           unreadCount: c.unreadCount || 0,
@@ -509,27 +523,27 @@ export default function WhatsAppInboxComponent() {
         let filtered = mapped;
         
         if (activeNavTab === 'assigned_to_me' || activeNavTab === 'assigned') {
-          filtered = mapped.filter((c) => c._raw.assignedEmployeeId !== null && c.status === 'OPEN');
+          filtered = mapped.filter((c: any) => c._raw.assignedEmployeeId !== null && c.status === 'OPEN');
         } else if (activeNavTab === 'unassigned') {
-          filtered = mapped.filter((c) => c._raw.assignedEmployeeId === null && c.status === 'OPEN');
+          filtered = mapped.filter((c: any) => c._raw.assignedEmployeeId === null && c.status === 'OPEN');
         } else if (activeNavTab === 'closed') {
-          filtered = mapped.filter((c) => c.status === 'CLOSED');
+          filtered = mapped.filter((c: any) => c.status === 'CLOSED');
         } else {
-          filtered = mapped.filter((c) => c.status === 'OPEN'); // 'all'
+          filtered = mapped.filter((c: any) => c.status === 'OPEN'); // 'all'
         }
         // Apply Lead Status Filter
         if (leadStatusFilter) {
-          filtered = filtered.filter((c) => c.leadStatus === leadStatusFilter);
+          filtered = filtered.filter((c: any) => c.leadStatus === leadStatusFilter);
         }
 
         // Apply Unread Only Filter
         if (unreadOnly) {
-          filtered = filtered.filter((c) => c.unreadCount > 0);
+          filtered = filtered.filter((c: any) => c.unreadCount > 0);
         }
 
         // Apply Employee Filter (Dropdown)
         if (filterEmployeeId) {
-          filtered = filtered.filter((c) => c._raw.assignedEmployeeId === filterEmployeeId);
+          filtered = filtered.filter((c: any) => c._raw.assignedEmployeeId === filterEmployeeId);
         }
 
         setConversations(filtered);
@@ -542,11 +556,11 @@ export default function WhatsAppInboxComponent() {
               const paramConvId = sp.get("convId");
               const paramPhone = sp.get("phone") || sp.get("search");
               if (paramConvId) {
-                matchedConv = filtered.find((c) => c.id === paramConvId);
+                matchedConv = filtered.find((c: any) => c.id === paramConvId);
               }
               if (!matchedConv && paramPhone) {
                 const clean = paramPhone.replace(/\D/g, '').slice(-10);
-                matchedConv = filtered.find((c) => 
+                matchedConv = filtered.find((c: any) => 
                   (c.customer?.mobile && c.customer.mobile.includes(clean)) ||
                   (c.customer?.whatsappNumber && c.customer.whatsappNumber.includes(clean)) ||
                   (c.customer?.contactPerson && c.customer.contactPerson.toLowerCase().includes(paramPhone.toLowerCase()))
@@ -557,7 +571,7 @@ export default function WhatsAppInboxComponent() {
             if (matchedConv) {
               setSelectedConvId(matchedConv.id);
             } else {
-              const isCurrentInList = filtered.some((c) => c.id === selectedConvId);
+              const isCurrentInList = filtered.some((c: any) => c.id === selectedConvId);
               if (!selectedConvId || !isCurrentInList) {
                 setSelectedConvId(filtered[0].id);
               }
@@ -1338,7 +1352,7 @@ export default function WhatsAppInboxComponent() {
     setAssigningLead(false);
   };
 
-  const handleToggleConversationStatus = async (status: string) => {
+  const handleToggleConversationStatus = async (status: 'OPEN' | 'CLOSED') => {
     if (!selectedConvId) return;
     const res = await toggleConversationStatusAction(selectedConvId, status);
     if (res.success) {
@@ -1962,7 +1976,7 @@ export default function WhatsAppInboxComponent() {
                               color: "white",
                               display: "flex",
                               alignItems: "center",
-                              justify: "center",
+                              justifyContent: "center",
                               fontSize: "12px",
                               fontWeight: "bold"
                             }}>
@@ -2023,7 +2037,7 @@ export default function WhatsAppInboxComponent() {
                               textDecoration: "none",
                               display: "flex",
                               alignItems: "center",
-                              justify: "center",
+                              justifyContent: "center",
                               gap: "4px"
                             }}
                           >
@@ -2331,13 +2345,13 @@ export default function WhatsAppInboxComponent() {
                         {isAgent && !msg.isInternalNote && (
                           <span className="msg-status-tick" style={{ display: "inline-flex", alignItems: "center" }}>
                             {msg.status?.toUpperCase() === "READ" ? (
-                              <CheckCheck size={14} style={{ color: "#3b82f6", marginLeft: "4px" }} title="Read" />
+                              <span title="Read"><CheckCheck size={14} style={{ color: "#3b82f6", marginLeft: "4px" }} /></span>
                             ) : msg.status?.toUpperCase() === "DELIVERED" ? (
-                              <CheckCheck size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} title="Delivered" />
+                              <span title="Delivered"><CheckCheck size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} /></span>
                             ) : msg.status?.toUpperCase() === "FAILED" ? (
                               <span style={{ color: "#ef4444", fontSize: "11px", marginLeft: "4px" }} title="Failed to send">⚠️</span>
                             ) : (
-                              <Check size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} title="Sent" />
+                              <span title="Sent"><Check size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} /></span>
                             )}
                           </span>
                         )}

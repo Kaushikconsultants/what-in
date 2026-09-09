@@ -59,12 +59,14 @@ export async function callGeminiRest(apiKey: string, modelName: string, prompt: 
   return text.trim();
 }
 
-async function callAIEngine(messages: any[], preferredModel: string, jsonMode = false, maxTokens = 600) {
-  let apiKey = process.env.GEMINI_API_KEY || '';
-  try {
-    const settings = await prisma.whatsAppSettings.findFirst();
-    if (settings?.geminiApiKey) apiKey = settings.geminiApiKey;
-  } catch (_) {}
+async function callAIEngine(messages: any[], preferredModel: string, jsonMode = false, maxTokens = 600, explicitApiKey?: string) {
+  let apiKey = explicitApiKey || process.env.GEMINI_API_KEY || '';
+  if (!apiKey) {
+    try {
+      const settings = await prisma.whatsAppSettings.findFirst();
+      if (settings?.geminiApiKey) apiKey = settings.geminiApiKey;
+    } catch (_) {}
+  }
 
   if (!apiKey) {
     throw new Error('No Gemini API Key found in settings or environment.');
@@ -451,11 +453,54 @@ export async function handleIncomingAILogic(senderPhone: string, userText: strin
   let brandAddress = "Rohtak, Haryana, India";
   let gstin = "06AAHCE7721Q1Z4";
 
+  let client: any = null;
   let settings: any = null;
   let legacySetting: any = null;
   let activeCombos: any[] = [];
 
   try {
+    if (conversationId && conversationId !== "internal-ai-hook") {
+      const conv = await prisma.whatsAppConversation.findUnique({
+        where: { id: conversationId },
+        include: { account: true }
+      });
+      if (conv?.account?.phoneId || conv?.account?.businessAccountId) {
+        client = await prisma.whatsAppClient.findFirst({
+          where: {
+            OR: [
+              ...(conv.account.phoneId ? [{ phoneId: conv.account.phoneId }] : []),
+              ...(conv.account.businessAccountId ? [{ wabaId: conv.account.businessAccountId }] : []),
+              ...(conv.account.phoneNumber ? [{ phoneNumber: conv.account.phoneNumber }] : [])
+            ]
+          }
+        });
+      }
+    } else {
+      const cleanPhone = senderPhone.replace(/\D/g, '').slice(-10);
+      const conv = await prisma.whatsAppConversation.findFirst({
+        where: {
+          customer: {
+            OR: [
+              { whatsappNumber: { contains: cleanPhone } },
+              { mobile: { contains: cleanPhone } }
+            ]
+          }
+        },
+        include: { account: true }
+      });
+      if (conv?.account?.phoneId || conv?.account?.businessAccountId) {
+        client = await prisma.whatsAppClient.findFirst({
+          where: {
+            OR: [
+              ...(conv.account.phoneId ? [{ phoneId: conv.account.phoneId }] : []),
+              ...(conv.account.businessAccountId ? [{ wabaId: conv.account.businessAccountId }] : []),
+              ...(conv.account.phoneNumber ? [{ phoneNumber: conv.account.phoneNumber }] : [])
+            ]
+          }
+        });
+      }
+    }
+
     const [company, s, acc, legacy, combos] = await Promise.all([
       prisma.companySettings.findFirst().catch(() => null),
       prisma.whatsAppSettings.findFirst().catch(() => null),
@@ -467,19 +512,26 @@ export async function handleIncomingAILogic(senderPhone: string, userText: strin
     legacySetting = legacy;
     activeCombos = combos;
 
-    if (company?.companyName) brandName = company.companyName;
+    if (client?.businessName || client?.companyName) {
+      brandName = client.businessName || client.companyName;
+    } else if (company?.companyName) brandName = company.companyName;
     else if (acc?.name) brandName = acc.name;
 
-    if (company?.shopifyStoreDomain) {
+    if (client?.shopifyDomain) {
+      brandDomain = client.shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    } else if (company?.shopifyStoreDomain) {
       brandDomain = company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     } else if (company?.website) {
       brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     }
 
-    if (company?.mobile) brandPhone = company.mobile;
+    if (client?.phone) brandPhone = client.phone;
+    else if (company?.mobile) brandPhone = company.mobile;
     else if (acc?.phoneNumber) brandPhone = acc.phoneNumber;
 
-    if (company?.email) brandEmail = company.email;
+    if (client?.email) brandEmail = client.email;
+    else if (company?.email) brandEmail = company.email;
+    
     if (company?.address) brandAddress = `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim();
     if (company?.gstin) gstin = company.gstin;
   } catch (_) {}
@@ -521,9 +573,10 @@ export async function handleIncomingAILogic(senderPhone: string, userText: strin
     toolContext += `\n${sizeInfo}`;
   }
 
-  const systemRules = settings?.aiSystemPrompt || "You are an elite sales, customer service, and stylist assistant.";
+  const systemRules = client?.aiSystemPrompt || settings?.aiSystemPrompt || "You are an elite sales, customer service, and stylist assistant.";
   const kbPieces: string[] = [];
-  if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
+  if (client?.aiKnowledgeBase) kbPieces.push(client.aiKnowledgeBase);
+  else if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
   if (legacySetting?.knowledge_base) kbPieces.push(legacySetting.knowledge_base);
   if (legacySetting?.inst_brand_policies) kbPieces.push(`Policies: ${legacySetting.inst_brand_policies}`);
   const knowledgeBase = kbPieces.join('\n\n') || "Leading apparel brand with premium fabrics, fast nationwide delivery, GST invoicing, and easy returns.";
@@ -575,13 +628,14 @@ CUSTOMER NEW MESSAGE:
 ${userText}`;
 
   try {
-    const preferredModel = settings?.aiModel || "gemini-2.0-flash";
+    const preferredModel = client?.aiModel || settings?.aiModel || "gemini-2.0-flash";
+    const apiKey = client?.geminiApiKey || settings?.geminiApiKey || process.env.GEMINI_API_KEY;
     let aiReply = await callAIEngine(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userText }
       ],
-      preferredModel, false, 2000
+      preferredModel, false, 2000, apiKey
     );
 
     let sendCarousel = carouselCards.length > 0;

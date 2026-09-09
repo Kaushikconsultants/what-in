@@ -252,7 +252,7 @@ export default function WhatsAppChatbotsComponent() {
                 style={{ padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
               />
               <button 
-                onClick={handleSearchLogs}
+                onClick={() => handleSearchLogs()}
                 style={{ background: '#0f172a', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}
               >
                 <Search size={16} /> Search Sessions

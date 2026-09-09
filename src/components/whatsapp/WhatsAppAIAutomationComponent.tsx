@@ -130,7 +130,7 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
     try {
       // If user entered a key, test it in real-time first
       if (settings.geminiApiKey?.trim()) {
-        const testRes = await testGeminiKey(settings.geminiApiKey, false);
+        const testRes: any = await testGeminiKey(settings.geminiApiKey, false);
         if (!testRes.success) {
           const proceed = confirm(
             `⚠️ Google API Verification Notice:\n\n` +

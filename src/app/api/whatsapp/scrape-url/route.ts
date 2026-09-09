@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import * as cheerio from 'cheerio';
+import { cookies } from 'next/headers';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,17 +24,52 @@ export async function POST(req: NextRequest) {
 
     const newText = '\n\n--- Source: Web Scrape (' + url + ') ---\n' + extractedText.trim().slice(0, 10000);
 
-    let settings = await prisma.whatsAppSettings.findFirst();
-    if (!settings) {
-      settings = await prisma.whatsAppSettings.create({ data: {} });
+    // Resolve active client from cookies
+    const cookieStore = await cookies();
+    const wmUserCookie = cookieStore.get("wm_user")?.value || req.cookies.get("wm_user")?.value;
+    let clientId: string | null = null;
+    
+    if (wmUserCookie) {
+      try {
+        const parsed = JSON.parse(wmUserCookie);
+        if (parsed.clientId) {
+          clientId = parsed.clientId;
+        } else if (parsed.email) {
+          const client = await prisma.whatsAppClient.findFirst({
+            where: {
+              OR: [
+                { adminEmail: parsed.email },
+                { contactEmail: parsed.email },
+                { contactPhone: parsed.phone || parsed.email },
+                { ownerWhatsApp: parsed.phone || parsed.email }
+              ]
+            }
+          });
+          if (client) clientId = client.id;
+        }
+      } catch (_) {}
     }
 
-    const updatedKnowledgeBase = (settings.aiKnowledgeBase || '') + newText;
+    let updatedKnowledgeBase = '';
 
-    await prisma.whatsAppSettings.update({
-      where: { id: settings.id },
-      data: { aiKnowledgeBase: updatedKnowledgeBase }
-    });
+    if (clientId) {
+      const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+      updatedKnowledgeBase = (client?.aiKnowledgeBase || '') + newText;
+      await prisma.whatsAppClient.update({
+        where: { id: clientId },
+        data: { aiKnowledgeBase: updatedKnowledgeBase }
+      });
+    } else {
+      let settings = await prisma.whatsAppSettings.findFirst();
+      if (!settings) {
+        settings = await prisma.whatsAppSettings.create({ data: {} });
+      }
+      updatedKnowledgeBase = (settings.aiKnowledgeBase || '') + newText;
+      await prisma.whatsAppSettings.update({
+        where: { id: settings.id },
+        data: { aiKnowledgeBase: updatedKnowledgeBase }
+      });
+    }
 
     return NextResponse.json({ success: true, textExtracted: extractedText.length, newKnowledgeBase: updatedKnowledgeBase });
   } catch (err: any) {
@@ -41,3 +77,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+

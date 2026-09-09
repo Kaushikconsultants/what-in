@@ -10,13 +10,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Message cannot be empty.' }, { status: 400 });
     }
 
-    // Load settings from DB for fallbacks
+    // Load settings from active client or DB fallback
+    let client: any = null;
     let dbSettings: any = null;
     try {
+      const userCookie = req.cookies.get('wm_user')?.value;
+      if (userCookie) {
+        const parsed = JSON.parse(decodeURIComponent(userCookie));
+        if (parsed?.clientId) {
+          client = await prisma.whatsAppClient.findUnique({ where: { id: parsed.clientId } });
+        }
+      }
       dbSettings = await prisma.whatsAppSettings.findFirst();
     } catch (_) {}
 
-    const apiKey = (body.apiKey?.trim() || dbSettings?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || '');
+    const apiKey = (body.apiKey?.trim() || client?.geminiApiKey?.trim() || dbSettings?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || '');
     if (!apiKey) {
       return NextResponse.json({
         success: false,
@@ -24,9 +32,9 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const preferredModel = body.model || dbSettings?.aiModel || 'gemini-3.8-flash';
-    const systemRules = body.systemPrompt !== undefined ? body.systemPrompt : (dbSettings?.aiSystemPrompt || 'You are a helpful customer service assistant.');
-    const knowledgeBase = body.knowledgeBase !== undefined ? body.knowledgeBase : (dbSettings?.aiKnowledgeBase || '');
+    const preferredModel = body.model || client?.aiModel || dbSettings?.aiModel || 'gemini-3.8-flash';
+    const systemRules = body.systemPrompt !== undefined ? body.systemPrompt : (client?.aiSystemPrompt || dbSettings?.aiSystemPrompt || 'You are a helpful customer service assistant.');
+    const knowledgeBase = body.knowledgeBase !== undefined ? body.knowledgeBase : (client?.aiKnowledgeBase || dbSettings?.aiKnowledgeBase || '');
     const fallbackLang = body.fallbackLanguage || dbSettings?.aiFallbackLanguage || 'English';
 
     const fullSystemInstruction = `

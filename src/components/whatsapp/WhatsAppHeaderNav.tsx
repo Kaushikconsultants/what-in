@@ -190,7 +190,7 @@ export default function WhatsAppHeaderNav() {
             <Link
               key={item.path}
               href={item.path}
-              className={`nav-item ${active ? "active" : ""} ${item.highlight ? "highlight" : ""}`}
+              className={`nav-item ${active ? "active" : ""} ${(item as any).highlight ? "highlight" : ""}`}
             >
               <Icon size={16} />
               <span>{userRole === "AGENT" && item.name === "Settings" ? "My Profile" : item.name}</span>

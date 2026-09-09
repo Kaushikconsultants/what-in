@@ -1975,22 +1975,41 @@ model WhatsAppClient {
   aiRepliesUsedCount  Int     @default(0)
 
   // Meta (WhatsApp Business) API credentials — set by owner or client admin
-  wabaId          String?  // WhatsApp Business Account ID
-  phoneId         String?  // Phone Number ID from Meta
-  metaAccessToken String?  // Permanent Access Token
-  webhookVerifyToken String? // Custom webhook verify token
+  wabaId             String?  // WhatsApp Business Account ID
+  phoneId            String?  // Phone Number ID from Meta
+  businessManagerId  String?  // Business Manager ID
+  metaAccessToken    String?  // Permanent Access Token
+  webhookVerifyToken String?  // Custom webhook verify token
   customWebhookUrl   String?  // Override webhook URL (e.g. legacy clients using default webhook)
-  phoneNumber     String?  // Display phone number
+  phoneNumber        String?  // Display phone number
 
   // Shopify credentials — set by owner or client admin
-  shopifyDomain   String?
-  shopifyToken    String?
+  shopifyDomain      String?
+  shopifyToken       String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  // AI Settings & Credentials per client (100% Client-Isolated)
+  geminiApiKey       String?
+  aiModel            String?   @default("gemini-3.8-flash")
+  aiSystemPrompt     String?
+  aiKnowledgeBase    String?
+  welcomeMessage     String?   @default("Welcome! How can we help you today?")
+  workingHoursStart  String?   @default("09:00")
+  workingHoursEnd    String?   @default("19:00")
 
-  payments        WhatsAppClientPayment[]
-  agents          WhatsAppAgentUser[]
+  // Payment Gateway per client (100% Client-Isolated)
+  activeGateway      String?
+  razorpayKeyId      String?
+  razorpayKeySecret  String?
+  cashfreeAppId      String?
+  cashfreeSecretKey  String?
+  merchantUpiId      String?
+  merchantUpiName    String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  payments           WhatsAppClientPayment[]
+  agents             WhatsAppAgentUser[]
 }
 
 model WhatsAppClientPayment {

@@ -326,7 +326,7 @@ export default function OwnerClientsPage() {
 
   const handleRegisterWebhook = async (client: any) => {
     setRegisteringWebhook(client.id);
-    const res = await registerWebhookForClientAction(client.id);
+    const res: any = await registerWebhookForClientAction(client.id);
     if (res.success) {
       alert(`✅ Webhook registered successfully!\n\nWebhook URL: ${res.webhookUrl}\nVerify Token: ${res.verifyToken}\n\nThis URL is now active on Meta.`);
     } else {

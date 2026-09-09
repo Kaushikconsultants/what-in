@@ -5,8 +5,22 @@ import { GEMINI_MODEL_CASCADE } from '@/lib/whatsappAI';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const key = body.apiKey;
+    let key = body.apiKey;
     const model = body.model || 'gemini-3.8-flash';
+
+    if (!key) {
+      const userCookie = req.cookies.get('wm_user')?.value;
+      if (userCookie) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(userCookie));
+          if (parsed?.clientId) {
+            const client = await prisma.whatsAppClient.findUnique({ where: { id: parsed.clientId } });
+            if (client?.geminiApiKey) key = client.geminiApiKey;
+          }
+        } catch {}
+      }
+    }
+
     return await handleKeyValidation(key, model);
   } catch (err: any) {
     return NextResponse.json({ success: false, valid: false, error: err.message }, { status: 500 });
@@ -16,8 +30,22 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const key = searchParams.get('apiKey') || undefined;
+    let key = searchParams.get('apiKey') || undefined;
     const model = searchParams.get('model') || 'gemini-3.8-flash';
+
+    if (!key) {
+      const userCookie = req.cookies.get('wm_user')?.value;
+      if (userCookie) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(userCookie));
+          if (parsed?.clientId) {
+            const client = await prisma.whatsAppClient.findUnique({ where: { id: parsed.clientId } });
+            if (client?.geminiApiKey) key = client.geminiApiKey;
+          }
+        } catch {}
+      }
+    }
+
     return await handleKeyValidation(key, model);
   } catch (err: any) {
     return NextResponse.json({ success: false, valid: false, error: err.message }, { status: 500 });

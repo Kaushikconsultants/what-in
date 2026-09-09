@@ -32,9 +32,36 @@ async function ensureSeeded() {
   }
 }
 
-export async function getMetaApiCredentials() {
+export async function getActiveSessionClient() {
   try {
-    const client = await prisma.whatsAppClient.findFirst().catch(() => null);
+    const cookieStore = await cookies();
+    const userCookie = cookieStore.get("wm_user")?.value;
+    if (userCookie) {
+      const parsed = JSON.parse(decodeURIComponent(userCookie));
+      if (parsed?.clientId) {
+        const client = await prisma.whatsAppClient.findUnique({ where: { id: parsed.clientId } }).catch(() => null);
+        if (client) return client;
+      }
+      if (parsed?.email) {
+        const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: parsed.email } }).catch(() => null);
+        if (agent?.clientId) {
+          const client = await prisma.whatsAppClient.findUnique({ where: { id: agent.clientId } }).catch(() => null);
+          if (client) return client;
+        }
+      }
+    }
+  } catch {}
+  return await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "desc" } }).catch(() => null);
+}
+
+export async function getMetaApiCredentials(clientIdOverride?: string) {
+  try {
+    let client = null;
+    if (clientIdOverride) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: clientIdOverride } }).catch(() => null);
+    } else {
+      client = await getActiveSessionClient();
+    }
     const account = await prisma.whatsAppAccount.findFirst().catch(() => null);
 
     const phoneId = client?.phoneId || account?.phoneId || '';
@@ -841,8 +868,26 @@ export async function generateWhatsAppPaymentLinkAction(data: {
   deliveryMethod?: 'link' | 'qr' | 'both';
 }) {
   try {
-    const creds = await prisma.whatsAppSettings.findFirst();
-    const gw = creds?.activeGateway;
+    let client = await getActiveSessionClient();
+    if (!client && data.conversationId) {
+      const conv = await prisma.whatsAppConversation.findUnique({
+        where: { id: data.conversationId },
+        select: { clientId: true }
+      });
+      if (conv?.clientId) {
+        client = await prisma.whatsAppClient.findUnique({ where: { id: conv.clientId } });
+      }
+    }
+
+    const creds = await prisma.whatsAppSettings.findFirst().catch(() => null);
+    const gw = client?.activeGateway || creds?.activeGateway;
+    const razorpayKeyId = client?.razorpayKeyId || creds?.razorpayKeyId;
+    const razorpayKeySecret = client?.razorpayKeySecret || creds?.razorpayKeySecret;
+    const cashfreeAppId = client?.cashfreeAppId || creds?.cashfreeAppId;
+    const cashfreeSecretKey = client?.cashfreeSecretKey || creds?.cashfreeSecretKey;
+    const merchantUpiId = client?.merchantUpiId || creds?.merchantUpiId;
+    const merchantUpiName = client?.merchantUpiName || creds?.merchantUpiName || client?.businessName || client?.companyName || 'What-In';
+
     const domain = process.env.NEXTAUTH_URL || 'https://what-in.tinkal.in';
     let paymentUrl = `${domain}/pay`;
 
@@ -850,8 +895,8 @@ export async function generateWhatsAppPaymentLinkAction(data: {
     const rawContactPhone = customer?.whatsappNumber ? customer.whatsappNumber.replace(/\D/g, '') : (customer?.mobile || '').replace(/\D/g, '') || '9999999999';
     const dynamicContact = rawContactPhone.length === 10 ? `+91${rawContactPhone}` : `+${rawContactPhone}`;
 
-    if (gw === 'RAZORPAY' && creds?.razorpayKeyId && creds?.razorpayKeySecret) {
-      const auth = Buffer.from(`${creds.razorpayKeyId}:${creds.razorpayKeySecret}`).toString('base64');
+    if (gw === 'RAZORPAY' && razorpayKeyId && razorpayKeySecret) {
+      const auth = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString('base64');
       const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
         method: 'POST',
         headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' },
@@ -866,27 +911,27 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       });
       const rzpData = await rzpRes.json();
       if (rzpData.short_url) paymentUrl = rzpData.short_url;
-    } else if (gw === 'CASHFREE' && creds?.cashfreeAppId && creds?.cashfreeSecretKey) {
+    } else if (gw === 'CASHFREE' && cashfreeAppId && cashfreeSecretKey) {
       const cfRes = await fetch('https://api.cashfree.com/pg/links', {
         method: 'POST',
-        headers: { 'x-api-version': '2023-08-01', 'x-client-id': creds.cashfreeAppId, 'x-client-secret': creds.cashfreeSecretKey, 'Content-Type': 'application/json' },
+        headers: { 'x-api-version': '2023-08-01', 'x-client-id': cashfreeAppId, 'x-client-secret': cashfreeSecretKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           link_id: `wm_${Date.now()}`,
           link_amount: data.amount,
           link_currency: 'INR',
           link_purpose: data.description,
-          customer_details: { customer_phone: contactPhone, customer_name: customer?.contactPerson || 'Customer' }
+          customer_details: { customer_phone: dynamicContact, customer_name: customer?.contactPerson || 'Customer' }
         })
       });
       const cfData = await cfRes.json();
       if (cfData.link_url) paymentUrl = cfData.link_url;
-    } else if (gw === 'UPI' && creds?.merchantUpiId) {
+    } else if (gw === 'UPI' && merchantUpiId) {
       const domain = process.env.NEXTAUTH_URL || 'https://what-in.tinkal.in';
-      paymentUrl = `${domain}/pay?pa=${encodeURIComponent(creds.merchantUpiId)}&pn=${encodeURIComponent(creds.merchantUpiName || 'Espon')}&am=${data.amount}&tn=${encodeURIComponent(data.description)}`;
+      paymentUrl = `${domain}/pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantUpiName)}&am=${data.amount}&tn=${encodeURIComponent(data.description)}`;
 
-      const upiLink = `upi://pay?pa=${encodeURIComponent(creds.merchantUpiId)}&pn=${encodeURIComponent(creds.merchantUpiName || 'Espon')}&am=${data.amount}&cu=INR&tn=${encodeURIComponent(data.description)}`;
+      const upiLink = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantUpiName)}&am=${data.amount}&cu=INR&tn=${encodeURIComponent(data.description)}`;
       const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
-      const qrMsgText = `🏦 UPI ID: *${creds.merchantUpiId}*\n\nScan this QR to pay, or click the Pay Now button below.`;
+      const qrMsgText = `🏦 UPI ID: *${merchantUpiId}*\n\nScan this QR to pay, or click the Pay Now button below.`;
 
       if (data.deliveryMethod === 'qr' || data.deliveryMethod === 'both' || !data.deliveryMethod) {
         await sendWhatsAppMessageAction({
@@ -1150,22 +1195,31 @@ export async function checkIntegrationHealthAction() {
 export async function getWhatsAppApiCredentialsAction() {
   await ensureSeeded();
   try {
+    const client = await getActiveSessionClient();
     const account = await prisma.whatsAppAccount.findFirst();
-    const isConnected = isWhatsAppApiConfigured(account);
+    const isConnected = isWhatsAppApiConfigured(account, client);
+
+    const wabaId = client?.wabaId || account?.businessAccountId || "";
+    const phoneId = client?.phoneId || account?.phoneId || "";
+    const managerId = client?.businessManagerId || account?.businessManagerId || "";
+    const phoneNumber = client?.phoneNumber || account?.phoneNumber || "";
+    const accessToken = client?.metaAccessToken || account?.accessToken || "";
+    const webhookVerifyToken = client?.webhookVerifyToken || account?.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026";
+    const status = isConnected ? (account?.status || "CONNECTED") : "NOT CONNECTED (Setup Required)";
 
     return {
       success: true,
       isConnected,
       credentials: {
-        id: account?.id,
-        name: account?.name || "Espon Main Sales",
-        phoneNumber: account?.phoneNumber || "",
-        phoneId: account?.phoneId || "",
-        businessAccountId: account?.businessAccountId || "",
-        businessManagerId: account?.businessManagerId || "",
-        accessToken: account?.accessToken || "",
-        webhookVerifyToken: account?.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026",
-        status: isConnected ? (account?.status || "CONNECTED") : "NOT CONNECTED (Setup Required)"
+        id: client?.id || account?.id,
+        name: client?.businessName || account?.name || "WhatsApp Business Account",
+        phoneNumber,
+        phoneId,
+        businessAccountId: wabaId,
+        businessManagerId: managerId,
+        accessToken,
+        webhookVerifyToken,
+        status
       }
     };
   } catch (error: any) {
@@ -1182,11 +1236,27 @@ export async function saveWhatsAppApiCredentialsAction(data: {
   webhookVerifyToken?: string;
 }) {
   try {
-    let account = await prisma.whatsAppAccount.findFirst();
+    const client = await getActiveSessionClient();
 
-    const isConnected = data.accessToken && data.phoneId && data.wabaId && !data.accessToken.startsWith("EAAG...meta");
+    const isConnected = Boolean(data.accessToken && data.phoneId && data.wabaId && !data.accessToken.startsWith("EAAG...meta"));
     const status = isConnected ? "CONNECTED" : "NOT CONNECTED (Setup Required)";
 
+    if (client) {
+      await prisma.whatsAppClient.update({
+        where: { id: client.id },
+        data: {
+          wabaId: data.wabaId,
+          phoneId: data.phoneId,
+          businessManagerId: data.managerId || null,
+          metaAccessToken: data.accessToken,
+          phoneNumber: data.phoneNumber,
+          webhookVerifyToken: data.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026",
+        }
+      });
+    }
+
+    // Also sync to fallback WhatsAppAccount
+    let account = await prisma.whatsAppAccount.findFirst();
     if (account) {
       account = await prisma.whatsAppAccount.update({
         where: { id: account.id },
@@ -1205,7 +1275,7 @@ export async function saveWhatsAppApiCredentialsAction(data: {
     } else {
       account = await prisma.whatsAppAccount.create({
         data: {
-          name: "Espon Main Sales",
+          name: client?.businessName || "WhatsApp Business Account",
           phoneNumber: data.phoneNumber,
           phoneId: data.phoneId,
           businessAccountId: data.wabaId,
@@ -2644,6 +2714,7 @@ export async function generateAITemplateAction(prompt: string, context?: {
   currentDraft?: any;
 }) {
   try {
+    const client = await getActiveSessionClient();
     const [
       settings,
       company,
@@ -2669,24 +2740,25 @@ export async function generateAITemplateAction(prompt: string, context?: {
       prisma.whatsAppCannedResponse.findMany({ take: 6, select: { title: true, shortcut: true, content: true, category: true } }).catch(() => [])
     ]);
 
-    const brandName = context?.brandName || company?.companyName || organization?.name || account?.name || "Espon Clothing";
-    const brandDomain = context?.brandDomain || (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.shopifyStoreDomain ? (company.shopifyStoreDomain.includes('what-in') ? 'what-in.tinkal.in' : company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()) : "what-in.tinkal.in"));
-    const brandPhone = company?.mobile || (company as any)?.phone || account?.phoneNumber || "+91 7206066678";
-    const brandEmail = company?.email || organization?.email || `support@${brandDomain}`;
+    const brandName = context?.brandName || client?.businessName || company?.companyName || organization?.name || account?.name || "What-In Brand";
+    const brandDomain = context?.brandDomain || (client?.shopifyDomain ? client.shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.shopifyStoreDomain ? (company.shopifyStoreDomain.includes('what-in') ? 'what-in.tinkal.in' : company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()) : "what-in.tinkal.in")));
+    const brandPhone = client?.phoneNumber || client?.contactPhone || company?.mobile || (company as any)?.phone || account?.phoneNumber || "+91 7206066678";
+    const brandEmail = client?.contactEmail || client?.adminEmail || company?.email || organization?.email || `support@${brandDomain}`;
     const brandAddress = company?.address 
       ? `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}, ${company.country || 'India'}`.replace(/\s+,/g, ',').trim()
       : (company?.city || "Rohtak, Haryana, India");
     const gstin = company?.gstin || organization?.gstin || "06AAHCE7721Q1Z4";
 
     const kbPieces: string[] = [];
-    if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
+    if (client?.aiKnowledgeBase) kbPieces.push(client.aiKnowledgeBase);
+    else if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
     if (legacySetting?.knowledge_base) kbPieces.push(legacySetting.knowledge_base);
     if (legacySetting?.inst_brand_policies) kbPieces.push(`Brand Policies: ${legacySetting.inst_brand_policies}`);
     if (legacySetting?.inst_size_advisor) kbPieces.push(`Size Guidelines: ${legacySetting.inst_size_advisor}`);
     if (legacySetting?.inst_order_security) kbPieces.push(`Order & Payment Rules: ${legacySetting.inst_order_security}`);
 
     const aiKnowledgeBase = kbPieces.join('\n\n') || "Leading apparel manufacturer & B2B wholesale brand with premium fabrics, fast nationwide delivery, GST invoicing, and easy exchanges.";
-    const aiSystemRules = settings?.aiSystemPrompt || "Be polite, high-converting, professional, and Meta compliant.";
+    const aiSystemRules = client?.aiSystemPrompt || settings?.aiSystemPrompt || "Be polite, high-converting, professional, and Meta compliant.";
     const fallbackLanguage = settings?.aiFallbackLanguage || "English";
 
     const cleanPrompt = (prompt || '').trim();
@@ -2739,14 +2811,13 @@ MANDATORY INSTRUCTION: You MUST set templateType to "CAROUSEL" with category "MA
       knowledgeBase: aiKnowledgeBase,
       systemRules: aiSystemRules,
       selectedProducts: effectiveSelectedProducts,
-      activeProducts,
+      activeProducts: activeProducts as any,
       activeCombos,
       cannedFaqs: cannedFaqsSummary
     };
 
-    let apiKey = process.env.GEMINI_API_KEY || '';
-    let preferredModel = settings?.aiModel || "gemini-2.0-flash";
-    if (settings?.geminiApiKey) apiKey = settings.geminiApiKey;
+    let apiKey = client?.geminiApiKey || settings?.geminiApiKey || process.env.GEMINI_API_KEY || '';
+    let preferredModel = client?.aiModel || settings?.aiModel || "gemini-2.0-flash";
 
     let generatedJson: any = null;
 
@@ -4073,13 +4144,63 @@ export async function exportWhatsAppConversationsCSV() {
 // ---------------------------------------------------------
 export async function getWhatsAppSettingsAction() {
   try {
-    let settings = await prisma.whatsAppSettings.findFirst();
-    if (!settings) {
-      settings = await prisma.whatsAppSettings.create({
-        data: {} // Uses default schema values
-      });
+    const client = await getActiveSessionClient();
+    const globalSettings = await prisma.whatsAppSettings.findFirst().catch(() => null);
+
+    if (client) {
+      const settings = {
+        id: client.id,
+        workingHoursStart: client.workingHoursStart || '09:00',
+        workingHoursEnd: client.workingHoursEnd || '19:00',
+        outOfOfficeMessage: globalSettings?.outOfOfficeMessage || 'We are currently unavailable. We will respond during working hours 9 AM - 7 PM.',
+        slaWarningMinutes: globalSettings?.slaWarningMinutes || 15,
+        slaBreadMinutes: globalSettings?.slaBreadMinutes || 30,
+        autoAssignStrategy: globalSettings?.autoAssignStrategy || 'ROUND_ROBIN',
+        aiConfidenceThreshold: globalSettings?.aiConfidenceThreshold || 85,
+        aiModel: client.aiModel || 'gemini-3.8-flash',
+        welcomeMessage: client.welcomeMessage || 'Welcome! How can we help you today?',
+        aiKnowledgeBase: client.aiKnowledgeBase || '',
+        aiSystemPrompt: client.aiSystemPrompt || '',
+        aiFallbackLanguage: globalSettings?.aiFallbackLanguage || 'English',
+        geminiApiKey: client.geminiApiKey || '',
+        activeGateway: client.activeGateway || null,
+        razorpayKeyId: client.razorpayKeyId || '',
+        razorpayKeySecret: client.razorpayKeySecret || '',
+        cashfreeAppId: client.cashfreeAppId || '',
+        cashfreeSecretKey: client.cashfreeSecretKey || '',
+        merchantUpiId: client.merchantUpiId || '',
+        merchantUpiName: client.merchantUpiName || client.businessName || '',
+        metaCapiLeadValue: globalSettings?.metaCapiLeadValue || 10000,
+      };
+      return { success: true, settings };
     }
-    return { success: true, settings };
+
+    const fallbackSettings = {
+      id: globalSettings?.id || 'default',
+      workingHoursStart: globalSettings?.workingHoursStart || '09:00',
+      workingHoursEnd: globalSettings?.workingHoursEnd || '19:00',
+      outOfOfficeMessage: globalSettings?.outOfOfficeMessage || 'We are currently unavailable. We will respond during working hours 9 AM - 7 PM.',
+      slaWarningMinutes: globalSettings?.slaWarningMinutes || 15,
+      slaBreadMinutes: globalSettings?.slaBreadMinutes || 30,
+      autoAssignStrategy: globalSettings?.autoAssignStrategy || 'ROUND_ROBIN',
+      aiConfidenceThreshold: globalSettings?.aiConfidenceThreshold || 85,
+      aiModel: globalSettings?.aiModel || 'gemini-3.8-flash',
+      welcomeMessage: globalSettings?.welcomeMessage || 'Welcome! How can we help you today?',
+      aiKnowledgeBase: globalSettings?.aiKnowledgeBase || '',
+      aiSystemPrompt: globalSettings?.aiSystemPrompt || '',
+      aiFallbackLanguage: globalSettings?.aiFallbackLanguage || 'English',
+      geminiApiKey: globalSettings?.geminiApiKey || '',
+      activeGateway: globalSettings?.activeGateway || null,
+      razorpayKeyId: globalSettings?.razorpayKeyId || '',
+      razorpayKeySecret: globalSettings?.razorpayKeySecret || '',
+      cashfreeAppId: globalSettings?.cashfreeAppId || '',
+      cashfreeSecretKey: globalSettings?.cashfreeSecretKey || '',
+      merchantUpiId: globalSettings?.merchantUpiId || '',
+      merchantUpiName: globalSettings?.merchantUpiName || '',
+      metaCapiLeadValue: globalSettings?.metaCapiLeadValue || 10000,
+    };
+
+    return { success: true, settings: fallbackSettings };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -4097,6 +4218,27 @@ export async function saveWhatsAppSettingsAction(data: {
   metaCapiLeadValue?: number;
 }) {
   try {
+    const client = await getActiveSessionClient();
+    if (client) {
+      const clientUpdate: any = {};
+      if (data.geminiApiKey !== undefined) clientUpdate.geminiApiKey = data.geminiApiKey;
+      if (data.aiModel !== undefined) clientUpdate.aiModel = data.aiModel;
+      if (data.aiSystemPrompt !== undefined) clientUpdate.aiSystemPrompt = data.aiSystemPrompt;
+      if (data.welcomeMessage !== undefined) clientUpdate.welcomeMessage = data.welcomeMessage;
+      if (data.workingHoursStart !== undefined) clientUpdate.workingHoursStart = data.workingHoursStart;
+      if (data.workingHoursEnd !== undefined) clientUpdate.workingHoursEnd = data.workingHoursEnd;
+
+      const updated = await prisma.whatsAppClient.update({
+        where: { id: client.id },
+        data: clientUpdate
+      });
+      revalidatePath("/whatsapp/settings");
+      revalidatePath("/whatsapp/integrations");
+      revalidatePath("/whatsapp/api-settings");
+      return { success: true, settings: updated };
+    }
+
+    // Only update global settings if super-admin (no client session)
     let settings = await prisma.whatsAppSettings.findFirst();
     if (!settings) {
       settings = await prisma.whatsAppSettings.create({ data });
@@ -4108,6 +4250,7 @@ export async function saveWhatsAppSettingsAction(data: {
     }
     revalidatePath("/whatsapp/settings");
     revalidatePath("/whatsapp/integrations");
+    revalidatePath("/whatsapp/api-settings");
     return { success: true, settings };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -4279,12 +4422,13 @@ export async function getWhatsAppWebhookLogsAction(search = '') {
 
 export async function getShopifyCredentialsAction() {
   try {
+    const client = await getActiveSessionClient();
     const settings = await prisma.companySettings.findFirst();
     return {
       success: true,
       credentials: {
-        shopifyStoreDomain: settings?.shopifyStoreDomain || '',
-        shopifyAccessToken: settings?.shopifyAccessToken || ''
+        shopifyStoreDomain: client?.shopifyDomain || settings?.shopifyStoreDomain || '',
+        shopifyAccessToken: client?.shopifyToken || settings?.shopifyAccessToken || ''
       }
     };
   } catch (error: any) {
@@ -4325,7 +4469,19 @@ export async function saveShopifyCredentialsAction(data: { storeDomain: string; 
       };
     }
 
-    // Save to database only if connected
+    // Save to client's record in database
+    const client = await getActiveSessionClient();
+    if (client) {
+      await prisma.whatsAppClient.update({
+        where: { id: client.id },
+        data: {
+          shopifyDomain: domain,
+          shopifyToken: token
+        }
+      });
+    }
+
+    // Also update legacy fallback
     let settings = await prisma.companySettings.findFirst();
     if (settings) {
       await prisma.companySettings.update({
@@ -4344,7 +4500,7 @@ export async function saveShopifyCredentialsAction(data: { storeDomain: string; 
         }
       });
     }
-    return { success: true, message: '✓ Shopify connection test successful! Credentials saved securely.' };
+    return { success: true, message: '✓ Shopify connection test successful! Credentials saved securely for your account.' };
   } catch (error: any) {
     return { success: false, error: `Connection Error: ${error.message}. Please verify the Shopify domain.` };
   }
@@ -7216,8 +7372,8 @@ export async function exportAllWhatsAppContactsAction() {
 // ---------------------------------------------------------
 export async function getWhatsAppBrandDetailsAction() {
   try {
-    const [client, settings, company, account, legacySetting, org, productsCount, combosCount] = await Promise.all([
-      prisma.whatsAppClient.findFirst().catch(() => null),
+    const activeClient = await getActiveSessionClient();
+    const [settings, company, account, legacySetting, org, productsCount, combosCount] = await Promise.all([
       prisma.whatsAppSettings.findFirst().catch(() => null),
       prisma.companySettings.findFirst().catch(() => null),
       prisma.whatsAppAccount.findFirst().catch(() => null),
@@ -7227,6 +7383,7 @@ export async function getWhatsAppBrandDetailsAction() {
       prisma.shopifyCombo.count({ where: { is_active: true } }).catch(() => 0)
     ]);
 
+    const client = activeClient || await prisma.whatsAppClient.findFirst().catch(() => null);
     const brandName = client?.businessName || company?.companyName || org?.name || account?.name || "What-In Platform";
     
     // Resolve public storefront domain
@@ -7240,7 +7397,7 @@ export async function getWhatsAppBrandDetailsAction() {
       brandDomain = rawDomain.includes("what-in") ? "what-in.tinkal.in" : rawDomain;
     }
 
-    const phoneNumber = client?.phoneNumber || client?.contactPhone || company?.mobile || company?.phone || account?.phoneNumber || "Not Configured";
+    const phoneNumber = client?.phoneNumber || client?.contactPhone || company?.mobile || (company as any)?.phone || account?.phoneNumber || "Not Configured";
     const brandEmail = client?.contactEmail || company?.email || org?.email || `support@${brandDomain}`;
     const brandAddress = company?.address 
       ? `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim()

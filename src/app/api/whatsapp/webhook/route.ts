@@ -445,14 +445,16 @@ export async function POST(req: NextRequest) {
               data: { name: "Meta Flow Form", fields: "[]" }
             });
           }
-          await prisma.whatsAppFormSubmission.create({
-            data: {
-              formId: formRecord.id,
-              conversationId: conversation.id,
-              customerId: customer.id,
-              dataJson: flowReply.response_json || "{}"
-            }
-          });
+          if (conversation) {
+            await prisma.whatsAppFormSubmission.create({
+              data: {
+                formId: formRecord.id,
+                conversationId: conversation.id,
+                customerId: customer.id,
+                dataJson: flowReply.response_json || "{}"
+              }
+            });
+          }
         } catch (err) {
           console.error("Failed to log form submission in webhook:", err);
         }
@@ -518,7 +520,7 @@ export async function POST(req: NextRequest) {
           await prisma.customer.update({
             where: { id: customer.id },
             data: { 
-              leadSource: "Meta Click-to-WhatsApp Ad",
+              source: "Meta Click-to-WhatsApp Ad",
               tags: newTags.join(', ')
             }
           });
