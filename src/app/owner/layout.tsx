@@ -11,7 +11,7 @@ export const metadata = {
 
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ margin: 0, fontFamily: "Inter, -apple-system, sans-serif", background: "#0a0a0f", color: "#e2e8f0", minHeight: "100vh" }}>
+    <div style={{ margin: 0, fontFamily: "Inter, -apple-system, sans-serif", background: "#f8fafc", color: "#0f172a", minHeight: "100vh" }}>
       {children}
     </div>
   );

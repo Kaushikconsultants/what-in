@@ -1,50 +1,149 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const PLANS = [
-  { name: "STARTER", price: "₹999/mo", agents: "3 agents", color: "#3b82f6", desc: "For small businesses starting with WhatsApp automation" },
-  { name: "GROWTH", price: "₹2,499/mo", agents: "10 agents", color: "#7c3aed", desc: "Growing teams needing advanced automation & CRM" },
-  { name: "ENTERPRISE", price: "₹5,999/mo", agents: "Unlimited", color: "#f59e0b", desc: "Large operations with full feature access & priority support" },
-  { name: "CUSTOM", price: "Custom", agents: "Custom", color: "#10b981", desc: "Special pricing and configuration for unique requirements" },
+  {
+    name: "STARTER",
+    price: "₹999",
+    cycle: "per month",
+    agents: "Up to 3 Agent Logins",
+    color: "#3b82f6",
+    bg: "#eff6ff",
+    border: "#bfdbfe",
+    desc: "For small businesses starting with automated WhatsApp messaging, inbox, and AI auto-reply.",
+    features: ["3 Team Agent Accounts", "5,000 Messages / mo", "500 AI Auto-Replies / mo", "Standard Webhooks", "Community Support"]
+  },
+  {
+    name: "GROWTH",
+    price: "₹2,499",
+    cycle: "per month",
+    agents: "Up to 10 Agent Logins",
+    color: "#7c3aed",
+    bg: "#f5f3ff",
+    border: "#ddd6fe",
+    desc: "Growing teams needing multi-agent collaboration, advanced chatbots, and Shopify commerce sync.",
+    features: ["10 Team Agent Accounts", "25,000 Messages / mo", "2,500 AI Auto-Replies / mo", "Shopify E-Commerce Sync", "Flows & Interactive Bots"]
+  },
+  {
+    name: "ENTERPRISE",
+    price: "₹5,999",
+    cycle: "per month",
+    agents: "Unlimited Agents",
+    color: "#f59e0b",
+    bg: "#fffbeb",
+    border: "#fde68a",
+    desc: "High-volume commerce brands with custom webhook routing, dedicated throughput, and VIP SLA.",
+    features: ["Unlimited Team Agents", "100,000 Messages / mo", "10,000 AI Auto-Replies / mo", "Priority Graph API Queue", "Custom CRM Webhook Endpoints"]
+  },
+  {
+    name: "CUSTOM",
+    price: "Custom",
+    cycle: "tailored billing",
+    agents: "Custom Agents & Quotas",
+    color: "#10b981",
+    bg: "#f0fdf4",
+    border: "#bbf7d0",
+    desc: "Special corporate agreements with custom message limits, dedicated databases, or white-labeling.",
+    features: ["Custom Agent Quota", "Custom Volume Limits", "White-Label Setup", "Dedicated Support Manager", "Custom Integrations"]
+  },
 ];
 
 export default function OwnerPlansPage() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    sessionStorage.removeItem("owner_authed");
+    await fetch("/api/owner/auth", { method: "DELETE" });
+    router.push("/owner/login");
+  };
+
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0a0a0f 0%, #0f0f1a 100%)" }}>
-      <header style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      {/* Header */}
+      <header style={{ background: "#ffffff", borderBottom: "1px solid #e2e8f0", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #7c3aed, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>👑</div>
-          <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#f8fafc" }}>Owner Console</h1>
+          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(79,70,229,0.25)" }}>👑</div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.3px" }}>Owner Console</h1>
+            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>What-In SaaS Management</p>
+          </div>
         </div>
-        <nav style={{ display: "flex", gap: "4px" }}>
-          {[{ label: "Dashboard", href: "/owner", icon: "📊" }, { label: "Clients", href: "/owner/clients", icon: "🏢" }, { label: "Plans", href: "/owner/plans", icon: "💎" }].map(item => (
-            <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: item.href === "/owner/plans" ? "rgba(124,58,237,0.2)" : "transparent", border: item.href === "/owner/plans" ? "1px solid rgba(124,58,237,0.3)" : "1px solid transparent", color: "#94a3b8", textDecoration: "none", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
+        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          {[
+            { label: "Dashboard", href: "/owner", icon: "📊" },
+            { label: "Clients", href: "/owner/clients", icon: "🏢" },
+            { label: "Announcements", href: "/owner/announcements", icon: "📢" },
+            { label: "Plans", href: "/owner/plans", icon: "💎" },
+          ].map(item => (
+            <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: item.href === "/owner/plans" ? "#eef2ff" : "transparent", border: item.href === "/owner/plans" ? "1px solid #c7d2fe" : "1px solid transparent", color: item.href === "/owner/plans" ? "#4f46e5" : "#64748b", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
               {item.icon} {item.label}
             </Link>
           ))}
+          <button onClick={handleLogout} style={{ marginLeft: "12px", padding: "8px 14px", borderRadius: "10px", background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+            Sign Out
+          </button>
         </nav>
       </header>
-      <main style={{ padding: "32px" }}>
-        <h2 style={{ fontSize: "22px", fontWeight: 800, color: "#f1f5f9", margin: "0 0 8px 0" }}>Subscription Plans</h2>
-        <p style={{ color: "#475569", fontSize: "13px", margin: "0 0 28px 0" }}>Plans are set manually per client in the Clients tab. These are reference pricing tiers.</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "20px" }}>
+
+      <main style={{ padding: "32px", maxWidth: "1400px", margin: "0 auto" }}>
+        <div style={{ marginBottom: "28px" }}>
+          <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#0f172a", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>💎 SaaS Subscription Tier Reference</h2>
+          <p style={{ color: "#64748b", fontSize: "14px", margin: 0 }}>Standard pricing tiers and feature allocations for What-In clients. Plans and custom monthly fees are assigned per client in the Clients tab.</p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "24px" }}>
           {PLANS.map(plan => (
-            <div key={plan.name} style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${plan.color}30`, borderRadius: "18px", padding: "24px", position: "relative", overflow: "hidden" }}>
-              <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: `${plan.color}20`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "14px" }}>
-                <div style={{ width: "16px", height: "16px", borderRadius: "4px", background: plan.color }} />
+            <div key={plan.name} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "28px", position: "relative", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <span style={{ padding: "4px 12px", background: plan.bg, border: `1px solid ${plan.border}`, borderRadius: "999px", color: plan.color, fontSize: "12px", fontWeight: 800, letterSpacing: "0.05em" }}>
+                    {plan.name}
+                  </span>
+                  <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: plan.color }} />
+                </div>
+
+                <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "32px", fontWeight: 900, color: "#0f172a", letterSpacing: "-1px" }}>{plan.price}</span>
+                  <span style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>{plan.cycle}</span>
+                </div>
+                
+                <div style={{ fontSize: "13px", color: "#4f46e5", fontWeight: 700, marginBottom: "16px" }}>
+                  👥 {plan.agents}
+                </div>
+
+                <p style={{ fontSize: "13px", color: "#475569", margin: "0 0 20px 0", lineHeight: "1.5" }}>
+                  {plan.desc}
+                </p>
+
+                <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: "16px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>Plan Inclusions</div>
+                  <ul style={{ margin: 0, paddingLeft: "18px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {plan.features.map(f => (
+                      <li key={f} style={{ fontSize: "13px", color: "#334155" }}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: plan.color, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>{plan.name}</div>
-              <div style={{ fontSize: "28px", fontWeight: 900, color: "#f1f5f9", letterSpacing: "-1px", marginBottom: "4px" }}>{plan.price}</div>
-              <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "12px" }}>{plan.agents}</div>
-              <p style={{ fontSize: "13px", color: "#475569", margin: 0, lineHeight: "1.5" }}>{plan.desc}</p>
+
+              <div style={{ marginTop: "24px" }}>
+                <Link href="/owner/clients" style={{ display: "block", textAlign: "center", padding: "10px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", textDecoration: "none", fontSize: "13px", fontWeight: 700, transition: "background 0.2s" }}>
+                  Assign to Client →
+                </Link>
+              </div>
             </div>
           ))}
         </div>
-        <div style={{ marginTop: "32px", padding: "20px", background: "rgba(124,58,237,0.05)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: "12px" }}>
-          <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
-            💡 <strong style={{ color: "#c4b5fd" }}>Tip:</strong> To change a client's plan or monthly fee, go to <Link href="/owner/clients" style={{ color: "#a78bfa" }}>Clients</Link> → click <strong>✏️ Edit</strong> on the client row.
-          </p>
+
+        <div style={{ marginTop: "32px", padding: "20px 24px", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: "16px", display: "flex", alignItems: "center", gap: "16px" }}>
+          <span style={{ fontSize: "28px" }}>💡</span>
+          <div>
+            <h4 style={{ margin: "0 0 2px 0", fontSize: "14px", fontWeight: 800, color: "#4338ca" }}>Customizable Client Pricing</h4>
+            <p style={{ margin: 0, fontSize: "13px", color: "#475569", lineHeight: 1.5 }}>
+              You can override any client's monthly fee, agent seat limit, or message/AI quotas at any time. Go to <Link href="/owner/clients" style={{ color: "#4f46e5", fontWeight: 700 }}>Clients</Link> and click <b>✏️ Edit</b>.
+            </p>
+          </div>
         </div>
       </main>
     </div>

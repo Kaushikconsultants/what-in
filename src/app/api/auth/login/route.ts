@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
     // Check WhatsAppAgentUser table first (SaaS agents)
     const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email } });
     if (agent && agent.password === password && agent.isActive) {
-      const res = NextResponse.json({ success: true, name: agent.name, role: agent.role });
+      const mustChange = agent.mustChangePassword ?? false;
+      const res = NextResponse.json({ success: true, name: agent.name, role: agent.role, mustChangePassword: mustChange });
       res.cookies.set("wm_session", SESSION_SECRET, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
         path: "/",
         sameSite: "lax"
       });
-      res.cookies.set("wm_user", JSON.stringify({ name: agent.name, email: agent.email, role: agent.role }), {
+      res.cookies.set("wm_user", JSON.stringify({ name: agent.name, email: agent.email, role: agent.role, clientId: agent.clientId, mustChangePassword: mustChange }), {
         httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         maxAge: 60 * 60 * 24 * 7,

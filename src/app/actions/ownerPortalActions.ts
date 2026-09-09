@@ -520,3 +520,215 @@ export async function loginAsClientAction(clientId: string) {
   }
 }
 
+// -------------------------------------------------------------
+// 1. Meta WABA & Webhook Health Live Diagnostics
+// -------------------------------------------------------------
+export async function checkClientMetaHealthAction(clientId: string) {
+  try {
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+    if (!client) return { success: false, error: "Client not found" };
+
+    if (!client.metaAccessToken || !client.phoneId) {
+      return {
+        success: true,
+        configured: false,
+        status: "NOT_CONFIGURED",
+        message: "WABA Phone ID or Permanent Access Token is missing.",
+        client
+      };
+    }
+
+    const start = Date.now();
+    const metaRes = await fetch(
+      `https://graph.facebook.com/v21.0/${client.phoneId}?fields=display_phone_number,verified_name,quality_rating,code_verification_status,messaging_limit_tier`,
+      {
+        headers: { Authorization: `Bearer ${client.metaAccessToken}` },
+        cache: "no-store"
+      }
+    );
+    const latency = Date.now() - start;
+    const metaData = await metaRes.json();
+
+    if (!metaRes.ok || metaData.error) {
+      return {
+        success: true,
+        configured: true,
+        isValidToken: false,
+        status: "TOKEN_INVALID",
+        error: metaData.error?.message || "Invalid or expired Meta Access Token",
+        errorCode: metaData.error?.code,
+        latencyMs: latency,
+        client
+      };
+    }
+
+    // Also check WABA info if WABA ID is available
+    let wabaName = "";
+    if (client.wabaId) {
+      try {
+        const wabaRes = await fetch(
+          `https://graph.facebook.com/v21.0/${client.wabaId}?fields=name,timezone_id,currency`,
+          { headers: { Authorization: `Bearer ${client.metaAccessToken}` }, cache: "no-store" }
+        );
+        const wabaData = await wabaRes.json();
+        if (wabaData.name) wabaName = wabaData.name;
+      } catch {}
+    }
+
+    return {
+      success: true,
+      configured: true,
+      isValidToken: true,
+      status: "HEALTHY",
+      displayPhoneNumber: metaData.display_phone_number || client.phoneNumber || "Verified",
+      verifiedName: metaData.verified_name || client.businessName,
+      wabaName,
+      qualityRating: metaData.quality_rating || "GREEN",
+      codeVerificationStatus: metaData.code_verification_status || "VERIFIED",
+      messagingLimitTier: metaData.messaging_limit_tier || "TIER_1K",
+      latencyMs: latency,
+      webhookVerified: !!client.webhookVerifyToken,
+      client
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+// -------------------------------------------------------------
+// 2. Message & AI Quotas Management
+// -------------------------------------------------------------
+export async function updateClientQuotasAction(clientId: string, data: {
+  monthlyMessageQuota?: number;
+  monthlyAiQuota?: number;
+  resetCounts?: boolean;
+}) {
+  try {
+    const updateData: any = {};
+    if (data.monthlyMessageQuota !== undefined) updateData.monthlyMessageQuota = Number(data.monthlyMessageQuota);
+    if (data.monthlyAiQuota !== undefined) updateData.monthlyAiQuota = Number(data.monthlyAiQuota);
+    if (data.resetCounts) {
+      updateData.messagesUsedCount = 0;
+      updateData.aiRepliesUsedCount = 0;
+    }
+
+    const client = await prisma.whatsAppClient.update({
+      where: { id: clientId },
+      data: updateData
+    });
+    return { success: true, client };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+// -------------------------------------------------------------
+// 3. Global In-App Announcements (CRUD)
+// -------------------------------------------------------------
+export async function getAnnouncementsAction() {
+  try {
+    const announcements = await prisma.whatsAppAnnouncement.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+    return { success: true, announcements };
+  } catch (e: any) {
+    return { success: false, error: e.message, announcements: [] };
+  }
+}
+
+export async function getActiveAnnouncementsAction() {
+  try {
+    const announcements = await prisma.whatsAppAnnouncement.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: "desc" }
+    });
+    return { success: true, announcements };
+  } catch (e: any) {
+    return { success: false, error: e.message, announcements: [] };
+  }
+}
+
+export async function createAnnouncementAction(data: {
+  title: string;
+  message: string;
+  type: string; // INFO, WARNING, MAINTENANCE, SUCCESS
+  targetPlan?: string;
+  expiresAt?: string;
+}) {
+  try {
+    const announcement = await prisma.whatsAppAnnouncement.create({
+      data: {
+        title: data.title.trim(),
+        message: data.message.trim(),
+        type: data.type || "INFO",
+        targetPlan: data.targetPlan || "ALL",
+        isActive: true,
+        expiresAt: data.expiresAt ? new Date(data.expiresAt) : null
+      }
+    });
+    return { success: true, announcement };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function toggleAnnouncementAction(id: string, isActive: boolean) {
+  try {
+    const announcement = await prisma.whatsAppAnnouncement.update({
+      where: { id },
+      data: { isActive }
+    });
+    return { success: true, announcement };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function deleteAnnouncementAction(id: string) {
+  try {
+    await prisma.whatsAppAnnouncement.delete({ where: { id } });
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+// -------------------------------------------------------------
+// 4. First-Login Password Change Action
+// -------------------------------------------------------------
+export async function changeUserPasswordAction(email: string, newPassword: string) {
+  try {
+    if (!newPassword || newPassword.trim().length < 4) {
+      return { success: false, error: "Password must be at least 4 characters long" };
+    }
+
+    const cleanPass = newPassword.trim();
+    const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email } });
+
+    if (!agent) {
+      return { success: false, error: "User account not found" };
+    }
+
+    await prisma.whatsAppAgentUser.update({
+      where: { email },
+      data: {
+        password: cleanPass,
+        mustChangePassword: false
+      }
+    });
+
+    // If this user is an admin of a client, also update client adminPassword
+    if (agent.role === "ADMIN" && agent.clientId) {
+      await prisma.whatsAppClient.update({
+        where: { id: agent.clientId },
+        data: { adminPassword: cleanPass }
+      });
+    }
+
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+

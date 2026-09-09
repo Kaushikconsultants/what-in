@@ -1968,6 +1968,12 @@ model WhatsAppClient {
   isActive        Boolean  @default(true)
   notes           String?
 
+  // Monthly quotas & usage limits
+  monthlyMessageQuota Int     @default(5000)
+  monthlyAiQuota      Int     @default(500)
+  messagesUsedCount   Int     @default(0)
+  aiRepliesUsedCount  Int     @default(0)
+
   // Meta (WhatsApp Business) API credentials — set by owner or client admin
   wabaId          String?  // WhatsApp Business Account ID
   phoneId         String?  // Phone Number ID from Meta
@@ -2000,16 +2006,28 @@ model WhatsAppClientPayment {
 }
 
 model WhatsAppAgentUser {
-  id          String          @id @default(uuid())
-  clientId    String
-  client      WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name        String
-  email       String          @unique
-  password    String
-  role        String          @default("AGENT") // ADMIN, AGENT
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id                 String          @id @default(uuid())
+  clientId           String
+  client             WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name               String
+  email              String          @unique
+  password           String
+  role               String          @default("AGENT") // ADMIN, AGENT
+  mustChangePassword Boolean         @default(true)
+  isActive           Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model WhatsAppAnnouncement {
+  id          String    @id @default(uuid())
+  title       String
+  message     String
+  type        String    @default("INFO") // INFO, WARNING, MAINTENANCE, SUCCESS
+  isActive    Boolean   @default(true)
+  targetPlan  String?   @default("ALL")  // ALL or specific plan
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
 }
 
 model WhatsAppMetaFlow {
