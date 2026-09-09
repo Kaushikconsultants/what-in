@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { CheckCircle2, AlertTriangle, RefreshCw, PhoneCall, TrendingUp, Users, MessageSquare, Zap, Activity, Box, Search, Bell } from "lucide-react";
@@ -10,7 +10,7 @@ import {
   checkIntegrationHealthAction
 } from "@/app/actions/whatsAppPlatformActions";
 
-export default function What-InDashboard() {
+export default function WhatInDashboard() {
   const [data, setData] = useState<any | null>(null);
   const [health, setHealth] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
