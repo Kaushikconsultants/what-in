@@ -1,0 +1,2057 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------
+// Multi-Tenant SaaS Platform: Organizations & Subscriptions
+// ---------------------------------------------------------
+model Organization {
+  id                    String    @id @default(uuid())
+  name                  String    // Company Legal Name e.g. "Acme Clothing Pvt Ltd"
+  slug                  String    @unique // Unique URL slug e.g. "acme-clothing"
+  tradeName             String?
+  industry              String?   @default("Apparel & Garments") // Apparel, Manufacturing, Wholesale, Retail
+  businessType          String?   @default("Private Limited") // Pvt Ltd, Partnership, Proprietorship
+  gstin                 String?
+  pan                   String?
+  phone                 String?
+  email                 String
+  website               String?
+  logoUrl               String?
+  address               String?
+  city                  String?
+  state                 String?
+  pincode               String?
+  country               String    @default("India")
+
+  // Subscription Plan & Billing Cycle
+  subscriptionPlan      String    @default("GROWTH") // TRIAL, STARTER, GROWTH, ENTERPRISE, CUSTOM
+  billingCycle          String    @default("MONTHLY") // MONTHLY, QUARTERLY, ANNUALLY
+  subscriptionStatus    String    @default("ACTIVE")  // TRIAL, ACTIVE, PAST_DUE, EXPIRED, CANCELLED
+  trialEndsAt           DateTime?
+  currentPeriodStart    DateTime  @default(now())
+  currentPeriodEnd      DateTime  @default(now())
+  cancelAtPeriodEnd     Boolean   @default(false)
+
+  // Payment Gateway References
+  gatewayCustomerId     String?   // Razorpay Customer ID
+  gatewaySubscriptionId String?   // Razorpay Subscription ID
+
+  // Quotas & Feature Access
+  maxUsers              Int       @default(10)
+  maxBranches           Int       @default(3)
+  maxWarehouses         Int       @default(2)
+  monthlyOrderLimit     Int       @default(2000)
+  whatsAppCreditBalance Int       @default(1000)
+
+  isGstEnabled          Boolean   @default(true)
+  isWhatsAppEnabled     Boolean   @default(true)
+  isEWayBillEnabled     Boolean   @default(true)
+  isHrmsEnabled         Boolean   @default(true)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  users                 User[]
+  employees             Employee[]
+  customers             Customer[]
+  vendors               Vendor[]
+  products              Product[]
+  orders                Order[]
+  invoices              Invoice[]
+  bills                 Bill[]
+  quotations            Quotation[]
+  creditNotes           CreditNote[]
+  branches              Branch[]
+  warehouses            Warehouse[]
+  companySettings       CompanySettings?
+  gstSettings           GstSetting?
+  subscriptions         SubscriptionHistory[]
+  invoicesIssued        SubscriptionInvoice[]
+  gstFilingReturns      GstFilingReturn[]
+  eWayBills             EWayBill[]
+}
+
+model SubscriptionHistory {
+  id                String       @id @default(uuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan              String       // STARTER, GROWTH, ENTERPRISE
+  billingCycle      String       // MONTHLY, QUARTERLY, ANNUALLY
+  amount            Float
+  currency          String       @default("INR")
+  taxAmount         Float        @default(0) // 18% GST on SaaS
+  totalAmount       Float
+  status            String       @default("PAID") // PAID, PENDING, FAILED, REFUNDED
+  paymentMethod     String?      // UPI, CARD, NETBANKING
+  gatewayPaymentId  String?
+  startDate         DateTime     @default(now())
+  endDate           DateTime
+  createdAt         DateTime     @default(now())
+}
+
+model SubscriptionInvoice {
+  id                String       @id @default(uuid())
+  invoiceNumber     String       @unique // SaaS-2024-0001
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount            Float
+  cgst              Float        @default(0)
+  sgst              Float        @default(0)
+  igst              Float        @default(0)
+  total             Float
+  paidAt            DateTime?
+  pdfUrl            String?
+  createdAt         DateTime     @default(now())
+}
+
+model PlatformPricingSetting {
+  id                    String   @id @default("default")
+  starterMonthlyPrice   Float    @default(999)
+  starterQuarterlyPrice Float    @default(2699)
+  starterAnnualPrice    Float    @default(9599)
+  starterMaxUsers       Int      @default(3)
+  starterMaxOrders      Int      @default(500)
+  starterWhatsAppCredits Int     @default(500)
+  starterFeatures       String[] @default(["Up to 3 Users", "1 Branch", "500 Orders / mo", "Basic CRM & Invoicing", "500 WhatsApp Msgs", "GST Reports"])
+
+  growthMonthlyPrice    Float    @default(2499)
+  growthQuarterlyPrice  Float    @default(6749)
+  growthAnnualPrice     Float    @default(23999)
+  growthMaxUsers        Int      @default(10)
+  growthMaxOrders       Int      @default(2000)
+  growthWhatsAppCredits Int      @default(2500)
+  growthFeatures        String[] @default(["Up to 10 Users", "3 Branches & 2 Warehouses", "2,000 Orders / mo", "Full CRM & Purchase Ledger", "Live GST Portal Filing (1/3B/2B)", "2,500 WhatsApp Msgs & AI"])
+
+  enterpriseMonthlyPrice Float   @default(5999)
+  enterpriseQuarterlyPrice Float @default(16199)
+  enterpriseAnnualPrice   Float  @default(57599)
+  enterpriseMaxUsers     Int      @default(999)
+  enterpriseMaxOrders    Int      @default(999999)
+  enterpriseWhatsAppCredits Int   @default(10000)
+  enterpriseFeatures     String[] @default(["Unlimited Users", "Unlimited Branches & Multi-Warehouse", "Unlimited Orders", "Automated E-Way Bill Generation", "Dedicated WhatsApp AI Bot", "Priority Support & API Access"])
+
+  updatedAt             DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// User & Role Management
+// ---------------------------------------------------------
+model User {
+  id                String        @id @default(uuid())
+  organizationId    String?
+  organization      Organization? @relation(fields: [organizationId], references: [id])
+  name              String
+  email             String        @unique
+  password          String
+  role              String        @default("SALES")
+  roleId            String?
+  roleDef           Role?         @relation(fields: [roleId], references: [id])
+  isActive          Boolean       @default(true)
+  canManageSettings Boolean       @default(false)
+  allowedSections   String? // Comma-separated or JSON array of section keys allowed for this user
+  avatarUrl         String?
+  image             String?
+  lastActiveAt      DateTime?
+  presenceStatus    String?       @default("OFFLINE") // "ONLINE", "IDLE", "OFFLINE"
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  employee          Employee?
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  customerProfile   Customer?     @relation("CustomerUser")
+  broadcastsCreated TeamBroadcast[] @relation("BroadcastAuthor")
+  broadcastReplies  BroadcastReply[]
+  broadcastReads    BroadcastRead[]
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  permissions String   // JSON string of permissions
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// Employee & HR Management
+// ---------------------------------------------------------
+model Employee {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  employeeId      String   @unique // Company generated ID
+  mobile          String?
+  joiningDate     DateTime?
+  department      String?
+  designation     String?
+  employmentStatus String  @default("Active")
+  chatAvailable    Boolean @default(true)  // Temporary toggle for chat assignment only
+  salary          Float?
+  target          Float?
+  bankDetails     String?
+  address         String?
+  emergencyContact String?
+  notes           String?
+
+  branchId        String?
+  branch          Branch?  @relation(fields: [branchId], references: [id])
+
+  teamId          String?
+  team            Team?    @relation(fields: [teamId], references: [id])
+  managerId       String?
+  manager         Employee? @relation("ManagerToEmployee", fields: [managerId], references: [id])
+  subordinates    Employee[] @relation("ManagerToEmployee")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  customers       Customer[] @relation("AssignedSalesperson")
+  calls           Call[]
+  followUps       FollowUp[]
+  tasksAssigned   Task[]     @relation("TaskAssignee")
+  tasksCreated    Task[]     @relation("TaskCreator")
+  orders          Order[]
+  attendances     Attendance[]
+  leaves          Leave[]
+  salaries        Salary[]
+  incentives      Incentive[]
+  quotations      Quotation[]
+  inventoryTransactions InventoryTransaction[]
+  expenses        Expense[]
+  round1Candidates Candidate[] @relation("CandidateRound1Interviewer")
+  round2Candidates Candidate[] @relation("CandidateRound2Interviewer")
+  round3Candidates Candidate[] @relation("CandidateRound3Interviewer")
+  assignedWhatsAppConversations WhatsAppConversation[] @relation("AssignedAgent")
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  leaderId    String?  @unique
+  members     Employee[]
+  whatsAppConversations WhatsAppConversation[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// Customer CRM
+// ---------------------------------------------------------
+model Customer {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  businessName    String
+  contactPerson   String
+  mobile          String
+  whatsappNumber  String?
+  alternatePhone  String?
+  gstNumber       String?
+  pan             String?
+  billingAddress  String?
+  shippingAddress String?
+  landmark        String?
+
+  openingBalance  Float    @default(0)
+  openingBalanceType String? @default("DEBIT") // "DEBIT" (To Receive / Dr) or "CREDIT" (To Pay / Cr)
+
+  regularDiscount String?
+  preferredPaymentMethod String?
+
+  customerType    String?  // e.g., Wholesaler, Retailer
+  businessCategory String?
+  source          String?  // e.g., Website, Reference, Cold Call
+
+  status          String   @default("New Lead")
+  leadStage       String   @default("Contacted")
+
+  assignedSalespersonId String?
+  assignedSalesperson   Employee? @relation("AssignedSalesperson", fields: [assignedSalespersonId], references: [id])
+
+  lastContactDate DateTime?
+  nextFollowUp    DateTime?
+  notes           String?
+  tags            String?
+
+  healthScore          Float?
+  leadScore            Int?
+  temperature          String?  // HOT, WARM, COLD
+  portalUserId         String?  @unique
+  portalUser           User?    @relation("CustomerUser", fields: [portalUserId], references: [id])
+  expectedValue        Float? @default(0)
+  averageOrderCycleDays Int?
+  preferences          String? // JSON string
+  territoryId          String?
+  territory            Territory? @relation(fields: [territoryId], references: [id])
+  marketingOptOut      Boolean  @default(false)
+  optedOutAt           DateTime?
+
+  totalPurchaseValue Float @default(0)
+  totalOrders        Int   @default(0)
+  retentionStatus    String @default("Active")
+
+  branchId        String?
+  branch          Branch?  @relation(fields: [branchId], references: [id])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  calls           Call[]
+  followUps       FollowUp[]
+  tasks           Task[]
+  orders          Order[]
+  quotations      Quotation[]
+  invoices        Invoice[]
+  creditNotes     CreditNote[]
+  ewayBills       EWayBill[]
+  payments        Payment[]
+
+  whatsAppConversations WhatsAppConversation[]
+  whatsAppPaymentLinks  WhatsAppPaymentLink[]
+  whatsAppFormSubmissions WhatsAppFormSubmission[]
+}
+
+// ---------------------------------------------------------
+// Sales & Activity (Calls, FollowUps, Tasks)
+// ---------------------------------------------------------
+model Call {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  callType     String   // Incoming / Outgoing
+  durationSec  Int?
+  status       String   // Connected, Missed, etc.
+  outcome      String   // Order Confirmed, Call Back, etc.
+  notes        String?
+  nextAction   String?
+  followUpDate DateTime?
+  recordingUrl String?
+  summary      String?
+
+  createdAt    DateTime @default(now())
+}
+
+model FollowUp {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  date         DateTime
+  followUpType String
+  priority     String   @default("Medium")
+  notes        String?
+  expectedOutcome String?
+  status       String   @default("Pending") // Pending, Completed, Rescheduled, Cancelled
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Task {
+  id           String   @id @default(uuid())
+  title        String
+  description  String?
+  priority     String   @default("Medium")
+  dueDate      DateTime?
+  status       String   @default("To Do")
+
+  assigneeId   String
+  assignee     Employee @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creatorId    String
+  creator      Employee @relation("TaskCreator", fields: [creatorId], references: [id])
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id])
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// Products & Orders
+// ---------------------------------------------------------
+model Product {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  name            String
+  sku             String?  @unique
+  articleNumber   String?  @unique
+  hsnCode         String?
+  category        String
+  subCategory     String?
+  fabric          String?
+  color           String?
+  size            String?
+  purchasePrice   Float
+  sellingPrice    Float
+  mrp             Float
+  stockQuantity   Int      @default(0)
+  minimumStock    Int      @default(10)
+  status          String   @default("Active")
+  description     String?
+  weight          Float?   @default(0)
+  images          String[] @default([])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orderItems      OrderItem[]
+  quotationItems  QuotationItem[]
+  inventoryTransactions InventoryTransaction[]
+  purchaseOrderItems PurchaseOrderItem[]
+  creditNoteItems CreditNoteItem[]
+  billItems       BillItem[]
+  vendorCreditItems VendorCreditItem[]
+}
+
+model ProductCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  weight      Float    @default(0)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model InventoryTransaction {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  type        String   // "IN", "OUT", "ADJUSTMENT"
+  quantity    Int
+  reference   String?  // Order ID, PO number, or manual scan
+  date        DateTime @default(now())
+  employeeId  String?
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+  warehouseId String?
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+  notes       String?
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  orderNumber     String   @unique
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  salespersonId   String
+  salesperson     Employee @relation(fields: [salespersonId], references: [id])
+
+  orderDate       DateTime @default(now())
+  deliveryDate    DateTime?
+
+  totalValue      Float
+  discount        Float    @default(0)
+  tax             Float    @default(0)
+  paymentReceived Float    @default(0)
+  outstandingAmount Float  @default(0)
+
+  paymentStatus   String   @default("Unpaid") // Unpaid, Partially Paid, Paid
+  orderStatus     String   @default("Processing") // Processing, Packed, Dispatched, Delivered, Cancelled
+  notes           String?
+
+  // GST & Financial Fields
+  placeOfSupply   String?
+  subtotal        Float    @default(0)
+  cgst            Float    @default(0)
+  sgst            Float    @default(0)
+  igst            Float    @default(0)
+  isInterstate    Boolean  @default(false)
+
+  // Shipping & Tracking fields
+  awbNumber       String?
+  courierName     String?
+  trackingUrl     String?
+  dispatchDate    DateTime?
+  expectedDeliveryDate DateTime?
+  shippingStatus  String? // e.g. "In Transit", "Out for Delivery", "Delivered", "RTO"
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           OrderItem[]
+  invoices        Invoice[]
+  creditNotes     CreditNote[]
+  ewayBills       EWayBill[]
+  payments        Payment[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity  Int
+  rate      Float
+  hsnCode   String? @default("6109")
+  gstRate   Float   @default(12)
+  cgst      Float   @default(0)
+  sgst      Float   @default(0)
+  igst      Float   @default(0)
+  total     Float
+}
+
+// ---------------------------------------------------------
+// Performance & Financials
+// ---------------------------------------------------------
+model Attendance {
+  id          String   @id @default(uuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  date        DateTime
+  checkIn     DateTime?
+  checkOut    DateTime?
+  status      String   @default("Present") // Present, Absent, Half Day, Leave
+  workingHours Float?
+  notes       String?
+
+  createdAt   DateTime @default(now())
+}
+
+model Leave {
+  id          String   @id @default(uuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  leaveType   String
+  startDate   DateTime
+  endDate     DateTime
+  numberOfDays Int
+  reason      String
+  status      String   @default("Pending") // Pending, Approved, Rejected
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Salary {
+  id          String   @id @default(uuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  month       String   // e.g. "2023-10"
+  basicSalary Float
+  hra         Float    @default(0)
+  allowances  Float    @default(0)
+  deductions  Float    @default(0)
+  bonus       Float    @default(0)
+  advance     Float    @default(0)
+  netSalary   Float
+  paymentDate DateTime?
+  status      String   @default("Pending") // Pending, Processed, Paid
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Incentive {
+  id              String   @id @default(uuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  month           String   // e.g. "2023-10"
+  eligibleSales   Float
+  incentiveRate   Float
+  incentiveEarned Float
+  status          String   @default("Pending") // Pending, Approved, Paid
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// System & Admin
+// ---------------------------------------------------------
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  action      String
+  module      String
+  recordId    String
+  previousValue String? // JSON string
+  newValue      String? // JSON string
+  createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// Telecalling (Scripts & Objections)
+// ---------------------------------------------------------
+model CallScript {
+  id          String   @id @default(uuid())
+  stage       String   @unique // e.g. "New Lead", "Follow Up", "Negotiation"
+  content     String   // The actual script content (can be markdown)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Objection {
+  id          String   @id @default(uuid())
+  concern     String   // e.g. "Price is too high"
+  response    String   // The suggested response
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// CRM Additions
+// ---------------------------------------------------------
+model Territory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  pincodes    String?  // comma-separated list
+  description String?
+  customers   Customer[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   // e.g. Alert, Reminder, Message
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+}
+
+model IncentiveRule {
+  id          String   @id @default(uuid())
+  name        String
+  condition   String   // JSON string describing the condition
+  rewardType  String   // e.g. Percentage, Fixed
+  rewardValue Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// Company Settings & Invoicing / Quotations
+// ---------------------------------------------------------
+model CompanySettings {
+  id            String   @id @default("default")
+  organizationId String?  @unique
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  companyName   String   @default("Espon Clothing Private Limited")
+  address       String   @default("Sco 71A , 2nd Floor , Ashoka PlazaDelhi Road")
+  city          String   @default("Rohtak")
+  state         String   @default("Haryana")
+  pincode       String   @default("124001")
+  country       String   @default("India")
+  gstin         String?  @default("06AAHCE7721Q1Z4")
+  pan           String?  @default("AAHCE7721Q")
+  mobile        String?  @default("7206066678")
+  email         String?  @default("clothingespon@gmail.com")
+  website       String?  @default("www.espon.in")
+  logoUrl       String?
+
+  bankAccountName String? @default("ESPON CLOTHING PRIVATE LIMITED.")
+  accountNumber   String? @default("016805006415")
+  ifscCode        String? @default("ICIC0000168")
+  branch          String? @default("Rohtak")
+  upiId           String? @default("7206066678@OKBIZAXIS")
+
+  signatoryUrl    String?
+  signatoryName   String? @default("Ashish Aggarwal")
+  signatoryDesignation String? @default("Authorized Signatory")
+
+  themeColor      String? @default("#4f46e5")
+  fontFamily      String? @default("Inter")
+  fontSize        String? @default("16px")
+  buttonRadius    String? @default("8px")
+  useBoldText     Boolean @default(false)
+  monthlyTarget   Float   @default(2000000)
+
+  callOutcomes    String[] @default(["Interested / Follow-up Needed", "Not Interested", "No Answer / Voicemail", "Order Placed", "Complaint / Support", "Call Back Later"])
+  callTypes       String[] @default(["Outbound Call (Made by us)", "Inbound Call (Received from customer)", "In-person Meeting", "WhatsApp Chat"])
+
+  nextQuotationNumber String? @default("QT-1001")
+  nextInvoiceNumber   String? @default("INV-1001")
+
+  shopifyStoreDomain  String?
+  shopifyAccessToken  String?
+
+  updatedAt       DateTime @updatedAt
+}
+
+model Quotation {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  quotationNumber String   @unique
+  revisionNumber  Int      @default(0)
+  parentQuoteId   String?
+  referenceNumber String?
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  salespersonId   String
+  salesperson     Employee @relation(fields: [salespersonId], references: [id])
+
+  date            DateTime @default(now())
+  expiryDate      DateTime?
+  placeOfSupply   String?
+  subject         String?
+  shippingAddress String?
+  billingAddress  String?
+
+  currency        String   @default("INR")
+  paymentTerms    String?
+  priceList       String?
+  warehouse       String?
+  deliveryTerms   String?
+  shippingMethod  String?
+  expectedDeliveryDate DateTime?
+  template        String   @default("Standard")
+
+  subtotal        Float    @default(0)
+  itemDiscount    Float    @default(0)
+  additionalDiscount Float @default(0)
+  taxableAmount   Float    @default(0)
+  shippingCharges Float    @default(0)
+  adjustment      Float    @default(0)
+  roundOff        Float    @default(0)
+  receivedAmount  Float    @default(0)
+  taxTotal        Float    @default(0)
+  cgst            Float    @default(0)
+  sgst            Float    @default(0)
+  igst            Float    @default(0)
+  totalValue      Float
+  totalQuantity   Float    @default(0)
+  totalItems      Int      @default(0)
+  totalWeight     Float?   @default(0)
+
+  isInterstate    Boolean  @default(false)
+  status          String   @default("Draft") // Draft, Sent, Viewed, Accepted, Declined, Expired, Converted
+  approvalStatus  String   @default("Approved") // Pending Approval, Approved, Rejected
+
+  notes           String?
+  internalNotes   String?
+  termsConditions String?
+
+  viewedDate      DateTime?
+  acceptedDate    DateTime?
+  declinedDate    DateTime?
+  ipAddress       String?
+  digitalSignature String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           QuotationItem[]
+  activities      QuotationActivity[]
+}
+
+model QuotationItem {
+  id          String    @id @default(uuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+
+  sku         String?
+  description String?
+  hsnCode     String?   @default("6103")
+  quantity    Float     @default(1)
+  unit        String?   @default("pcs")
+  unitWeight  Float?    @default(0)
+  rate        Float
+  discountPercent Float @default(0)
+  discountAmount  Float @default(0)
+  taxableAmount   Float @default(0)
+  gstRate     Float     @default(0)
+  taxAmount   Float     @default(0)
+  cgst        Float     @default(0)
+  sgst        Float     @default(0)
+  igst        Float     @default(0)
+  total       Float
+
+  warehouse   String?
+  availableStock Int?
+}
+
+model QuotationActivity {
+  id          String    @id @default(uuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  userId      String?
+  userName    String?
+  action      String    // e.g. "Created", "Updated", "Sent", "Viewed", "Accepted"
+  details     String?
+  createdAt   DateTime  @default(now())
+}
+
+// ---------------------------------------------------------
+// NEW ERP MODELS (PHASE 1)
+// ---------------------------------------------------------
+
+model Branch {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  name            String   @unique
+  code            String?  @unique
+  address         String?
+  city            String?
+  state           String?
+  pincode         String?
+  phone           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  employees       Employee[]
+  customers       Customer[]
+  warehouses      Warehouse[]
+}
+
+model Warehouse {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  name            String
+  code            String?  @unique
+  address         String?
+  managerId       String?
+  branchId        String?
+  branch          Branch?  @relation(fields: [branchId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  inventoryTransactions InventoryTransaction[]
+}
+
+model Vendor {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  companyName     String
+  contactPerson   String?
+  email           String?  @unique
+  mobile          String?
+  gstNumber       String?
+  pan             String?
+  address         String?
+  city            String?
+  state           String?
+  pincode         String?
+  paymentTerms    String?
+  status          String   @default("Active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrders  PurchaseOrder[]
+  bills           Bill[]
+  payments        VendorPayment[]
+  vendorCredits   VendorCredit[]
+}
+
+model PurchaseOrder {
+  id              String   @id @default(uuid())
+  poNumber        String   @unique
+  vendorId        String
+  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+  orderDate       DateTime @default(now())
+  expectedDate    DateTime?
+  status          String   @default("Draft") // Draft, Issued, Partially Received, Received, Cancelled
+  totalValue      Float    @default(0)
+  taxAmount       Float    @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           PurchaseOrderItem[]
+  bills           Bill[]
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Int
+  receivedQty     Int           @default(0)
+  rate            Float
+  taxAmount       Float         @default(0)
+  total           Float
+}
+
+model Bill {
+  id               String    @id @default(uuid())
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id])
+  billNumber       String    @unique // Auto: BILL-0001
+  vendorBillNumber String?   // Vendor Invoice / Bill Reference Number
+  vendorId         String
+  vendor           Vendor    @relation(fields: [vendorId], references: [id])
+  purchaseOrderId  String?
+  purchaseOrder    PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+
+  billDate         DateTime  @default(now())
+  dueDate          DateTime?
+  paymentTerms     String?   @default("Net 30")
+
+  subtotal         Float     @default(0)
+  taxAmount        Float     @default(0)
+  discountAmount   Float     @default(0)
+  totalAmount      Float
+  amountPaid       Float     @default(0)
+  amountDue        Float
+
+  status           String    @default("Open") // Draft, Open, Paid, Partially Paid, Overdue, Void
+  notes            String?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  items            BillItem[]
+  payments         VendorPayment[]
+  vendorCredits    VendorCredit[]
+}
+
+model BillItem {
+  id          String   @id @default(uuid())
+  billId      String
+  bill        Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+
+  description String
+  hsnCode     String?  @default("6109")
+  quantity    Int      @default(1)
+  unit        String?  @default("pcs")
+  rate        Float    @default(0)
+  gstRate     Float    @default(0)
+  taxAmount   Float    @default(0)
+  total       Float    @default(0)
+}
+
+model VendorPayment {
+  id               String    @id @default(uuid())
+  paymentNumber    String    @unique // VPAY-2026-0001
+  vendorId         String
+  vendor           Vendor    @relation(fields: [vendorId], references: [id])
+  billId           String?
+  bill             Bill?     @relation(fields: [billId], references: [id])
+
+  amount           Float
+  paymentDate      DateTime  @default(now())
+  paymentMode      String    // Bank Transfer (NEFT/RTGS), UPI, Cheque, Cash, Advance Adjustment, Other
+  paidFromAccount  String?   // HDFC Bank Current A/c, ICICI Bank, Cash in Hand, etc.
+  referenceNumber  String?   // UTR #, Cheque #, Transaction ID
+  paymentType      String    @default("Bill Payment") // Bill Payment, Advance Deposit, On-Account
+  status           String    @default("Completed") // Completed, Pending, Cancelled
+  notes            String?
+  recordedBy       String?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model VendorCredit {
+  id               String    @id @default(uuid())
+  creditNoteNumber String    @unique // DN-0001 (Debit Note / Vendor Credit)
+  vendorId         String
+  vendor           Vendor    @relation(fields: [vendorId], references: [id])
+  billId           String?
+  bill             Bill?     @relation(fields: [billId], references: [id])
+
+  creditDate       DateTime  @default(now())
+  reason           String    // Goods Return, Rate Difference, Quality Rejection, Post-Purchase Discount, Other
+  status           String    @default("OPEN") // OPEN, ADJUSTED, REFUNDED, CANCELLED
+
+  subtotal         Float     @default(0)
+  taxAmount        Float     @default(0)
+  totalAmount      Float     @default(0)
+  allocatedAmount  Float     @default(0)
+  balanceAmount    Float     @default(0)
+
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  items            VendorCreditItem[]
+}
+
+model VendorCreditItem {
+  id             String       @id @default(uuid())
+  vendorCreditId String
+  vendorCredit   VendorCredit @relation(fields: [vendorCreditId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product?     @relation(fields: [productId], references: [id])
+
+  description    String
+  hsnCode        String?      @default("6109")
+  quantity       Int          @default(1)
+  rate           Float        @default(0)
+  gstRate        Float        @default(0)
+  taxAmount      Float        @default(0)
+  total          Float        @default(0)
+}
+
+model Invoice {
+  id              String   @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  invoiceNumber   String   @unique
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  orderId         String?
+  order           Order?   @relation(fields: [orderId], references: [id])
+  invoiceDate     DateTime @default(now())
+  dueDate         DateTime?
+  subtotal        Float    @default(0)
+  taxAmount       Float    @default(0)
+  discountAmount  Float    @default(0)
+  totalAmount     Float
+  amountPaid      Float    @default(0)
+  amountDue       Float
+  status          String   @default("Unpaid") // Draft, Sent, Unpaid, Partially Paid, Paid, Overdue, Cancelled
+  paymentTerms    String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  payments        Payment[]
+  creditNotes     CreditNote[]
+}
+
+model CreditNote {
+  id               String   @id @default(uuid())
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id])
+  creditNoteNumber String   @unique // e.g. CN-1001
+  invoiceId        String?
+  invoice          Invoice? @relation(fields: [invoiceId], references: [id])
+  orderId          String?
+  order            Order?   @relation(fields: [orderId], references: [id])
+  customerId       String
+  customer         Customer @relation(fields: [customerId], references: [id])
+
+  creditNoteDate   DateTime @default(now())
+  reason           String   // Sales Return, Post-Sale Discount, Defective Goods, Price Correction, Other
+  status           String   @default("OPEN") // OPEN, ADJUSTED, REFUNDED, CANCELLED
+
+  subtotal         Float    @default(0)
+  taxAmount        Float    @default(0)
+  cgst             Float    @default(0)
+  sgst             Float    @default(0)
+  igst             Float    @default(0)
+  totalAmount      Float    @default(0)
+  allocatedAmount  Float    @default(0)
+  balanceAmount    Float    @default(0)
+
+  restockReturnedGoods Boolean @default(true) // Automatically replenish warehouse stock
+
+  notes            String?
+  termsConditions  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  items            CreditNoteItem[]
+}
+
+model CreditNoteItem {
+  id            String     @id @default(uuid())
+  creditNoteId  String
+  creditNote    CreditNote @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?   @relation(fields: [productId], references: [id])
+
+  description   String
+  sku           String?
+  hsnCode       String?    @default("6109")
+  quantity      Float      @default(1)
+  unit          String?    @default("pcs")
+  rate          Float      @default(0)
+  taxableAmount Float      @default(0)
+  gstRate       Float      @default(0)
+  taxAmount     Float      @default(0)
+  cgst          Float      @default(0)
+  sgst          Float      @default(0)
+  igst          Float      @default(0)
+  total         Float      @default(0)
+}
+
+model EWayBill {
+  id              String    @id @default(uuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  ewbNumber       String    @unique // 12-digit EWB Number e.g. 141289345678
+  ewbDate         DateTime  @default(now())
+  validUntil      DateTime?
+
+  // Document Reference
+  docType         String    @default("Tax Invoice") // Tax Invoice, Bill of Supply, Delivery Challan, Credit Note
+  docNumber       String    // e.g. INV-1001, CN-1001, ORD-1001
+  docDate         DateTime  @default(now())
+
+  // Links
+  orderId         String?
+  order           Order?    @relation(fields: [orderId], references: [id])
+  customerId      String?
+  customer        Customer? @relation(fields: [customerId], references: [id])
+
+  // Supply Type & Transaction
+  supplyType      String    @default("Outward") // Outward, Inward
+  subSupplyType   String    @default("Supply") // Supply, Export, Job Work, For Own Use, Recipient Not Known, Line Sales
+  transactionType String    @default("Regular") // Regular, Bill To - Ship To, Bill From - Dispatch From
+
+  // Consignor (From) Details
+  fromGstin       String?
+  fromTradeName   String?
+  fromAddress     String?
+  fromPlace       String?
+  fromPincode     String?
+  fromState       String?
+
+  // Consignee (To) Details
+  toGstin         String?
+  toTradeName     String?
+  toAddress       String?
+  toPlace         String?
+  toPincode       String?
+  toState         String?
+
+  // Goods Summary & Values
+  totalTaxableAmount Float  @default(0)
+  cgstAmount         Float  @default(0)
+  sgstAmount         Float  @default(0)
+  igstAmount         Float  @default(0)
+  cessAmount         Float  @default(0)
+  totalInvoiceValue  Float  @default(0)
+  mainHsnCode        String?
+
+  // Part B (Transporter & Vehicle Details)
+  transporterId   String?  // Transporter GSTIN or Transporter ID
+  transporterName String?
+  transportMode   String   @default("Road") // Road, Rail, Air, Ship
+  approxDistanceKm Int     @default(100)
+  vehicleType     String   @default("Regular") // Regular, Over Dimensional Cargo
+  vehicleNumber   String?  // e.g. DL-01-AB-1234
+  docNoOrLorryReceipt String? // LR/GR/RR/Airway Bill Number
+  docDatePartB    DateTime?
+
+  status          String   @default("GENERATED") // GENERATED, ACTIVE, EXTENDED, CANCELLED
+  cancelReason    String?
+
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Payment {
+  id               String    @id @default(uuid())
+  paymentNumber    String    @unique
+  invoiceId        String?
+  invoice          Invoice?  @relation(fields: [invoiceId], references: [id])
+  customerId       String?
+  customer         Customer? @relation(fields: [customerId], references: [id])
+  orderId          String?
+  order            Order?    @relation(fields: [orderId], references: [id])
+  paymentType      String    @default("Invoice Payment") // Invoice Payment, Advance Payment, On-Account, Quotation Advance
+  amount           Float
+  paymentDate      DateTime  @default(now())
+  paymentMode      String    // Cash, Bank Transfer, UPI, Cheque, Card, Online Gateway, Advance Adjustment, Other
+  receivingAccount String?   // HDFC Bank Current A/c, ICICI Bank, SBI Current A/c, Petty Cash, Store Counter, UPI QR, etc.
+  referenceNumber  String?   // UTR / Cheque / Transaction / IMPS / Slip Number
+  payerName        String?   // Name of person/company paying
+  status           String    @default("Completed") // Completed, Pending Realization, Failed, Refunded, Cancelled
+  notes            String?
+  recordedBy       String?   // Staff name who recorded payment
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Expense {
+  id              String   @id @default(uuid())
+  expenseNumber   String   @unique
+  date            DateTime @default(now())
+  category        String   // Travel, Meals, Supplies, etc.
+  amount          Float
+  description     String?
+  employeeId      String?
+  employee        Employee? @relation(fields: [employeeId], references: [id])
+  status          String   @default("Pending") // Pending, Approved, Rejected, Paid
+  receiptUrl      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model MobileScanSession {
+  id          String   @id @default(uuid())
+  sessionCode String   @unique
+  scannedCode String?
+  mode        String   @default("INVENTORY") // INVENTORY, PACKING
+  orderId     String?
+  status      String   @default("ACTIVE")    // ACTIVE, CONNECTED, COMPLETED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// Omnichannel & Automated Workflows
+// ---------------------------------------------------------
+model CommunicationLog {
+  id           String   @id @default(uuid())
+  type         String   // WHATSAPP, EMAIL, SMS
+  recipient    String
+  message      String
+  status       String   @default("SENT")
+  triggerEvent String?
+  createdAt    DateTime @default(now())
+}
+
+model WorkflowRule {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  trigger     String   // UNPAID_INVOICE_7_DAYS, NEW_ORDER, NEW_LEAD
+  action      String   // SEND_WHATSAPP, CREATE_TASK, SEND_EMAIL
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// Hiring & 3-Round Interview Evaluation Module
+// ---------------------------------------------------------
+model Candidate {
+  id              String   @id @default(uuid())
+  candidateNumber String   @unique
+  name            String
+  email           String
+  phone           String
+  appliedRole     String
+  experienceYears Float    @default(0)
+  expectedSalary  String?
+  resumeUrl       String?
+  referenceName   String?  // Reference Name / Referred By
+  status          String   @default("NEW") // NEW, ROUND_1_PENDING, ROUND_1_PASSED, ROUND_2_PENDING, ROUND_2_PASSED, ROUND_3_PENDING, HIRED, REJECTED
+
+  round1InterviewerId String?
+  round1Interviewer   Employee? @relation("CandidateRound1Interviewer", fields: [round1InterviewerId], references: [id])
+
+  round2InterviewerId String?
+  round2Interviewer   Employee? @relation("CandidateRound2Interviewer", fields: [round2InterviewerId], references: [id])
+
+  round3InterviewerId String?
+  round3Interviewer   Employee? @relation("CandidateRound3Interviewer", fields: [round3InterviewerId], references: [id])
+
+  overallRating   Float    @default(0)
+  finalConclusion String?
+  finalDecisionBy String?
+
+  evaluations     CandidateEvaluation[]
+  roundSummaries  CandidateRoundSummary[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model InterviewQuestion {
+  id          String   @id @default(uuid())
+  roundNumber Int      // 1 = Basic/Screening, 2 = Technical, 3 = Final/HR
+  question    String
+  category    String?  @default("General")
+  isDefault   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  evaluations CandidateEvaluation[]
+}
+
+model CandidateEvaluation {
+  id          String   @id @default(uuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  roundNumber Int
+  questionId  String
+  question    InterviewQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  rating      Int      // 1 to 5
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CandidateRoundSummary {
+  id                  String    @id @default(uuid())
+  candidateId         String
+  candidate           Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  roundNumber         Int
+  interviewerId       String?
+  interviewerName     String?
+  averageRating       Float     @default(0)
+  recommendation      String    // ADVANCE, REJECT, HOLD
+  feedbackNotes       String?
+  completedAt         DateTime  @default(now())
+}
+
+// ---------------------------------------------------------
+// WhatsApp Business Automation & CRM Platform Models
+// ---------------------------------------------------------
+
+model WhatsAppAccount {
+  id                 String   @id @default(uuid())
+  name               String   // e.g., "Main Sales", "Customer Support"
+  phoneNumber        String   // e.g., "+91 9876543210"
+  phoneId            String?  // Meta WhatsApp Phone ID
+  businessAccountId  String?  // Meta WABA ID
+  businessManagerId  String?  // Meta Business Manager ID
+  accessToken        String?  // Masked or encrypted token
+  webhookVerifyToken String?
+  status             String   @default("CONNECTED") // CONNECTED, DISCONNECTED, VERIFICATION_REQUIRED, RESTRICTED
+  dailyLimit         String   @default("10K per day")
+  usedToday          Int      @default(1250)
+  qualityRating      String   @default("GREEN") // GREEN, YELLOW, RED
+  isDefault          Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  conversations      WhatsAppConversation[]
+}
+
+model WhatsAppConversation {
+  id                 String   @id @default(uuid())
+  accountId          String
+  account            WhatsAppAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  customerId         String
+  customer           Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  assignedEmployeeId String?
+  assignedEmployee   Employee? @relation("AssignedAgent", fields: [assignedEmployeeId], references: [id])
+
+  teamId             String?
+  team               Team?    @relation(fields: [teamId], references: [id])
+
+  status             String   @default("OPEN") // OPEN, CLOSED, SNOOZED, PENDING
+  leadStatus         String   @default("New Lead") // New Lead, Contacted, Qualified, Negotiation, Won, Lost
+  orderStatus        String?  // Processing, Packed, Dispatched, Delivered, Payment Pending
+  customerType       String   @default("Wholesale") // Retailer, Wholesaler, Distributor, VIP
+
+  aiHandled          Boolean  @default(true)
+  aiConfidence       Float    @default(0.92)
+  unreadCount        Int      @default(0)
+
+  lastMessageText    String?
+  lastMessageAt      DateTime @default(now())
+  tags               String?  // Comma separated tags e.g. "Hot Lead, Follow-up"
+
+  snoozedUntil       DateTime?
+  followUpDueAt      DateTime?
+  slaStatus          String   @default("GREEN") // GREEN, ORANGE, RED
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  messages           WhatsAppMessage[]
+  paymentLinks       WhatsAppPaymentLink[]
+  formSubmissions    WhatsAppFormSubmission[]
+}
+
+model WhatsAppMessage {
+  id               String   @id @default(uuid())
+  conversationId   String
+  conversation     WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  senderType       String   // "CUSTOMER", "AGENT", "SYSTEM", "BOT", "AI"
+  senderId         String?  // Agent User/Employee ID if applicable
+  senderName       String?
+
+  messageType      String   @default("TEXT") // TEXT, IMAGE, VIDEO, DOCUMENT, AUDIO, LOCATION, CONTACT, TEMPLATE, QUICK_REPLY, CATALOG, PAYMENT_LINK, BUTTONS, LIST
+  content          String   // Message text or caption
+  mediaUrl         String?
+  mediaType        String?  // image/png, application/pdf, audio/ogg
+  mediaFilename    String?
+
+  templateId       String?
+  metadata         String?  // JSON string storing interactive data (buttons, product IDs, payment IDs)
+
+  status           String   @default("SENT") // SENT, DELIVERED, READ, FAILED, RECEIVED
+  isInternalNote   Boolean  @default(false)
+  replyToMessageId String?
+  metaMessageId    String?  @unique
+
+  sentAt           DateTime @default(now())
+  deliveredAt      DateTime?
+  readAt           DateTime?
+}
+
+model WhatsAppTemplate {
+  id               String   @id @default(uuid())
+  name             String   // e.g., "order_confirmation_v2"
+  category         String   @default("MARKETING") // MARKETING, UTILITY, AUTHENTICATION
+  language         String   @default("en_US")
+  status           String   @default("PENDING") // APPROVED, PENDING, IN_REVIEW, REJECTED, PAUSED
+  headerType       String   @default("NONE") // NONE, TEXT, IMAGE, VIDEO, DOCUMENT
+  headerContent    String?
+  bodyText         String   // Standard body text with {{customer_name}}, {{order_number}}, etc.
+  footerText       String?
+  buttons          String?  // JSON array of buttons (CTA, QUICK_REPLY)
+  variables        String?  // JSON array of dynamic CRM fields
+  templateType     String   @default("STANDARD") // STANDARD, CAROUSEL, CATALOG, LTO_COUPON
+  carouselCards    String?  // JSON array of up to 10 carousel cards
+  catalogId        String?  // Meta / Shopify Catalog ID
+  rejectionReason  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model WhatsAppReplyItem {
+  id          String   @id @default(uuid())
+  title       String
+  category    String   @default("Quick Reply") // Quick Reply, Pitch, Catalog, Payment, Support, Dispatch
+  shortcut    String   // e.g. "/catalog", "/price", "/payment", "/followup"
+  content     String
+  variables   String?  // JSON string
+  isPersonal  Boolean  @default(false)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WhatsAppAutomationRule {
+  id           String   @id @default(uuid())
+  name         String
+  trigger      String   // NEW_MESSAGE, NEW_LEAD, KEYWORD_RECEIVED, PAYMENT_RECEIVED, ORDER_CREATED, NO_RESPONSE_24H
+  conditions   String?  // JSON string (customerType, stage, tag, orderValue, location)
+  actions      String   // JSON string (sendMessage, assignAgent, addTag, changeStage, createFollowUp, createOrder, sendPaymentLink)
+  delayMinutes Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model WhatsAppChatbotFlow {
+  id             String   @id @default(uuid())
+  name           String
+  triggerKeyword String?
+  nodesJson      String   // Detailed node tree (Start, Message, Question, Buttons, Catalog, Payment, CRM action, Transfer)
+  isActive       Boolean  @default(true)
+  executionCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model WhatsAppForm {
+  id             String   @id @default(uuid())
+  title          String
+  description    String?
+  fieldsJson     String   // Dynamic CRM field mapping (Name, Phone, Email, Company, Requirement, Quantity, Budget, GST)
+  submitMessage  String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  submissions    WhatsAppFormSubmission[]
+}
+
+model WhatsAppFormSubmission {
+  id             String   @id @default(uuid())
+  formId         String
+  form           WhatsAppForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+  conversation   WhatsAppConversation? @relation(fields: [conversationId], references: [id])
+
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id])
+
+  dataJson       String
+  createdAt      DateTime @default(now())
+}
+
+model WhatsAppCampaign {
+  id              String   @id @default(uuid())
+  name            String
+  templateId      String
+  segmentId       String?
+  scheduledAt     DateTime?
+  status          String   @default("COMPLETED") // DRAFT, SCHEDULED, RUNNING, COMPLETED, CANCELLED
+  totalAudience   Int      @default(0)
+  sentCount       Int      @default(0)
+  deliveredCount  Int      @default(0)
+  readCount       Int      @default(0)
+  clicksCount     Int      @default(0)
+  repliedCount    Int      @default(0)
+  failedCount     Int      @default(0)
+  leadsGenerated  Int      @default(0)
+  ordersGenerated Int      @default(0)
+  revenueGenerated Float   @default(0)
+  cost            Float    @default(0)
+  variablesMap    String?  // JSON string representing variable dynamic mapping rules
+  category        String?  // MARKETING, UTILITY, AUTHENTICATION
+  carouselCardsJson String? // JSON string representing multi-card carousel cards
+  offerExpiration DateTime? // Limited-Time Offer expiration date
+  couponCode      String?   // Promo / Coupon code for copy button
+  optOutCount     Int      @default(0) // Count of recipients who clicked Opt-Out or replied STOP
+  metaQualityStatus String? // GREEN, YELLOW, RED
+  // A/B Testing
+  isAbTest        Boolean  @default(false)
+  variantTemplateId String?
+  abSplitRatio    Int      @default(50) // e.g. 50 for 50/50 split
+  // Drip Sequence Automation
+  isDripCampaign  Boolean  @default(false)
+  dripStepsJson   String?  // JSON string array of follow-up steps
+  parentCampaignId String?
+  dripStepNumber  Int      @default(1)
+
+  queues          WhatsAppCampaignQueue[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model WhatsAppCampaignQueue {
+  id           String           @id @default(uuid())
+  campaignId   String
+  campaign     WhatsAppCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  toPhone      String
+  customerName String?
+  customerCity String?
+  status       String           @default("PENDING") // PENDING, SENT, DELIVERED, READ, CLICKED, REPLIED, FAILED
+  variant      String?          @default("A")       // "A" or "B" for A/B Testing
+  dripStep     Int?             @default(1)         // Drip sequence step number
+  deliveredAt  DateTime?
+  readAt       DateTime?
+  clickedAt    DateTime?
+  buttonClicked String?
+  repliedAt    DateTime?
+  replyText    String?
+  orderValue   Float?
+  metaErrorCode Int?            // Meta API error code (e.g. 131026, 130429, 131047)
+  retryCount   Int              @default(0)
+  errorMsg     String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model WhatsAppSegment {
+  id           String   @id @default(uuid())
+  name         String   // High Value, Inactive 90 Days, New Leads, Repeat Buyers, Wholesale
+  criteriaJson String
+  contactCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model WhatsAppPaymentLink {
+  id             String   @id @default(uuid())
+  conversationId String
+  conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  customerId     String
+  customer       Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  orderId        String?
+  invoiceId      String?
+  amount         Float
+  currency       String   @default("INR")
+  paymentUrl     String
+  status         String   @default("PENDING") // PENDING, PAID, FAILED, EXPIRED
+  transactionId  String?
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// Team Broadcasts & Announcements System
+// ---------------------------------------------------------
+model TeamBroadcast {
+  id              String   @id @default(uuid())
+  title           String
+  content         String
+  category        String   @default("GENERAL") // "OFFER", "HOLIDAY", "ANNOUNCEMENT", "URGENT", "GENERAL", "MEETING"
+  priority        String   @default("NORMAL")  // "LOW", "NORMAL", "HIGH", "URGENT"
+
+  // Attachments (JSON array of { name: string, url: string, type: string, size?: number })
+  attachments     String?  // JSON string
+
+  // Audience Targeting
+  targetAudience  String   @default("ALL")     // "ALL" or "SELECTED"
+  targetUserIds   String[] @default([])        // Array of User IDs
+  targetRoles     String[] @default([])        // Array of Roles e.g. ["SALES", "HR"]
+
+  // Author
+  authorId        String
+  author          User     @relation("BroadcastAuthor", fields: [authorId], references: [id])
+
+  // Pinned & Status
+  isPinned        Boolean  @default(false)
+  expiresAt       DateTime?
+
+  // Relations
+  replies         BroadcastReply[]
+  reads           BroadcastRead[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model BroadcastReply {
+  id              String   @id @default(uuid())
+  broadcastId     String
+  broadcast       TeamBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+
+  content         String
+  attachments     String?  // JSON array of attachments if any
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model BroadcastRead {
+  id              String   @id @default(uuid())
+  broadcastId     String
+  broadcast       TeamBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  readAt          DateTime @default(now())
+
+  @@unique([broadcastId, userId])
+}
+
+// ---------------------------------------------------------
+// WhatsApp Chatbot Flow State (Per-Customer Position Tracking)
+// ---------------------------------------------------------
+model WhatsAppFlowState {
+  id            String   @id @default(uuid())
+  phone         String   @unique
+  flowId        String
+  currentNodeId String
+  variables     String   @default("{}")  // JSON: captured user inputs
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// WhatsApp AI Execution Log (Debug & Audit Trail)
+// ---------------------------------------------------------
+model WhatsAppAILog {
+  id           String   @id @default(uuid())
+  phone        String
+  userMessage  String
+  aiReply      String?
+  toolsCalled  String   @default("none")  // comma-separated: lookupOrder, searchProducts, recommendSize
+  status       String   @default("SUCCESS") // SUCCESS, FAILED, SKIPPED
+  errorMessage String?
+  durationMs   Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// Web Push Notification Subscriptions
+// ---------------------------------------------------------
+model WhatsAppPushSubscription {
+  id           String   @id @default(uuid())
+  userId       String
+  endpoint     String   @unique
+  p256dh       String
+  auth         String
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// WhatsApp Account Settings (Persisted Working Hours, SLA, etc.)
+// ---------------------------------------------------------
+model WhatsAppSettings {
+  id                   String   @id @default(uuid())
+  workingHoursStart    String   @default("09:00")
+  workingHoursEnd      String   @default("19:00")
+  outOfOfficeMessage   String   @default("We are currently unavailable. We will respond during working hours 9 AM - 7 PM.")
+  slaWarningMinutes    Int      @default(15)
+  slaBreadMinutes      Int      @default(30)
+  autoAssignStrategy   String   @default("ROUND_ROBIN") // ROUND_ROBIN, LEAST_ASSIGNED, MANUAL
+  aiConfidenceThreshold Int     @default(85)
+  aiModel              String   @default("gpt-4o") // gpt-4o, claude-3-5-sonnet, gemini-1.5-pro
+  welcomeMessage       String   @default("Welcome! How can we help you today?")
+  aiKnowledgeBase      String?
+  aiSystemPrompt       String?
+  aiFallbackLanguage   String   @default("English")
+  geminiApiKey         String?
+
+  // Payment Gateway Integration
+  activeGateway        String?  // "RAZORPAY" | "CASHFREE" | null
+  razorpayKeyId        String?
+  razorpayKeySecret    String?
+  cashfreeAppId        String?
+  cashfreeSecretKey    String?
+  merchantUpiId        String?
+  merchantUpiName      String?
+
+  // Meta CAPI Lead Value Settings
+  metaCapiLeadValue    Int      @default(10000)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// WhatsApp Canned Responses (Quick Replies)
+// ---------------------------------------------------------
+model WhatsAppCannedResponse {
+  id         String   @id @default(uuid())
+  title      String
+  shortcut   String?  @unique
+  content    String
+  category   String?  @default("General")
+  headerText String?
+  footerText String?
+  mediaUrl   String?
+  mediaType  String?
+  buttons    Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ---------------------------------------------------------
+// Comprehensive Tax & GST Settings Suite
+// ---------------------------------------------------------
+model TaxRate {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   // CGST, SGST, IGST, UTGST, CESS, Tax Group
+  rate        Float    // e.g. 5, 2.5, 9, 18, 12, 28, 0
+  isGroup     Boolean  @default(false)
+  subTaxes    String?  // JSON array of sub-tax rate IDs for tax groups
+  isDefault   Boolean  @default(false)
+  status      String   @default("Active") // Active, Inactive
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TaxExemption {
+  id          String   @id @default(uuid())
+  name        String   // e.g. "Special Economic Zone (SEZ)", "Export Goods"
+  type        String   // Customer, Vendor, Item, Transaction
+  reason      String
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TaxPreference {
+  id                    String   @id @default(uuid())
+  taxPreference         String   @default("Taxable") // Taxable, Tax Exempt
+  intraStateTaxRateId   String?
+  interStateTaxRateId   String?
+  itemTaxInclusiveness  String   @default("Tax Exclusive") // Tax Exclusive, Tax Inclusive
+  defaultHsn            String?  @default("6109")
+  enableReverseCharge   Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model GstSetting {
+  id                  String   @id @default(uuid())
+  organizationId      String?  @unique
+  organization        Organization? @relation(fields: [organizationId], references: [id])
+  gstin               String?
+  legalName           String?
+  tradeName           String?
+  registeredState     String?  @default("Rajasthan")
+  stateCode           String?  @default("08")
+  isComposition       Boolean  @default(false)
+  enableRcm           Boolean  @default(false)
+  eWayBillThreshold   Float    @default(50000)
+  enableEInvoicing    Boolean  @default(false)
+  eInvoicingThreshold Float    @default(50000000)
+  filingFrequency     String   @default("Monthly") // Monthly, Quarterly
+  gstr1FilingDueDay   Int      @default(11)
+  gstr3bFilingDueDay  Int      @default(20)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model GstTdsSetting {
+  id              String   @id @default(uuid())
+  enableGstTds    Boolean  @default(false)
+  tdsSection      String   @default("Section 51")
+  tdsRate         Float    @default(2.0)
+  thresholdAmount Float    @default(250000)
+  deductorType    String   @default("Government Authority / PSU")
+  tanNumber       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model OnlineFilingSetting {
+  id                   String    @id @default(uuid())
+  gstPortalUsername    String?
+  gstPortalApiEnabled  Boolean   @default(false)
+  autoSyncGstr1        Boolean   @default(true)
+  autoSyncGstr3b       Boolean   @default(true)
+  autoSyncGstr2b       Boolean   @default(true)
+  lastSyncDate         DateTime?
+  sandboxMode          Boolean   @default(false)
+  apiAuthToken         String?
+  tokenExpiresAt       DateTime?
+  sessionActive        Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model GstFilingReturn {
+  id                  String    @id @default(uuid())
+  organizationId      String?
+  organization        Organization? @relation(fields: [organizationId], references: [id])
+  returnType          String    // GSTR-1, GSTR-3B, GSTR-2B, GSTR-9, CMP-08
+  financialYear       String    // e.g. "2024-25"
+  period              String    // e.g. "April", "May", "Q1", "Q2"
+  periodKey           String    // e.g. "042024", "052024"
+  status              String    @default("Draft") // Draft, Ready To Upload, Uploaded, Filed, Reconciled
+  arnNumber           String?   // Acknowledgment Reference Number e.g. AA0804240019283
+  filingDate          DateTime?
+  dueDate             DateTime?
+  totalTaxableValue   Float     @default(0)
+  totalTaxAmount      Float     @default(0)
+  cgstAmount          Float     @default(0)
+  sgstAmount          Float     @default(0)
+  igstAmount          Float     @default(0)
+  cessAmount          Float     @default(0)
+  itcClaimed          Float     @default(0)
+  taxPaidCash         Float     @default(0)
+  taxPaidCredit       Float     @default(0)
+  jsonPayload         String?   // Complete GSTN-compliant JSON payload
+  portalSyncStatus    String?   // SUCCESS, PENDING, FAILED
+  portalSyncResponse  String?   // GSTN portal response body
+  lastSyncedAt        DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([returnType, financialYear, periodKey])
+}
+
+model GstPortalLog {
+  id              String   @id @default(uuid())
+  action          String   // SYNC_GSTR1, FETCH_GSTR2B, GENERATE_3B, CHECK_STATUS, AUTH_TOKEN
+  status          String   // SUCCESS, FAILED, WARNING
+  requestPayload  String?
+  responsePayload String?
+  arn             String?
+  message         String
+  createdAt       DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// Legacy Support Models (Migrated from Supabase)
+// ---------------------------------------------------------
+
+model ShopifyCombo {
+  id            String   @id @default(uuid())
+  product_id    String
+  product_title String?
+  combo_count   Int
+  combo_price   Float
+  discount_code String
+  is_active     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model WhatsAppCall {
+  id          String   @id
+  phone       String
+  direction   String
+  status      String
+  sdp_offer   String?
+  sdp_answer  String?
+  started_at  DateTime @default(now())
+  answered_at DateTime?
+  ended_at    DateTime?
+}
+
+model WhatsAppLegacyFlow {
+  id          String   @id @default(uuid())
+  name        String   @default("Flow")
+  is_active   Boolean  @default(true)
+  flow_json   Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  states      WhatsAppLegacyFlowState[]
+}
+
+model WhatsAppLegacyFlowState {
+  id              String   @id @default(uuid())
+  phone           String   @unique
+  flow_id         String
+  flow            WhatsAppLegacyFlow @relation(fields: [flow_id], references: [id], onDelete: Cascade)
+  current_node_id String
+  variables       Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model WhatsAppLegacySetting {
+  id                  Int      @id @default(autoincrement())
+  waba_id             String?
+  whatsapp_token      String?
+  groq_api_key        String?
+  inst_language       String?
+  inst_order_security String?
+  inst_size_advisor   String?
+  inst_brand_policies String?
+  inst_custom         String?
+  knowledge_base      String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model WhatsAppLegacyScheduledMessage {
+  id              String   @id @default(uuid())
+  phone           String
+  flow_json       Json
+  current_node_id String
+  variables       Json     @default("{}")
+  send_after      DateTime
+  status          String   @default("pending") // pending, sent, failed
+  createdAt       DateTime @default(now())
+}
+
+
+// ---------------------------------------------------------
+// WhatsApp Webhook Raw Logs
+// ---------------------------------------------------------
+model WhatsAppWebhookLog {
+  id           String   @id @default(uuid())
+  event        String
+  status       String   @default("RECEIVED") // RECEIVED, IGNORED, ERROR, PROCESSED
+  payload      Json?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+}
+
+
+// ---------------------------------------------------------
+// SaaS Multi-Tenant: WhatsApp Clients (Tenants) & Payments
+// ---------------------------------------------------------
+model WhatsAppClient {
+  id               String   @id @default(uuid())
+  businessName     String
+  contactEmail     String
+  contactPhone     String?
+  ownerWhatsApp    String?  // Owner's WA number for blocked clients to reach
+  webhookClientId  String   @unique @default(uuid()) // Used in webhook URL
+  adminEmail       String?  // Login email of the client's admin user
+  adminPassword    String?  // Hashed password set by owner on onboard
+
+  subscriptionPlan   String   @default("STARTER") // TRIAL, STARTER, GROWTH, ENTERPRISE, CUSTOM
+  monthlyFee         Float    @default(999)
+  subscriptionStatus String   @default("TRIAL")   // TRIAL, ACTIVE, PAST_DUE, BLOCKED
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime @default(now())
+  gracePeriodDays    Int      @default(7)
+
+  maxAgents       Int      @default(3)
+  isActive        Boolean  @default(true)
+  notes           String?
+
+  // Meta (WhatsApp Business) API credentials — set by owner or client admin
+  wabaId          String?  // WhatsApp Business Account ID
+  phoneId         String?  // Phone Number ID from Meta
+  metaAccessToken String?  // Permanent Access Token
+  webhookVerifyToken String? // Custom webhook verify token
+  customWebhookUrl   String?  // Override webhook URL (e.g. legacy clients using default webhook)
+  phoneNumber     String?  // Display phone number
+
+  // Shopify credentials — set by owner or client admin
+  shopifyDomain   String?
+  shopifyToken    String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  payments        WhatsAppClientPayment[]
+  agents          WhatsAppAgentUser[]
+}
+
+model WhatsAppClientPayment {
+  id           String          @id @default(uuid())
+  clientId     String
+  client       WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amount       Float
+  periodStart  DateTime
+  periodEnd    DateTime
+  notes        String?
+  markedByOwner Boolean        @default(true)
+  createdAt    DateTime        @default(now())
+}
+
+model WhatsAppAgentUser {
+  id          String          @id @default(uuid())
+  clientId    String
+  client      WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  email       String          @unique
+  password    String
+  role        String          @default("AGENT") // ADMIN, AGENT
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model WhatsAppMetaFlow {
+  id          String   @id @default(uuid())
+  name        String
+  flowId      String
+  description String?
+  screenName  String   @default("SCREEN_NAME")
+  ctaText     String   @default("Open Form")
+  formSchema  String   @default("[]") // JSON string of fields
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WhatsAppTag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#e2e8f0")
+  createdAt DateTime @default(now())
+}
+
+model WhatsAppChatbotLog {
+  id             String   @id @default(uuid())
+  phone          String
+  conversationId String?
+  nodeId         String
+  nodeType       String
+  actionDesc     String
+  payload        Json?
+  responseStatus Int?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+}
+
+model WhatsAppIntegration {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  token     String?
+  type      String   @default("CRM_LEAD")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
