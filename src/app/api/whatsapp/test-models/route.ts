@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}));
     const key = body.apiKey;
-    const model = body.model || 'gemini-3.8-flash';
+    const model = body.model || 'gemini-flash-lite-latest';
     return await handleKeyValidation(key, model);
   } catch (err: any) {
     return NextResponse.json({ success: false, valid: false, error: err.message }, { status: 500 });
@@ -30,14 +30,14 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const key = searchParams.get('apiKey') || undefined;
-    const model = searchParams.get('model') || 'gemini-3.8-flash';
+    const model = searchParams.get('model') || 'gemini-flash-lite-latest';
     return await handleKeyValidation(key, model);
   } catch (err: any) {
     return NextResponse.json({ success: false, valid: false, error: err.message }, { status: 500 });
   }
 }
 
-async function handleKeyValidation(providedKey?: string, preferredModel = 'gemini-3.8-flash') {
+async function handleKeyValidation(providedKey?: string, preferredModel = 'gemini-flash-lite-latest') {
   let key = providedKey?.trim();
 
   // If no key was passed in request, look up saved key in database or env
@@ -125,33 +125,40 @@ async function handleKeyValidation(providedKey?: string, preferredModel = 'gemin
     });
   }
 
-  // Step 2: Test live token generation dynamically
-  const prioritizedCandidates = [
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-3.7-flash',
+  // Step 2: Test live token generation using system hardcoded working models from whatmore Espon
+  const hardcodedSystemCandidates = [
+    'gemini-flash-lite-latest',
+    'gemini-flash-latest',
+    'gemini-pro-latest',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
     'gemini-3.6-flash',
+    'gemini-3.7-flash',
     'gemini-3.8-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-    'gemini-2.0-flash-exp'
+    'gemini-3.1-flash-lite',
+    'gemini-3-flash-preview',
+    'gemini-3.1-pro-preview'
   ];
 
   const testModels: string[] = [];
-  if (preferredModel && preferredModel !== 'gemini-2.0-flash') {
-    testModels.push(preferredModel);
-  }
 
-  // Add available models returned by Google that support generateContent
-  for (const m of availableModels) {
-    if (!testModels.includes(m) && (m.startsWith('gemini') || m.includes('flash') || m.includes('pro'))) {
+  // Prioritize verified working models that Google's account confirmed
+  for (const m of hardcodedSystemCandidates) {
+    if (availableModels.includes(m) && !testModels.includes(m)) {
       testModels.push(m);
     }
   }
 
-  // Add remaining prioritized candidates
-  for (const m of prioritizedCandidates) {
+  // Add remaining hardcoded candidates
+  for (const m of hardcodedSystemCandidates) {
     if (!testModels.includes(m)) {
+      testModels.push(m);
+    }
+  }
+
+  // Add any other valid Google models that support generateContent
+  for (const m of availableModels) {
+    if (!testModels.includes(m) && (m.startsWith('gemini') || m.includes('flash') || m.includes('pro'))) {
       testModels.push(m);
     }
   }

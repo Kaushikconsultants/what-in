@@ -8,15 +8,20 @@ const SHOPIFY_ACCESS_TOKEN = process.env.VITE_SHOPIFY_ACCESS_TOKEN || '';
 
 // Mock AI call (You can use @google/genai or fetch in real app)
 
+export const HARDCODED_PRIMARY_MODEL = 'gemini-flash-lite-latest';
+
 export const GEMINI_MODEL_CASCADE = [
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'gemini-3.7-flash',
+  'gemini-flash-lite-latest',
+  'gemini-flash-latest',
+  'gemini-pro-latest',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
+  'gemini-3.7-flash',
   'gemini-3.8-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-  'gemini-2.0-flash-exp'
+  'gemini-3.1-flash-lite',
+  'gemini-3-flash-preview',
+  'gemini-3.1-pro-preview'
 ];
 
 export async function callGeminiRest(apiKey: string, modelName: string, prompt: string, systemPrompt: string, maxTokens = 600) {
@@ -73,9 +78,14 @@ async function callAIEngine(messages: any[], preferredModel: string, jsonMode = 
   const systemMsg = messages.find((m: any) => m.role === 'system')?.content || '';
   const userMsgs = messages.filter((m: any) => m.role !== 'system').map((m: any) => (m.role === 'user' ? 'Customer: ' : 'Agent: ') + m.content).join('\n');
 
+  // Hardcoded model hierarchy: always start with active, verified models
+  const startModel = (preferredModel && GEMINI_MODEL_CASCADE.includes(preferredModel))
+    ? preferredModel
+    : HARDCODED_PRIMARY_MODEL;
+
   const cascade = [
-    preferredModel,
-    ...GEMINI_MODEL_CASCADE.filter(m => m !== preferredModel)
+    startModel,
+    ...GEMINI_MODEL_CASCADE.filter(m => m !== startModel)
   ];
 
   let lastError = '';

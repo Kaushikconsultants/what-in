@@ -31,7 +31,9 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const preferredModel = body.model || dbSettings?.aiModel || 'gemini-3.8-flash';
+    const preferredModel = (body.model && GEMINI_MODEL_CASCADE.includes(body.model))
+      ? body.model
+      : (dbSettings?.aiModel && GEMINI_MODEL_CASCADE.includes(dbSettings.aiModel) ? dbSettings.aiModel : HARDCODED_PRIMARY_MODEL);
     const systemRules = body.systemPrompt !== undefined ? body.systemPrompt : (dbSettings?.aiSystemPrompt || 'You are a helpful customer service assistant.');
     const knowledgeBase = body.knowledgeBase !== undefined ? body.knowledgeBase : (dbSettings?.aiKnowledgeBase || '');
     const fallbackLang = body.fallbackLanguage || dbSettings?.aiFallbackLanguage || 'English';

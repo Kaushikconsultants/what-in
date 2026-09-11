@@ -107,7 +107,7 @@ export default function IntegrationsHubPage() {
   // Gemini AI Tab States
   const [geminiKey, setGeminiKey] = useState("");
   const [welcomeMsg, setWelcomeMsg] = useState("");
-  const [activeModel, setActiveModel] = useState("gemini-3.8-flash");
+  const [activeModel, setActiveModel] = useState("gemini-flash-lite-latest");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [savingAI, setSavingAI] = useState(false);
   const [aiResultMsg, setAiResultMsg] = useState<{ success: boolean; text: string } | null>(null);
@@ -185,7 +185,7 @@ export default function IntegrationsHubPage() {
       if (resSettings.success && resSettings.settings) {
         setGeminiKey(resSettings.settings.geminiApiKey || "");
         setWelcomeMsg(resSettings.settings.welcomeMessage || "Welcome! How can we help you today?");
-        setActiveModel(resSettings.settings.aiModel || "gemini-3.8-flash");
+        setActiveModel(resSettings.settings.aiModel || "gemini-flash-lite-latest");
         setSystemPrompt(resSettings.settings.aiSystemPrompt || "");
         if (resSettings.settings.metaCapiLeadValue) {
           setMetaCapiLeadValue(resSettings.settings.metaCapiLeadValue);

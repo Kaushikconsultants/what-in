@@ -98,9 +98,9 @@ Rules:
       return NextResponse.json({ error: "Gemini API Key is not configured." }, { status: 500 });
     }
 
-    const { callGeminiRest, GEMINI_MODEL_CASCADE } = await import('@/lib/whatsappAI');
+    const { callGeminiRest, GEMINI_MODEL_CASCADE, HARDCODED_PRIMARY_MODEL } = await import('@/lib/whatsappAI');
 
-    const preferredModel = aiModel || 'gemini-3.8-flash';
+    const preferredModel = (aiModel && GEMINI_MODEL_CASCADE.includes(aiModel)) ? aiModel : HARDCODED_PRIMARY_MODEL;
     const cascade = [
       preferredModel,
       ...GEMINI_MODEL_CASCADE.filter(m => m !== preferredModel)

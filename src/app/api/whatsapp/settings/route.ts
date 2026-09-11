@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
         settings = {
           ...settings,
           geminiApiKey: client.geminiApiKey || settings.geminiApiKey,
-          aiModel: client.aiModel || settings.aiModel || "gemini-3.8-flash",
+          aiModel: "gemini-flash-lite-latest",
           aiSystemPrompt: client.aiSystemPrompt || settings.aiSystemPrompt,
           aiKnowledgeBase: client.aiKnowledgeBase || settings.aiKnowledgeBase,
           welcomeMessage: client.welcomeMessage || settings.welcomeMessage,
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     if (user?.clientId) {
       const clientData: any = {};
       if (body.geminiApiKey !== undefined) clientData.geminiApiKey = body.geminiApiKey;
-      if (body.aiModel !== undefined) clientData.aiModel = body.aiModel;
+      clientData.aiModel = "gemini-flash-lite-latest";
       if (body.aiSystemPrompt !== undefined) clientData.aiSystemPrompt = body.aiSystemPrompt;
       if (body.aiKnowledgeBase !== undefined) clientData.aiKnowledgeBase = body.aiKnowledgeBase;
       if (body.welcomeMessage !== undefined) clientData.welcomeMessage = body.welcomeMessage;
