@@ -74,8 +74,17 @@ export default function WhatsAppHeaderNav() {
 
   const [userName, setUserName] = React.useState("");
   const [userRole, setUserRole] = React.useState("");
+  const [brandTitle, setBrandTitle] = React.useState("What-In");
+
   React.useEffect(() => {
     try {
+      if (typeof window !== "undefined") {
+        if (window.location.hostname.includes("whatmore") || window.location.hostname.includes("espon")) {
+          setBrandTitle("Whatmore");
+        } else {
+          setBrandTitle("What-In");
+        }
+      }
       const u = document.cookie.split(";").find(c => c.trim().startsWith("wm_user="));
       if (u) { 
         const v = decodeURIComponent(u.split("=")[1]); 
@@ -164,7 +173,7 @@ export default function WhatsAppHeaderNav() {
             <ShoppingBag size={24} strokeWidth={2.5} />
           </div>
           <div className="brand-text">
-            <h1>{typeof window !== "undefined" && (window.location.hostname.includes("what-in") || window.location.hostname.includes("whatin")) ? "What-In" : "Whatmore"}</h1>
+            <h1 suppressHydrationWarning>{brandTitle}</h1>
             <p>WhatsApp Business Automation</p>
           </div>
         </div>

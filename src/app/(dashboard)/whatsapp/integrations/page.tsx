@@ -702,13 +702,13 @@ const reloadTeams = async () => {
                       1. Callback URL (Paste in Meta App Dashboard → WhatsApp → Configuration):
                     </label>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 p-3 bg-white dark:bg-slate-900 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-mono font-semibold text-gray-800 dark:text-gray-200 break-all select-all">
-                        {customWebhookUrl || (typeof window !== "undefined" ? `${window.location.origin}/api/whatsapp/webhook` : "https://what-in.tinkal.in/api/whatsapp/webhook")}
+                      <code suppressHydrationWarning className="flex-1 p-3 bg-white dark:bg-slate-900 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-mono font-semibold text-gray-800 dark:text-gray-200 break-all select-all">
+                        {customWebhookUrl || "https://what-in.tinkal.in/api/whatsapp/webhook"}
                       </code>
                       <button
                         type="button"
                         onClick={() => {
-                          const url = customWebhookUrl || `${window.location.origin}/api/whatsapp/webhook`;
+                          const url = customWebhookUrl || (typeof window !== "undefined" ? `${window.location.origin}/api/whatsapp/webhook` : "https://what-in.tinkal.in/api/whatsapp/webhook");
                           navigator.clipboard.writeText(url);
                           setCopiedUrl(true);
                           setTimeout(() => setCopiedUrl(false), 2000);
@@ -726,7 +726,7 @@ const reloadTeams = async () => {
                       2. Verify Token (Paste in Meta App Dashboard → Verify Token field):
                     </label>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 p-3 bg-white dark:bg-slate-900 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-mono font-bold text-indigo-700 dark:text-indigo-300 break-all select-all">
+                      <code suppressHydrationWarning className="flex-1 p-3 bg-white dark:bg-slate-900 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-mono font-bold text-indigo-700 dark:text-indigo-300 break-all select-all">
                         {webhookToken}
                       </code>
                       <button
