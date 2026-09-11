@@ -1063,6 +1063,22 @@ function isWhatsAppApiConfigured(account: any) {
 export async function getWhatsAppDashboardMetrics() {
   await ensureSeeded();
   try {
+    const user = await getAuthenticatedUser();
+    let client: any = null;
+
+    if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email }
+          ]
+        }
+      });
+    }
+
     const [
       account,
       totalConvs,
@@ -1085,6 +1101,43 @@ export async function getWhatsAppDashboardMetrics() {
       prisma.whatsAppCampaign.count({ where: { status: 'COMPLETED' } })
     ]);
 
+    if (client) {
+      const isConnected = !!(client.metaAccessToken && client.phoneId && client.wabaId && !client.metaAccessToken.startsWith("EAAG...meta"));
+      const brandSlug = (client.businessName || "client").toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const personalizedToken = client.webhookVerifyToken || `${brandSlug}_whatsapp_secure_webhook_token_2026`;
+      const accountStatus = isConnected ? (client.status || "CONNECTED") : "NOT CONNECTED (Setup Required)";
+
+      return {
+        success: true,
+        isConnected,
+        isClientTenant: true,
+        account: {
+          id: client.id,
+          name: client.businessName || "Client WABA",
+          phoneNumber: client.phoneNumber || "Not Configured",
+          phoneId: client.phoneId || "",
+          businessAccountId: client.wabaId || "",
+          businessManagerId: "",
+          accessToken: client.metaAccessToken ? "••••••••••••••••" : "",
+          webhookVerifyToken: personalizedToken,
+          status: accountStatus,
+          dailyLimit: client.dailyLimit || "10K per day",
+          usedToday: 0,
+          qualityRating: isConnected ? "GREEN" : "PENDING_SETUP"
+        },
+        metrics: {
+          totalConvs: isConnected ? totalConvs : 0,
+          openConvs: isConnected ? openConvs : 0,
+          closedConvs: isConnected ? closedConvs : 0,
+          totalMessages: isConnected ? totalMessages : 0,
+          sentToday: 0,
+          activeAutomations: isConnected ? activeAutomations : 0,
+          activeTemplates: isConnected ? activeTemplates : 0,
+          activeCampaigns: isConnected ? activeCampaigns : 0
+        }
+      };
+    }
+
     const isConnected = isWhatsAppApiConfigured(account);
     const accountStatus = isConnected
       ? (account?.status || "CONNECTED")
@@ -1093,6 +1146,7 @@ export async function getWhatsAppDashboardMetrics() {
     return {
       success: true,
       isConnected,
+      isClientTenant: false,
       account: {
         id: account?.id,
         name: account?.name || "Primary WABA Account",
