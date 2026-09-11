@@ -213,9 +213,9 @@ export default function PresentationPage() {
               <span className="animate-pulse">✨</span> 7-Day Free Live Demo • Official WhatsApp Cloud OS
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-[1.1]">
-              Scale WhatsApp into your <br />
-              <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[52px] font-black text-white tracking-tight leading-[1.15]">
+              Scale WhatsApp into Your <br className="hidden sm:inline" />
+              <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent sm:whitespace-nowrap inline-block mt-1">
                 #1 24/7 Revenue Channel
               </span>
             </h1>

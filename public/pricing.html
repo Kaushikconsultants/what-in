@@ -173,9 +173,11 @@
     }
 
     .hero-title {
-      font-size: 54px;
+      font-size: clamp(32px, 4.5vw, 54px);
       font-weight: 900;
-      line-height: 1.1;
+      color: #ffffff;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
       margin-bottom: 20px;
     }
     .gradient-text {
@@ -844,8 +846,8 @@
       <div>
         <div class="hero-tag">✨ Complete WhatsApp Business Operating System</div>
         <h1 class="hero-title">
-          Scale WhatsApp into your <br />
-          <span class="gradient-text">#1 24/7 Revenue Channel</span>
+          Scale WhatsApp into Your <br style="display: block;" />
+          <span class="gradient-text" style="white-space: nowrap; display: inline-block;">#1 24/7 Revenue Channel</span>
         </h1>
         <p class="hero-desc">
           Automate customer inquiries with <strong>Gemini AI</strong>, synchronize <strong>Shopify & Meta Catalogs</strong>, collect <strong>0% fee UPI QR payments</strong>, and supercharge ROAS with <strong>Meta CAPI Server Tracking</strong>.
