@@ -266,21 +266,8 @@ export default function WhatsAppInboxComponent() {
   const [followUpDays, setFollowUpDays] = useState<number>(3);
   const [followUpNotes, setFollowUpNotes] = useState<string>("");
 
-  const handleCreateQuoteSubmit = async () => {
-    if (!selectedConvId) return;
-    setShowQuoteModal(false);
-    setToastMsg("PDF Quotation generated & sent to customer!");
-    setTimeout(() => setToastMsg(null), 3000);
-  };
-
-  const handleCreateFollowUpSubmit = async () => {
-    if (!selectedConvId) return;
-    setShowFollowUpModal(false);
-    setToastMsg(`Follow-up scheduled in ${followUpDays} days.`);
-    setTimeout(() => setToastMsg(null), 3000);
-  };
-
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [sendingPayment, setSendingPayment] = useState<boolean>(false);
   const [showAssignModal, setShowAssignModal] = useState<boolean>(false);
   const [assigningLead, setAssigningLead] = useState<boolean>(false);
   const [statusToggleLoading, setStatusToggleLoading] = useState<boolean>(false);
@@ -423,6 +410,80 @@ export default function WhatsAppInboxComponent() {
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
 
+  // WhatsApp Date & Media Helpers
+  const formatConversationTime = (dateInput: string | Date | null | undefined) => {
+    if (!dateInput) return "";
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) {
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    }
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 7 && diffDays >= 0) {
+      return d.toLocaleDateString([], { weekday: "short" });
+    }
+    return d.toLocaleDateString([], { day: "numeric", month: "short" });
+  };
+
+  const formatChatDividerDate = (dateInput: string | Date | null | undefined) => {
+    if (!dateInput) return "";
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+    const now = new Date();
+    
+    const formattedDate = d.toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined
+    });
+
+    if (d.toDateString() === now.toDateString()) {
+      return `📅 Today • ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+    }
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) {
+      return `📅 Yesterday • ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+    }
+
+    return `📅 ${formattedDate}`;
+  };
+
+  const formatMessageBubbleTime = (dateInput: string | Date | null | undefined) => {
+    if (!dateInput) return "";
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+    const now = new Date();
+    const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    
+    if (d.toDateString() === now.toDateString()) {
+      return `Today, ${timeStr}`;
+    }
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) {
+      return `Yesterday, ${timeStr}`;
+    }
+    const dateStr = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+    return `${dateStr}, ${timeStr}`;
+  };
+
+  const resolveSafeMediaUrl = (url?: string | null) => {
+    if (!url) return "";
+    if (url.includes("/api/whatsapp/media/")) {
+      const idx = url.indexOf("/api/whatsapp/media/");
+      return url.slice(idx);
+    }
+    return url;
+  };
+
   // Fetch Employees List for Filtering & Assignment
   useEffect(() => {
     const fetchEmps = async () => {
@@ -487,7 +548,7 @@ export default function WhatsAppInboxComponent() {
       if (data.success && data.chats) {
         const mapped = data.chats.map((c: any) => ({
           id: c.id,
-          status: c.chat_status === 'open' ? 'OPEN' : 'CLOSED',
+          status: (c.chat_status === 'open' ? 'OPEN' : 'CLOSED') as 'OPEN' | 'CLOSED',
           unreadCount: c.unreadCount || 0,
           lastMessageText: c.last_message,
           lastMessageAt: c.created_at,
@@ -508,7 +569,7 @@ export default function WhatsAppInboxComponent() {
 
         // Read user details from cookie for filtering to avoid stale state in closures
         try {
-          const u = document.cookie.split(";").find(c => c.trim().startsWith("wm_user="));
+          const u = document.cookie.split(";").find((c: any) => c.trim().startsWith("wm_user="));
           if (u) {
             const v = decodeURIComponent(u.split("=")[1]);
             const parsed = JSON.parse(v);
@@ -1034,7 +1095,20 @@ export default function WhatsAppInboxComponent() {
   };
 
 
-    // Inline Name Save Handler
+  // Quotation and Follow-Up Modal Handlers
+  const handleCreateQuoteSubmit = async () => {
+    setShowQuoteModal(false);
+    setToastMsg("Quotation creation is currently disabled for this tenant.");
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  const handleCreateFollowUpSubmit = async () => {
+    setShowFollowUpModal(false);
+    setToastMsg(`Follow-up scheduled for ${followUpDays} days from now.`);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
+  // Inline Name Save Handler
   const handleSaveCustomerName = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!selectedConvId || !activeConvDetail?.customer?.id) return;
@@ -1295,18 +1369,31 @@ export default function WhatsAppInboxComponent() {
 
   // Handle Send Payment Link Submit
   const handleSendPaymentSubmit = async () => {
-    if (!selectedConvId || !activeConvDetail?.customer?.id) return;
-    const res = await generateWhatsAppPaymentLinkAction({
-      conversationId: selectedConvId,
-      customerId: activeConvDetail.customer.id,
-      amount: paymentAmount,
-      description: paymentDesc,
-      deliveryMethod: paymentDeliveryMethod
-    });
-    if (res.success) {
-      setShowPaymentModal(false);
-      await fetchConversationDetail(selectedConvId, true);
-      await fetchConversationsList(true);
+    if (!selectedConvId || !activeConvDetail?.customer?.id || sendingPayment) return;
+    setSendingPayment(true);
+    try {
+      const res = await generateWhatsAppPaymentLinkAction({
+        conversationId: selectedConvId,
+        customerId: activeConvDetail.customer.id,
+        amount: paymentAmount,
+        description: paymentDesc,
+        deliveryMethod: paymentDeliveryMethod
+      });
+      if (res.success) {
+        setShowPaymentModal(false);
+        setToastMsg(`Payment request sent successfully.`);
+        setTimeout(() => setToastMsg(null), 3000);
+        await fetchConversationDetail(selectedConvId, true);
+        await fetchConversationsList(true);
+      } else {
+        setToastMsg(`Failed to send payment link: ${res.error || "Unknown error"}`);
+        setTimeout(() => setToastMsg(null), 4000);
+      }
+    } catch (err: any) {
+      setToastMsg(`Failed to send payment link: ${err.message || "Network error"}`);
+      setTimeout(() => setToastMsg(null), 4000);
+    } finally {
+      setSendingPayment(false);
     }
   };
 
@@ -1352,7 +1439,7 @@ export default function WhatsAppInboxComponent() {
     setAssigningLead(false);
   };
 
-  const handleToggleConversationStatus = async (status: 'OPEN' | 'CLOSED') => {
+  const handleToggleConversationStatus = async (status: "OPEN" | "CLOSED") => {
     if (!selectedConvId) return;
     const res = await toggleConversationStatusAction(selectedConvId, status);
     if (res.success) {
@@ -1569,8 +1656,8 @@ export default function WhatsAppInboxComponent() {
                     <div className="conv-content-box">
                       <div className="conv-top-line">
                         <span className="conv-name">{cust?.contactPerson || cust?.businessName || cust?.whatsappNumber}</span>
-                        <span className="conv-time">
-                          {new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        <span className="conv-time" title={new Date(conv.lastMessageAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}>
+                          {formatConversationTime(conv.lastMessageAt)}
                         </span>
                       </div>
 
@@ -1579,7 +1666,9 @@ export default function WhatsAppInboxComponent() {
                       </div>
 
                       <div className="conv-snippet-line">
-                        <span className="conv-last-msg">{conv.lastMessageText || "No messages yet"}</span>
+                        <span className="conv-last-msg">
+                          {conv.lastMessageText === "[Message]" ? "🛍️ Catalog Order" : (conv.lastMessageText || "No messages yet")}
+                        </span>
                         {isUnread && <span className="unread-counter-badge">{conv.unreadCount}</span>}
                       </div>
 
@@ -1934,9 +2023,55 @@ export default function WhatsAppInboxComponent() {
 
             {/* Messages Scroll Area */}
             <div className="chat-messages-container" ref={chatMessagesContainerRef}>
-              {sortedMessages?.map((msg: any) => {
+              {sortedMessages?.map((msg: any, mIdx: number) => {
                 const isAgent = msg.senderType === "AGENT" || msg.senderType === "BOT" || msg.senderType === "AI";
                 const isInternal = msg.isInternalNote;
+
+                const msgDate = new Date(msg.sentAt);
+                const prevMsg = mIdx > 0 ? sortedMessages[mIdx - 1] : null;
+                const prevDate = prevMsg ? new Date(prevMsg.sentAt) : null;
+                const showDateDivider = !prevDate || msgDate.toDateString() !== prevDate.toDateString();
+
+                const dateDividerNode = showDateDivider ? (
+                  <div key={`date-div-${msg.id}`} style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "18px 0 12px 0",
+                    position: "sticky",
+                    top: "4px",
+                    zIndex: 6
+                  }}>
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      width: "100%",
+                      maxWidth: "480px"
+                    }}>
+                      <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, transparent, #cbd5e1)" }} />
+                      <span style={{
+                        background: "rgba(255, 255, 255, 0.96)",
+                        backdropFilter: "blur(8px)",
+                        color: "#334155",
+                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)",
+                        border: "1px solid #cbd5e1",
+                        borderRadius: "12px",
+                        padding: "4px 14px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        letterSpacing: "0.2px",
+                        userSelect: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}>
+                        {formatChatDividerDate(msg.sentAt)}
+                      </span>
+                      <div style={{ flex: 1, height: "1px", background: "linear-gradient(to left, transparent, #cbd5e1)" }} />
+                    </div>
+                  </div>
+                ) : null;
 
                 // Render Meta CTWA Ad Referral Card inside the chat stream
                 if (msg.senderName === "META_CTWA_AD" || msg.messageType === "META_CTWA_AD") {
@@ -1952,412 +2087,876 @@ export default function WhatsAppInboxComponent() {
                   const mediaUrl = metaDataObj.image_url || metaDataObj.video_url || "";
 
                   return (
-                    <div key={msg.id} style={{ display: "flex", justifyContent: "center", margin: "14px 0" }}>
-                      <div style={{
-                        maxWidth: "92%",
-                        width: "440px",
-                        background: "linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%)",
-                        border: "1px solid #c7d2fe",
-                        borderRadius: "16px",
-                        padding: "14px 16px",
-                        boxShadow: "0 4px 12px rgba(79, 70, 229, 0.08)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px"
-                      }}>
-                        {/* Header Badge */}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <div style={{
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "8px",
-                              background: "#2563eb",
-                              color: "white",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "12px",
-                              fontWeight: "bold"
-                            }}>
-                              🎯
-                            </div>
-                            <div>
-                              <span style={{ fontSize: "11px", fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                META AD REFERRAL
-                              </span>
-                              <div style={{ fontSize: "10px", color: "#475569" }}>
-                                Customer clicked this ad on Meta
+                    <React.Fragment key={msg.id}>
+                      {dateDividerNode}
+                      <div style={{ display: "flex", justifyContent: "center", margin: "14px 0" }}>
+                        <div style={{
+                          maxWidth: "92%",
+                          width: "440px",
+                          background: "linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%)",
+                          border: "1px solid #c7d2fe",
+                          borderRadius: "16px",
+                          padding: "14px 16px",
+                          boxShadow: "0 4px 12px rgba(79, 70, 229, 0.08)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px"
+                        }}>
+                          {/* Header Badge */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <div style={{
+                                width: "28px",
+                                height: "28px",
+                                borderRadius: "8px",
+                                background: "#2563eb",
+                                color: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "12px",
+                                fontWeight: "bold"
+                              }}>
+                                🎯
+                              </div>
+                              <div>
+                                <span style={{ fontSize: "11px", fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                  META AD REFERRAL
+                                </span>
+                                <div style={{ fontSize: "10px", color: "#475569" }}>
+                                  Customer clicked this ad on Meta
+                                </div>
                               </div>
                             </div>
+                            <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }} title={new Date(msg.sentAt).toLocaleString([], { dateStyle: "full", timeStyle: "medium" })}>
+                              {formatMessageBubbleTime(msg.sentAt)}
+                            </span>
                           </div>
-                          <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }}>
-                            {new Date(msg.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </div>
 
-                        {/* Optional Ad Image / Media Thumbnail */}
-                        {mediaUrl && (
-                          <img
-                            src={mediaUrl}
-                            alt="Meta Ad Media"
-                            style={{ width: "100%", maxHeight: "160px", objectFit: "cover", borderRadius: "10px", border: "1px solid #dbeafe" }}
-                          />
-                        )}
-
-                        {/* Ad Body Content */}
-                        <div style={{ background: "white", padding: "10px 12px", borderRadius: "10px", border: "1px solid #e0e7ff" }}>
-                          <div style={{ fontSize: "13px", fontWeight: "700", color: "#0f172a", marginBottom: "4px" }}>
-                            "{headline}"
-                          </div>
-                          {body && (
-                            <div style={{ fontSize: "12px", color: "#475569", lineHeight: "1.4" }}>
-                              {body}
-                            </div>
+                          {/* Optional Ad Image / Media Thumbnail */}
+                          {mediaUrl && (
+                            <img
+                              src={resolveSafeMediaUrl(mediaUrl)}
+                              alt="Meta Ad Media"
+                              referrerPolicy="no-referrer"
+                              style={{ width: "100%", maxHeight: "160px", objectFit: "cover", borderRadius: "10px", border: "1px solid #dbeafe" }}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = "none";
+                              }}
+                            />
                           )}
-                          <div style={{ fontSize: "10.5px", color: "#64748b", marginTop: "6px" }}>
-                            Ad ID: <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: "4px", fontWeight: 600 }}>{sourceId}</code>
-                          </div>
-                        </div>
 
-                        {/* Action Button */}
-                        {sourceUrl && (
-                          <a
-                            href={sourceUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              textAlign: "center",
-                              background: "#2563eb",
-                              color: "white",
-                              fontSize: "12px",
-                              fontWeight: "600",
-                              padding: "8px 12px",
-                              borderRadius: "8px",
-                              textDecoration: "none",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: "4px"
-                            }}
-                          >
-                            View Ad on Meta ↗
-                          </a>
-                        )}
+                          {/* Ad Body Content */}
+                          <div style={{ background: "white", padding: "10px 12px", borderRadius: "10px", border: "1px solid #e0e7ff" }}>
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#0f172a", marginBottom: "4px" }}>
+                              "{headline}"
+                            </div>
+                            {body && (
+                              <div style={{ fontSize: "12px", color: "#475569", lineHeight: "1.4" }}>
+                                {body}
+                              </div>
+                            )}
+                            <div style={{ fontSize: "10.5px", color: "#64748b", marginTop: "6px" }}>
+                              Ad ID: <code style={{ background: "#f1f5f9", padding: "1px 5px", borderRadius: "4px", fontWeight: 600 }}>{sourceId}</code>
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          {sourceUrl && (
+                            <a
+                              href={sourceUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                textAlign: "center",
+                                background: "#2563eb",
+                                color: "white",
+                                fontSize: "12px",
+                                fontWeight: "600",
+                                padding: "8px 12px",
+                                borderRadius: "8px",
+                                textDecoration: "none",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "4px"
+                              }}
+                            >
+                              View Ad on Meta ↗
+                            </a>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 }
 
                 if (isInternal) {
                   return (
-                    <div key={msg.id} className="internal-note-card">
-                      <div className="internal-note-header">
-                        <LockIcon size={12} />
-                        <span>Internal Team Note by {msg.senderName}</span>
-                        <span className="note-time">
-                          {new Date(msg.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
+                    <React.Fragment key={msg.id}>
+                      {dateDividerNode}
+                      <div className="internal-note-card">
+                        <div className="internal-note-header">
+                          <LockIcon size={12} />
+                          <span>Internal Team Note by {msg.senderName}</span>
+                          <span className="note-time" title={new Date(msg.sentAt).toLocaleString([], { dateStyle: "full", timeStyle: "medium" })}>
+                            {formatMessageBubbleTime(msg.sentAt)}
+                          </span>
+                        </div>
+                        <div className="internal-note-body">{msg.content}</div>
                       </div>
-                      <div className="internal-note-body">{msg.content}</div>
-                    </div>
+                    </React.Fragment>
                   );
                 }
 
                 return (
-                  <div key={msg.id} className={`message-row ${isAgent ? "outgoing" : "incoming"} ${msg.isInternalNote ? "internal-note-row" : ""}`}>
-                    <div className="message-bubble" style={msg.isInternalNote ? { background: '#fef9c3', color: '#854d0e', border: '1px solid #fde047' } : {}}>
-                      <div className="message-sender-name" style={msg.isInternalNote ? { color: '#a16207' } : {}}>
-                        {msg.isInternalNote ? (
-                          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><LockIcon size={12} /> Internal Note</span>
-                        ) : (
-                          (msg.senderName === "Sales Rep" || msg.senderName === "Agent") && activeConvDetail.assignedEmployee?.user?.name 
-                            ? activeConvDetail.assignedEmployee.user.name 
-                            : msg.senderName
-                        )}
-                      </div>
-
-                      {/* PDF Document Renderer */}
-                      {msg.messageType === "DOCUMENT" && (
-                        <div className="message-doc-box">
-                          <FileText size={24} color="#ef4444" />
-                          <div className="doc-info">
-                            <span className="doc-filename">{msg.mediaFilename || "Document.pdf"}</span>
-                            <span className="doc-filesize">Attachment Document</span>
-                          </div>
-                          {msg.mediaUrl && (
-                            <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="doc-download-btn">
-                              Download
-                            </a>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Image Message Renderer */}
-                      {msg.messageType === "IMAGE" && (
-                        <div style={{ marginTop: "4px", position: "relative" }}>
-                          {msg.mediaUrl ? (
-                            <div style={{ position: "relative", display: "inline-block", width: "100%" }}>
-                              <img
-                                src={msg.mediaUrl}
-                                alt="Media Image"
-                                style={{ width: "100%", maxHeight: "220px", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }}
-                                onClick={() => window.open(msg.mediaUrl, "_blank")}
-                              />
-                              <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ position: "absolute", bottom: "8px", right: "8px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} title="Download Image">
-                                <Download size={14} />
-                              </button>
-                            </div>
+                  <React.Fragment key={msg.id}>
+                    {dateDividerNode}
+                    <div className={`message-row ${isAgent ? "outgoing" : "incoming"} ${msg.isInternalNote ? "internal-note-row" : ""}`}>
+                      <div className="message-bubble" style={msg.isInternalNote ? { background: '#fef9c3', color: '#854d0e', border: '1px solid #fde047' } : {}}>
+                        <div className="message-sender-name" style={msg.isInternalNote ? { color: '#a16207' } : {}}>
+                          {msg.isInternalNote ? (
+                            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><LockIcon size={12} /> Internal Note</span>
                           ) : (
-                            <div style={{ padding: "12px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center" }}>
-                              📷 Image expired (Stored only for 30 days)
+                            (msg.senderName === "Sales Rep" || msg.senderName === "Agent") && activeConvDetail.assignedEmployee?.user?.name 
+                              ? activeConvDetail.assignedEmployee.user.name 
+                              : msg.senderName
+                          )}
+                        </div>
+
+                        {/* PDF Document Renderer */}
+                        {msg.messageType === "DOCUMENT" && (
+                          <div className="message-doc-box">
+                            <FileText size={24} color="#ef4444" />
+                            <div className="doc-info">
+                              <span className="doc-filename">{msg.mediaFilename || "Document.pdf"}</span>
+                              <span className="doc-filesize">Attachment Document</span>
                             </div>
-                          )}
-                          {msg.content && msg.content !== "[IMAGE]" && !msg.content.startsWith("Attached file:") && <p className="message-text-content" style={{ marginTop: "4px" }}>{msg.content}</p>}
-                        </div>
-                      )}
-
-                      {/* Video Message Renderer */}
-                      {msg.messageType === "VIDEO" && (
-                        <div style={{ marginTop: "4px", position: "relative" }}>
-                          <video src={msg.mediaUrl || ""} controls style={{ width: "100%", maxHeight: "220px", borderRadius: "8px" }} />
-                          {msg.mediaUrl && (
-                            <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ position: "absolute", top: "8px", right: "8px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 10 }} title="Download Video">
-                              <Download size={14} />
-                            </button>
-                          )}
-                          {msg.content && msg.content !== "[IMAGE]" && !msg.content.startsWith("Attached file:") && <p className="message-text-content" style={{ marginTop: "4px" }}>{msg.content}</p>}
-                        </div>
-                      )}
-
-                      {/* Audio Message Renderer */}
-                      {msg.messageType === "AUDIO" && (
-                        <div style={{ marginTop: "4px", background: "#f3f4f6", padding: "8px", borderRadius: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>Voice Message</span>
                             {msg.mediaUrl && (
-                              <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ background: "transparent", color: "#6b7280", border: "none", cursor: "pointer", padding: "2px" }} title="Download Audio">
+                              <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="doc-download-btn">
+                                Download
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Image Message Renderer */}
+                        {msg.messageType === "IMAGE" && (
+                          <div style={{ marginTop: "4px", position: "relative" }}>
+                            {msg.mediaUrl ? (
+                              <div style={{ position: "relative", display: "inline-block", width: "100%" }}>
+                                <img
+                                  src={resolveSafeMediaUrl(msg.mediaUrl)}
+                                  alt="Media Image"
+                                  referrerPolicy="no-referrer"
+                                  style={{ width: "100%", maxHeight: "220px", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }}
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = "none";
+                                  }}
+                                  onClick={() => window.open(resolveSafeMediaUrl(msg.mediaUrl), "_blank")}
+                                />
+                                <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ position: "absolute", bottom: "8px", right: "8px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} title="Download Image">
+                                  <Download size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ padding: "12px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center" }}>
+                                📷 Image expired (Stored only for 30 days)
+                              </div>
+                            )}
+                            {msg.content && msg.content !== "[IMAGE]" && !msg.content.startsWith("Attached file:") && <p className="message-text-content" style={{ marginTop: "4px" }}>{msg.content}</p>}
+                          </div>
+                        )}
+
+                        {/* Video Message Renderer */}
+                        {msg.messageType === "VIDEO" && (
+                          <div style={{ marginTop: "4px", position: "relative" }}>
+                            <video src={msg.mediaUrl || ""} controls style={{ width: "100%", maxHeight: "220px", borderRadius: "8px" }} />
+                            {msg.mediaUrl && (
+                              <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ position: "absolute", top: "8px", right: "8px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 10 }} title="Download Video">
                                 <Download size={14} />
                               </button>
                             )}
+                            {msg.content && msg.content !== "[IMAGE]" && !msg.content.startsWith("Attached file:") && <p className="message-text-content" style={{ marginTop: "4px" }}>{msg.content}</p>}
                           </div>
-                          {msg.mediaUrl ? (
-                            <audio src={msg.mediaUrl} controls style={{ width: "100%", height: "36px" }} />
-                          ) : (
-                            <div style={{ padding: "8px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center" }}>
-                              🎙 Voice note expired (Stored only for 30 days)
+                        )}
+
+                        {/* Audio Message Renderer */}
+                        {msg.messageType === "AUDIO" && (
+                          <div style={{ marginTop: "4px", background: "#f3f4f6", padding: "8px", borderRadius: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>Voice Message</span>
+                              {msg.mediaUrl && (
+                                <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ background: "transparent", color: "#6b7280", border: "none", cursor: "pointer", padding: "2px" }} title="Download Audio">
+                                  <Download size={14} />
+                                </button>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Payment Link Card Renderer */}
-                      {msg.messageType === "PAYMENT_LINK" && (
-                        <div className="message-payment-card">
-                          <div className="payment-card-header">
-                            <CreditCard size={18} />
-                            <span>WhatsApp Payment Link</span>
+                            {msg.mediaUrl ? (
+                              <audio src={msg.mediaUrl} controls style={{ width: "100%", height: "36px" }} />
+                            ) : (
+                              <div style={{ padding: "8px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center" }}>
+                                🎙 Voice note expired (Stored only for 30 days)
+                              </div>
+                            )}
                           </div>
-                          <div className="payment-card-body">
-                            <p>{msg.content}</p>
-                            <div className="payment-status-pill">Status: PENDING</div>
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Interactive Buttons / List Renderer */}
-                      {(msg.messageType === "BUTTONS" || msg.messageType === "LIST") && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
-                          {/* Image Header Preview */}
-                          {msg.mediaUrl && (
-                            <img
-                              src={msg.mediaUrl}
-                              alt="Button Header"
-                              style={{ width: "100%", aspectRatio: "1.91 / 1", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }}
-                              onClick={() => window.open(msg.mediaUrl, "_blank")}
-                            />
-                          )}
-                          
-                          {/* Text Body */}
-                          <p className="message-text-content" style={{ margin: 0, color: msg.isInternalNote ? '#713f12' : undefined }}>
-                            {msg.content}
-                          </p>
+                        {/* Payment Link Card Renderer */}
+                        {msg.messageType === "PAYMENT_LINK" && (() => {
+                          let payMeta: any = {};
+                          try {
+                            if (msg.metadata) {
+                              payMeta = typeof msg.metadata === "string" ? JSON.parse(msg.metadata) : msg.metadata;
+                            }
+                          } catch (_) {}
 
-                          {/* Passive Interactive Options Preview */}
-                          {(() => {
-                            let options: string[] = [];
-                            try {
-                              if (msg.metadata) {
-                                options = JSON.parse(msg.metadata);
-                              }
-                            } catch (_) {}
-                            if (options.length === 0) return null;
+                          const qrImg = payMeta.qrImageUrl || (msg.mediaUrl?.includes("create-qr-code") ? msg.mediaUrl : null);
+                          const payUrl = payMeta.paymentUrl || (msg.mediaUrl?.startsWith("http") && !msg.mediaUrl.includes("create-qr-code") ? msg.mediaUrl : null);
+                          const payAmt = payMeta.amount || (msg.content?.match(/₹\s*([0-9,]+)/)?.[1]);
 
-                            return (
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px" }}>
-                                {options.map((optText, oIdx) => (
-                                  <div
-                                    key={oIdx}
+                          return (
+                            <div style={{
+                              background: "#ffffff",
+                              border: "1.5px solid #818cf8",
+                              borderRadius: "14px",
+                              overflow: "hidden",
+                              marginTop: "4px",
+                              maxWidth: "340px",
+                              width: "100%",
+                              boxShadow: "0 4px 14px rgba(79, 70, 229, 0.12)"
+                            }}>
+                              {/* Header */}
+                              <div style={{
+                                background: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
+                                color: "#ffffff",
+                                padding: "10px 14px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: "8px"
+                              }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <div style={{
+                                    background: "rgba(255,255,255,0.2)",
+                                    borderRadius: "50%",
+                                    width: "26px",
+                                    height: "26px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                  }}>
+                                    <CreditCard size={15} color="#ffffff" />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.2px" }}>
+                                      Payment Request
+                                    </div>
+                                    {payAmt && (
+                                      <div style={{ fontSize: "11px", opacity: 0.92, fontWeight: 600 }}>
+                                        ₹{typeof payAmt === "number" ? payAmt.toLocaleString("en-IN") : payAmt}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <span style={{
+                                  background: "#fef3c7",
+                                  color: "#b45309",
+                                  padding: "3px 8px",
+                                  borderRadius: "12px",
+                                  fontSize: "10px",
+                                  fontWeight: 700
+                                }}>
+                                  PENDING
+                                </span>
+                              </div>
+
+                              {/* Scannable QR Code Image */}
+                              {qrImg && (
+                                <div style={{ padding: "12px", background: "#f8fafc", textAlign: "center", borderBottom: "1px solid #e2e8f0" }}>
+                                  <div style={{ display: "inline-block", background: "#ffffff", padding: "8px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
+                                    <img
+                                      src={qrImg}
+                                      alt="UPI QR Code"
+                                      referrerPolicy="no-referrer"
+                                      style={{ width: "160px", height: "160px", display: "block" }}
+                                    />
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", fontWeight: 500 }}>
+                                    Scan with Google Pay, PhonePe, Paytm or UPI
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Body Text */}
+                              <div style={{
+                                padding: "12px 14px",
+                                fontSize: "12.5px",
+                                color: "#334155",
+                                lineHeight: "1.5",
+                                whiteSpace: "pre-wrap"
+                              }}>
+                                {msg.content}
+                              </div>
+
+                              {/* Pay Now Button Link */}
+                              {payUrl && (
+                                <div style={{ padding: "0 12px 12px" }}>
+                                  <a
+                                    href={payUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
                                     style={{
-                                      background: "#f1f5f9",
-                                      border: "1px solid #cbd5e1",
-                                      color: "#475569",
-                                      padding: "5px 12px",
-                                      borderRadius: "16px",
-                                      fontSize: "11px",
-                                      fontWeight: 600,
-                                      userSelect: "none"
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "6px",
+                                      background: "#4f46e5",
+                                      color: "#ffffff",
+                                      padding: "10px 14px",
+                                      borderRadius: "8px",
+                                      textDecoration: "none",
+                                      fontSize: "12.5px",
+                                      fontWeight: 700,
+                                      boxShadow: "0 2px 4px rgba(79, 70, 229, 0.25)"
                                     }}
                                   >
-                                    🔘 {optText}
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
+                                    💳 Pay Now ↗
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
-                      {/* Meta Template Badge */}
-                      {msg.messageType === "TEMPLATE" && (
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#0284c7", background: "#e0f2fe", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
-                          📋 Meta Approved Template
-                        </div>
-                      )}
-
-                      {/* Interactive Flow Badge */}
-                      {msg.messageType === "FLOW" && (
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#7c3aed", background: "#f3e8ff", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
-                          ⚡ Interactive Flow Form
-                        </div>
-                      )}
-
-                      {/* Product Card Badge */}
-                      {msg.messageType === "PRODUCT_CARD" && (
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#ea580c", background: "#ffedd5", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
-                          🛍️ Product Card
-                        </div>
-                      )}
-
-                      {/* Standard Text & Unsupported Format Renderer */}
-                      {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && (
-                        <p className="message-text-content" style={msg.isInternalNote ? { color: '#713f12' } : { whiteSpace: 'pre-wrap' }}>
-                          {msg.messageType === "UNSUPPORTED" ? (
-                            <span style={{ fontStyle: "italic", color: "#64748b", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                              📎 [Unsupported message format (e.g. Sticker, Location, or Poll)]
-                            </span>
-                          ) : (
-                            msg.content
-                          )}
-                        </p>
-                      )}
-
-                      {msg.status === "FAILED" && (() => {
-                        let errorObj: any = null;
-                        try {
-                          if (msg.metadata) {
-                            const parsed = typeof msg.metadata === "string" ? JSON.parse(msg.metadata) : msg.metadata;
-                            errorObj = parsed.error || null;
-                          }
-                        } catch {}
-
-                        // A message is ONLY considered 24h expired if Meta explicitly returned error 131047 / is24hExpired,
-                        // OR if sessionStatus.expired is truly true and not neverMessaged
-                        const isReal24hExpired = errorObj?.is24hExpired === true || 
-                          (sessionStatus.expired && !sessionStatus.neverMessaged);
-
-                        const displayReason = isReal24hExpired
-                          ? "24-Hour WhatsApp Session Window has expired"
-                          : errorObj?.details || errorObj?.message || "Delivery Failed (Check recipient number or Meta API)";
-
-                        const isRetrying = retryingMsgId === msg.id;
-
-                        return (
-                          <div 
-                            style={{ 
-                              color: isReal24hExpired ? "#b45309" : "#dc2626", 
-                              fontSize: "11.5px", 
-                              display: "flex", 
-                              alignItems: "center", 
-                              flexWrap: "wrap",
-                              gap: "6px", 
-                              marginTop: "6px", 
-                              background: isReal24hExpired ? "#fffbeb" : "#fef2f2", 
-                              padding: "6px 10px", 
-                              borderRadius: "6px", 
-                              border: `1px solid ${isReal24hExpired ? "#fde68a" : "#fecaca"}`, 
-                              width: "fit-content" 
-                            }}
-                            title={errorObj?.details || errorObj?.message || displayReason}
-                          >
-                            <span style={{ fontWeight: 600 }}>⚠️ {displayReason}</span>
+                        {/* Interactive Buttons / List Renderer */}
+                        {(msg.messageType === "BUTTONS" || msg.messageType === "LIST") && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+                            {/* Image Header Preview */}
+                            {msg.mediaUrl && (
+                              <img
+                                src={resolveSafeMediaUrl(msg.mediaUrl)}
+                                alt="Header Media"
+                                referrerPolicy="no-referrer"
+                                style={{ width: "100%", aspectRatio: "1.91 / 1", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }}
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = "none";
+                                }}
+                                onClick={() => window.open(resolveSafeMediaUrl(msg.mediaUrl), "_blank")}
+                              />
+                            )}
                             
-                            {isReal24hExpired ? (
-                              <button
-                                type="button"
-                                onClick={() => setShowTemplatePicker(true)}
-                                style={{
-                                  background: "#d97706",
-                                  color: "#ffffff",
-                                  border: "none",
-                                  borderRadius: "4px",
-                                  padding: "2px 8px",
-                                  fontSize: "10.5px",
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "3px"
-                                }}
-                              >
-                                Send Template
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={isRetrying}
-                                onClick={() => handleRetryMessage(msg)}
-                                style={{
-                                  background: "#dc2626",
-                                  color: "#ffffff",
-                                  border: "none",
-                                  borderRadius: "4px",
-                                  padding: "2px 8px",
-                                  fontSize: "10.5px",
-                                  fontWeight: 700,
-                                  cursor: isRetrying ? "wait" : "pointer",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "3px"
-                                }}
-                              >
-                                <RefreshCw size={11} className={isRetrying ? "animate-spin" : ""} />
-                                {isRetrying ? "Retrying..." : "Retry Send"}
-                              </button>
-                            )}
+                            {/* Text Body */}
+                            <p className="message-text-content" style={{ margin: 0, color: msg.isInternalNote ? '#713f12' : undefined }}>
+                              {msg.content}
+                            </p>
+
+                            {/* Passive Interactive Options Preview */}
+                            {(() => {
+                              let options: string[] = [];
+                              try {
+                                if (msg.metadata) {
+                                  const parsed = typeof msg.metadata === "string" ? JSON.parse(msg.metadata) : msg.metadata;
+                                  if (Array.isArray(parsed)) {
+                                    options = parsed;
+                                  } else if (parsed && Array.isArray(parsed.options)) {
+                                    options = parsed.options;
+                                  }
+                                }
+                              } catch (_) {}
+                              if (options.length === 0) return null;
+
+                              return (
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px" }}>
+                                  {options.map((optText, oIdx) => (
+                                    <div
+                                      key={oIdx}
+                                      style={{
+                                        background: "#f1f5f9",
+                                        border: "1px solid #cbd5e1",
+                                        color: "#475569",
+                                        padding: "5px 12px",
+                                        borderRadius: "16px",
+                                        fontSize: "11px",
+                                        fontWeight: 600,
+                                        userSelect: "none"
+                                      }}
+                                    >
+                                      🔘 {optText}
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
-                        );
-                      })()}
-                      <div className="message-meta-line">
-                        <span className="message-timestamp" style={msg.isInternalNote ? { color: '#a16207' } : {}}>
-                          {new Date(msg.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                        {isAgent && !msg.isInternalNote && (
-                          <span className="msg-status-tick" style={{ display: "inline-flex", alignItems: "center" }}>
-                            {msg.status?.toUpperCase() === "READ" ? (
-                              <span title="Read"><CheckCheck size={14} style={{ color: "#3b82f6", marginLeft: "4px" }} /></span>
-                            ) : msg.status?.toUpperCase() === "DELIVERED" ? (
-                              <span title="Delivered"><CheckCheck size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} /></span>
-                            ) : msg.status?.toUpperCase() === "FAILED" ? (
-                              <span style={{ color: "#ef4444", fontSize: "11px", marginLeft: "4px" }} title="Failed to send">⚠️</span>
-                            ) : (
-                              <span title="Sent"><Check size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} /></span>
-                            )}
-                          </span>
                         )}
+
+                        {/* Meta Template Badge */}
+                        {msg.messageType === "TEMPLATE" && (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#0284c7", background: "#e0f2fe", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
+                            📋 Meta Approved Template
+                          </div>
+                        )}
+
+                        {/* Interactive Flow Badge */}
+                        {msg.messageType === "FLOW" && (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#7c3aed", background: "#f3e8ff", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
+                            ⚡ Interactive Flow Form
+                          </div>
+                        )}
+
+                        {/* Product Card Badge */}
+                        {msg.messageType === "PRODUCT_CARD" && (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#ea580c", background: "#ffedd5", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
+                            🛍️ Product Card
+                          </div>
+                        )}
+
+                        {/* WhatsApp Catalog Order Card Renderer */}
+                        {(msg.messageType === "ORDER" || (() => {
+                          try {
+                            if (msg.metadata) {
+                              const p = typeof msg.metadata === "string" ? JSON.parse(msg.metadata) : msg.metadata;
+                              return Boolean(p.order || p.items);
+                            }
+                          } catch (_) {}
+                          return false;
+                        })()) && (() => {
+                          let orderInfo: any = null;
+                          try {
+                            if (msg.metadata) {
+                              const parsed = typeof msg.metadata === "string" ? JSON.parse(msg.metadata) : msg.metadata;
+                              orderInfo = parsed.order || parsed;
+                            }
+                          } catch (_) {}
+
+                          const items: any[] = Array.isArray(orderInfo?.items) ? orderInfo.items : [];
+                          const totalAmount = orderInfo?.totalAmount ?? 0;
+                          const totalQuantity = orderInfo?.totalQuantity ?? (items.reduce((s: number, i: any) => s + (i.quantity || 1), 0) || 1);
+                          const currencySymbol = (orderInfo?.currency === 'INR' || !orderInfo?.currency) ? '₹' : '$';
+                          const customerNote = orderInfo?.customerNote || orderInfo?.text || '';
+
+                          return (
+                            <div style={{
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              borderRadius: '12px',
+                              overflow: 'hidden',
+                              marginTop: '4px',
+                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)',
+                              maxWidth: '380px',
+                              width: '100%'
+                            }}>
+                              {/* Header */}
+                              <div style={{
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                color: '#ffffff',
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '8px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{
+                                    background: 'rgba(255,255,255,0.2)',
+                                    borderRadius: '50%',
+                                    width: '26px',
+                                    height: '26px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}>
+                                    <ShoppingBag size={15} color="#ffffff" />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.2px' }}>
+                                      WhatsApp Catalog Order
+                                    </div>
+                                    <div style={{ fontSize: '10.5px', opacity: 0.9 }}>
+                                      {totalQuantity} {totalQuantity === 1 ? 'Item' : 'Items'} Ordered
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <span style={{
+                                  background: 'rgba(255,255,255,0.22)',
+                                  padding: '3px 8px',
+                                  borderRadius: '12px',
+                                  fontSize: '11px',
+                                  fontWeight: 700
+                                }}>
+                                  Cart Sent
+                                </span>
+                              </div>
+
+                              {/* Items list */}
+                              <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff' }}>
+                                {items.length > 0 ? (
+                                  items.map((it: any, idx: number) => (
+                                    <div key={idx} style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '10px',
+                                      paddingBottom: idx === items.length - 1 ? 0 : '10px',
+                                      borderBottom: idx === items.length - 1 ? 'none' : '1px dashed #e2e8f0'
+                                    }}>
+                                      {/* Thumbnail */}
+                                      <div style={{
+                                        width: '52px',
+                                        height: '52px',
+                                        borderRadius: '8px',
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        overflow: 'hidden',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0,
+                                        position: 'relative'
+                                      }}>
+                                        {it.image ? (
+                                          <img
+                                            src={it.image}
+                                            alt={it.name || 'Product'}
+                                            referrerPolicy="no-referrer"
+                                            style={{
+                                              width: '100%',
+                                              height: '100%',
+                                              objectFit: 'cover'
+                                            }}
+                                            onError={(e) => {
+                                              const target = e.currentTarget;
+                                              target.style.display = 'none';
+                                              const fallback = target.parentElement?.querySelector('.prod-fallback-icon') as HTMLElement;
+                                              if (fallback) fallback.style.display = 'flex';
+                                            }}
+                                          />
+                                        ) : null}
+                                        <div
+                                          className="prod-fallback-icon"
+                                          style={{
+                                            display: it.image ? 'none' : 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: '100%',
+                                            height: '100%',
+                                            color: '#10b981',
+                                            background: '#ecfdf5'
+                                          }}
+                                        >
+                                          <ShoppingBag size={22} />
+                                        </div>
+                                      </div>
+
+                                      {/* Title & Qty */}
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{
+                                          fontSize: '12.5px',
+                                          fontWeight: 600,
+                                          color: '#1e293b',
+                                          whiteSpace: 'normal',
+                                          lineHeight: '1.3',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis'
+                                        }}>
+                                          {it.name || `Product SKU: ${it.sku || it.retailerId}`}
+                                        </div>
+                                        <div style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          marginTop: '3px',
+                                          fontSize: '11px',
+                                          color: '#64748b'
+                                        }}>
+                                          <span style={{
+                                            background: '#f1f5f9',
+                                            padding: '1px 6px',
+                                            borderRadius: '4px',
+                                            fontWeight: 600,
+                                            color: '#334155'
+                                          }}>
+                                            Qty: {it.quantity || 1}
+                                          </span>
+                                          {it.price > 0 && (
+                                            <span>× {currencySymbol}{Number(it.price).toLocaleString('en-IN')}</span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Subtotal */}
+                                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#059669' }}>
+                                          {currencySymbol}{(Number(it.subtotal || (it.price * (it.quantity || 1)))).toLocaleString('en-IN')}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div style={{ fontSize: '12.5px', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                    {msg.content === '[Message]' ? '🛍️ Customer sent items from the WhatsApp Catalog.' : msg.content}
+                                  </div>
+                                )}
+
+                                {/* Customer Note (Only when explicitly provided by customer) */}
+                                {customerNote && String(customerNote).trim() && String(customerNote).trim() !== "null" && String(customerNote).trim() !== "undefined" ? (
+                                  <div style={{
+                                    background: '#fffbeb',
+                                    border: '1px solid #fde68a',
+                                    borderRadius: '6px',
+                                    padding: '8px 10px',
+                                    fontSize: '11.5px',
+                                    color: '#92400e',
+                                    display: 'flex',
+                                    gap: '6px',
+                                    alignItems: 'flex-start'
+                                  }}>
+                                    <span>💬</span>
+                                    <div style={{ flex: 1 }}>
+                                      <strong>Customer Note:</strong> {customerNote}
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              {/* Footer Total */}
+                              {totalAmount > 0 && (
+                                <div style={{
+                                  background: '#f8fafc',
+                                  borderTop: '1px solid #e2e8f0',
+                                  padding: '10px 14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between'
+                                }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>
+                                    Estimated Total
+                                  </span>
+                                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#059669' }}>
+                                    {currencySymbol}{Number(totalAmount).toLocaleString('en-IN')}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Action Buttons */}
+                              <div style={{
+                                background: '#f8fafc',
+                                borderTop: '1px solid #e2e8f0',
+                                padding: '8px 12px',
+                                display: 'flex',
+                                gap: '6px',
+                                flexWrap: 'wrap'
+                              }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setMessageInput(`Hello ${activeConvDetail?.customer?.contactPerson || ''}! We received your catalog order of ${totalQuantity} item(s) ${totalAmount > 0 ? `(Total: ${currencySymbol}${Number(totalAmount).toLocaleString('en-IN')})` : ''}. We are preparing your quotation / order confirmation now! 👍`);
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    background: '#ffffff',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '6px',
+                                    padding: '6px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    color: '#334155',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <Sparkles size={12} color="#10b981" /> Reply Confirmation
+                                </button>
+
+                                {totalAmount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPaymentAmount(totalAmount);
+                                      setPaymentDesc(`Payment for WhatsApp Catalog Order (${totalQuantity} items)`);
+                                      setShowPaymentModal(true);
+                                    }}
+                                    style={{
+                                      background: '#10b981',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      padding: '6px 10px',
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      color: '#ffffff',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    title="Generate Payment Link"
+                                  >
+                                    <CreditCard size={12} /> Payment Link
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const summary = `🛍️ WhatsApp Catalog Order:\n` +
+                                      (items.length > 0
+                                        ? items.map((i: any) => `• ${i.quantity}x ${i.name} - ${currencySymbol}${i.subtotal}`).join('\n')
+                                        : msg.content) +
+                                      (totalAmount > 0 ? `\nTotal: ${currencySymbol}${totalAmount}` : '');
+                                    navigator.clipboard.writeText(summary);
+                                    setToastMsg('✓ Order summary copied to clipboard!');
+                                    setTimeout(() => setToastMsg(null), 2500);
+                                  }}
+                                  style={{
+                                    background: '#ffffff',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '6px',
+                                    padding: '6px 10px',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    color: '#334155',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Copy order details"
+                                >
+                                  <FileText size={12} /> Copy
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Standard Text & Unsupported Format Renderer */}
+                        {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && msg.messageType !== "ORDER" && (
+                          <p className="message-text-content" style={msg.isInternalNote ? { color: '#713f12' } : { whiteSpace: 'pre-wrap' }}>
+                            {msg.messageType === "UNSUPPORTED" ? (
+                              <span style={{ fontStyle: "italic", color: "#64748b", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                📎 [Unsupported message format (e.g. Sticker, Location, or Poll)]
+                              </span>
+                            ) : (
+                              msg.content
+                            )}
+                          </p>
+                        )}
+
+                        {msg.status === "FAILED" && (() => {
+                          let errorObj: any = null;
+                          try {
+                            if (msg.metadata) {
+                              const parsed = typeof msg.metadata === "string" ? JSON.parse(msg.metadata) : msg.metadata;
+                              errorObj = parsed.error || null;
+                            }
+                          } catch {}
+
+                          // A message is ONLY considered 24h expired if Meta explicitly returned error 131047 / is24hExpired,
+                          // OR if sessionStatus.expired is truly true and not neverMessaged
+                          const isReal24hExpired = errorObj?.is24hExpired === true || 
+                            (sessionStatus.expired && !sessionStatus.neverMessaged);
+
+                          const displayReason = isReal24hExpired
+                            ? "24-Hour WhatsApp Session Window has expired"
+                            : errorObj?.details || errorObj?.message || "Delivery Failed (Check recipient number or Meta API)";
+
+                          const isRetrying = retryingMsgId === msg.id;
+
+                          return (
+                            <div 
+                              style={{ 
+                                color: isReal24hExpired ? "#b45309" : "#dc2626", 
+                                fontSize: "11.5px", 
+                                display: "flex", 
+                                alignItems: "center", 
+                                flexWrap: "wrap",
+                                gap: "6px", 
+                                marginTop: "6px", 
+                                background: isReal24hExpired ? "#fffbeb" : "#fef2f2", 
+                                padding: "6px 10px", 
+                                borderRadius: "6px", 
+                                border: `1px solid ${isReal24hExpired ? "#fde68a" : "#fecaca"}`, 
+                                width: "fit-content" 
+                              }}
+                              title={errorObj?.details || errorObj?.message || displayReason}
+                            >
+                              <span style={{ fontWeight: 600 }}>⚠️ {displayReason}</span>
+                              
+                              {isReal24hExpired ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowTemplatePicker(true)}
+                                  style={{
+                                    background: "#d97706",
+                                    color: "#ffffff",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    padding: "2px 8px",
+                                    fontSize: "10.5px",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "3px"
+                                  }}
+                                >
+                                  Send Template
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={isRetrying}
+                                  onClick={() => handleRetryMessage(msg)}
+                                  style={{
+                                    background: "#dc2626",
+                                    color: "#ffffff",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    padding: "2px 8px",
+                                    fontSize: "10.5px",
+                                    fontWeight: 700,
+                                    cursor: isRetrying ? "wait" : "pointer",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "3px"
+                                  }}
+                                >
+                                  <RefreshCw size={11} className={isRetrying ? "animate-spin" : ""} />
+                                  {isRetrying ? "Retrying..." : "Retry Send"}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        <div className="message-meta-line">
+                          <span 
+                            className="message-timestamp" 
+                            style={msg.isInternalNote ? { color: '#a16207' } : {}}
+                            title={new Date(msg.sentAt).toLocaleString([], { dateStyle: "full", timeStyle: "medium" })}
+                          >
+                            {formatMessageBubbleTime(msg.sentAt)}
+                          </span>
+                          {isAgent && !msg.isInternalNote && (
+                            <span className="msg-status-tick" style={{ display: "inline-flex", alignItems: "center" }}>
+                              {msg.status?.toUpperCase() === "READ" ? (
+                                <span title="Read" style={{ display: "inline-flex" }}><CheckCheck size={14} style={{ color: "#3b82f6", marginLeft: "4px" }} /></span>
+                              ) : msg.status?.toUpperCase() === "DELIVERED" ? (
+                                <span title="Delivered" style={{ display: "inline-flex" }}><CheckCheck size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} /></span>
+                              ) : msg.status?.toUpperCase() === "FAILED" ? (
+                                <span style={{ color: "#ef4444", fontSize: "11px", marginLeft: "4px" }} title="Failed to send">⚠️</span>
+                              ) : (
+                                <span title="Sent" style={{ display: "inline-flex" }}><Check size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} /></span>
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
 
               })}
@@ -2888,8 +3487,8 @@ export default function WhatsAppInboxComponent() {
                   <div className="timeline-item">
                     <div className="timeline-dot green" />
                     <div className="timeline-content">
-                      <span className="timeline-time">
-                        {new Date(activeConvDetail.messages[activeConvDetail.messages.length - 1].sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <span className="timeline-time" title={new Date(activeConvDetail.messages[activeConvDetail.messages.length - 1].sentAt).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}>
+                        {formatMessageBubbleTime(activeConvDetail.messages[activeConvDetail.messages.length - 1].sentAt)}
                       </span>
                       <p className="timeline-text">Last interaction with customer</p>
                     </div>
@@ -3244,24 +3843,35 @@ export default function WhatsAppInboxComponent() {
 
               <button 
                 onClick={handleSendPaymentSubmit}
+                disabled={sendingPayment || paymentAmount <= 0}
                 style={{
                   marginTop: "8px",
                   padding: "14px",
-                  background: "#4f46e5",
+                  background: sendingPayment ? "#94a3b8" : "#4f46e5",
                   color: "white",
                   border: "none",
                   borderRadius: "8px",
                   fontSize: "14px",
                   fontWeight: 600,
-                  cursor: "pointer",
+                  cursor: sendingPayment ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "8px",
-                  boxShadow: "0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1)"
+                  boxShadow: "0 4px 6px -1px rgba(79, 70, 229, 0.2), 0 2px 4px -1px rgba(79, 70, 229, 0.1)",
+                  opacity: sendingPayment ? 0.85 : 1,
+                  transition: "all 0.2s"
                 }}
               >
-                <Send size={16} /> Send Request in Chat
+                {sendingPayment ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" /> Sending Payment Request...
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} /> Send Request in Chat
+                  </>
+                )}
               </button>
             </div>
           </div>

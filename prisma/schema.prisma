@@ -2054,6 +2054,8 @@ model WhatsAppClient {
   integrations       WhatsAppIntegration[]
   flowStates         WhatsAppFlowState[]
   aiLogs             WhatsAppAILog[]
+  abandonedCheckouts ShopifyAbandonedCheckout[]
+  shopifyFlows       ShopifyAutomationFlow[]
 }
 
 model WhatsAppClientPayment {
@@ -2142,3 +2144,61 @@ model WhatsAppIntegration {
   updatedAt DateTime @updatedAt
 }
 
+
+
+// ---------------------------------------------------------
+// Shopify E-Commerce WhatsApp Automation Models
+// ---------------------------------------------------------
+
+model ShopifyAbandonedCheckout {
+  id              String   @id @default(uuid())
+  clientId        String?
+  client          WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  checkoutId      String   @unique // Shopify Checkout ID or Token
+  checkoutUrl     String?  // Direct prefilled recovery URL
+  customerPhone   String?
+  customerEmail   String?
+  customerName    String?
+  totalPrice      Float    @default(0)
+  currency        String   @default("INR")
+  lineItemsJson   String?  // JSON string of item titles, variant, price, image
+  recoveryStatus  String   @default("ABANDONED") // ABANDONED, NUDGED, RECOVERED, EXPIRED
+  nudgesSentCount Int      @default(0)
+  lastNudgeAt     DateTime?
+  abandonedAt     DateTime @default(now())
+  recoveredAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ShopifyAutomationFlow {
+  id              String   @id @default(uuid())
+  clientId        String?
+  client          WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  flowKey         String   @unique // ORDER_CONFIRMATION, ABANDONED_CART_DRIP, COD_TO_PREPAID, ORDER_DISPATCHED, ORDER_DELIVERED, NDR_RESOLUTION
+  name            String
+  description     String
+  triggerEvent    String   // orders/create, checkouts/create, orders/fulfilled, orders/updated, courier/ndr
+  isActive        Boolean  @default(true)
+  delayMinutes    Int      @default(0)
+  discountCode    String?  // e.g. SAVE10, PREPAID50
+  discountValue   Float?   // e.g. 10 (%) or 50 (₹)
+  templateName    String?  // WhatsApp template name
+  messageCopy     String?  // Custom message body
+  totalTriggered  Int      @default(0)
+  totalConverted  Int      @default(0)
+  revenueRecovered Float   @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ShopifyWebhookLog {
+  id          String   @id @default(uuid())
+  clientId    String?
+  topic       String   // orders/create, checkouts/create, etc.
+  shopDomain  String?
+  payload     Json?
+  status      String   @default("PROCESSED") // PROCESSED, FAILED, IGNORED
+  errorMsg    String?
+  createdAt   DateTime @default(now())
+}

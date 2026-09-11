@@ -3,15 +3,12 @@
 import { prisma } from "@/lib/prisma";
 import { seedWhatsAppPlatformData } from "@/lib/seedWhatsApp";
 import { revalidatePath } from "next/cache";
-import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey, resolveWhatsAppDispatchPhone } from "@/lib/phoneUtils";
+import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 
 export async function getWhatsAppChatbotLogsAction(phone: string) {
   try {
-    const client = await getActiveSessionClient();
-    const whereClause: any = {};
-    if (phone) whereClause.phone = phone;
-    if (client) whereClause.clientId = client.id;
+    const whereClause = phone ? { phone } : {};
     const logs = await prisma.whatsAppChatbotLog.findMany({
       where: whereClause,
       orderBy: { createdAt: 'desc' },
@@ -35,60 +32,19 @@ async function ensureSeeded() {
   }
 }
 
-export async function getActiveSessionClient() {
+export async function getMetaApiCredentials() {
   try {
-    const cookieStore = await cookies();
-    const userCookie = cookieStore.get("wm_user")?.value;
-    if (userCookie) {
-      const parsed = JSON.parse(decodeURIComponent(userCookie));
-      if (parsed?.clientId) {
-        const client = await prisma.whatsAppClient.findUnique({ where: { id: parsed.clientId } }).catch(() => null);
-        if (client) return client;
-      }
-      if (parsed?.email) {
-        const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: parsed.email } }).catch(() => null);
-        if (agent?.clientId) {
-          const client = await prisma.whatsAppClient.findUnique({ where: { id: agent.clientId } }).catch(() => null);
-          if (client) return client;
-        }
-        const clientByEmail = await prisma.whatsAppClient.findFirst({
-          where: { OR: [{ contactEmail: parsed.email }, { adminEmail: parsed.email }] }
-        }).catch(() => null);
-        if (clientByEmail) return clientByEmail;
-      }
-    }
-  } catch {}
-  return await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "desc" } }).catch(() => null);
-}
-
-export async function getMetaApiCredentials(clientIdOverride?: string) {
-  try {
-    let client = null;
-    if (clientIdOverride) {
-      client = await prisma.whatsAppClient.findUnique({ where: { id: clientIdOverride } }).catch(() => null);
-    } else {
-      client = await getActiveSessionClient();
-    }
-    const account = await prisma.whatsAppAccount.findFirst().catch(() => null);
-
-    const phoneId = client?.phoneId || account?.phoneId || '';
-    const token = client?.metaAccessToken || account?.accessToken || '';
-    const wabaId = client?.wabaId || account?.businessAccountId || '';
-    const phoneNumber = client?.phoneNumber || account?.phoneNumber || '';
-    const businessName = client?.businessName || account?.name || '';
-
+    const account = await prisma.whatsAppAccount.findFirst();
     return {
-      phoneId,
-      token,
-      accessToken: token,
-      wabaId,
-      businessAccountId: wabaId,
-      phoneNumber,
-      businessName,
-      isConnected: Boolean(token && phoneId)
+      phoneId: account?.phoneId || '',
+      token: account?.accessToken || '',
+      accessToken: account?.accessToken || '',
+      wabaId: account?.businessAccountId || '',
+      businessAccountId: account?.businessAccountId || '',
+      isConnected: Boolean(account?.accessToken && account?.phoneId)
     };
   } catch (e) {
-    return { phoneId: '', token: '', accessToken: '', wabaId: '', businessAccountId: '', phoneNumber: '', businessName: '', isConnected: false };
+    return { phoneId: '', token: '', accessToken: '', wabaId: '', businessAccountId: '', isConnected: false };
   }
 }
 
@@ -151,11 +107,7 @@ export async function getWhatsAppConversations(filters: ConversationFilterOption
     } else if (userEmail) {
       currentEmployee = await prisma.employee.findFirst({ where: { user: { email: userEmail } } });
     }
-    const activeClient = await getActiveSessionClient();
-    const where: any = {};
-    if (activeClient) {
-      where.clientId = activeClient.id;
-    }
+  const where: any = {};
 
     if (filters.search && filters.search.trim()) {
       const q = filters.search.trim();
@@ -219,14 +171,16 @@ export async function getWhatsAppConversations(filters: ConversationFilterOption
             businessName: true,
             contactPerson: true,
             mobile: true,
-            whatsappNumber: true,
-            billingAddress: true,
-            shippingAddress: true,
+            email: true,
+            city: true,
+            state: true,
             customerType: true,
             status: true,
             leadStage: true,
             temperature: true,
-            tags: true
+            tags: true,
+            totalOrders: true,
+            totalPurchaseValue: true
           }
         },
         assignedEmployee: {
@@ -268,7 +222,6 @@ export async function getWhatsAppConversations(filters: ConversationFilterOption
 export async function getWhatsAppConversationById(id: string) {
   await ensureSeeded();
   try {
-    const activeClient = await getActiveSessionClient();
     console.log(`[getWhatsAppConversationById] Fetching conv ${id}`);
     const conversation = await prisma.whatsAppConversation.findUnique({
       where: { id },
@@ -292,10 +245,6 @@ export async function getWhatsAppConversationById(id: string) {
     if (!conversation) {
       console.log(`[getWhatsAppConversationById] Conversation ${id} not found in DB`);
       return { success: false, error: "Conversation not found" };
-    }
-
-    if (activeClient && conversation.clientId && conversation.clientId !== activeClient.id) {
-      return { success: false, error: "Unauthorized: Access denied to conversation of another organization" };
     }
 
     console.log(`[getWhatsAppConversationById] Found conv ${id}, fetching session`);
@@ -429,20 +378,11 @@ export async function sendWhatsAppMessageAction(data: {
 
     let metaMessageId = null;
     let messageStatus = 'SENT';
-    let metaErrorDetails: any = null;
 
     // Call Meta API if it's an outbound message and not an internal note
     if (!data.isInternalNote && data.senderType !== 'CUSTOMER') {
-      let token = conversation.account?.accessToken;
-      let phoneId = conversation.account?.phoneId;
-
-      if (conversation.clientId) {
-        const client = await prisma.whatsAppClient.findUnique({ where: { id: conversation.clientId } }).catch(() => null);
-        if (client?.metaAccessToken && client?.phoneId) {
-          token = client.metaAccessToken;
-          phoneId = client.phoneId;
-        }
-      }
+      const token = conversation.account?.accessToken;
+      const phoneId = conversation.account?.phoneId;
 
       if (token && phoneId && token.length > 20) {
         const url = `https://graph.facebook.com/v20.0/${phoneId}/messages`;
@@ -488,12 +428,28 @@ export async function sendWhatsAppMessageAction(data: {
            payload.type = 'audio';
            payload.audio = { ...mediaField }; // Audio does not support caption in Meta API
         } else if (data.messageType === 'PAYMENT_LINK' && data.mediaUrl) {
+           let qrImageUrl: string | null = null;
+           let paymentUrl = data.mediaUrl;
+           if (data.metadata) {
+             try {
+               const meta = typeof data.metadata === 'string' ? JSON.parse(data.metadata) : data.metadata;
+               if (meta.qrImageUrl) qrImageUrl = meta.qrImageUrl;
+               if (meta.paymentUrl) paymentUrl = meta.paymentUrl;
+             } catch(e) {}
+           }
            payload.type = 'interactive';
-           payload.interactive = {
+           const interactiveData: any = {
              type: 'cta_url',
              body: { text: data.content },
-             action: { name: 'cta_url', parameters: { display_text: '💳 Pay Now', url: data.mediaUrl } }
+             action: { name: 'cta_url', parameters: { display_text: '💳 Pay Now', url: paymentUrl } }
            };
+           if (qrImageUrl) {
+             interactiveData.header = {
+               type: 'image',
+               image: { link: qrImageUrl }
+             };
+           }
+           payload.interactive = interactiveData;
         } else if (data.messageType === 'INTERACTIVE') {
            payload.type = 'interactive';
            let interactiveData: any = {
@@ -528,7 +484,7 @@ export async function sendWhatsAppMessageAction(data: {
         }
 
 
-        metaErrorDetails = null;
+        let metaErrorDetails: any = null;
         try {
            const response = await fetch(url, {
              method: 'POST',
@@ -754,7 +710,62 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
       to: targetPhone
     };
 
-    if (existing.messageType === 'TEXT' || !existing.messageType) {
+    if (existing.messageType === 'BUTTONS' || existing.messageType === 'LIST') {
+      let options: string[] = [];
+      try {
+        if (existing.metadata) {
+          const parsed = JSON.parse(existing.metadata);
+          if (Array.isArray(parsed)) {
+            options = parsed;
+          } else if (parsed && Array.isArray(parsed.options)) {
+            options = parsed.options;
+          }
+        }
+      } catch (_) {}
+
+      if (options.length > 0 && options.length <= 3) {
+        payload.type = 'interactive';
+        payload.interactive = {
+          type: 'button',
+          body: { text: existing.content || 'Please choose an option:' },
+          action: {
+            buttons: options.map((optText, idx) => ({
+              type: 'reply',
+              reply: { id: `btn_retry_${idx}_${Date.now()}`, title: String(optText).slice(0, 20) }
+            }))
+          }
+        };
+        // Only include media header if it's a valid external URL (not dead local/railway media proxies)
+        if (existing.mediaUrl && existing.mediaUrl.startsWith('http') && !existing.mediaUrl.includes('railway.app') && !existing.mediaUrl.includes('localhost')) {
+          payload.interactive.header = {
+            type: 'image',
+            image: { link: existing.mediaUrl }
+          };
+        }
+      } else if (options.length > 3) {
+        payload.type = 'interactive';
+        payload.interactive = {
+          type: 'list',
+          header: { type: 'text', text: 'Options' },
+          body: { text: existing.content || 'Please choose an option:' },
+          action: {
+            button: 'Select Option',
+            sections: [
+              {
+                title: 'Options',
+                rows: options.map((opt, idx) => ({
+                  id: `list_retry_${idx}_${Date.now()}`,
+                  title: String(opt).slice(0, 24)
+                }))
+              }
+            ]
+          }
+        };
+      } else {
+        payload.type = 'text';
+        payload.text = { body: existing.content };
+      }
+    } else if (existing.messageType === 'TEXT' || !existing.messageType) {
       payload.type = 'text';
       payload.text = { body: existing.content };
     } else if (existing.mediaUrl) {
@@ -778,13 +789,27 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
     const resData = await response.json();
 
     if (resData.messages?.[0]?.id) {
+      let successMeta: string | null = null;
+      if (existing.messageType === 'BUTTONS' || existing.messageType === 'LIST') {
+        try {
+          if (existing.metadata) {
+            const parsed = JSON.parse(existing.metadata);
+            if (Array.isArray(parsed)) {
+              successMeta = JSON.stringify(parsed);
+            } else if (parsed && Array.isArray(parsed.options)) {
+              successMeta = JSON.stringify(parsed.options);
+            }
+          }
+        } catch (_) {}
+      }
+
       const updated = await prisma.whatsAppMessage.update({
         where: { id: messageId },
         data: {
           status: 'SENT',
           metaMessageId: resData.messages[0].id,
           sentAt: new Date(),
-          metadata: null // Clear previous error metadata on success
+          metadata: successMeta
         }
       });
       revalidatePath('/whatsapp/inbox');
@@ -805,7 +830,14 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
 
       let meta: any = {};
       try {
-        meta = existing.metadata ? JSON.parse(existing.metadata) : {};
+        if (existing.metadata) {
+          const parsed = JSON.parse(existing.metadata);
+          if (Array.isArray(parsed)) {
+            meta = { options: parsed };
+          } else if (typeof parsed === 'object' && parsed !== null) {
+            meta = { ...parsed };
+          }
+        }
       } catch {}
       meta.error = errInfo;
 
@@ -891,35 +923,20 @@ export async function generateWhatsAppPaymentLinkAction(data: {
   deliveryMethod?: 'link' | 'qr' | 'both';
 }) {
   try {
-    let client = await getActiveSessionClient();
-    if (!client && data.conversationId) {
-      const conv = await prisma.whatsAppConversation.findUnique({
-        where: { id: data.conversationId },
-        select: { clientId: true }
-      });
-      if (conv?.clientId) {
-        client = await prisma.whatsAppClient.findUnique({ where: { id: conv.clientId } });
-      }
-    }
-
-    const creds = await prisma.whatsAppSettings.findFirst().catch(() => null);
-    const gw = client?.activeGateway || creds?.activeGateway;
-    const razorpayKeyId = client?.razorpayKeyId || creds?.razorpayKeyId;
-    const razorpayKeySecret = client?.razorpayKeySecret || creds?.razorpayKeySecret;
-    const cashfreeAppId = client?.cashfreeAppId || creds?.cashfreeAppId;
-    const cashfreeSecretKey = client?.cashfreeSecretKey || creds?.cashfreeSecretKey;
-    const merchantUpiId = client?.merchantUpiId || creds?.merchantUpiId;
-    const merchantUpiName = client?.merchantUpiName || creds?.merchantUpiName || client?.businessName || 'What-In';
-
-    const domain = process.env.NEXTAUTH_URL || 'https://what-in.tinkal.in';
+    const creds = await prisma.whatsAppSettings.findFirst();
+    const gw = creds?.activeGateway;
+    const domain = process.env.NEXTAUTH_URL || 'https://whatsapp.esponsports.com';
     let paymentUrl = `${domain}/pay`;
 
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
     const rawContactPhone = customer?.whatsappNumber ? customer.whatsappNumber.replace(/\D/g, '') : (customer?.mobile || '').replace(/\D/g, '') || '9999999999';
     const dynamicContact = rawContactPhone.length === 10 ? `+91${rawContactPhone}` : `+${rawContactPhone}`;
 
-    if (gw === 'RAZORPAY' && razorpayKeyId && razorpayKeySecret) {
-      const auth = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString('base64');
+    let qrApiUrl: string | null = null;
+    let upiId: string | null = null;
+
+    if (gw === 'RAZORPAY' && creds?.razorpayKeyId && creds?.razorpayKeySecret) {
+      const auth = Buffer.from(`${creds.razorpayKeyId}:${creds.razorpayKeySecret}`).toString('base64');
       const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
         method: 'POST',
         headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' },
@@ -934,10 +951,10 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       });
       const rzpData = await rzpRes.json();
       if (rzpData.short_url) paymentUrl = rzpData.short_url;
-    } else if (gw === 'CASHFREE' && cashfreeAppId && cashfreeSecretKey) {
+    } else if (gw === 'CASHFREE' && creds?.cashfreeAppId && creds?.cashfreeSecretKey) {
       const cfRes = await fetch('https://api.cashfree.com/pg/links', {
         method: 'POST',
-        headers: { 'x-api-version': '2023-08-01', 'x-client-id': cashfreeAppId, 'x-client-secret': cashfreeSecretKey, 'Content-Type': 'application/json' },
+        headers: { 'x-api-version': '2023-08-01', 'x-client-id': creds.cashfreeAppId, 'x-client-secret': creds.cashfreeSecretKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           link_id: `wm_${Date.now()}`,
           link_amount: data.amount,
@@ -948,24 +965,13 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       });
       const cfData = await cfRes.json();
       if (cfData.link_url) paymentUrl = cfData.link_url;
-    } else if (gw === 'UPI' && merchantUpiId) {
-      const domain = process.env.NEXTAUTH_URL || 'https://what-in.tinkal.in';
-      paymentUrl = `${domain}/pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantUpiName)}&am=${data.amount}&tn=${encodeURIComponent(data.description)}`;
+    } else {
+      // Default to UPI Gateway
+      upiId = creds?.merchantUpiId || '9306817689@kotak811';
+      paymentUrl = `${domain}/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(creds?.merchantUpiName || 'Espon')}&am=${data.amount}&tn=${encodeURIComponent(data.description)}`;
 
-      const upiLink = `upi://pay?pa=${encodeURIComponent(merchantUpiId)}&pn=${encodeURIComponent(merchantUpiName)}&am=${data.amount}&cu=INR&tn=${encodeURIComponent(data.description)}`;
-      const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
-      const qrMsgText = `🏦 UPI ID: *${merchantUpiId}*\n\nScan this QR to pay, or click the Pay Now button below.`;
-
-      if (data.deliveryMethod === 'qr' || data.deliveryMethod === 'both' || !data.deliveryMethod) {
-        await sendWhatsAppMessageAction({
-          conversationId: data.conversationId,
-          senderType: 'AGENT',
-          senderName: 'Billing System',
-          messageType: 'IMAGE',
-          content: qrMsgText,
-          mediaUrl: qrApiUrl,
-        });
-      }
+      const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(creds?.merchantUpiName || 'Espon')}&am=${data.amount}&cu=INR&tn=${encodeURIComponent(data.description)}`;
+      qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
     }
     
     const paymentLink = await prisma.whatsAppPaymentLink.create({
@@ -978,16 +984,51 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       }
     });
 
-    // Send Payment Link Message into WhatsApp Chat conditionally
-    if (data.deliveryMethod === 'link' || data.deliveryMethod === 'both' || !data.deliveryMethod) {
+    const metadataPayload = JSON.stringify({
+      paymentLinkId: paymentLink.id,
+      amount: data.amount,
+      paymentUrl,
+      qrImageUrl: qrApiUrl,
+      upiId
+    });
+
+    // Send SINGLE unified message based on delivery method
+    if (data.deliveryMethod === 'qr' && qrApiUrl) {
+      // Send single QR image message
+      await sendWhatsAppMessageAction({
+        conversationId: data.conversationId,
+        senderType: 'AGENT',
+        senderName: 'Billing System',
+        messageType: 'IMAGE',
+        content: `💳 *Payment Request: ₹${data.amount.toLocaleString('en-IN')}*\n\n${data.description}\n\n🏦 UPI ID: *${upiId}*\n\nScan this QR code with any UPI app (GPay, PhonePe, Paytm) to complete payment.`,
+        mediaUrl: qrApiUrl,
+        metadata: metadataPayload
+      });
+    } else if (data.deliveryMethod === 'link') {
+      // Send single CTA link button message without image header
       await sendWhatsAppMessageAction({
         conversationId: data.conversationId,
         senderType: 'AGENT',
         senderName: 'Billing System',
         messageType: 'PAYMENT_LINK',
-        content: `💳 *Payment Request*\n\nAmount: ₹${data.amount.toLocaleString('en-IN')}\nDescription: ${data.description}\n\nClick below to pay securely:`,
-        mediaUrl: paymentUrl, // Handled as CTA URL inside sendWhatsAppMessageAction
-        metadata: JSON.stringify({ paymentLinkId: paymentLink.id, amount: data.amount, paymentUrl })
+        content: `💳 *Payment Request: ₹${data.amount.toLocaleString('en-IN')}*\n\n${data.description}\n\nClick the button below to pay securely:`,
+        mediaUrl: paymentUrl,
+        metadata: JSON.stringify({ paymentLinkId: paymentLink.id, amount: data.amount, paymentUrl, upiId })
+      });
+    } else {
+      // Both (Default): Send ONE single interactive message with QR image header AND Pay Now button!
+      const bodyContent = qrApiUrl 
+        ? `💳 *Payment Request: ₹${data.amount.toLocaleString('en-IN')}*\n\n${data.description}${upiId ? `\n\n🏦 UPI ID: *${upiId}*` : ''}\n\nScan this QR code or tap 'Pay Now' below to complete payment:`
+        : `💳 *Payment Request: ₹${data.amount.toLocaleString('en-IN')}*\n\n${data.description}\n\nClick below to pay securely:`;
+
+      await sendWhatsAppMessageAction({
+        conversationId: data.conversationId,
+        senderType: 'AGENT',
+        senderName: 'Billing System',
+        messageType: 'PAYMENT_LINK',
+        content: bodyContent,
+        mediaUrl: paymentUrl,
+        metadata: metadataPayload
       });
     }
 
@@ -1007,30 +1048,21 @@ export async function generateWhatsAppPaymentLinkAction(data: {
 // ---------------------------------------------------------
 
 // Helper to check if real Meta WhatsApp API credentials are set up
-// Helper to check if real Meta WhatsApp API credentials are set up
-function isWhatsAppApiConfigured(account: any, client?: any) {
-  const token = client?.metaAccessToken || account?.accessToken || process.env.META_WHATSAPP_TOKEN;
-  const phoneId = client?.phoneId || account?.phoneId || process.env.META_PHONE_NUMBER_ID;
+function isWhatsAppApiConfigured(account: any) {
+  const envToken = process.env.META_WHATSAPP_TOKEN;
+  const dbToken = account?.accessToken;
+  const phoneId = account?.phoneId || process.env.META_PHONE_NUMBER_ID;
 
   if (!phoneId || phoneId.startsWith("ph_1092837465")) return false;
-  if (!token || token.startsWith("EAAG...meta_token_secured")) return false;
+  if (!dbToken && !envToken) return false;
+  if (dbToken && dbToken.startsWith("EAAG...meta_token_secured")) return false;
   return true;
 }
 
 export async function getWhatsAppDashboardMetrics() {
+  await ensureSeeded();
   try {
-    let sessionClientId: string | undefined;
-    try {
-      const cookieStore = await cookies();
-      const userCookie = cookieStore.get("wm_user")?.value;
-      if (userCookie) {
-        const parsed = JSON.parse(decodeURIComponent(userCookie));
-        sessionClientId = parsed?.clientId;
-      }
-    } catch {}
-
     const [
-      client,
       account,
       totalConvs,
       openConvs,
@@ -1039,70 +1071,54 @@ export async function getWhatsAppDashboardMetrics() {
       sentToday,
       activeAutomations,
       activeTemplates,
-      activeCampaigns,
-      productsCount,
-      revenueResult
+      activeCampaigns
     ] = await Promise.all([
-      sessionClientId
-        ? prisma.whatsAppClient.findUnique({ where: { id: sessionClientId } }).catch(() => null)
-        : prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "desc" } }).catch(() => null),
-      prisma.whatsAppAccount.findFirst().catch(() => null),
-      prisma.whatsAppConversation.count().catch(() => 0),
-      prisma.whatsAppConversation.count({ where: { status: 'OPEN' } }).catch(() => 0),
-      prisma.whatsAppConversation.count({ where: { status: 'CLOSED' } }).catch(() => 0),
-      prisma.whatsAppMessage.count().catch(() => 0),
-      prisma.whatsAppMessage.count({ where: { sentAt: { gte: new Date(new Date().setHours(0,0,0,0)) } } }).catch(() => 0),
-      prisma.whatsAppAutomationRule.count({ where: { isActive: true } }).catch(() => 0),
-      prisma.whatsAppTemplate.count({ where: { status: 'APPROVED' } }).catch(() => 0),
-      prisma.whatsAppCampaign.count({ where: { status: 'COMPLETED' } }).catch(() => 0),
-      prisma.product.count({ where: { status: 'Active' } }).catch(() => 0),
-      prisma.order.aggregate({ _sum: { totalValue: true } }).catch(() => ({ _sum: { totalValue: 0 } }))
+      prisma.whatsAppAccount.findFirst(),
+      prisma.whatsAppConversation.count(),
+      prisma.whatsAppConversation.count({ where: { status: 'OPEN' } }),
+      prisma.whatsAppConversation.count({ where: { status: 'CLOSED' } }),
+      prisma.whatsAppMessage.count(),
+      prisma.whatsAppMessage.count({ where: { sentAt: { gte: new Date(new Date().setHours(0,0,0,0)) } } }),
+      prisma.whatsAppAutomationRule.count({ where: { isActive: true } }),
+      prisma.whatsAppTemplate.count({ where: { status: 'APPROVED' } }),
+      prisma.whatsAppCampaign.count({ where: { status: 'COMPLETED' } })
     ]);
 
-    const isConnected = isWhatsAppApiConfigured(account, client);
+    const isConnected = isWhatsAppApiConfigured(account);
     const accountStatus = isConnected
       ? (account?.status || "CONNECTED")
       : "NOT CONNECTED (Setup Required)";
-
-    const totalRevenue = revenueResult?._sum?.totalValue || 0;
 
     return {
       success: true,
       isConnected,
       account: {
-        id: client?.id || account?.id,
-        name: client?.businessName || account?.name || "WhatsApp Business Account",
-        phoneNumber: client?.phoneNumber || account?.phoneNumber || "Not Configured",
-        phoneId: client?.phoneId || account?.phoneId || "",
-        businessAccountId: client?.wabaId || account?.businessAccountId || "",
+        id: account?.id,
+        name: account?.name || "Primary WABA Account",
+        phoneNumber: account?.phoneNumber || "Not Configured",
+        phoneId: account?.phoneId || "",
+        businessAccountId: account?.businessAccountId || "",
         businessManagerId: account?.businessManagerId || "",
-        accessToken: (client?.metaAccessToken || account?.accessToken) ? "••••••••••••••••" : "",
-        webhookVerifyToken: client?.webhookVerifyToken || account?.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026",
+        accessToken: account?.accessToken ? "••••••••••••••••" : "",
+        webhookVerifyToken: account?.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026",
         status: accountStatus,
-        dailyLimit: isConnected ? (account?.dailyLimit || "10,000 / 24h") : "--",
-        usedToday: isConnected ? (client?.messagesUsedCount || sentToday || 0) : 0,
-        qualityRating: isConnected ? (account?.qualityRating || "GREEN") : "NOT_CONFIGURED"
+        dailyLimit: account?.dailyLimit || "10K per day",
+        usedToday: isConnected ? (account?.usedToday || 0) : 0,
+        qualityRating: isConnected ? (account?.qualityRating || "GREEN") : "PENDING_SETUP"
       },
       metrics: {
-        totalRevenue,
-        productsCount,
         totalConvs,
         openConvs,
         closedConvs,
-        totalMessages: client?.messagesUsedCount || totalMessages || 0,
-        aiRepliesCount: client?.aiRepliesUsedCount || 0,
+        totalMessages,
         sentToday: isConnected ? (sentToday || 0) : 0,
         activeAutomations,
         activeTemplates,
         activeCampaigns
       }
     };
-  } catch (e: any) {
-    return {
-      success: false,
-      isConnected: false,
-      error: e.message
-    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 }
 
@@ -1174,39 +1190,39 @@ export async function verifyWhatsAppPhoneNumberAction(otpCode?: string) {
 }
 
 export async function checkIntegrationHealthAction() {
+  await ensureSeeded();
   try {
-    const client = await prisma.whatsAppClient.findFirst().catch(() => null);
-    const account = await prisma.whatsAppAccount.findFirst().catch(() => null);
-    const isConnected = isWhatsAppApiConfigured(account, client);
-    const totalMsgs = (client?.messagesUsedCount) || (await prisma.whatsAppMessage.count().catch(() => 0));
+    const account = await prisma.whatsAppAccount.findFirst();
+    const isConnected = isWhatsAppApiConfigured(account);
+    const totalMsgs = await prisma.whatsAppMessage.count();
     const deliveredMsgs = await prisma.whatsAppMessage.count({
       where: { status: { in: ['DELIVERED', 'READ', 'SENT'] } }
-    }).catch(() => 0);
+    });
 
-    const rate = isConnected && totalMsgs > 0 ? ((deliveredMsgs / Math.max(1, totalMsgs)) * 100).toFixed(1) : "100.0";
+    const rate = isConnected && totalMsgs > 0 ? ((deliveredMsgs / totalMsgs) * 100).toFixed(1) : "0.0";
 
     return {
       success: true,
       isConnected,
       webhook: {
-        status: isConnected ? "Active & Verified" : "Pending Setup",
-        endpoint: client ? `/api/whatsapp/webhook/${client.webhookClientId}` : "/api/whatsapp/webhook",
+        status: isConnected ? "Active & Verified" : "Pending Setup (Missing Token)",
+        endpoint: "/api/whatsapp/webhook",
         latency: isConnected ? "18ms" : "N/A",
         isHealthy: isConnected
       },
       metaApi: {
-        status: isConnected ? "Operational" : "Not Configured",
-        version: "v21.0 Cloud API",
-        latency: isConnected ? "35ms" : "N/A",
+        status: isConnected ? "Operational (100%)" : "Not Configured (Enter Credentials)",
+        version: "v18.0 Cloud API",
+        latency: isConnected ? "42ms" : "N/A",
         isHealthy: isConnected
       },
       delivery: {
-        rate: isConnected ? `${rate}% Rate` : "No Traffic",
+        rate: isConnected ? `${rate}% Delivered` : "N/A (No Live API)",
         totalSent: isConnected ? totalMsgs : 0,
         isHealthy: isConnected
       },
       quality: {
-        rating: isConnected ? `${account?.qualityRating || "GREEN"}` : "NOT_CONFIGURED",
+        rating: isConnected ? `${account?.qualityRating || "GREEN"} (High Quality)` : "PENDING SETUP",
         isHealthy: isConnected
       }
     };
@@ -1218,35 +1234,22 @@ export async function checkIntegrationHealthAction() {
 export async function getWhatsAppApiCredentialsAction() {
   await ensureSeeded();
   try {
-    const client = await getActiveSessionClient();
     const account = await prisma.whatsAppAccount.findFirst();
-    const isConnected = isWhatsAppApiConfigured(account, client);
-
-    const wabaId = client?.wabaId || account?.businessAccountId || "";
-    const phoneId = client?.phoneId || account?.phoneId || "";
-    const managerId = client?.businessManagerId || account?.businessManagerId || "";
-    const phoneNumber = client?.phoneNumber || account?.phoneNumber || "";
-    const accessToken = client?.metaAccessToken || account?.accessToken || "";
-    const webhookVerifyToken = client?.webhookVerifyToken || account?.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026";
-    const webhookClientId = client?.webhookClientId || "";
-    const webhookUrl = client?.customWebhookUrl || (client?.webhookClientId ? `/api/whatsapp/webhook/${client.webhookClientId}` : "/api/whatsapp/webhook");
-    const status = isConnected ? (account?.status || "CONNECTED") : "NOT CONNECTED (Setup Required)";
+    const isConnected = isWhatsAppApiConfigured(account);
 
     return {
       success: true,
       isConnected,
       credentials: {
-        id: client?.id || account?.id,
-        name: client?.businessName || account?.name || "WhatsApp Business Account",
-        phoneNumber,
-        phoneId,
-        businessAccountId: wabaId,
-        businessManagerId: managerId,
-        accessToken,
-        webhookVerifyToken,
-        webhookClientId,
-        webhookUrl,
-        status
+        id: account?.id,
+        name: account?.name || "Espon Main Sales",
+        phoneNumber: account?.phoneNumber || "",
+        phoneId: account?.phoneId || "",
+        businessAccountId: account?.businessAccountId || "",
+        businessManagerId: account?.businessManagerId || "",
+        accessToken: account?.accessToken || "",
+        webhookVerifyToken: account?.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026",
+        status: isConnected ? (account?.status || "CONNECTED") : "NOT CONNECTED (Setup Required)"
       }
     };
   } catch (error: any) {
@@ -1263,27 +1266,11 @@ export async function saveWhatsAppApiCredentialsAction(data: {
   webhookVerifyToken?: string;
 }) {
   try {
-    const client = await getActiveSessionClient();
+    let account = await prisma.whatsAppAccount.findFirst();
 
-    const isConnected = Boolean(data.accessToken && data.phoneId && data.wabaId && !data.accessToken.startsWith("EAAG...meta"));
+    const isConnected = data.accessToken && data.phoneId && data.wabaId && !data.accessToken.startsWith("EAAG...meta");
     const status = isConnected ? "CONNECTED" : "NOT CONNECTED (Setup Required)";
 
-    if (client) {
-      await prisma.whatsAppClient.update({
-        where: { id: client.id },
-        data: {
-          wabaId: data.wabaId,
-          phoneId: data.phoneId,
-          businessManagerId: data.managerId || null,
-          metaAccessToken: data.accessToken,
-          phoneNumber: data.phoneNumber,
-          webhookVerifyToken: data.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026",
-        }
-      });
-    }
-
-    // Also sync to fallback WhatsAppAccount
-    let account = await prisma.whatsAppAccount.findFirst();
     if (account) {
       account = await prisma.whatsAppAccount.update({
         where: { id: account.id },
@@ -1293,7 +1280,7 @@ export async function saveWhatsAppApiCredentialsAction(data: {
           businessManagerId: data.managerId || null,
           accessToken: data.accessToken,
           phoneNumber: data.phoneNumber,
-          webhookVerifyToken: data.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026",
+          webhookVerifyToken: data.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026",
           status,
           qualityRating: isConnected ? "GREEN" : "PENDING_SETUP",
           updatedAt: new Date()
@@ -1302,13 +1289,13 @@ export async function saveWhatsAppApiCredentialsAction(data: {
     } else {
       account = await prisma.whatsAppAccount.create({
         data: {
-          name: client?.businessName || "WhatsApp Business Account",
+          name: "Espon Main Sales",
           phoneNumber: data.phoneNumber,
           phoneId: data.phoneId,
           businessAccountId: data.wabaId,
           businessManagerId: data.managerId || null,
           accessToken: data.accessToken,
-          webhookVerifyToken: data.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026",
+          webhookVerifyToken: data.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026",
           status,
           dailyLimit: "10K per day",
           usedToday: 0,
@@ -1802,7 +1789,7 @@ export async function getMetaUploadHandle(accessToken: string, appIdOrWabaId: st
         'file_offset': '0',
         'Content-Type': mimeType
       },
-      body: new Uint8Array(imageBuffer)
+      body: imageBuffer
     });
     const binaryJson = await binaryRes.json();
     if (binaryJson.h) {
@@ -1821,7 +1808,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
   try {
     const creds = await getMetaApiCredentials();
     const brandDetails = await getWhatsAppBrandDetailsAction();
-    const brandDomain = brandDetails.brandDomain || 'what-in.tinkal.in';
+    const brandDomain = brandDetails.brandDomain || 'esponsports.com';
     const brandPhone = (brandDetails as any).brandPhone || (brandDetails as any).phoneNumber || '+917404388242';
     
     let templateName = data.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
@@ -2110,7 +2097,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
               otp_type: data.authCodeDelivery,
               text: data.authCodeDelivery === 'ZERO_TAP' ? 'Auto-fill' : 'One-tap',
               autofill_text: 'Auto-fill',
-              package_name: firstApp.packageName || data.authPackageName || 'com.whatin.app',
+              package_name: firstApp.packageName || data.authPackageName || 'com.esponsports.app',
               signature_hash: firstApp.appSignatureHash || data.authAppSignatureHash || 'K4w8v9N2q1P'
             }
           ]
@@ -2426,7 +2413,7 @@ function extractProductsFromPrompt(prompt: string, activeProducts: any[] = []): 
         mrp,
         primaryImage: img,
         handle: slug,
-        productUrl: `https://what-in.tinkal.in/products/${slug}`
+        productUrl: `https://esponsports.com/products/${slug}`
       });
     }
   }
@@ -2741,7 +2728,6 @@ export async function generateAITemplateAction(prompt: string, context?: {
   currentDraft?: any;
 }) {
   try {
-    const client = await getActiveSessionClient();
     const [
       settings,
       company,
@@ -2767,25 +2753,24 @@ export async function generateAITemplateAction(prompt: string, context?: {
       prisma.whatsAppCannedResponse.findMany({ take: 6, select: { title: true, shortcut: true, content: true, category: true } }).catch(() => [])
     ]);
 
-    const brandName = context?.brandName || client?.businessName || company?.companyName || organization?.name || account?.name || "What-In Brand";
-    const brandDomain = context?.brandDomain || (client?.shopifyDomain ? client.shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.shopifyStoreDomain ? (company.shopifyStoreDomain.includes('what-in') ? 'what-in.tinkal.in' : company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()) : "what-in.tinkal.in")));
-    const brandPhone = client?.phoneNumber || client?.contactPhone || company?.mobile || (company as any)?.phone || account?.phoneNumber || "+91 7206066678";
-    const brandEmail = client?.contactEmail || client?.adminEmail || company?.email || organization?.email || `support@${brandDomain}`;
+    const brandName = context?.brandName || company?.companyName || organization?.name || account?.name || "Espon Clothing";
+    const brandDomain = context?.brandDomain || (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.shopifyStoreDomain ? (company.shopifyStoreDomain.includes('esponsports') ? 'esponsports.com' : company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()) : "esponsports.com"));
+    const brandPhone = company?.mobile || (company as any)?.phone || account?.phoneNumber || "+91 7206066678";
+    const brandEmail = company?.email || organization?.email || `support@${brandDomain}`;
     const brandAddress = company?.address 
       ? `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}, ${company.country || 'India'}`.replace(/\s+,/g, ',').trim()
       : (company?.city || "Rohtak, Haryana, India");
     const gstin = company?.gstin || organization?.gstin || "06AAHCE7721Q1Z4";
 
     const kbPieces: string[] = [];
-    if (client?.aiKnowledgeBase) kbPieces.push(client.aiKnowledgeBase);
-    else if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
+    if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
     if (legacySetting?.knowledge_base) kbPieces.push(legacySetting.knowledge_base);
     if (legacySetting?.inst_brand_policies) kbPieces.push(`Brand Policies: ${legacySetting.inst_brand_policies}`);
     if (legacySetting?.inst_size_advisor) kbPieces.push(`Size Guidelines: ${legacySetting.inst_size_advisor}`);
     if (legacySetting?.inst_order_security) kbPieces.push(`Order & Payment Rules: ${legacySetting.inst_order_security}`);
 
     const aiKnowledgeBase = kbPieces.join('\n\n') || "Leading apparel manufacturer & B2B wholesale brand with premium fabrics, fast nationwide delivery, GST invoicing, and easy exchanges.";
-    const aiSystemRules = client?.aiSystemPrompt || settings?.aiSystemPrompt || "Be polite, high-converting, professional, and Meta compliant.";
+    const aiSystemRules = settings?.aiSystemPrompt || "Be polite, high-converting, professional, and Meta compliant.";
     const fallbackLanguage = settings?.aiFallbackLanguage || "English";
 
     const cleanPrompt = (prompt || '').trim();
@@ -2838,13 +2823,14 @@ MANDATORY INSTRUCTION: You MUST set templateType to "CAROUSEL" with category "MA
       knowledgeBase: aiKnowledgeBase,
       systemRules: aiSystemRules,
       selectedProducts: effectiveSelectedProducts,
-      activeProducts: activeProducts as any,
+      activeProducts,
       activeCombos,
       cannedFaqs: cannedFaqsSummary
     };
 
-    let apiKey = client?.geminiApiKey || settings?.geminiApiKey || process.env.GEMINI_API_KEY || '';
-    let preferredModel = client?.aiModel || settings?.aiModel || "gemini-2.0-flash";
+    let apiKey = process.env.GEMINI_API_KEY || '';
+    let preferredModel = settings?.aiModel || "gemini-2.0-flash";
+    if (settings?.geminiApiKey) apiKey = settings.geminiApiKey;
 
     let generatedJson: any = null;
 
@@ -3098,11 +3084,7 @@ export async function saveWhatsAppReplyItemAction(data: any) {
 export async function getWhatsAppAutomationRules() {
   try {
     await ensureSeeded();
-    const activeClient = await getActiveSessionClient();
-    const rules = await prisma.whatsAppAutomationRule.findMany({
-      where: activeClient ? { clientId: activeClient.id } : {},
-      orderBy: { createdAt: 'desc' }
-    });
+    const rules = await prisma.whatsAppAutomationRule.findMany({ orderBy: { createdAt: 'desc' } });
     return { success: true, rules };
   } catch (e: any) {
     return { success: false, error: e.message, rules: [] };
@@ -3112,11 +3094,7 @@ export async function getWhatsAppAutomationRules() {
 export async function getWhatsAppChatbotFlows() {
   try {
     await ensureSeeded();
-    const activeClient = await getActiveSessionClient();
-    const flows = await prisma.whatsAppChatbotFlow.findMany({
-      where: activeClient ? { clientId: activeClient.id } : {},
-      orderBy: { updatedAt: 'desc' }
-    });
+    const flows = await prisma.whatsAppChatbotFlow.findMany({ orderBy: { updatedAt: 'desc' } });
     return { success: true, flows };
   } catch (e: any) {
     return { success: false, error: e.message, flows: [] };
@@ -3131,7 +3109,6 @@ export async function saveWhatsAppChatbotFlowAction(data: {
   isActive?: boolean;
 }) {
   try {
-    const activeClient = await getActiveSessionClient();
     let flow;
     if (data.id) {
       flow = await prisma.whatsAppChatbotFlow.update({
@@ -3147,7 +3124,6 @@ export async function saveWhatsAppChatbotFlowAction(data: {
     } else {
       flow = await prisma.whatsAppChatbotFlow.create({
         data: {
-          clientId: activeClient?.id || null,
           name: data.name,
           triggerKeyword: data.triggerKeyword || "HI, HELLO, CATALOG",
           nodesJson: data.nodesJson,
@@ -3195,7 +3171,6 @@ export async function renameWhatsAppChatbotFlowAction(id: string, name: string) 
 
 export async function duplicateWhatsAppChatbotFlowAction(id: string) {
   try {
-    const activeClient = await getActiveSessionClient();
     const existing = await prisma.whatsAppChatbotFlow.findUnique({
       where: { id }
     });
@@ -3206,7 +3181,6 @@ export async function duplicateWhatsAppChatbotFlowAction(id: string) {
 
     const cloned = await prisma.whatsAppChatbotFlow.create({
       data: {
-        clientId: activeClient?.id || existing.clientId || null,
         name: `${existing.name} (Copy)`,
         triggerKeyword: existing.triggerKeyword,
         nodesJson: existing.nodesJson,
@@ -3238,11 +3212,7 @@ export async function toggleWhatsAppChatbotFlowStatusAction(id: string, isActive
 export async function getWhatsAppForms() {
   try {
     await ensureSeeded();
-    const activeClient = await getActiveSessionClient();
-    const forms = await prisma.whatsAppForm.findMany({
-      where: activeClient ? { clientId: activeClient.id } : {},
-      orderBy: { createdAt: 'desc' }
-    });
+    const forms = await prisma.whatsAppForm.findMany({ orderBy: { createdAt: 'desc' } });
     return { success: true, forms };
   } catch (e: any) {
     return { success: false, error: e.message, forms: [] };
@@ -3251,9 +3221,7 @@ export async function getWhatsAppForms() {
 
 export async function getWhatsAppCampaigns() {
   try {
-    const activeClient = await getActiveSessionClient();
     const campaigns = await prisma.whatsAppCampaign.findMany({
-      where: activeClient ? { clientId: activeClient.id } : {},
       orderBy: { createdAt: 'desc' },
       include: {
         queues: {
@@ -3302,10 +3270,7 @@ export async function getWhatsAppCampaigns() {
       };
     });
 
-    const segments = await prisma.whatsAppSegment.findMany({
-      where: activeClient ? { clientId: activeClient.id } : {},
-      orderBy: { createdAt: 'desc' }
-    });
+    const segments = await prisma.whatsAppSegment.findMany({ orderBy: { createdAt: 'desc' } });
     return { success: true, campaigns: enrichedCampaigns, segments };
   } catch (e: any) {
     return { success: false, error: e.message, campaigns: [], segments: [] };
@@ -3319,10 +3284,8 @@ export async function createWhatsAppBroadcastCampaign(data: {
   totalAudience: number;
 }) {
   try {
-    const activeClient = await getActiveSessionClient();
     const campaign = await prisma.whatsAppCampaign.create({
       data: {
-        clientId: activeClient?.id || null,
         name: data.name,
         templateId: data.templateId,
         segmentId: data.segmentId,
@@ -3741,7 +3704,7 @@ export async function launchWhatsAppBroadcastAction(data: {
 
       const customers = await prisma.customer.findMany({
         where: whereClause,
-        select: { id: true, mobile: true, whatsappNumber: true, contactPerson: true, businessName: true, shippingAddress: true },
+        select: { id: true, mobile: true, whatsappNumber: true, contactPerson: true, businessName: true, city: true },
         take: 5000
       });
 
@@ -3751,7 +3714,7 @@ export async function launchWhatsAppBroadcastAction(data: {
         return {
           toPhone: formatted,
           customerName: c.contactPerson || c.businessName || 'Customer',
-          customerCity: c.shippingAddress || 'India'
+          customerCity: c.city || 'India'
         };
       }).filter(q => q.toPhone && q.toPhone.length >= 10);
     }
@@ -3840,7 +3803,7 @@ export async function getWhatsAppAudienceSegments() {
           contactPerson: true,
           mobile: true,
           whatsappNumber: true,
-          shippingAddress: true,
+          city: true,
           tags: true,
           status: true,
           customerType: true
@@ -3961,12 +3924,12 @@ export async function getBroadcastCampaignAnalyticsAction(campaignId: string) {
               customerId: { in: customerIds },
               createdAt: { gte: campaign.createdAt }
             },
-            select: { id: true, customerId: true, totalValue: true, createdAt: true }
+            select: { id: true, customerId: true, totalAmount: true, createdAt: true }
           });
 
           if (attributedOrders.length > 0) {
             totalOrders = Math.max(totalOrders, attributedOrders.length);
-            const sumRevenue = attributedOrders.reduce((sum, o) => sum + (o.totalValue || 0), 0);
+            const sumRevenue = attributedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
             totalRevenue = Math.max(totalRevenue, sumRevenue);
           }
         }
@@ -4172,7 +4135,7 @@ export async function exportWhatsAppConversationsCSV() {
       `"${(c.customer?.businessName || c.customer?.contactPerson || "").replace(/"/g, '""')}"`,
       `"${c.customer?.mobile || ""}"`,
       `"${c.leadStatus || ""}"`,
-      `"${(c as any).priority || c.slaStatus || ""}"`,
+      `"${c.priority || ""}"`,
       `"${c.assignedEmployee?.user?.name || ""}"`,
       `"${(c.lastMessageText || "").replace(/"/g, '""')}"`,
       `"${c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : ""}"`
@@ -4194,63 +4157,13 @@ export async function exportWhatsAppConversationsCSV() {
 // ---------------------------------------------------------
 export async function getWhatsAppSettingsAction() {
   try {
-    const client = await getActiveSessionClient();
-    const globalSettings = await prisma.whatsAppSettings.findFirst().catch(() => null);
-
-    if (client) {
-      const settings = {
-        id: client.id,
-        workingHoursStart: client.workingHoursStart || '09:00',
-        workingHoursEnd: client.workingHoursEnd || '19:00',
-        outOfOfficeMessage: globalSettings?.outOfOfficeMessage || 'We are currently unavailable. We will respond during working hours 9 AM - 7 PM.',
-        slaWarningMinutes: globalSettings?.slaWarningMinutes || 15,
-        slaBreadMinutes: globalSettings?.slaBreadMinutes || 30,
-        autoAssignStrategy: globalSettings?.autoAssignStrategy || 'ROUND_ROBIN',
-        aiConfidenceThreshold: globalSettings?.aiConfidenceThreshold || 85,
-        aiModel: client.aiModel || 'gemini-3.8-flash',
-        welcomeMessage: client.welcomeMessage || 'Welcome! How can we help you today?',
-        aiKnowledgeBase: client.aiKnowledgeBase || '',
-        aiSystemPrompt: client.aiSystemPrompt || '',
-        aiFallbackLanguage: globalSettings?.aiFallbackLanguage || 'English',
-        geminiApiKey: client.geminiApiKey || '',
-        activeGateway: client.activeGateway || null,
-        razorpayKeyId: client.razorpayKeyId || '',
-        razorpayKeySecret: client.razorpayKeySecret || '',
-        cashfreeAppId: client.cashfreeAppId || '',
-        cashfreeSecretKey: client.cashfreeSecretKey || '',
-        merchantUpiId: client.merchantUpiId || '',
-        merchantUpiName: client.merchantUpiName || client.businessName || '',
-        metaCapiLeadValue: globalSettings?.metaCapiLeadValue || 10000,
-      };
-      return { success: true, settings };
+    let settings = await prisma.whatsAppSettings.findFirst();
+    if (!settings) {
+      settings = await prisma.whatsAppSettings.create({
+        data: {} // Uses default schema values
+      });
     }
-
-    const fallbackSettings = {
-      id: globalSettings?.id || 'default',
-      workingHoursStart: globalSettings?.workingHoursStart || '09:00',
-      workingHoursEnd: globalSettings?.workingHoursEnd || '19:00',
-      outOfOfficeMessage: globalSettings?.outOfOfficeMessage || 'We are currently unavailable. We will respond during working hours 9 AM - 7 PM.',
-      slaWarningMinutes: globalSettings?.slaWarningMinutes || 15,
-      slaBreadMinutes: globalSettings?.slaBreadMinutes || 30,
-      autoAssignStrategy: globalSettings?.autoAssignStrategy || 'ROUND_ROBIN',
-      aiConfidenceThreshold: globalSettings?.aiConfidenceThreshold || 85,
-      aiModel: globalSettings?.aiModel || 'gemini-3.8-flash',
-      welcomeMessage: globalSettings?.welcomeMessage || 'Welcome! How can we help you today?',
-      aiKnowledgeBase: globalSettings?.aiKnowledgeBase || '',
-      aiSystemPrompt: globalSettings?.aiSystemPrompt || '',
-      aiFallbackLanguage: globalSettings?.aiFallbackLanguage || 'English',
-      geminiApiKey: globalSettings?.geminiApiKey || '',
-      activeGateway: globalSettings?.activeGateway || null,
-      razorpayKeyId: globalSettings?.razorpayKeyId || '',
-      razorpayKeySecret: globalSettings?.razorpayKeySecret || '',
-      cashfreeAppId: globalSettings?.cashfreeAppId || '',
-      cashfreeSecretKey: globalSettings?.cashfreeSecretKey || '',
-      merchantUpiId: globalSettings?.merchantUpiId || '',
-      merchantUpiName: globalSettings?.merchantUpiName || '',
-      metaCapiLeadValue: globalSettings?.metaCapiLeadValue || 10000,
-    };
-
-    return { success: true, settings: fallbackSettings };
+    return { success: true, settings };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -4268,27 +4181,6 @@ export async function saveWhatsAppSettingsAction(data: {
   metaCapiLeadValue?: number;
 }) {
   try {
-    const client = await getActiveSessionClient();
-    if (client) {
-      const clientUpdate: any = {};
-      if (data.geminiApiKey !== undefined) clientUpdate.geminiApiKey = data.geminiApiKey;
-      if (data.aiModel !== undefined) clientUpdate.aiModel = data.aiModel;
-      if (data.aiSystemPrompt !== undefined) clientUpdate.aiSystemPrompt = data.aiSystemPrompt;
-      if (data.welcomeMessage !== undefined) clientUpdate.welcomeMessage = data.welcomeMessage;
-      if (data.workingHoursStart !== undefined) clientUpdate.workingHoursStart = data.workingHoursStart;
-      if (data.workingHoursEnd !== undefined) clientUpdate.workingHoursEnd = data.workingHoursEnd;
-
-      const updated = await prisma.whatsAppClient.update({
-        where: { id: client.id },
-        data: clientUpdate
-      });
-      revalidatePath("/whatsapp/settings");
-      revalidatePath("/whatsapp/integrations");
-      revalidatePath("/whatsapp/api-settings");
-      return { success: true, settings: updated };
-    }
-
-    // Only update global settings if super-admin (no client session)
     let settings = await prisma.whatsAppSettings.findFirst();
     if (!settings) {
       settings = await prisma.whatsAppSettings.create({ data });
@@ -4300,7 +4192,6 @@ export async function saveWhatsAppSettingsAction(data: {
     }
     revalidatePath("/whatsapp/settings");
     revalidatePath("/whatsapp/integrations");
-    revalidatePath("/whatsapp/api-settings");
     return { success: true, settings };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -4348,9 +4239,7 @@ export async function uploadMediaToMetaAction(formData: FormData) {
 // ---------------------------------------------------------
 export async function getWhatsAppCannedResponsesAction() {
   try {
-    const activeClient = await getActiveSessionClient();
     let responses = await prisma.whatsAppCannedResponse.findMany({
-      where: activeClient ? { clientId: activeClient.id } : {},
       orderBy: { title: 'asc' }
     });
 
@@ -4358,14 +4247,13 @@ export async function getWhatsAppCannedResponsesAction() {
     if (responses.length === 0) {
       await prisma.whatsAppCannedResponse.createMany({
         data: [
-          { clientId: activeClient?.id || null, title: "Return Policy", shortcut: "/return", content: "Our return policy is 7 days from the date of delivery. Items must be unwashed and unworn. Can I help you initiate a return?" },
-          { clientId: activeClient?.id || null, title: "Shipping Time", shortcut: "/shipping", content: "Standard shipping takes 3-5 business days. You will receive a tracking link as soon as your order is dispatched." },
-          { clientId: activeClient?.id || null, title: "Greeting", shortcut: "/hi", content: "Hi there! 👋 How can I help you today?" },
-          { clientId: activeClient?.id || null, title: "Discount Code", shortcut: "/discount", content: "Use code ESPON10 at checkout for 10% off your next purchase!" },
+          { title: "Return Policy", shortcut: "/return", content: "Our return policy is 7 days from the date of delivery. Items must be unwashed and unworn. Can I help you initiate a return?" },
+          { title: "Shipping Time", shortcut: "/shipping", content: "Standard shipping takes 3-5 business days. You will receive a tracking link as soon as your order is dispatched." },
+          { title: "Greeting", shortcut: "/hi", content: "Hi there! 👋 How can I help you today?" },
+          { title: "Discount Code", shortcut: "/discount", content: "Use code ESPON10 at checkout for 10% off your next purchase!" },
         ]
       });
       responses = await prisma.whatsAppCannedResponse.findMany({
-        where: activeClient ? { clientId: activeClient.id } : {},
         orderBy: { title: 'asc' }
       });
     }
@@ -4380,9 +4268,7 @@ export async function getWhatsAppCannedResponsesAction() {
 // ---------------------------------------------------------
 export async function getWhatsAppAILogsAction(search = '', statusFilter = 'ALL') {
   try {
-    const activeClient = await getActiveSessionClient();
     const where: any = {};
-    if (activeClient) where.clientId = activeClient.id;
     if (statusFilter !== 'ALL') where.status = statusFilter;
     if (search) {
       where.OR = [
@@ -4477,13 +4363,12 @@ export async function getWhatsAppWebhookLogsAction(search = '') {
 
 export async function getShopifyCredentialsAction() {
   try {
-    const client = await getActiveSessionClient();
     const settings = await prisma.companySettings.findFirst();
     return {
       success: true,
       credentials: {
-        shopifyStoreDomain: client?.shopifyDomain || settings?.shopifyStoreDomain || '',
-        shopifyAccessToken: client?.shopifyToken || settings?.shopifyAccessToken || ''
+        shopifyStoreDomain: settings?.shopifyStoreDomain || '',
+        shopifyAccessToken: settings?.shopifyAccessToken || ''
       }
     };
   } catch (error: any) {
@@ -4524,19 +4409,7 @@ export async function saveShopifyCredentialsAction(data: { storeDomain: string; 
       };
     }
 
-    // Save to client's record in database
-    const client = await getActiveSessionClient();
-    if (client) {
-      await prisma.whatsAppClient.update({
-        where: { id: client.id },
-        data: {
-          shopifyDomain: domain,
-          shopifyToken: token
-        }
-      });
-    }
-
-    // Also update legacy fallback
+    // Save to database only if connected
     let settings = await prisma.companySettings.findFirst();
     if (settings) {
       await prisma.companySettings.update({
@@ -4555,7 +4428,7 @@ export async function saveShopifyCredentialsAction(data: { storeDomain: string; 
         }
       });
     }
-    return { success: true, message: '✓ Shopify connection test successful! Credentials saved securely for your account.' };
+    return { success: true, message: '✓ Shopify connection test successful! Credentials saved securely.' };
   } catch (error: any) {
     return { success: false, error: `Connection Error: ${error.message}. Please verify the Shopify domain.` };
   }
@@ -4686,10 +4559,8 @@ export async function createWhatsAppCannedResponseAction(data: {
   buttons?: any;
 }) {
   try {
-    const activeClient = await getActiveSessionClient();
     const res = await prisma.whatsAppCannedResponse.create({
       data: {
-        clientId: activeClient?.id || null,
         title: data.title,
         shortcut: data.shortcut.startsWith('/') ? data.shortcut : `/${data.shortcut}`,
         content: data.content,
@@ -4697,7 +4568,7 @@ export async function createWhatsAppCannedResponseAction(data: {
         footerText: data.footerText || null,
         mediaUrl: data.mediaUrl || null,
         mediaType: data.mediaType || null,
-        buttons: (data.buttons ? JSON.parse(JSON.stringify(data.buttons)) : undefined) as any,
+        buttons: data.buttons ? JSON.stringify(data.buttons) : null,
       }
     });
     return { success: true, response: res };
@@ -4727,7 +4598,7 @@ export async function updateWhatsAppCannedResponseAction(id: string, data: {
         footerText: data.footerText || null,
         mediaUrl: data.mediaUrl || null,
         mediaType: data.mediaType || null,
-        buttons: (data.buttons ? JSON.parse(JSON.stringify(data.buttons)) : undefined) as any,
+        buttons: data.buttons ? JSON.stringify(data.buttons) : null,
       }
     });
     return { success: true, response: res };
@@ -4748,7 +4619,7 @@ export async function deleteWhatsAppCannedResponseAction(id: string) {
 }
 
 // Shopify Product Synchronization and Database CRUD Server Actions
-export async function syncShopifyProductsAction() {
+export async function syncShopifyProductsAction(options?: { cleanupPrevious?: 'deactivate' | 'delete' | 'none' }) {
   try {
     const settings = await prisma.companySettings.findFirst();
     if (!settings || !settings.shopifyStoreDomain || !settings.shopifyAccessToken) {
@@ -4757,6 +4628,46 @@ export async function syncShopifyProductsAction() {
 
     const domain = settings.shopifyStoreDomain;
     const token = settings.shopifyAccessToken;
+
+    // Handle switching away from Meta to Shopify (deactivate or delete previous platform products)
+    const cleanup = options?.cleanupPrevious || 'deactivate';
+    if (cleanup === 'delete') {
+      const referencedQuotes = await prisma.quotationItem.findMany({ select: { productId: true } });
+      const referencedOrders = await prisma.orderItem.findMany({ select: { productId: true } });
+      const safeRefIds = new Set([
+        ...referencedQuotes.map(q => q.productId),
+        ...referencedOrders.map(o => o.productId)
+      ]);
+
+      await prisma.product.deleteMany({
+        where: {
+          OR: [
+            { hsnCode: 'META' },
+            { AND: [{ NOT: { sku: { startsWith: 'SP-' } } }, { OR: [{ fabric: null }, { fabric: 'General' }] }] }
+          ],
+          id: { notIn: Array.from(safeRefIds) }
+        }
+      });
+      await prisma.product.updateMany({
+        where: {
+          OR: [
+            { hsnCode: 'META' },
+            { AND: [{ NOT: { sku: { startsWith: 'SP-' } } }, { OR: [{ fabric: null }, { fabric: 'General' }] }] }
+          ]
+        },
+        data: { status: 'Inactive' }
+      });
+    } else if (cleanup === 'deactivate') {
+      await prisma.product.updateMany({
+        where: {
+          OR: [
+            { hsnCode: 'META' },
+            { AND: [{ NOT: { sku: { startsWith: 'SP-' } } }, { OR: [{ fabric: null }, { fabric: 'General' }] }] }
+          ]
+        },
+        data: { status: 'Inactive' }
+      });
+    }
 
     const gqlQuery = `
       query SyncProducts {
@@ -4844,6 +4755,7 @@ export async function syncShopifyProductsAction() {
             category: sp.productType || "General",
             subCategory: sp.handle,
             fabric: collectionTitles || "General",
+            hsnCode: "SHOPIFY",
             sellingPrice: 0,
             mrp: 0,
             purchasePrice: 0,
@@ -4858,6 +4770,7 @@ export async function syncShopifyProductsAction() {
             category: sp.productType || "General",
             subCategory: sp.handle,
             fabric: collectionTitles || "General",
+            hsnCode: "SHOPIFY",
             sellingPrice: 0,
             mrp: 0,
             purchasePrice: 0,
@@ -4889,6 +4802,7 @@ export async function syncShopifyProductsAction() {
             category: sp.productType || "General",
             subCategory: sp.handle,
             fabric: collectionTitles || "General",
+            hsnCode: "SHOPIFY",
             sellingPrice: price,
             mrp: compareAt,
             purchasePrice: cost,
@@ -4903,6 +4817,7 @@ export async function syncShopifyProductsAction() {
             category: sp.productType || "General",
             subCategory: sp.handle,
             fabric: collectionTitles || "General",
+            hsnCode: "SHOPIFY",
             sellingPrice: price,
             mrp: compareAt,
             purchasePrice: cost,
@@ -4916,9 +4831,18 @@ export async function syncShopifyProductsAction() {
       }
     }
 
+    // Set active platform setting to SHOPIFY
+    await prisma.whatsAppIntegration.upsert({
+      where: { id: 'active-catalog-source-setting' },
+      update: { url: 'SHOPIFY', name: 'Active Catalog Platform', type: 'CATALOG_ACTIVE_SOURCE', isActive: true },
+      create: { id: 'active-catalog-source-setting', url: 'SHOPIFY', name: 'Active Catalog Platform', type: 'CATALOG_ACTIVE_SOURCE', isActive: true }
+    });
+
+    revalidatePath("/whatsapp/commerce");
     return { 
       success: true, 
-      message: `✓ Successfully synced ${createdCount} products/variants and linked collections from Shopify!`,
+      activePlatform: 'SHOPIFY',
+      message: `✓ Successfully synced ${createdCount} products from Shopify! Meta products are now ${cleanup === 'delete' ? 'deleted' : 'inactive'}.`,
       count: createdCount 
     };
   } catch (error: any) {
@@ -4966,6 +4890,995 @@ export async function toggleProductVisibilityAction(id: string, targetStatus: st
     });
     return { success: true, product };
   } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function getActiveCatalogPlatformAction() {
+  try {
+    const setting = await prisma.whatsAppIntegration.findFirst({
+      where: { type: 'CATALOG_ACTIVE_SOURCE', isActive: true }
+    });
+    return { success: true, activePlatform: setting?.url || 'META' };
+  } catch (e: any) {
+    return { success: true, activePlatform: 'META' };
+  }
+}
+
+export async function switchActiveCatalogPlatformAction(targetPlatform: 'META' | 'SHOPIFY', cleanupMode: 'deactivate' | 'delete' = 'deactivate') {
+  try {
+    const referencedQuotes = await prisma.quotationItem.findMany({ select: { productId: true } });
+    const referencedOrders = await prisma.orderItem.findMany({ select: { productId: true } });
+    const safeRefIds = new Set([
+      ...referencedQuotes.map(q => q.productId),
+      ...referencedOrders.map(o => o.productId)
+    ]);
+
+    if (targetPlatform === 'META') {
+      if (cleanupMode === 'delete') {
+        await prisma.product.deleteMany({
+          where: {
+            OR: [{ hsnCode: 'SHOPIFY' }, { sku: { startsWith: 'SP-' } }],
+            id: { notIn: Array.from(safeRefIds) }
+          }
+        });
+      }
+      // Deactivate Shopify products
+      await prisma.product.updateMany({
+        where: { OR: [{ hsnCode: 'SHOPIFY' }, { sku: { startsWith: 'SP-' } }] },
+        data: { status: 'Inactive' }
+      });
+      // Activate Meta products
+      await prisma.product.updateMany({
+        where: { hsnCode: 'META' },
+        data: { status: 'Active' }
+      });
+    } else {
+      if (cleanupMode === 'delete') {
+        await prisma.product.deleteMany({
+          where: {
+            hsnCode: 'META',
+            id: { notIn: Array.from(safeRefIds) }
+          }
+        });
+      }
+      // Deactivate Meta products
+      await prisma.product.updateMany({
+        where: { hsnCode: 'META' },
+        data: { status: 'Inactive' }
+      });
+      // Activate Shopify products
+      await prisma.product.updateMany({
+        where: { OR: [{ hsnCode: 'SHOPIFY' }, { sku: { startsWith: 'SP-' } }] },
+        data: { status: 'Active' }
+      });
+    }
+
+    await prisma.whatsAppIntegration.upsert({
+      where: { id: 'active-catalog-source-setting' },
+      update: { url: targetPlatform, name: 'Active Catalog Platform', type: 'CATALOG_ACTIVE_SOURCE', isActive: true },
+      create: { id: 'active-catalog-source-setting', url: targetPlatform, name: 'Active Catalog Platform', type: 'CATALOG_ACTIVE_SOURCE', isActive: true }
+    });
+
+    revalidatePath("/whatsapp/commerce");
+    return {
+      success: true,
+      activePlatform: targetPlatform,
+      message: `Active store platform switched to ${targetPlatform === 'META' ? 'Meta Commerce Catalog' : 'Shopify Store'}.`
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function deleteInactiveProductsAction() {
+  try {
+    const referencedQuotes = await prisma.quotationItem.findMany({ select: { productId: true } });
+    const referencedOrders = await prisma.orderItem.findMany({ select: { productId: true } });
+    const safeRefIds = new Set([
+      ...referencedQuotes.map(q => q.productId),
+      ...referencedOrders.map(o => o.productId)
+    ]);
+
+    const res = await prisma.product.deleteMany({
+      where: {
+        status: 'Inactive',
+        id: { notIn: Array.from(safeRefIds) }
+      }
+    });
+
+    revalidatePath("/whatsapp/commerce");
+    return {
+      success: true,
+      count: res.count,
+      message: `Permanently deleted ${res.count} inactive products.`
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function getMetaCatalogStatusAction() {
+  try {
+    const integration = await prisma.whatsAppIntegration.findFirst({
+      where: { type: 'META_CATALOG', isActive: true }
+    });
+    if (!integration || !integration.url || !integration.token) {
+      return { success: true, isConnected: false };
+    }
+    const catalogId = integration.url.trim();
+    const token = integration.token.trim();
+
+    const res = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(catalogId)}?fields=id,name,vertical,product_count&access_token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+    if (res.ok && !data.error) {
+      return {
+        success: true,
+        isConnected: true,
+        catalogId: data.id,
+        catalogName: data.name || integration.name || "Meta Product Catalog",
+        productCount: data.product_count ?? 0,
+        vertical: data.vertical || "commerce"
+      };
+    }
+    return {
+      success: true,
+      isConnected: true,
+      catalogId,
+      catalogName: integration.name || "Meta Product Catalog",
+      productCount: 0
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message, isConnected: false };
+  }
+}
+
+export async function syncMetaCatalogProductsAction(options?: { cleanupPrevious?: 'deactivate' | 'delete' | 'none' }) {
+  try {
+    const integration = await prisma.whatsAppIntegration.findFirst({
+      where: { type: 'META_CATALOG', isActive: true }
+    });
+    if (!integration || !integration.url || !integration.token) {
+      return { success: false, error: "No active Meta Product Catalog integration found. Connect it in Integrations first." };
+    }
+    const catalogId = integration.url.trim();
+    const token = integration.token.trim();
+
+    // Handle switching away from Shopify to Meta (deactivate or delete previous platform products)
+    const cleanup = options?.cleanupPrevious || 'deactivate';
+    if (cleanup === 'delete') {
+      const referencedQuotes = await prisma.quotationItem.findMany({ select: { productId: true } });
+      const referencedOrders = await prisma.orderItem.findMany({ select: { productId: true } });
+      const safeRefIds = new Set([
+        ...referencedQuotes.map(q => q.productId),
+        ...referencedOrders.map(o => o.productId)
+      ]);
+
+      await prisma.product.deleteMany({
+        where: {
+          OR: [
+            { hsnCode: 'SHOPIFY' },
+            { sku: { startsWith: 'SP-' } }
+          ],
+          id: { notIn: Array.from(safeRefIds) }
+        }
+      });
+      await prisma.product.updateMany({
+        where: {
+          OR: [
+            { hsnCode: 'SHOPIFY' },
+            { sku: { startsWith: 'SP-' } }
+          ]
+        },
+        data: { status: 'Inactive' }
+      });
+    } else if (cleanup === 'deactivate') {
+      await prisma.product.updateMany({
+        where: {
+          OR: [
+            { hsnCode: 'SHOPIFY' },
+            { sku: { startsWith: 'SP-' } }
+          ]
+        },
+        data: { status: 'Inactive' }
+      });
+    }
+
+    let allMetaProducts: any[] = [];
+    let nextUrl: string | null = `https://graph.facebook.com/v21.0/${encodeURIComponent(catalogId)}/products?fields=id,retailer_id,name,description,price,currency,image_url,url,availability,color,size,brand,category,sale_price,product_group&limit=100&access_token=${encodeURIComponent(token)}`;
+
+    let pageCount = 0;
+    while (nextUrl && pageCount < 5) {
+      pageCount++;
+      const res = await fetch(nextUrl);
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error?.message || "Failed to fetch products from Meta Catalog");
+      }
+      if (Array.isArray(data.data)) {
+        allMetaProducts = allMetaProducts.concat(data.data);
+      }
+      nextUrl = data.paging?.next || null;
+    }
+
+    if (allMetaProducts.length === 0) {
+      return { success: true, count: 0, message: "No products found in Meta Catalog." };
+    }
+
+    let syncedCount = 0;
+    for (const mp of allMetaProducts) {
+      const sku = (mp.retailer_id || mp.id || "").trim();
+      if (!sku) continue;
+
+      const parsePrice = (val: any) => {
+        if (!val) return 0;
+        if (typeof val === 'number') return val;
+        const cleaned = String(val).replace(/[^0-9.]/g, '');
+        return parseFloat(cleaned) || 0;
+      };
+
+      const rawMrp = parsePrice(mp.price);
+      const rawSale = parsePrice(mp.sale_price);
+
+      const sellingPrice = rawSale > 0 ? rawSale : (rawMrp > 0 ? rawMrp : 0);
+      const mrp = rawMrp > 0 ? rawMrp : sellingPrice;
+      const purchasePrice = Math.round(sellingPrice * 0.5);
+      const stockQuantity = mp.availability === 'in stock' ? 100 : 0;
+      const status = mp.availability === 'in stock' ? 'Active' : 'Out of Stock';
+
+      let displayName = mp.name || "Meta Catalog Product";
+      const variantParts: string[] = [];
+      if (mp.color && !displayName.toLowerCase().includes(mp.color.toLowerCase())) {
+        variantParts.push(mp.color);
+      }
+      if (mp.size && !displayName.toLowerCase().includes(mp.size.toLowerCase())) {
+        variantParts.push(mp.size);
+      }
+      if (variantParts.length > 0) {
+        displayName = `${displayName} - ${variantParts.join(' / ')}`;
+      }
+
+      await prisma.product.upsert({
+        where: { sku },
+        update: {
+          name: displayName,
+          articleNumber: null,
+          subCategory: mp.product_group?.retailer_id || null,
+          hsnCode: "META",
+          description: mp.description || null,
+          category: mp.category || mp.brand || "Meta Catalog",
+          color: mp.color || null,
+          size: mp.size || null,
+          sellingPrice,
+          mrp,
+          purchasePrice,
+          stockQuantity,
+          status,
+          images: mp.image_url ? [mp.image_url] : []
+        },
+        create: {
+          name: displayName,
+          sku,
+          articleNumber: null,
+          subCategory: mp.product_group?.retailer_id || null,
+          hsnCode: "META",
+          description: mp.description || null,
+          category: mp.category || mp.brand || "Meta Catalog",
+          color: mp.color || null,
+          size: mp.size || null,
+          sellingPrice,
+          mrp,
+          purchasePrice,
+          stockQuantity,
+          status,
+          images: mp.image_url ? [mp.image_url] : []
+        }
+      });
+      syncedCount++;
+    }
+
+    // Set active platform setting to META
+    await prisma.whatsAppIntegration.upsert({
+      where: { id: 'active-catalog-source-setting' },
+      update: { url: 'META', name: 'Active Catalog Platform', type: 'CATALOG_ACTIVE_SOURCE', isActive: true },
+      create: { id: 'active-catalog-source-setting', url: 'META', name: 'Active Catalog Platform', type: 'CATALOG_ACTIVE_SOURCE', isActive: true }
+    });
+
+    revalidatePath("/whatsapp/commerce");
+    return {
+      success: true,
+      activePlatform: 'META',
+      count: syncedCount,
+      message: `✓ Successfully synced ${syncedCount} products from Meta Catalog! Shopify products are now ${cleanup === 'delete' ? 'deleted' : 'inactive'}.`
+    };
+  } catch (e: any) {
+    console.error("[Meta Catalog Sync Error]:", e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+export async function createAndPushCatalogProductAction(data: {
+  title: string;
+  baseSku: string;
+  description: string;
+  category?: string;
+  brand?: string;
+  imageUrl?: string;
+  sellingPrice: number;
+  compareAtPrice?: number;
+  costPrice?: number;
+  variants: Array<{
+    name?: string;
+    label?: string;
+    color?: string;
+    size?: string;
+    pattern?: string;
+    sku: string;
+    price: number;
+    compareAt?: number;
+    inventory?: number;
+    imageUrl?: string;
+  }>;
+  pushToMeta?: boolean;
+}) {
+  try {
+    const {
+      title,
+      baseSku,
+      description,
+      category = "Apparel",
+      brand = "Esponsports",
+      imageUrl,
+      sellingPrice,
+      compareAtPrice = sellingPrice,
+      costPrice = 0,
+      variants,
+      pushToMeta = true
+    } = data;
+
+    if (!title || !baseSku) {
+      return { success: false, error: "Product title and Base SKU are required." };
+    }
+
+    const createdProducts: any[] = [];
+    const itemsToCreate = variants && variants.length > 0 ? variants : [
+      {
+        sku: baseSku,
+        color: undefined,
+        size: undefined,
+        price: sellingPrice,
+        compareAt: compareAtPrice,
+        inventory: 20,
+        imageUrl: imageUrl
+      }
+    ];
+
+    const activeSetting = await prisma.whatsAppIntegration.findFirst({
+      where: { type: 'CATALOG_ACTIVE_SOURCE', isActive: true }
+    });
+    const currentPlatform = activeSetting?.url === 'SHOPIFY' ? 'SHOPIFY' : 'META';
+
+    for (const v of itemsToCreate) {
+      let variantName = title;
+      if (v.label || v.name) {
+        variantName = `${title} - ${v.label || v.name}`;
+      } else {
+        const vTitleParts: string[] = [];
+        if (v.pattern) vTitleParts.push(v.pattern);
+        if (v.color) vTitleParts.push(v.color);
+        if (v.size) vTitleParts.push(v.size);
+        if (vTitleParts.length > 0) {
+          variantName = `${title} - ${vTitleParts.join(' / ')}`;
+        }
+      }
+
+      const pPrice = v.price || sellingPrice || 0;
+      const pMrp = v.compareAt || compareAtPrice || pPrice;
+      const pCost = costPrice || Math.round(pPrice * 0.5);
+      const pImg = v.imageUrl || imageUrl;
+
+      const saved = await prisma.product.upsert({
+        where: { sku: v.sku },
+        update: {
+          name: variantName,
+          articleNumber: null,
+          subCategory: baseSku,
+          hsnCode: currentPlatform,
+          description,
+          category,
+          color: v.color || null,
+          size: v.size || (v.label ? v.label : null),
+          sellingPrice: pPrice,
+          mrp: pMrp,
+          purchasePrice: pCost,
+          stockQuantity: v.inventory ?? 20,
+          status: "Active",
+          images: pImg ? [pImg] : []
+        },
+        create: {
+          name: variantName,
+          sku: v.sku,
+          articleNumber: null,
+          subCategory: baseSku,
+          hsnCode: currentPlatform,
+          description,
+          category,
+          color: v.color || null,
+          size: v.size || (v.label ? v.label : null),
+          sellingPrice: pPrice,
+          mrp: pMrp,
+          purchasePrice: pCost,
+          stockQuantity: v.inventory ?? 20,
+          status: "Active",
+          images: pImg ? [pImg] : []
+        }
+      });
+      createdProducts.push(saved);
+    }
+
+    let metaResult = { pushed: false, message: "Saved locally." };
+    if (pushToMeta) {
+      const integration = await prisma.whatsAppIntegration.findFirst({
+        where: { type: 'META_CATALOG', isActive: true }
+      });
+
+      if (integration && integration.url && integration.token) {
+        const catalogId = integration.url.trim();
+        const token = integration.token.trim();
+
+        const requests = itemsToCreate.map(v => {
+          let variantName = title;
+          if (v.label || v.name) {
+            variantName = `${title} - ${v.label || v.name}`;
+          } else {
+            const vTitleParts: string[] = [];
+            if (v.pattern) vTitleParts.push(v.pattern);
+            if (v.color) vTitleParts.push(v.color);
+            if (v.size) vTitleParts.push(v.size);
+            if (vTitleParts.length > 0) {
+              variantName = `${title} - ${vTitleParts.join(' / ')}`;
+            }
+          }
+
+          const pPrice = v.price || sellingPrice || 0;
+          const pMrp = v.compareAt || compareAtPrice || pPrice;
+          const pImg = v.imageUrl || imageUrl || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800";
+
+          const regularPriceCents = Math.round(pMrp * 100);
+          const salePriceCents = pPrice < pMrp ? Math.round(pPrice * 100) : undefined;
+
+          const itemData: any = {
+            id: v.sku,
+            title: variantName,
+            description: description || title,
+            availability: (v.inventory ?? 20) > 0 ? "in stock" : "out of stock",
+            condition: "new",
+            price: regularPriceCents,
+            url: `https://esponsports.com/products/${baseSku.toLowerCase()}`,
+            image_url: pImg,
+            brand: brand || "Esponsports",
+            category: category || "Apparel & Accessories > Clothing"
+          };
+
+          if (salePriceCents) {
+            itemData.sale_price = salePriceCents;
+          }
+          if (v.color) itemData.color = v.color;
+          if (v.size) itemData.size = v.size;
+          if (v.pattern) itemData.pattern = v.pattern;
+          if (itemsToCreate.length > 1) {
+            itemData.item_group_id = baseSku;
+          }
+
+          return {
+            method: "CREATE",
+            retailer_id: v.sku,
+            data: itemData
+          };
+        });
+
+        const batchRes = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(catalogId)}/items_batch?access_token=${encodeURIComponent(token)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item_type: "PRODUCT_ITEM",
+            requests
+          })
+        });
+
+        const batchData = await batchRes.json();
+        if (batchRes.ok && !batchData.error) {
+          metaResult = {
+            pushed: true,
+            message: `Successfully created ${createdProducts.length} items and pushed to Meta Catalog!`
+          };
+        } else {
+          metaResult = {
+            pushed: false,
+            message: `Saved locally, but Meta Catalog batch returned: ${batchData.error?.message || "Check fields"}`
+          };
+        }
+      } else {
+        metaResult = {
+          pushed: false,
+          message: "Saved locally. Meta Catalog integration not connected."
+        };
+      }
+    }
+
+    revalidatePath("/whatsapp/commerce");
+    return {
+      success: true,
+      products: createdProducts,
+      metaResult
+    };
+  } catch (error: any) {
+    console.error("[Create Catalog Product Error]:", error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function pushSingleProductToMetaAction(productId: string) {
+  try {
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product) return { success: false, error: "Product not found" };
+
+    const integration = await prisma.whatsAppIntegration.findFirst({
+      where: { type: 'META_CATALOG', isActive: true }
+    });
+    if (!integration || !integration.url || !integration.token) {
+      return { success: false, error: "Meta Catalog is not connected. Please connect in Integrations." };
+    }
+
+    const catalogId = integration.url.trim();
+    const token = integration.token.trim();
+    const sku = product.sku || product.id;
+
+    const regularPriceCents = Math.round((product.mrp || product.sellingPrice) * 100);
+    const salePriceCents = product.sellingPrice < (product.mrp || product.sellingPrice) 
+      ? Math.round(product.sellingPrice * 100) 
+      : undefined;
+
+    const itemData: any = {
+      id: sku,
+      title: product.name,
+      description: product.description || product.name,
+      availability: product.stockQuantity > 0 ? "in stock" : "out of stock",
+      condition: "new",
+      price: regularPriceCents,
+      url: `https://esponsports.com/products/${(product.subCategory || product.articleNumber || sku).toLowerCase()}`,
+      image_url: product.images?.[0] || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800",
+      brand: "Esponsports",
+      category: product.category || "Apparel & Accessories > Clothing"
+    };
+
+    if (salePriceCents) itemData.sale_price = salePriceCents;
+    if (product.color) itemData.color = product.color;
+    if (product.size) itemData.size = product.size;
+    const groupIdentifier = product.subCategory || product.articleNumber;
+    if (groupIdentifier) itemData.item_group_id = groupIdentifier;
+
+    const batchRes = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(catalogId)}/items_batch?access_token=${encodeURIComponent(token)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        item_type: "PRODUCT_ITEM",
+        requests: [
+          {
+            method: "CREATE",
+            retailer_id: sku,
+            data: itemData
+          }
+        ]
+      })
+    });
+
+    const batchData = await batchRes.json();
+    if (batchRes.ok && !batchData.error) {
+      return { success: true, message: `Product "${product.name}" pushed to Meta Catalog successfully!` };
+    }
+    return { success: false, error: batchData.error?.message || "Failed to push item to Meta" };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+// -------------------------------------------------------------
+// PRODUCT MANAGEMENT: EDIT, DELETE, IMAGE QUICK-UPDATE & META SYNC
+// -------------------------------------------------------------
+
+async function safelyDeleteOrDeactivateProducts(ids: string[]) {
+  if (!ids || ids.length === 0) return { deleted: 0, deactivated: 0 };
+  
+  const [orders, quotes, pos, bills, notes, credits, invTrans] = await Promise.all([
+    prisma.orderItem.findMany({ where: { productId: { in: ids } }, select: { productId: true } }).catch(() => []),
+    prisma.quotationItem.findMany({ where: { productId: { in: ids } }, select: { productId: true } }).catch(() => []),
+    prisma.purchaseOrderItem.findMany({ where: { productId: { in: ids } }, select: { productId: true } }).catch(() => []),
+    prisma.billItem.findMany({ where: { productId: { in: ids } }, select: { productId: true } }).catch(() => []),
+    prisma.creditNoteItem.findMany({ where: { productId: { in: ids } }, select: { productId: true } }).catch(() => []),
+    prisma.vendorCreditItem.findMany({ where: { productId: { in: ids } }, select: { productId: true } }).catch(() => []),
+    prisma.inventoryTransaction.findMany({ where: { productId: { in: ids } }, select: { productId: true } }).catch(() => [])
+  ]);
+
+  const referencedIds = new Set<string>();
+  for (const item of [...orders, ...quotes, ...pos, ...bills, ...notes, ...credits, ...invTrans]) {
+    if (item.productId) referencedIds.add(item.productId);
+  }
+
+  const toDelete = ids.filter(id => !referencedIds.has(id));
+  const toDeactivate = ids.filter(id => referencedIds.has(id));
+
+  let deletedCount = 0;
+  let deactivatedCount = 0;
+
+  if (toDelete.length > 0) {
+    const delRes = await prisma.product.deleteMany({ where: { id: { in: toDelete } } });
+    deletedCount = delRes.count;
+  }
+  if (toDeactivate.length > 0) {
+    const deactRes = await prisma.product.updateMany({ where: { id: { in: toDeactivate } }, data: { status: "Inactive" } });
+    deactivatedCount = deactRes.count;
+  }
+
+  return { deleted: deletedCount, deactivated: deactivatedCount };
+}
+
+async function sendMetaCatalogBatch(requests: any[]) {
+  if (!requests || requests.length === 0) return { success: true, count: 0 };
+  try {
+    const integration = await prisma.whatsAppIntegration.findFirst({
+      where: { type: 'META_CATALOG', isActive: true }
+    });
+    if (!integration || !integration.url || !integration.token) {
+      return { success: false, error: "Meta Catalog is not connected." };
+    }
+    const catalogId = integration.url.trim();
+    const token = integration.token.trim();
+
+    // Chunk requests into batches of 50
+    const chunkSize = 50;
+    for (let i = 0; i < requests.length; i += chunkSize) {
+      const chunk = requests.slice(i, i + chunkSize);
+      const res = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(catalogId)}/items_batch?access_token=${encodeURIComponent(token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_type: "PRODUCT_ITEM",
+          requests: chunk
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        return { success: false, error: data.error?.message || "Meta items_batch error" };
+      }
+    }
+    return { success: true, count: requests.length };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function updateProductGroupAction(data: {
+  productIds: string[];
+  name: string;
+  category: string;
+  description: string;
+  primaryImage?: string;
+  variants: Array<{
+    id?: string;
+    sku: string;
+    variantTitle?: string;
+    color?: string;
+    size?: string;
+    price: number;
+    compareAt: number;
+    cost?: number;
+    inventory: number;
+    status?: string;
+    imageUrl?: string;
+    isNew?: boolean;
+    isDeleted?: boolean;
+  }>;
+  syncToMeta?: boolean;
+}) {
+  try {
+    const { productIds, name, category, description, primaryImage, variants, syncToMeta = true } = data;
+    if (!name.trim()) {
+      return { success: false, error: "Product name cannot be empty." };
+    }
+
+    const activeSetting = await prisma.whatsAppIntegration.findFirst({
+      where: { type: 'CATALOG_ACTIVE_SOURCE', isActive: true }
+    });
+    const currentPlatform = activeSetting?.url === 'SHOPIFY' ? 'SHOPIFY' : 'META';
+
+    const metaRequests: any[] = [];
+
+    // 1. Handle deleted variants
+    const deletedVariantIds = variants.filter(v => v.isDeleted && v.id).map(v => v.id!);
+    const remainingVariantIds = new Set(variants.filter(v => !v.isDeleted && v.id).map(v => v.id!));
+    for (const existingId of productIds) {
+      if (!remainingVariantIds.has(existingId) && !deletedVariantIds.includes(existingId)) {
+        deletedVariantIds.push(existingId);
+      }
+    }
+
+    if (deletedVariantIds.length > 0) {
+      const deletedProds = await prisma.product.findMany({
+        where: { id: { in: deletedVariantIds } },
+        select: { id: true, sku: true }
+      });
+      await safelyDeleteOrDeactivateProducts(deletedVariantIds);
+
+      if (syncToMeta) {
+        for (const p of deletedProds) {
+          if (p.sku) {
+            metaRequests.push({
+              method: "DELETE",
+              retailer_id: p.sku,
+              data: { id: p.sku }
+            });
+          }
+        }
+      }
+    }
+
+    // 2. Process remaining & new variants
+    const activeVariants = variants.filter(v => !v.isDeleted);
+    const baseSubCategory = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+    for (const v of activeVariants) {
+      let variantName = name;
+      if (v.variantTitle && v.variantTitle !== "Default Variant" && v.variantTitle !== name) {
+        variantName = `${name} - ${v.variantTitle}`;
+      } else {
+        const parts = [v.color, v.size].filter(Boolean);
+        if (parts.length > 0) {
+          variantName = `${name} - ${parts.join(' / ')}`;
+        }
+      }
+
+      const pPrice = Number(v.price) || 0;
+      const pMrp = Number(v.compareAt) || pPrice;
+      const pCost = Number(v.cost) || Math.round(pPrice * 0.5);
+      const pStock = Number(v.inventory) || 0;
+      const pStatus = v.status || (pStock > 0 ? "Active" : "Out of Stock");
+      const vImage = v.imageUrl || primaryImage || null;
+
+      if (v.id && !v.isNew) {
+        // Update existing variant in DB
+        await prisma.product.update({
+          where: { id: v.id },
+          data: {
+            name: variantName,
+            category: category || "Apparel",
+            description: description || null,
+            color: v.color || null,
+            size: v.size || null,
+            sellingPrice: pPrice,
+            mrp: pMrp,
+            purchasePrice: pCost,
+            stockQuantity: pStock,
+            status: pStatus,
+            images: vImage ? [vImage] : []
+          }
+        });
+
+        if (syncToMeta && v.sku) {
+          const regularPriceCents = Math.round(pMrp * 100);
+          const salePriceCents = pPrice < pMrp ? Math.round(pPrice * 100) : undefined;
+          const itemData: any = {
+            id: v.sku,
+            title: variantName,
+            description: description || name,
+            availability: pStock > 0 ? "in stock" : "out of stock",
+            price: regularPriceCents,
+            image_url: vImage || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800",
+            category: category || "Apparel & Accessories > Clothing"
+          };
+          if (salePriceCents) itemData.sale_price = salePriceCents;
+          if (v.color) itemData.color = v.color;
+          if (v.size) itemData.size = v.size;
+          if (activeVariants.length > 1) itemData.item_group_id = baseSubCategory;
+
+          metaRequests.push({
+            method: "UPDATE",
+            retailer_id: v.sku,
+            data: itemData
+          });
+        }
+      } else {
+        // Create new variant
+        const genSku = v.sku || `${baseSubCategory.toUpperCase().slice(0, 8)}-${Date.now().toString(36).toUpperCase()}`;
+        await prisma.product.create({
+          data: {
+            name: variantName,
+            sku: genSku,
+            subCategory: baseSubCategory,
+            hsnCode: currentPlatform,
+            category: category || "Apparel",
+            description: description || null,
+            color: v.color || null,
+            size: v.size || null,
+            sellingPrice: pPrice,
+            mrp: pMrp,
+            purchasePrice: pCost,
+            stockQuantity: pStock,
+            status: pStatus,
+            images: vImage ? [vImage] : []
+          }
+        });
+
+        if (syncToMeta) {
+          const regularPriceCents = Math.round(pMrp * 100);
+          const salePriceCents = pPrice < pMrp ? Math.round(pPrice * 100) : undefined;
+          const itemData: any = {
+            id: genSku,
+            title: variantName,
+            description: description || name,
+            availability: pStock > 0 ? "in stock" : "out of stock",
+            price: regularPriceCents,
+            condition: "new",
+            url: `https://esponsports.com/products/${baseSubCategory.toLowerCase()}`,
+            image_url: vImage || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800",
+            brand: "Esponsports",
+            category: category || "Apparel & Accessories > Clothing"
+          };
+          if (salePriceCents) itemData.sale_price = salePriceCents;
+          if (v.color) itemData.color = v.color;
+          if (v.size) itemData.size = v.size;
+          if (activeVariants.length > 1) itemData.item_group_id = baseSubCategory;
+
+          metaRequests.push({
+            method: "CREATE",
+            retailer_id: genSku,
+            data: itemData
+          });
+        }
+      }
+    }
+
+    // 3. Push Meta batch updates if requested
+    let metaMessage = "";
+    if (syncToMeta && metaRequests.length > 0) {
+      const metaRes = await sendMetaCatalogBatch(metaRequests);
+      if (metaRes.success) {
+        metaMessage = ` (Synced ${metaRequests.length} changes to Meta Catalog)`;
+      } else {
+        metaMessage = ` (Meta batch notice: ${metaRes.error})`;
+      }
+    }
+
+    revalidatePath("/whatsapp/commerce");
+    return {
+      success: true,
+      message: `Product "${name}" updated successfully!${metaMessage}`
+    };
+  } catch (error: any) {
+    console.error("[Update Product Group Error]:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteProductGroupAction(data: {
+  productIds: string[];
+  skus: string[];
+  deleteFromMeta?: boolean;
+}) {
+  try {
+    const { productIds, skus, deleteFromMeta = true } = data;
+    if (!productIds || productIds.length === 0) {
+      return { success: false, error: "No products specified for deletion." };
+    }
+
+    const { deleted, deactivated } = await safelyDeleteOrDeactivateProducts(productIds);
+
+    let metaMsg = "";
+    if (deleteFromMeta && skus && skus.length > 0) {
+      const deleteRequests = skus.filter(Boolean).map(sku => ({
+        method: "DELETE",
+        retailer_id: sku,
+        data: { id: sku }
+      }));
+      const metaRes = await sendMetaCatalogBatch(deleteRequests);
+      if (metaRes.success) {
+        metaMsg = ` & deleted from Meta Catalog`;
+      } else {
+        metaMsg = ` (Meta Catalog notice: ${metaRes.error})`;
+      }
+    }
+
+    revalidatePath("/whatsapp/commerce");
+    return {
+      success: true,
+      message: `Product deleted successfully (${deleted} deleted, ${deactivated} archived)${metaMsg}.`
+    };
+  } catch (e: any) {
+    console.error("[Delete Product Group Error]:", e);
+    return { success: false, error: e.message };
+  }
+}
+
+export async function deleteSingleProductAction(data: {
+  productId: string;
+  sku: string;
+  deleteFromMeta?: boolean;
+}) {
+  try {
+    const { productId, sku, deleteFromMeta = true } = data;
+    if (!productId) return { success: false, error: "Product ID required" };
+
+    const { deleted, deactivated } = await safelyDeleteOrDeactivateProducts([productId]);
+
+    let metaMsg = "";
+    if (deleteFromMeta && sku) {
+      const metaRes = await sendMetaCatalogBatch([
+        {
+          method: "DELETE",
+          retailer_id: sku,
+          data: { id: sku }
+        }
+      ]);
+      if (metaRes.success) {
+        metaMsg = ` & deleted from Meta Catalog`;
+      }
+    }
+
+    revalidatePath("/whatsapp/commerce");
+    return {
+      success: true,
+      message: `Variant ${deleted > 0 ? 'deleted' : 'archived'}${metaMsg}.`
+    };
+  } catch (e: any) {
+    console.error("[Delete Single Product Error]:", e);
+    return { success: false, error: e.message };
+  }
+}
+
+export async function quickUpdateProductImageAction(data: {
+  productIds: string[];
+  imageUrl: string;
+  syncToMeta?: boolean;
+}) {
+  try {
+    const { productIds, imageUrl, syncToMeta = true } = data;
+    if (!productIds || productIds.length === 0 || !imageUrl) {
+      return { success: false, error: "Missing required product IDs or image URL." };
+    }
+
+    const prods = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, sku: true, name: true }
+    });
+
+    await prisma.product.updateMany({
+      where: { id: { in: productIds } },
+      data: { images: [imageUrl] }
+    });
+
+    let metaMsg = "";
+    if (syncToMeta) {
+      const updateRequests = prods.filter(p => p.sku).map(p => ({
+        method: "UPDATE",
+        retailer_id: p.sku!,
+        data: {
+          id: p.sku!,
+          image_url: imageUrl
+        }
+      }));
+      const metaRes = await sendMetaCatalogBatch(updateRequests);
+      if (metaRes.success) {
+        metaMsg = " & updated in Meta Catalog";
+      }
+    }
+
+    revalidatePath("/whatsapp/commerce");
+    return {
+      success: true,
+      message: `Product image updated successfully${metaMsg}!`
+    };
+  } catch (e: any) {
+    console.error("[Quick Update Image Error]:", e);
     return { success: false, error: e.message };
   }
 }
@@ -5115,7 +6028,7 @@ export async function resubmitCarouselTemplateAction(templateName: string) {
     });
 
     const brandDetails = await getWhatsAppBrandDetailsAction();
-    const brandDomain = brandDetails.brandDomain || 'what-in.tinkal.in';
+    const brandDomain = brandDetails.brandDomain || 'esponsports.com';
 
     let rawCards: any[] = [];
     if (template?.carouselCards) {
@@ -5419,7 +6332,7 @@ export async function sendWhatsAppFlowMessageAction(
           text: flowConfig.description || "Please fill out the form."
         },
         footer: {
-          text: "Powered by What-In"
+          text: "Powered by Whatmore"
         },
         action: {
           name: "flow",
@@ -5613,7 +6526,7 @@ export async function processCampaignQueueAction(campaignId: string) {
 
         // Media Header parameter support (Image/Video/Document)
         if (activeTemplate?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(activeTemplate.headerType.toUpperCase())) {
-          const mediaUrl = (activeTemplate as any).headerMediaUrl || activeTemplate.headerContent;
+          const mediaUrl = activeTemplate.headerMediaUrl || activeTemplate.headerContent;
           if (mediaUrl && mediaUrl.startsWith('http')) {
             const hType = activeTemplate.headerType.toLowerCase();
             components.push({
@@ -5740,19 +6653,17 @@ export async function processCampaignQueueAction(campaignId: string) {
             if (!customer) {
               customer = await prisma.customer.create({
                 data: {
-                  clientId: campaign.clientId || undefined,
                   businessName: item.customerName || "Customer",
                   contactPerson: item.customerName || "Customer",
                   mobile: phone,
                   whatsappNumber: phone,
-                  shippingAddress: item.customerCity || "India"
+                  city: item.customerCity || "India"
                 }
               });
             }
 
             conv = await prisma.whatsAppConversation.create({
               data: {
-                clientId: campaign.clientId || undefined,
                 accountId: account.id,
                 customerId: customer.id,
                 status: "OPEN",
@@ -5835,34 +6746,36 @@ export async function getMetaPhoneHealthAndLimitsAction() {
     const creds = await getMetaApiCredentials();
     const optedOutCount = await prisma.customer.count({
       where: { marketingOptOut: true }
-    }).catch(() => 0);
+    });
 
     if (!creds || !creds.isConnected) {
-      const client = await prisma.whatsAppClient.findFirst().catch(() => null);
-      const account = await prisma.whatsAppAccount.findFirst().catch(() => null);
       return {
         success: true,
         isConnected: false,
-        qualityRating: "NOT_CONFIGURED",
-        status: "NOT_CONNECTED",
-        verifiedName: client?.businessName || account?.name || "WhatsApp Business Account",
-        displayPhoneNumber: client?.phoneNumber || account?.phoneNumber || "Not Configured",
-        dailyLimitTier: "--",
-        throughput: 0,
+        qualityRating: "UNKNOWN",
+        status: "DISCONNECTED",
+        verifiedName: "WhatsApp Account",
+        dailyLimitTier: "10,000 / 24h",
+        throughput: 80,
         optedOutCount
       };
     }
 
+    const [clientRec, accountRec] = await Promise.all([
+      prisma.client.findFirst(),
+      prisma.whatsAppAccount.findFirst()
+    ]);
+    const fallbackBrandName = clientRec?.businessName || accountRec?.name || "Espon";
+
     let qualityRating = "GREEN";
     let status = "CONNECTED";
-    let verifiedName = creds.businessName || "WhatsApp Business";
-    let displayPhoneNumber = creds.phoneNumber || "Connected";
+    let verifiedName = fallbackBrandName;
     let dailyLimitTier = "10,000 / 24h";
     let throughput = 80;
 
     try {
       const phoneRes = await fetch(
-        `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=display_phone_number,quality_rating,status,verified_name,code_verification_status,throughput,is_official_business_account`,
+        `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=quality_rating,status,verified_name,code_verification_status,throughput,is_official_business_account`,
         {
           headers: { Authorization: `Bearer ${creds.accessToken}` }
         }
@@ -5872,7 +6785,6 @@ export async function getMetaPhoneHealthAndLimitsAction() {
         if (pData.quality_rating) qualityRating = pData.quality_rating.toUpperCase();
         if (pData.status) status = pData.status;
         if (pData.verified_name) verifiedName = pData.verified_name;
-        if (pData.display_phone_number) displayPhoneNumber = pData.display_phone_number;
         if (pData.throughput?.level) throughput = pData.throughput.level;
       }
     } catch (e) {
@@ -5885,7 +6797,6 @@ export async function getMetaPhoneHealthAndLimitsAction() {
       qualityRating,
       status,
       verifiedName,
-      displayPhoneNumber: displayPhoneNumber || creds.phoneNumber || "Connected",
       dailyLimitTier,
       throughput,
       optedOutCount
@@ -6006,7 +6917,7 @@ function compileMetaFlowJson(name: string, screenName: string, ctaText: string, 
     fields = JSON.parse(fieldsJsonStr || '[]');
   } catch (_) {}
 
-  const children: any[] = fields.map((f, idx: number) => {
+  const children = fields.map((f: any, idx: number) => {
     const fieldId = `field_${idx}`;
     if (f.type === 'select') {
       return {
@@ -6552,7 +7463,7 @@ export async function toggleContactCrmStatusAction(customerId: string, markDone:
             whatsappNumber: customer.whatsappNumber || customer.mobile,
             tags: customer.tags || '',
             createdAt: customer.createdAt,
-            city: (customer as any).city || customer.shippingAddress || '',
+            city: customer.city || '',
             source: 'WhatsApp Contacts Hub'
           };
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -7431,7 +8342,6 @@ export async function exportAllWhatsAppContactsAction() {
 // ---------------------------------------------------------
 export async function getWhatsAppBrandDetailsAction() {
   try {
-    const activeClient = await getActiveSessionClient();
     const [settings, company, account, legacySetting, org, productsCount, combosCount] = await Promise.all([
       prisma.whatsAppSettings.findFirst().catch(() => null),
       prisma.companySettings.findFirst().catch(() => null),
@@ -7442,26 +8352,23 @@ export async function getWhatsAppBrandDetailsAction() {
       prisma.shopifyCombo.count({ where: { is_active: true } }).catch(() => 0)
     ]);
 
-    const client = activeClient || await prisma.whatsAppClient.findFirst().catch(() => null);
-    const brandName = client?.businessName || company?.companyName || org?.name || account?.name || "What-In Platform";
+    const brandName = company?.companyName || org?.name || account?.name || "Espon Clothing";
     
-    // Resolve public storefront domain
-    let brandDomain = "what-in.tinkal.in";
-    if (client?.shopifyDomain) {
-      brandDomain = client.shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
-    } else if (company?.website) {
+    // Resolve public storefront domain (never fallback to raw internal myshopify admin domain)
+    let brandDomain = "esponsports.com";
+    if (company?.website) {
       brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
     } else if (company?.shopifyStoreDomain) {
       const rawDomain = company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
-      brandDomain = rawDomain.includes("what-in") ? "what-in.tinkal.in" : rawDomain;
+      brandDomain = rawDomain.includes("esponsports") ? "esponsports.com" : rawDomain;
     }
 
-    const phoneNumber = client?.phoneNumber || client?.contactPhone || company?.mobile || (company as any)?.phone || account?.phoneNumber || "Not Configured";
-    const brandEmail = client?.contactEmail || company?.email || org?.email || `support@${brandDomain}`;
+    const phoneNumber = company?.mobile || company?.phone || account?.phoneNumber || "+91 7206066678";
+    const brandEmail = company?.email || org?.email || `support@${brandDomain}`;
     const brandAddress = company?.address 
       ? `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim()
-      : (company?.city || "");
-    const gstin = company?.gstin || org?.gstin || "";
+      : (company?.city || "Rohtak, Haryana, India");
+    const gstin = company?.gstin || org?.gstin || "06AAHCE7721Q1Z4";
 
     const hasAiKnowledge = !!(settings?.aiKnowledgeBase || legacySetting?.knowledge_base);
     const knowledgeLength = (settings?.aiKnowledgeBase?.length || 0) + (legacySetting?.knowledge_base?.length || 0);
@@ -7483,18 +8390,13 @@ export async function getWhatsAppBrandDetailsAction() {
   } catch (e: any) {
     return { 
       success: false, 
-      error: e.message,
-      brandName: "What-In Platform",
-      brandDomain: "what-in.tinkal.in",
-      phoneNumber: "Not Configured",
-      brandPhone: "Not Configured",
-      brandEmail: "support@what-in.tinkal.in",
-      brandAddress: "",
-      gstin: "",
-      hasAiKnowledge: false,
-      knowledgeLength: 0,
-      productsCount: 0,
-      combosCount: 0
+      brandName: "Espon Clothing", 
+      brandDomain: "esponsports.com", 
+      phoneNumber: "+91 7206066678", 
+      brandPhone: "+91 7206066678",
+      brandEmail: "clothingespon@gmail.com",
+      brandAddress: "Rohtak, Haryana, India",
+      hasAiKnowledge: true
     };
   }
 }
@@ -7521,13 +8423,13 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
       prisma.whatsAppAccount.findFirst().catch(() => null)
     ]);
 
-    // Resolve customer-facing website domain (e.g. what-in.tinkal.in)
-    let brandDomain = "what-in.tinkal.in";
+    // Resolve customer-facing website domain (e.g. esponsports.com)
+    let brandDomain = "esponsports.com";
     if (company?.website) {
       brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
     } else if (company?.shopifyStoreDomain) {
       const rawDomain = company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
-      brandDomain = rawDomain.includes("what-in") ? "what-in.tinkal.in" : rawDomain;
+      brandDomain = rawDomain.includes("esponsports") ? "esponsports.com" : rawDomain;
     }
 
     const where: any = {
@@ -7687,10 +8589,10 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
       categories: categories.map(c => c.name),
       combos: combos.map(c => ({
         id: c.id,
-        name: c.product_title || `Combo of ${c.combo_count}`,
+        name: c.combo_name,
         price: c.combo_price,
         discountCode: c.discount_code,
-        productsCount: c.combo_count || 2
+        productsCount: (c.products as any)?.length || 2
       })),
       brandDomain,
       stats: {
@@ -7707,10 +8609,92 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
       products: [],
       categories: [],
       combos: [],
-      brandDomain: "what-in.tinkal.in",
+      brandDomain: "esponsports.com",
       stats: { totalProducts: 0, inStockProducts: 0, categoriesCount: 0 }
     };
   }
 }
+
+/**
+ * Fetch WhatsApp Commerce / Catalog Link status from Meta Graph API
+ */
+export async function getWhatsAppCommerceStatusAction() {
+  try {
+    const account = await prisma.whatsAppAccount.findFirst();
+    if (!account?.accessToken || !account?.phoneId) {
+      return { success: false, error: "WhatsApp account credentials missing" };
+    }
+
+    const res = await fetch(`https://graph.facebook.com/v21.0/${account.phoneId}/whatsapp_commerce_settings`, {
+      headers: { 'Authorization': `Bearer ${account.accessToken}` }
+    });
+    const data = await res.json();
+    const settings = data?.data?.[0] || null;
+
+    return {
+      success: true,
+      phoneId: account.phoneId,
+      phoneNumber: account.phoneNumber,
+      isCatalogVisible: settings?.is_catalog_visible ?? false,
+      isCartEnabled: settings?.is_cart_enabled ?? false,
+      raw: settings
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Programmatically link Meta Catalog to WhatsApp Business Phone Number via Meta Graph API
+ */
+export async function linkMetaCatalogToWhatsAppAction(overrideCatalogId?: string) {
+  try {
+    const account = await prisma.whatsAppAccount.findFirst();
+    if (!account?.accessToken || !account?.phoneId) {
+      return { success: false, error: "WhatsApp account credentials missing" };
+    }
+
+    let targetCatalogId = overrideCatalogId;
+    if (!targetCatalogId) {
+      const integration = await prisma.whatsAppIntegration.findFirst({
+        where: { type: "META_CATALOG", isActive: true }
+      });
+      targetCatalogId = integration?.url?.trim();
+    }
+
+    if (!targetCatalogId) {
+      return { success: false, error: "No active Meta Catalog integration found" };
+    }
+
+    const res = await fetch(`https://graph.facebook.com/v21.0/${account.phoneId}/whatsapp_commerce_settings`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${account.accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        is_catalog_visible: true,
+        is_cart_enabled: true,
+        catalog_id: targetCatalogId
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, error: data.error?.message || "Failed to link catalog to WhatsApp" };
+    }
+
+    return { 
+      success: true, 
+      catalogId: targetCatalogId,
+      phoneId: account.phoneId,
+      phoneNumber: account.phoneNumber,
+      data 
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 
 

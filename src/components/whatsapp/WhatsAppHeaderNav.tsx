@@ -25,6 +25,7 @@ function urlBase64ToUint8Array(base64String: string) {
 const subNavItems = [
   { name: "Dashboard", path: "/whatsapp/dashboard", icon: LayoutDashboard },
   { name: "Inbox", path: "/whatsapp/inbox", icon: MessageSquare },
+  { name: "Shopify", path: "/whatsapp/shopify", icon: ShoppingBag },
   { name: "WhatsApp", path: "/whatsapp/templates", icon: Bot },
   { name: "Integrations", path: "/whatsapp/integrations", icon: Zap },
   { name: "Products & Prices", path: "/whatsapp/commerce", icon: Box },
@@ -55,6 +56,9 @@ export default function WhatsAppHeaderNav() {
   const isItemActive = (path: string) => {
     if (path === "/whatsapp/inbox" && (pathname === "/whatsapp" || pathname === "/whatsapp/inbox")) {
       return true;
+    }
+    if (path === "/whatsapp/shopify") {
+      return pathname.startsWith("/whatsapp/shopify");
     }
     if (path === "/whatsapp/templates") {
       return (
@@ -153,14 +157,14 @@ export default function WhatsAppHeaderNav() {
   };
 
   return (
-    <header className="what-in-header">
-      <div className="what-in-header-top">
-        <div className="what-in-brand">
+    <header className="whatmore-header">
+      <div className="whatmore-header-top">
+        <div className="whatmore-brand">
           <div className="brand-logo">
             <ShoppingBag size={24} strokeWidth={2.5} />
           </div>
           <div className="brand-text">
-            <h1>What-In</h1>
+            <h1>Whatmore</h1>
             <p>Unified Commerce & Automation</p>
           </div>
         </div>
@@ -181,7 +185,7 @@ export default function WhatsAppHeaderNav() {
         </div>
       </div>
 
-      <nav className="what-in-nav">
+      <nav className="whatmore-nav">
         {subNavItems.map((item) => {
           if (userRole === "AGENT" && item.name !== "Inbox" && item.name !== "Settings") return null;
           const Icon = item.icon;
@@ -190,7 +194,7 @@ export default function WhatsAppHeaderNav() {
             <Link
               key={item.path}
               href={item.path}
-              className={`nav-item ${active ? "active" : ""} ${(item as any).highlight ? "highlight" : ""}`}
+              className={`nav-item ${active ? "active" : ""} ${item.highlight ? "highlight" : ""}`}
             >
               <Icon size={16} />
               <span>{userRole === "AGENT" && item.name === "Settings" ? "My Profile" : item.name}</span>

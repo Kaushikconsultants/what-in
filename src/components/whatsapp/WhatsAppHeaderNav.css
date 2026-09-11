@@ -1,25 +1,25 @@
-.what-in-header {
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+.whatmore-header {
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
 
-.what-in-header-top {
+.whatmore-header-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 24px;
+  padding: 16px 24px;
 }
 
-.what-in-brand {
+.whatmore-brand {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
 .brand-logo {
-  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  background: var(--primary);
   color: white;
   width: 40px;
   height: 40px;
@@ -27,7 +27,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
 .brand-text h1 {
@@ -35,7 +35,7 @@
   font-weight: 800;
   margin: 0;
   letter-spacing: -0.02em;
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .brand-text p {
@@ -49,10 +49,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: 20px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   border: 1px solid transparent;
   transition: all 0.2s;
@@ -85,12 +85,11 @@
   background: #ef4444;
 }
 
-.what-in-nav {
+.whatmore-nav {
   display: flex;
   gap: 8px;
   padding: 0 24px;
   overflow-x: auto;
-  border-top: 1px solid #f1f5f9;
 }
 
 .nav-item {
@@ -108,18 +107,17 @@
 }
 
 .nav-item:hover {
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .nav-item.active {
-  color: #4f46e5;
-  border-bottom-color: #4f46e5;
+  color: var(--primary);
+  border-bottom-color: var(--primary);
 }
 
 .nav-item.highlight {
-  color: #7c3aed;
+  color: #8b5cf6;
 }
 .nav-item.highlight.active {
-  border-bottom-color: #7c3aed;
+  border-bottom-color: #8b5cf6;
 }
-
