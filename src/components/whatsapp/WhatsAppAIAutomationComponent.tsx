@@ -53,10 +53,10 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
       const res = await fetch('/api/whatsapp/settings');
       const data = await res.json();
       if (data.success && data.settings) {
-        // If the model in DB is an old deprecated model (like 1.5-flash or 2.0-flash), default to 3.8-flash
+        // Default to gemini-2.5-flash if unset or legacy gemini-2.0-flash
         let initialModel = data.settings.aiModel;
-        if (!initialModel || initialModel.includes('1.5') || initialModel === 'gemini-2.0-flash') {
-          initialModel = 'gemini-3.8-flash';
+        if (!initialModel || initialModel === 'gemini-2.0-flash') {
+          initialModel = 'gemini-2.5-flash';
         }
         setSettings(prev => ({
           ...prev,
@@ -130,7 +130,7 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
     try {
       // If user entered a key, test it in real-time first
       if (settings.geminiApiKey?.trim()) {
-        const testRes: any = await testGeminiKey(settings.geminiApiKey, false);
+        const testRes = await testGeminiKey(settings.geminiApiKey, false);
         if (!testRes.success) {
           const proceed = confirm(
             `⚠️ Google API Verification Notice:\n\n` +
@@ -453,29 +453,24 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
                 Official Google Gemini Model
               </label>
               <select
-                value={settings.aiModel || 'gemini-3.8-flash'}
+                value={settings.aiModel || 'gemini-2.5-flash'}
                 onChange={(e) => setSettings({...settings, aiModel: e.target.value})}
                 style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "13px", background: "white", color: "#111827" }}
               >
-                <optgroup label="Gemini 3 Series (Latest Official Generation)">
-                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Recommended - Most Intelligent Stable)</option>
-                  <option value="gemini-3.7-flash">Gemini 3.7 Flash (Stable - High-Speed Reasoning)</option>
-                  <option value="gemini-3.6-flash">Gemini 3.6 Flash (Stable - Multimodal Balanced)</option>
-                  <option value="gemini-3.5-flash">Gemini 3.5 Flash (Stable - Fast Baseline)</option>
-                  <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Cost-Effective & Rapid)</option>
-                  <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (Frontier Compact)</option>
-                  <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (Complex Problem Solving)</option>
+                <optgroup label="Google Gemini 2.5 & 3 Series (Recommended)">
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Fast & Stable)</option>
+                  <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Reasoning & Complex Queries)</option>
+                  <option value="gemini-3.7-flash">Gemini 3.7 Flash (High-Speed Reasoning)</option>
+                  <option value="gemini-3.6-flash">Gemini 3.6 Flash (Multimodal Balanced)</option>
+                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Frontier Intelligent)</option>
                 </optgroup>
-                <optgroup label="Gemini 2.5 Series (Stable Long-Context)">
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Stable Multimodal)</option>
-                  <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Reasoning & Multimodal)</option>
-                </optgroup>
-                <optgroup label="Legacy (Deprecated by Google)">
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (Legacy)</option>
+                <optgroup label="Gemini 1.5 Series (Long-Context)">
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash (Long-Context Stable)</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro (Complex Analysis)</option>
                 </optgroup>
               </select>
               <p style={{ fontSize: "11px", color: "#6b7280", marginTop: "5px", lineHeight: "1.4" }}>
-                Active models from Google's official documentation. Legacy 1.5 models have been deprecated. Auto-cascades if rate-limited.
+                Active models from Google's official documentation. Auto-cascades if rate-limited.
               </p>
             </div>
 

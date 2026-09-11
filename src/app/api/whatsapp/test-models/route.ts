@@ -113,7 +113,9 @@ async function handleKeyValidation(providedKey?: string, preferredModel = 'gemin
     }
 
     if (Array.isArray(listData?.models)) {
-      availableModels = listData.models.map((m: any) => String(m.name || '').replace(/^models\//, ''));
+      availableModels = listData.models
+        .filter((m: any) => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
+        .map((m: any) => String(m.name || '').replace(/^models\//, ''));
     }
   } catch (netErr: any) {
     return NextResponse.json({
@@ -123,11 +125,36 @@ async function handleKeyValidation(providedKey?: string, preferredModel = 'gemin
     });
   }
 
-  // Step 2: Test live token generation on the chosen model or cascade
-  const testModels = [
-    preferredModel,
-    ...GEMINI_MODEL_CASCADE.filter(m => m !== preferredModel)
+  // Step 2: Test live token generation dynamically
+  const prioritizedCandidates = [
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-3.7-flash',
+    'gemini-3.6-flash',
+    'gemini-3.8-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-exp'
   ];
+
+  const testModels: string[] = [];
+  if (preferredModel && preferredModel !== 'gemini-2.0-flash') {
+    testModels.push(preferredModel);
+  }
+
+  // Add available models returned by Google that support generateContent
+  for (const m of availableModels) {
+    if (!testModels.includes(m) && (m.startsWith('gemini') || m.includes('flash') || m.includes('pro'))) {
+      testModels.push(m);
+    }
+  }
+
+  // Add remaining prioritized candidates
+  for (const m of prioritizedCandidates) {
+    if (!testModels.includes(m)) {
+      testModels.push(m);
+    }
+  }
 
   let generationSuccess = false;
   let modelWorking = '';

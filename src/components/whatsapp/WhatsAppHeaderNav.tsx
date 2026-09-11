@@ -85,6 +85,16 @@ export default function WhatsAppHeaderNav() {
           setBrandTitle("What-In");
         }
       }
+
+      fetch('/api/whatsapp/client-status')
+        .then(r => r.json())
+        .then(d => {
+          if (d?.businessName) {
+            setBrandTitle(d.businessName);
+          }
+        })
+        .catch(() => {});
+
       const u = document.cookie.split(";").find(c => c.trim().startsWith("wm_user="));
       if (u) { 
         const v = decodeURIComponent(u.split("=")[1]); 
@@ -92,7 +102,7 @@ export default function WhatsAppHeaderNav() {
         setUserName(parsed.name || ""); 
         setUserRole(parsed.role || "");
         
-        // Background sync to ensure role is up to date (e.g. if admin changed agent's role while logged in)
+        // Background sync to ensure role is up to date
         syncSessionRoleAction().then((newRole) => {
           if (newRole && newRole !== parsed.role) {
             setUserRole(newRole);

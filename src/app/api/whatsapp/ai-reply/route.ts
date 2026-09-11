@@ -24,17 +24,24 @@ export async function POST(req: NextRequest) {
       prisma.whatsAppAccount.findFirst().catch(() => null)
     ]);
 
-    const brandName = company?.companyName || account?.name || "Espon Clothing";
-    const brandDomain = company?.shopifyStoreDomain 
-      ? company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '') 
-      : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : "www.espon.in");
-    const brandPhone = company?.mobile || account?.phoneNumber || "+91 7206066678";
-    const brandEmail = company?.email || `clothingespon@gmail.com`;
+    let clientRecord: any = null;
+    if (user?.clientId) {
+      clientRecord = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } }).catch(() => null);
+    }
 
-    const aiKnowledgeBase = settings?.aiKnowledgeBase || "";
-    const aiSystemPrompt = settings?.aiSystemPrompt || "You are a helpful customer service assistant for our business.";
+    let brandName = clientRecord?.businessName || company?.companyName || account?.name || "Espon Clothing";
+    let brandDomain = clientRecord?.brandSlug 
+      ? `${clientRecord.brandSlug}.what-in.tinkal.in`
+      : (company?.shopifyStoreDomain 
+        ? company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '') 
+        : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : "www.espon.in"));
+    let brandPhone = clientRecord?.phoneNumber || company?.mobile || account?.phoneNumber || "+91 7206066678";
+    let brandEmail = clientRecord?.contactEmail || company?.email || `clothingespon@gmail.com`;
+
+    const aiKnowledgeBase = clientRecord?.aiKnowledgeBase || settings?.aiKnowledgeBase || "";
+    const aiSystemPrompt = clientRecord?.aiSystemPrompt || settings?.aiSystemPrompt || "You are a helpful customer service assistant for our business.";
     const fallbackLanguage = settings?.aiFallbackLanguage || "English";
-    const aiModel = settings?.aiModel || "gemini-2.0-flash"; // gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro, gemini-2.5-flash
+    const aiModel = clientRecord?.aiModel || settings?.aiModel || "gemini-2.5-flash";
 
     // 2. Fetch the conversation and its messages
     const conversation = await prisma.whatsAppConversation.findUnique({
@@ -86,7 +93,7 @@ Rules:
     fullPrompt += `\n--- Chat History ---\n${chatHistory}\n\nAgent (Your suggested reply):`;
 
     // 5. Call Gemini API
-    const apiKey = process.env.GEMINI_API_KEY || settings?.geminiApiKey;
+    const apiKey = clientRecord?.geminiApiKey || settings?.geminiApiKey || process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "Gemini API Key is not configured." }, { status: 500 });
     }

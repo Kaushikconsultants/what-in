@@ -35,6 +35,42 @@ async function ensureSeeded() {
 
 export async function getMetaApiCredentials() {
   try {
+    const user = await getAuthenticatedUser();
+    let client: any = null;
+
+    if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email }
+          ]
+        }
+      });
+    }
+
+    if (client) {
+      const isConnected = Boolean(
+        client.metaAccessToken &&
+        client.phoneId &&
+        !client.metaAccessToken.startsWith("EAAG...meta")
+      );
+      return {
+        phoneId: client.phoneId || '',
+        token: client.metaAccessToken || '',
+        accessToken: client.metaAccessToken || '',
+        wabaId: client.wabaId || '',
+        businessAccountId: client.wabaId || '',
+        phoneNumber: client.phoneNumber || '',
+        businessName: client.businessName || '',
+        isConnected,
+        isClientTenant: true,
+        clientId: client.id
+      };
+    }
+
     const account = await prisma.whatsAppAccount.findFirst();
     return {
       phoneId: account?.phoneId || '',
@@ -42,10 +78,14 @@ export async function getMetaApiCredentials() {
       accessToken: account?.accessToken || '',
       wabaId: account?.businessAccountId || '',
       businessAccountId: account?.businessAccountId || '',
-      isConnected: Boolean(account?.accessToken && account?.phoneId)
+      phoneNumber: account?.phoneNumber || '',
+      businessName: account?.name || '',
+      isConnected: Boolean(account?.accessToken && account?.phoneId),
+      isClientTenant: false,
+      clientId: null
     };
   } catch (e) {
-    return { phoneId: '', token: '', accessToken: '', wabaId: '', businessAccountId: '', isConnected: false };
+    return { phoneId: '', token: '', accessToken: '', wabaId: '', businessAccountId: '', phoneNumber: '', businessName: '', isConnected: false, isClientTenant: false, clientId: null };
   }
 }
 
@@ -382,8 +422,16 @@ export async function sendWhatsAppMessageAction(data: {
 
     // Call Meta API if it's an outbound message and not an internal note
     if (!data.isInternalNote && data.senderType !== 'CUSTOMER') {
-      const token = conversation.account?.accessToken;
-      const phoneId = conversation.account?.phoneId;
+      let token = conversation.account?.accessToken;
+      let phoneId = conversation.account?.phoneId;
+
+      if (!token || !phoneId || token.length < 20) {
+        const creds = await getMetaApiCredentials();
+        if (creds && creds.isConnected) {
+          token = creds.accessToken;
+          phoneId = creds.phoneId;
+        }
+      }
 
       if (token && phoneId && token.length > 20) {
         const url = `https://graph.facebook.com/v20.0/${phoneId}/messages`;
@@ -3003,9 +3051,8 @@ MANDATORY INSTRUCTION: You MUST set templateType to "CAROUSEL" with category "MA
       cannedFaqs: cannedFaqsSummary
     };
 
-    let apiKey = process.env.GEMINI_API_KEY || '';
-    let preferredModel = settings?.aiModel || "gemini-2.0-flash";
-    if (settings?.geminiApiKey) apiKey = settings.geminiApiKey;
+    let apiKey = clientRec?.geminiApiKey || settings?.geminiApiKey || process.env.GEMINI_API_KEY || '';
+    let preferredModel = clientRec?.aiModel || settings?.aiModel || "gemini-2.5-flash";
 
     let generatedJson: any = null;
 
@@ -6974,27 +7021,25 @@ export async function getMetaPhoneHealthAndLimitsAction() {
         qualityRating: "UNKNOWN",
         status: "DISCONNECTED",
         verifiedName: "WhatsApp Account",
+        displayPhoneNumber: "Not Configured",
         dailyLimitTier: "10,000 / 24h",
         throughput: 80,
         optedOutCount
       };
     }
 
-    const [clientRec, accountRec] = await Promise.all([
-      prisma.client.findFirst(),
-      prisma.whatsAppAccount.findFirst()
-    ]);
-    const fallbackBrandName = clientRec?.businessName || accountRec?.name || "Espon";
+    const fallbackBrandName = creds.businessName || "WhatsApp Account";
 
     let qualityRating = "GREEN";
     let status = "CONNECTED";
     let verifiedName = fallbackBrandName;
+    let displayPhoneNumber = creds.phoneNumber || "";
     let dailyLimitTier = "10,000 / 24h";
     let throughput = 80;
 
     try {
       const phoneRes = await fetch(
-        `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=quality_rating,status,verified_name,code_verification_status,throughput,is_official_business_account`,
+        `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=quality_rating,status,verified_name,code_verification_status,throughput,is_official_business_account,display_phone_number`,
         {
           headers: { Authorization: `Bearer ${creds.accessToken}` }
         }
@@ -7004,6 +7049,7 @@ export async function getMetaPhoneHealthAndLimitsAction() {
         if (pData.quality_rating) qualityRating = pData.quality_rating.toUpperCase();
         if (pData.status) status = pData.status;
         if (pData.verified_name) verifiedName = pData.verified_name;
+        if (pData.display_phone_number) displayPhoneNumber = pData.display_phone_number;
         if (pData.throughput?.level) throughput = pData.throughput.level;
       }
     } catch (e) {
@@ -7016,6 +7062,7 @@ export async function getMetaPhoneHealthAndLimitsAction() {
       qualityRating,
       status,
       verifiedName,
+      displayPhoneNumber: displayPhoneNumber || creds.phoneNumber || "Configured",
       dailyLimitTier,
       throughput,
       optedOutCount

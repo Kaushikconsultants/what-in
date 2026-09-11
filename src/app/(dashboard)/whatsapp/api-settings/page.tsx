@@ -44,7 +44,7 @@ export default function WhatsAppAPISettingsPage() {
   const [managerId, setManagerId] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [token, setToken] = useState("");
-  const [webhookToken, setWebhookToken] = useState("espon_whatsapp_secure_webhook_token_2026");
+  const [webhookToken, setWebhookToken] = useState("");
   const [showToken, setShowToken] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,7 @@ export default function WhatsAppAPISettingsPage() {
   // Gemini AI Tab States
   const [geminiKey, setGeminiKey] = useState("");
   const [welcomeMsg, setWelcomeMsg] = useState("");
-  const [activeModel, setActiveModel] = useState("gemini-3.8-flash");
+  const [activeModel, setActiveModel] = useState("gemini-2.5-flash");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [savingAI, setSavingAI] = useState(false);
   const [aiResultMsg, setAiResultMsg] = useState<{ success: boolean; text: string } | null>(null);
@@ -125,7 +125,7 @@ export default function WhatsAppAPISettingsPage() {
         setManagerId(resWA.credentials.businessManagerId || "");
         setPhoneNumber(resWA.credentials.phoneNumber || "");
         setToken(resWA.credentials.accessToken || "");
-        setWebhookToken(resWA.credentials.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026");
+        setWebhookToken(resWA.credentials.webhookVerifyToken || "");
         setIsConnected(resWA.isConnected || false);
       }
       if (resShopify.success && resShopify.credentials) {
@@ -135,7 +135,7 @@ export default function WhatsAppAPISettingsPage() {
       if (resSettings.success && resSettings.settings) {
         setGeminiKey(resSettings.settings.geminiApiKey || "");
         setWelcomeMsg(resSettings.settings.welcomeMessage || "Welcome! How can we help you today?");
-        setActiveModel(resSettings.settings.aiModel || "gemini-3.8-flash");
+        setActiveModel(resSettings.settings.aiModel || "gemini-2.5-flash");
         setSystemPrompt(resSettings.settings.aiSystemPrompt || "");
       }
       if (resTeams.success && resTeams.teams) setTeams(resTeams.teams);
