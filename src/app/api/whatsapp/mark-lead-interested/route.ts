@@ -26,10 +26,19 @@ export async function POST(req: NextRequest) {
 
     const cleanPhone = phone.replace(/\D/g, '').slice(-10);
 
-    // Fetch active Meta CAPI integration
-    const integration = await prisma.whatsAppIntegration.findFirst({
-      where: { type: "META_CAPI", isActive: true }
+    // Fetch active Meta CAPI integration for tenant or global
+    const capiWhere: any = { type: "META_CAPI", isActive: true };
+    if (user?.clientId) {
+      capiWhere.clientId = user.clientId;
+    }
+    let integration = await prisma.whatsAppIntegration.findFirst({
+      where: capiWhere
     });
+    if (!integration && !user?.clientId) {
+      integration = await prisma.whatsAppIntegration.findFirst({
+        where: { type: "META_CAPI", isActive: true, clientId: null }
+      });
+    }
 
     if (!integration || !integration.url || !integration.token) {
       return NextResponse.json({ 

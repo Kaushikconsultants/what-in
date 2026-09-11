@@ -88,6 +88,7 @@ import {
   retryFailedWhatsAppMessageAction
 } from "@/app/actions/whatsAppPlatformActions";
 import { getWhatsAppIntegrationsAction, pushLeadToIntegrationAction } from "@/app/actions/whatsAppIntegrationActions";
+import { getPaymentGatewaySettings } from "@/app/actions/paymentGatewayActions";
 import { useWhatsAppStore } from "@/store/whatsappStore";
 import { formatWhatsAppPhone } from "@/lib/phoneUtils";
 import "./WhatsAppInbox.css";
@@ -373,14 +374,23 @@ export default function WhatsAppInboxComponent() {
   const [paymentDesc, setPaymentDesc] = useState<string>("Advance Payment for Order #ORD-1092");
   const [paymentDeliveryMethod, setPaymentDeliveryMethod] = useState<'both'|'link'|'qr'>('both');
   const [paymentConfigured, setPaymentConfigured] = useState<boolean>(false);
+  const [hasMetaCapi, setHasMetaCapi] = useState<boolean>(false);
 
   useEffect(() => {
     const checkPaymentSettings = async () => {
-      const res = await getWhatsAppSettingsAction();
-      const gateway = res.success ? res.settings?.activeGateway : null;
-      if (gateway && gateway !== "NONE" && gateway !== "false" && gateway !== "none") {
-        setPaymentConfigured(true);
-      } else {
+      try {
+        const pg = await getPaymentGatewaySettings();
+        const gw = (pg?.activeGateway || '').toUpperCase();
+        let isConfigured = false;
+        if (gw === 'RAZORPAY' && pg.razorpayKeyId && pg.razorpayKeyId.trim().length > 3) {
+          isConfigured = true;
+        } else if (gw === 'CASHFREE' && pg.cashfreeAppId && pg.cashfreeAppId.trim().length > 3) {
+          isConfigured = true;
+        } else if (gw === 'UPI' && pg.merchantUpiId && pg.merchantUpiId.trim().length > 3) {
+          isConfigured = true;
+        }
+        setPaymentConfigured(isConfigured);
+      } catch {
         setPaymentConfigured(false);
       }
     };
@@ -525,6 +535,7 @@ export default function WhatsAppInboxComponent() {
       // Exclude Meta CAPI / Pixel integrations so only CRM / ERP webhook integrations appear
       const crmOnly = res.integrations.filter((i: any) => {
         if (!i.isActive) return false;
+        if (!i.url || !i.url.trim()) return false;
         const typeUpper = (i.type || '').toUpperCase();
         const nameLower = (i.name || '').toLowerCase();
         if (typeUpper === 'META_CAPI' || typeUpper === 'PIXEL' || typeUpper.includes('CAPI')) return false;
@@ -532,6 +543,19 @@ export default function WhatsAppInboxComponent() {
         return true;
       });
       setIntegrations(crmOnly);
+
+      // Check for active Meta CAPI integration with valid Pixel ID & Access Token
+      const capiActive = res.integrations.some((i: any) => {
+        if (!i.isActive) return false;
+        const typeUpper = (i.type || '').toUpperCase();
+        const nameLower = (i.name || '').toLowerCase();
+        const isCapi = typeUpper === 'META_CAPI' || typeUpper === 'PIXEL' || typeUpper.includes('CAPI') || nameLower.includes('pixel') || nameLower.includes('capi');
+        return isCapi && Boolean(i.url?.trim()) && Boolean(i.token?.trim());
+      });
+      setHasMetaCapi(capiActive);
+    } else {
+      setIntegrations([]);
+      setHasMetaCapi(false);
     }
   };
 
@@ -1938,60 +1962,64 @@ export default function WhatsAppInboxComponent() {
                   <span>{statusToggleLoading ? "..." : activeConvDetail.status === 'CLOSED' ? "Reopen Chat" : "Close Chat"}</span>
                 </button>
 
-                <div style={{ position: 'relative' }}>
+                {integrations && integrations.length > 0 && (
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      className="chat-action-btn"
+                      onClick={() => {
+                        if (integrations.length === 1) {
+                          handlePushToCrm(integrations[0].id);
+                        } else if (integrations.length > 1) {
+                          setShowIntegrationsMenu(!showIntegrationsMenu);
+                        } else {
+                          setToastMsg("No CRM integrations configured.");
+                          setTimeout(() => setToastMsg(null), 3000);
+                        }
+                      }}
+                      disabled={pushingToCrm}
+                      title={integrations.length === 1 ? `Push lead to ${integrations[0].name}` : "Push Lead to CRM"}
+                      style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontWeight: 600 }}
+                    >
+                      <Activity size={14} />
+                      <span>{pushingToCrm ? "Pushing..." : "Push to CRM"}</span>
+                    </button>
+                    
+                    {showIntegrationsMenu && integrations.length > 1 && (
+                      <>
+                        <div 
+                          style={{ position: 'fixed', inset: 0, zIndex: 49 }} 
+                          onClick={() => setShowIntegrationsMenu(false)} 
+                        />
+                        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', zIndex: 50, minWidth: '180px', overflow: 'hidden' }}>
+                          {integrations.map(int => (
+                            <div 
+                              key={int.id}
+                              onClick={() => handlePushToCrm(int.id)}
+                              style={{ padding: '8px 12px', fontSize: '12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#334155' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                            >
+                              {int.name}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {hasMetaCapi && (
                   <button
                     className="chat-action-btn"
-                    onClick={() => {
-                      if (integrations.length === 1) {
-                        handlePushToCrm(integrations[0].id);
-                      } else if (integrations.length > 1) {
-                        setShowIntegrationsMenu(!showIntegrationsMenu);
-                      } else {
-                        setToastMsg("No CRM integrations configured.");
-                        setTimeout(() => setToastMsg(null), 3000);
-                      }
-                    }}
-                    disabled={pushingToCrm}
-                    title={integrations.length === 1 ? `Push lead to ${integrations[0].name}` : "Push Lead to CRM"}
-                    style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontWeight: 600 }}
+                    onClick={handleMarkLeadInterested}
+                    disabled={firingMetaLead}
+                    style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#b45309", fontWeight: 700 }}
+                    title="Mark Lead Interested & Fire Meta Conversion Event"
                   >
-                    <Activity size={14} />
-                    <span>{pushingToCrm ? "Pushing..." : "Push to CRM"}</span>
+                    <Zap size={14} className={firingMetaLead ? "animate-spin text-amber-600" : "text-amber-600"} />
+                    <span>{firingMetaLead ? "Firing..." : "Mark Interested"}</span>
                   </button>
-                  
-                  {showIntegrationsMenu && integrations.length > 1 && (
-                    <>
-                      <div 
-                        style={{ position: 'fixed', inset: 0, zIndex: 49 }} 
-                        onClick={() => setShowIntegrationsMenu(false)} 
-                      />
-                      <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', zIndex: 50, minWidth: '180px', overflow: 'hidden' }}>
-                        {integrations.map(int => (
-                          <div 
-                            key={int.id}
-                            onClick={() => handlePushToCrm(int.id)}
-                            style={{ padding: '8px 12px', fontSize: '12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#334155' }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'white'}
-                          >
-                            {int.name}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  className="chat-action-btn"
-                  onClick={handleMarkLeadInterested}
-                  disabled={firingMetaLead}
-                  style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#b45309", fontWeight: 700 }}
-                  title="Mark Lead Interested & Fire Meta Conversion Event"
-                >
-                  <Zap size={14} className={firingMetaLead ? "animate-spin text-amber-600" : "text-amber-600"} />
-                  <span>{firingMetaLead ? "Firing..." : "Mark Interested"}</span>
-                </button>
+                )}
 
                 <button
                   className={`chat-action-btn ${isFullScreen ? "active-fullscreen" : ""}`}
@@ -2772,7 +2800,7 @@ export default function WhatsAppInboxComponent() {
                                   <Sparkles size={12} color="#10b981" /> Reply Confirmation
                                 </button>
 
-                                {totalAmount > 0 && (
+                                {paymentConfigured && totalAmount > 0 && (
                                   <button
                                     type="button"
                                     onClick={() => {

@@ -53,7 +53,15 @@ export async function getWhatsAppIntegrationsAction() {
       return { success: false, error: "Unauthorized access", integrations: [] };
     }
 
+    const where: any = {};
+    if (user?.clientId) {
+      where.clientId = user.clientId;
+    } else if (!isOwner && user) {
+      where.clientId = null;
+    }
+
     const integrations = await prisma.whatsAppIntegration.findMany({
+      where,
       orderBy: { createdAt: 'desc' }
     });
     return { success: true, integrations };
@@ -80,6 +88,7 @@ export async function createWhatsAppIntegrationAction(data: { name: string, url:
 
     const integration = await prisma.whatsAppIntegration.create({
       data: {
+        clientId: user?.clientId || null,
         name: data.name.trim(),
         url: data.url.trim(),
         token: data.token?.trim() || null,
