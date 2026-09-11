@@ -211,7 +211,12 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         else if (status === 'failed') targetStatus = 'FAILED';
         else if (status === 'sent') targetStatus = 'SENT';
 
-        if (targetStatus && last10) {
+        if (!targetStatus) continue;
+
+        const now = new Date();
+
+        // 1. Update Campaign Queue tracking if applicable
+        if (last10) {
           const queueItems = await prisma.whatsAppCampaignQueue.findMany({
             where: {
               toPhone: { endsWith: last10 },
@@ -221,7 +226,6 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
           });
 
           if (queueItems.length > 0) {
-            const now = new Date();
             await prisma.whatsAppCampaignQueue.updateMany({
               where: { id: { in: queueItems.map((q) => q.id) } },
               data: {
@@ -256,21 +260,65 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
               }
             }
           }
+        }
 
-          // Update matching WhatsAppMessage record
-          await prisma.whatsAppMessage.updateMany({
-            where: {
-              OR: [
-                { metaMessageId: wamid },
-                { conversation: { ...(clientId ? { clientId } : {}), customer: { mobile: { endsWith: last10 } } } }
-              ]
-            },
-            data: {
-              status: targetStatus,
-              deliveredAt: targetStatus === 'DELIVERED' ? new Date() : undefined,
-              readAt: targetStatus === 'READ' ? new Date() : undefined
-            }
+        // 2. Update WhatsAppMessage record with strict status progression
+        if (wamid) {
+          const existingMsg = await prisma.whatsAppMessage.findFirst({
+            where: { metaMessageId: wamid }
           });
+
+          if (existingMsg) {
+            // Never downgrade from READ to DELIVERED or SENT
+            const shouldUpdate = 
+              targetStatus === 'FAILED' ||
+              (targetStatus === 'READ' && existingMsg.status !== 'READ') ||
+              (targetStatus === 'DELIVERED' && existingMsg.status !== 'READ' && existingMsg.status !== 'DELIVERED') ||
+              (targetStatus === 'SENT' && existingMsg.status !== 'READ' && existingMsg.status !== 'DELIVERED');
+
+            if (shouldUpdate) {
+              await prisma.whatsAppMessage.update({
+                where: { id: existingMsg.id },
+                data: {
+                  status: targetStatus,
+                  deliveredAt: (targetStatus === 'DELIVERED' || targetStatus === 'READ') ? (existingMsg.deliveredAt || now) : undefined,
+                  readAt: targetStatus === 'READ' ? (existingMsg.readAt || now) : undefined
+                }
+              });
+              console.log(`[Status Webhook] Updated message ${existingMsg.id} (${wamid}) to ${targetStatus}`);
+            }
+          } else if (last10) {
+            // Safe fallback: match ONLY the latest outbound message for this customer still in SENT status
+            const fallbackMsg = await prisma.whatsAppMessage.findFirst({
+              where: {
+                senderType: { in: ['AGENT', 'AI', 'BOT', 'SYSTEM'] },
+                status: { notIn: ['READ', 'FAILED'] },
+                conversation: {
+                  ...(clientId ? { clientId } : {}),
+                  customer: {
+                    OR: [
+                      { mobile: { endsWith: last10 } },
+                      { whatsappNumber: { endsWith: last10 } }
+                    ]
+                  }
+                }
+              },
+              orderBy: { sentAt: 'desc' }
+            });
+
+            if (fallbackMsg) {
+              await prisma.whatsAppMessage.update({
+                where: { id: fallbackMsg.id },
+                data: {
+                  metaMessageId: wamid,
+                  status: targetStatus,
+                  deliveredAt: (targetStatus === 'DELIVERED' || targetStatus === 'READ') ? (fallbackMsg.deliveredAt || now) : undefined,
+                  readAt: targetStatus === 'READ' ? (fallbackMsg.readAt || now) : undefined
+                }
+              });
+              console.log(`[Status Webhook] Fallback matched message ${fallbackMsg.id} to ${wamid} -> ${targetStatus}`);
+            }
+          }
         }
       } catch (err) {
         console.error("[Webhook Status Receipt Error]:", err);

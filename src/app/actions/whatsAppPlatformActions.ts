@@ -410,7 +410,7 @@ export async function sendWhatsAppMessageAction(data: {
   try {
     const conversation = await prisma.whatsAppConversation.findUnique({
       where: { id: data.conversationId },
-      include: { customer: true, account: true }
+      include: { customer: true, account: true, client: true }
     });
 
     if (!conversation) {
@@ -422,8 +422,8 @@ export async function sendWhatsAppMessageAction(data: {
 
     // Call Meta API if it's an outbound message and not an internal note
     if (!data.isInternalNote && data.senderType !== 'CUSTOMER') {
-      let token = conversation.account?.accessToken;
-      let phoneId = conversation.account?.phoneId;
+      let token = conversation.client?.metaAccessToken || conversation.account?.accessToken;
+      let phoneId = conversation.client?.phoneId || conversation.account?.phoneId;
 
       if (!token || !phoneId || token.length < 20) {
         const creds = await getMetaApiCredentials();
@@ -721,7 +721,8 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
         conversation: {
           include: {
             account: true,
-            customer: true
+            customer: true,
+            client: true
           }
         }
       }
@@ -732,11 +733,19 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
     }
 
     const conversation = existing.conversation;
-    const token = conversation.account?.accessToken;
-    const phoneId = conversation.account?.phoneId;
+    let token = conversation.client?.metaAccessToken || conversation.account?.accessToken;
+    let phoneId = conversation.client?.phoneId || conversation.account?.phoneId;
+
+    if (!token || !phoneId || token.length < 20) {
+      const creds = await getMetaApiCredentials();
+      if (creds && creds.isConnected) {
+        token = creds.accessToken;
+        phoneId = creds.phoneId;
+      }
+    }
 
     if (!token || !phoneId) {
-      return { success: false, error: "WhatsApp Account credentials not configured" };
+      return { success: false, error: "WhatsApp credentials not configured" };
     }
 
     const recipientPhone = conversation.customer.whatsappNumber 

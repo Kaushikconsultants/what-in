@@ -39,6 +39,10 @@ export async function GET(req: NextRequest) {
       const isAdmin = isOwner || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'MANAGER';
       const where: any = {};
 
+      if (authUser?.clientId) {
+        where.clientId = authUser.clientId;
+      }
+
       if (!isAdmin) {
         if (userEmail) {
           const emp = await prisma.employee.findFirst({ where: { user: { email: userEmail } } });
@@ -241,6 +245,10 @@ export async function GET(req: NextRequest) {
       
       if (!conversation) {
         return NextResponse.json({ success: false, error: "Conversation not found" }, { status: 404 });
+      }
+
+      if (authUser?.clientId && (conversation as any).clientId && (conversation as any).clientId !== authUser.clientId) {
+        return NextResponse.json({ success: false, error: "Unauthorized access to this conversation" }, { status: 403 });
       }
 
       // Auto-heal customer phone numbers using verified Meta incoming message ID (wamid) or standard E.164
