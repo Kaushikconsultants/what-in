@@ -74,7 +74,9 @@ export default function IntegrationsHubPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [token, setToken] = useState("");
   const [webhookToken, setWebhookToken] = useState("whatin_whatsapp_secure_webhook_token_2026");
-  const [webhookEndpoint, setWebhookEndpoint] = useState("/api/whatsapp/webhook");
+  const [customWebhookUrl, setCustomWebhookUrl] = useState("");
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -171,8 +173,10 @@ export default function IntegrationsHubPage() {
         setPhoneNumber(resWA.credentials.phoneNumber || "");
         setToken(resWA.credentials.accessToken || "");
         setWebhookToken(resWA.credentials.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026");
-        if (resWA.credentials.webhookUrl) setWebhookEndpoint(resWA.credentials.webhookUrl);
         setIsConnected(resWA.isConnected || false);
+        if (resWA.webhookUrl) {
+          setCustomWebhookUrl(resWA.webhookUrl);
+        }
       }
       if (resShopify.success && resShopify.credentials) {
         setShopifyDomain(resShopify.credentials.shopifyStoreDomain || "");
@@ -682,13 +686,63 @@ const reloadTeams = async () => {
                   </div>
                 </div>
 
-                <div className="bg-indigo-50/50 dark:bg-indigo-500/5 p-4 rounded-xl border border-indigo-100 dark:border-indigo-500/20">
-                  <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-300 mb-2">Webhook Configuration</h4>
-                  <p className="text-xs text-indigo-700 dark:text-indigo-400/80 mb-3">Set this callback URL in your Meta App Dashboard:</p>
-                  <code className="block w-full p-3 bg-white dark:bg-slate-900 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-mono font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    {typeof window !== "undefined" ? `${window.location.origin}${webhookEndpoint}` : `https://what-in.tinkal.in${webhookEndpoint}`}
-                  </code>
-                  <p className="text-xs text-indigo-700 dark:text-indigo-400/80">Verify Token: <strong className="text-indigo-900 dark:text-indigo-300">{webhookToken}</strong></p>
+                <div className="bg-indigo-50/50 dark:bg-indigo-500/5 p-5 rounded-xl border border-indigo-100 dark:border-indigo-500/20 flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="text-indigo-600" size={18} />
+                      <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-300 m-0">Meta Webhook Configuration</h4>
+                    </div>
+                    <span className="text-[11px] font-bold px-2.5 py-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full">
+                      Client-Isolated & Secure
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5">
+                      1. Callback URL (Paste in Meta App Dashboard → WhatsApp → Configuration):
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 p-3 bg-white dark:bg-slate-900 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-mono font-semibold text-gray-800 dark:text-gray-200 break-all select-all">
+                        {customWebhookUrl || (typeof window !== "undefined" ? `${window.location.origin}/api/whatsapp/webhook` : "https://what-in.tinkal.in/api/whatsapp/webhook")}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const url = customWebhookUrl || `${window.location.origin}/api/whatsapp/webhook`;
+                          navigator.clipboard.writeText(url);
+                          setCopiedUrl(true);
+                          setTimeout(() => setCopiedUrl(false), 2000);
+                        }}
+                        className="px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+                      >
+                        {copiedUrl ? <Check size={14} /> : <Copy size={14} />}
+                        {copiedUrl ? "Copied!" : "Copy URL"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5">
+                      2. Verify Token (Paste in Meta App Dashboard → Verify Token field):
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 p-3 bg-white dark:bg-slate-900 rounded-lg border border-indigo-200 dark:border-indigo-500/30 text-xs font-mono font-bold text-indigo-700 dark:text-indigo-300 break-all select-all">
+                        {webhookToken}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(webhookToken);
+                          setCopiedToken(true);
+                          setTimeout(() => setCopiedToken(false), 2000);
+                        }}
+                        className="px-3 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+                      >
+                        {copiedToken ? <Check size={14} /> : <Copy size={14} />}
+                        {copiedToken ? "Copied!" : "Copy Token"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -702,8 +756,8 @@ const reloadTeams = async () => {
 
             {/* Test Message Section */}
             <div className="p-6 bg-slate-50 dark:bg-slate-900/50">
-              <h3 className="text-md font-bold text-gray-900 dark:text-white mb-3">Test Connection</h3>
-              <p className="text-sm text-gray-500 mb-4">Send a "espon_test_message" test template to verify your Meta API connection is working properly.</p>
+              <h3 className="text-md font-bold text-gray-900 dark:text-white mb-2">Test Live Meta API Connection</h3>
+              <p className="text-sm text-gray-500 mb-4">Send Meta's official pre-approved <strong>"hello_world"</strong> template message to your phone number to verify real-time message dispatch.</p>
               
               {testResultMsg && (
                 <div className={`mb-4 p-4 rounded-xl text-sm font-semibold flex items-center gap-2 ${testResultMsg.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
@@ -740,7 +794,7 @@ const reloadTeams = async () => {
               <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg"><Store size={20} /></div>
               <div>
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white m-0">Shopify Integration</h2>
-                <p className="text-sm text-gray-500 m-0 mt-0.5">Sync your Shopify catalog directly into What-In.</p>
+                <p className="text-sm text-gray-500 m-0 mt-0.5">Sync your Shopify catalog directly into Whatmore.</p>
               </div>
             </div>
 

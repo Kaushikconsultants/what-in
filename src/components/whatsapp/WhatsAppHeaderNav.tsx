@@ -164,13 +164,13 @@ export default function WhatsAppHeaderNav() {
             <ShoppingBag size={24} strokeWidth={2.5} />
           </div>
           <div className="brand-text">
-            <h1>Whatmore</h1>
-            <p>Unified Commerce & Automation</p>
+            <h1>{typeof window !== "undefined" && (window.location.hostname.includes("what-in") || window.location.hostname.includes("whatin")) ? "What-In" : "Whatmore"}</h1>
+            <p>WhatsApp Business Automation</p>
           </div>
         </div>
         
         <Link
-          href="/whatsapp/api-settings"
+          href="/whatsapp/integrations"
           className={`status-badge ${accountInfo.isConnected ? "active" : "inactive"}`}
         >
           <span className="pulse-dot"></span>

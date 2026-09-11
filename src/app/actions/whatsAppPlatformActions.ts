@@ -5,6 +5,7 @@ import { seedWhatsAppPlatformData } from "@/lib/seedWhatsApp";
 import { revalidatePath } from "next/cache";
 import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
+import { getAuthenticatedUser } from "@/lib/authSession";
 
 export async function getWhatsAppChatbotLogsAction(phone: string) {
   try {
@@ -55,7 +56,6 @@ export async function getMetaApiCredentials() {
 import { getServerSession } from "next-auth";
 import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
-import { getAuthenticatedUser } from "@/lib/authSession";
 
 export interface ConversationFilterOptions {
   search?: string;
@@ -1235,21 +1235,79 @@ export async function checkIntegrationHealthAction() {
 export async function getWhatsAppApiCredentialsAction() {
   await ensureSeeded();
   try {
+    const user = await getAuthenticatedUser();
+    let client: any = null;
+
+    if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email }
+          ]
+        }
+      });
+    }
+
+    if (client) {
+      const isConnected = !!(client.metaAccessToken && client.phoneId && client.wabaId && !client.metaAccessToken.startsWith("EAAG...meta"));
+      const brandSlug = (client.businessName || "client").toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const personalizedToken = client.webhookVerifyToken || `${brandSlug}_whatsapp_secure_webhook_token_2026`;
+      const webhookBase = "https://what-in.tinkal.in";
+      const tenantWebhookUrl = `${webhookBase}/api/whatsapp/webhook/${client.webhookClientId}`;
+
+      // Update client with personalized verify token if empty
+      if (!client.webhookVerifyToken) {
+        await prisma.whatsAppClient.update({
+          where: { id: client.id },
+          data: { webhookVerifyToken: personalizedToken }
+        }).catch(() => {});
+      }
+
+      return {
+        success: true,
+        isConnected,
+        isClientTenant: true,
+        clientName: client.businessName,
+        webhookClientId: client.webhookClientId,
+        webhookUrl: tenantWebhookUrl,
+        globalWebhookUrl: `${webhookBase}/api/whatsapp/webhook`,
+        credentials: {
+          id: client.id,
+          name: client.businessName,
+          phoneNumber: client.phoneNumber || "",
+          phoneId: client.phoneId || "",
+          businessAccountId: client.wabaId || "",
+          businessManagerId: "",
+          accessToken: client.metaAccessToken || "",
+          webhookVerifyToken: personalizedToken,
+          status: isConnected ? "CONNECTED" : "NOT CONNECTED (Setup Required)"
+        }
+      };
+    }
+
     const account = await prisma.whatsAppAccount.findFirst();
     const isConnected = isWhatsAppApiConfigured(account);
+    const verifyToken = account?.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026";
+    const webhookBase = "https://what-in.tinkal.in";
 
     return {
       success: true,
       isConnected,
+      isClientTenant: false,
+      webhookUrl: `${webhookBase}/api/whatsapp/webhook`,
+      globalWebhookUrl: `${webhookBase}/api/whatsapp/webhook`,
       credentials: {
         id: account?.id,
-        name: account?.name || "Espon Main Sales",
+        name: account?.name || "Primary WABA Account",
         phoneNumber: account?.phoneNumber || "",
         phoneId: account?.phoneId || "",
         businessAccountId: account?.businessAccountId || "",
         businessManagerId: account?.businessManagerId || "",
         accessToken: account?.accessToken || "",
-        webhookVerifyToken: account?.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026",
+        webhookVerifyToken: verifyToken,
         status: isConnected ? (account?.status || "CONNECTED") : "NOT CONNECTED (Setup Required)"
       }
     };
@@ -1267,10 +1325,71 @@ export async function saveWhatsAppApiCredentialsAction(data: {
   webhookVerifyToken?: string;
 }) {
   try {
-    let account = await prisma.whatsAppAccount.findFirst();
+    const user = await getAuthenticatedUser();
+    let client: any = null;
 
+    if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email }
+          ]
+        }
+      });
+    }
+
+    if (client) {
+      const isConnected = !!(data.accessToken && data.phoneId && data.wabaId && !data.accessToken.startsWith("EAAG...meta"));
+      const brandSlug = (client.businessName || "client").toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const tokenToSave = data.webhookVerifyToken?.trim() || client.webhookVerifyToken || `${brandSlug}_whatsapp_secure_webhook_token_2026`;
+
+      await prisma.whatsAppClient.update({
+        where: { id: client.id },
+        data: {
+          wabaId: data.wabaId,
+          phoneId: data.phoneId,
+          metaAccessToken: data.accessToken,
+          phoneNumber: data.phoneNumber,
+          webhookVerifyToken: tokenToSave,
+          updatedAt: new Date()
+        }
+      });
+
+      // Attempt auto-registration with Meta Graph API
+      if (data.wabaId && data.accessToken) {
+        try {
+          const appUrl = "https://what-in.tinkal.in";
+          const callbackUrl = `${appUrl}/api/whatsapp/webhook/${client.webhookClientId}`;
+          await fetch(`https://graph.facebook.com/v21.0/${data.wabaId}/subscribed_apps`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.accessToken}` },
+            body: JSON.stringify({ callback_url: callbackUrl, verify_token: tokenToSave, subscribed_fields: ["messages", "messaging_postbacks", "message_deliveries", "message_reads"] })
+          });
+        } catch (err) {
+          console.error("Auto-subscribe Meta webhook failed:", err);
+        }
+      }
+
+      revalidatePath('/whatsapp/dashboard');
+      revalidatePath('/whatsapp/integrations');
+      revalidatePath('/whatsapp/api-settings');
+      revalidatePath('/whatsapp');
+
+      return {
+        success: true,
+        isConnected,
+        message: `Credentials saved successfully for ${client.businessName}!`
+      };
+    }
+
+    // Standalone fallback
+    let account = await prisma.whatsAppAccount.findFirst();
     const isConnected = data.accessToken && data.phoneId && data.wabaId && !data.accessToken.startsWith("EAAG...meta");
     const status = isConnected ? "CONNECTED" : "NOT CONNECTED (Setup Required)";
+    const fallbackToken = data.webhookVerifyToken?.trim() || account?.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026";
 
     if (account) {
       account = await prisma.whatsAppAccount.update({
@@ -1281,7 +1400,7 @@ export async function saveWhatsAppApiCredentialsAction(data: {
           businessManagerId: data.managerId || null,
           accessToken: data.accessToken,
           phoneNumber: data.phoneNumber,
-          webhookVerifyToken: data.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026",
+          webhookVerifyToken: fallbackToken,
           status,
           qualityRating: isConnected ? "GREEN" : "PENDING_SETUP",
           updatedAt: new Date()
@@ -1290,13 +1409,13 @@ export async function saveWhatsAppApiCredentialsAction(data: {
     } else {
       account = await prisma.whatsAppAccount.create({
         data: {
-          name: "Espon Main Sales",
+          name: "Primary WABA Account",
           phoneNumber: data.phoneNumber,
           phoneId: data.phoneId,
           businessAccountId: data.wabaId,
           businessManagerId: data.managerId || null,
           accessToken: data.accessToken,
-          webhookVerifyToken: data.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026",
+          webhookVerifyToken: fallbackToken,
           status,
           dailyLimit: "10K per day",
           usedToday: 0,
@@ -1307,6 +1426,7 @@ export async function saveWhatsAppApiCredentialsAction(data: {
     }
 
     revalidatePath('/whatsapp/dashboard');
+    revalidatePath('/whatsapp/integrations');
     revalidatePath('/whatsapp/api-settings');
     revalidatePath('/whatsapp');
 
@@ -4441,77 +4561,121 @@ export async function saveShopifyCredentialsAction(data: { storeDomain: string; 
 
 export async function sendWhatsAppHelloWorldAction(phone: string) {
   try {
-    const account = await prisma.whatsAppAccount.findFirst();
-    if (!account || !account.accessToken || !account.phoneId || !account.businessAccountId) {
-      return { success: false, error: "WhatsApp API Account is not fully configured." };
+    const user = await getAuthenticatedUser();
+    let token = "";
+    let phoneId = "";
+    let wabaId = "";
+
+    if (user?.clientId) {
+      const client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+      if (client && client.metaAccessToken && client.phoneId) {
+        token = client.metaAccessToken;
+        phoneId = client.phoneId;
+        wabaId = client.wabaId || "";
+      }
+    } else if (user?.email) {
+      const client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email }
+          ]
+        }
+      });
+      if (client && client.metaAccessToken && client.phoneId) {
+        token = client.metaAccessToken;
+        phoneId = client.phoneId;
+        wabaId = client.wabaId || "";
+      }
+    }
+
+    if (!token || !phoneId) {
+      const account = await prisma.whatsAppAccount.findFirst();
+      if (!account || !account.accessToken || !account.phoneId) {
+        return { success: false, error: "WhatsApp API credentials are not configured. Please save your Phone ID and Permanent Access Token above." };
+      }
+      token = account.accessToken;
+      phoneId = account.phoneId;
+      wabaId = account.businessAccountId || "";
     }
 
     const cleanPhone = phone.replace(/\D/g, "");
-    const toPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
-    const token = account.accessToken;
-    const phoneId = account.phoneId;
-    const wabaId = account.businessAccountId;
+    const toPhone = cleanPhone.startsWith('91') && cleanPhone.length > 10 ? cleanPhone : (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone);
 
-    const sendPayload = {
+    const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+
+    // 1. Try sending Meta's official pre-approved universal default "hello_world" template
+    const helloWorldPayload = {
       messaging_product: "whatsapp",
       to: toPhone,
       type: "template",
       template: {
-        name: "espon_test_message",
+        name: "hello_world",
         language: { code: "en_US" }
       }
     };
 
-    const url = `https://graph.facebook.com/v20.0/${phoneId}/messages`;
     let response = await fetch(url, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(sendPayload)
+      body: JSON.stringify(helloWorldPayload)
     });
     
     let resData = await response.json();
 
-    if (resData.error && (resData.error.code === 132001 || resData.error.code === 132000 || resData.error.message.toLowerCase().includes('template'))) {
-      // Template doesn't exist, create it
-      const createUrl = `https://graph.facebook.com/v20.0/${wabaId}/message_templates`;
-      const createPayload = {
-        name: "espon_test_message",
-        language: "en_US",
-        category: "UTILITY",
-        components: [
-          { type: "HEADER", format: "TEXT", text: "Hello World" },
-          { type: "BODY", text: "Welcome and congratulations!! This message demonstrates your ability to send a WhatsApp message notification from the Cloud API, hosted by Meta. Thank you for taking the time to test with us." },
-          { type: "FOOTER", text: "Meta App Setup" }
-        ]
+    // 2. If en_US fails, try language code "en"
+    if (resData.error && resData.error.code === 132001) {
+      const fallbackLangPayload = {
+        messaging_product: "whatsapp",
+        to: toPhone,
+        type: "template",
+        template: {
+          name: "hello_world",
+          language: { code: "en" }
+        }
       };
-      
-      const createRes = await fetch(createUrl, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(createPayload)
-      });
-      
-      const createData = await createRes.json();
-      console.log("Create template result:", createData);
-
-      // Wait a bit for propagation
-      await new Promise(r => setTimeout(r, 2000));
-
-      // Retry send
       response = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(sendPayload)
+        body: JSON.stringify(fallbackLangPayload)
+      });
+      resData = await response.json();
+    }
+
+    // 3. If template is still unavailable, fallback to sending a direct text message
+    if (resData.error && (resData.error.code === 132001 || resData.error.code === 132000 || resData.error.message?.toLowerCase().includes('template'))) {
+      console.log("[Test Message] Template hello_world not found. Attempting direct text message fallback...");
+      const textPayload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: toPhone,
+        type: "text",
+        text: {
+          preview_url: false,
+          body: "👋 *WhatsApp Business API Connected!*\n\nThis is a live test message confirming your Meta Cloud API integration is operational.\n\n_Powered by What-In Platform_"
+        }
+      };
+
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(textPayload)
       });
       resData = await response.json();
     }
 
     if (resData.error) {
-      return { success: false, error: resData.error.message || "Failed to send message" };
+      console.error("[Test Message Error]:", resData.error);
+      return { success: false, error: resData.error.message || `Meta API Error (${resData.error.code})` };
     }
 
-    return { success: true, messageId: resData.messages?.[0]?.id };
+    return {
+      success: true,
+      messageId: resData.messages?.[0]?.id,
+      message: `✓ Test message successfully delivered to +${toPhone} via Meta Cloud API!`
+    };
   } catch (error: any) {
+    console.error("[Test Message Exception]:", error);
     return { success: false, error: error.message };
   }
 }

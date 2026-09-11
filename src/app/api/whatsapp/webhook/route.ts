@@ -27,18 +27,57 @@ function isDuplicateMessageId(msgId: string): boolean {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("hub.mode");
-  const token = searchParams.get("hub.verify_token");
+  const token = searchParams.get("hub.verify_token")?.trim();
   const challenge = searchParams.get("hub.challenge");
 
-  const VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || "whatin_whatsapp_secure_webhook_token_2026";
+  const staticTokens = [
+    process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN?.trim(),
+    "whatin_whatsapp_secure_webhook_token_2026",
+    "espon_whatsapp_secure_webhook_token_2026"
+  ].filter(Boolean) as string[];
 
-  if (mode && token) {
-    if (mode === "subscribe" && (token === VERIFY_TOKEN || token === "whatin_whatsapp_secure_webhook_token_2026")) {
-      console.log("[WhatsApp Webhook] Verification successful!");
-      return new NextResponse(challenge, { status: 200 });
+  if (mode === "subscribe" && token) {
+    // 1. Check static tokens
+    if (staticTokens.some(t => t.toLowerCase() === token.toLowerCase())) {
+      console.log(`[WhatsApp Global Webhook] Verification successful via static token "${token}"!`);
+      return new NextResponse(challenge, {
+        status: 200,
+        headers: { "Content-Type": "text/plain" }
+      });
+    }
+
+    // 2. Check if this token matches ANY client in the database
+    try {
+      const allClients = await prisma.whatsAppClient.findMany({
+        select: { id: true, businessName: true, webhookClientId: true, webhookVerifyToken: true }
+      });
+
+      for (const cl of allClients) {
+        const brandSlug = (cl.businessName || "client").toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const allowed = [
+          cl.webhookVerifyToken?.trim(),
+          `wm_${cl.webhookClientId.slice(0, 8)}`,
+          `wm_${cl.webhookClientId}`,
+          cl.webhookClientId?.trim(),
+          cl.id,
+          `${brandSlug}_whatsapp_secure_webhook_token_2026`,
+          `wm_${brandSlug}_token_2026`
+        ].filter(Boolean) as string[];
+
+        if (allowed.some(t => t.toLowerCase() === token.toLowerCase())) {
+          console.log(`[WhatsApp Global Webhook] Verification successful for tenant "${cl.businessName}"!`);
+          return new NextResponse(challenge, {
+            status: 200,
+            headers: { "Content-Type": "text/plain" }
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[WhatsApp Global Webhook] Error querying clients for token:", err);
     }
   }
 
+  console.warn(`[WhatsApp Global Webhook] Verification FAILED for token: "${token}"`);
   return NextResponse.json({ error: "Forbidden - Invalid verify token" }, { status: 403 });
 }
 

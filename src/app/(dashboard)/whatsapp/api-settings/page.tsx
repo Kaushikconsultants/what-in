@@ -44,7 +44,7 @@ export default function WhatsAppAPISettingsPage() {
   const [managerId, setManagerId] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [token, setToken] = useState("");
-  const [webhookToken, setWebhookToken] = useState("whatin_whatsapp_secure_webhook_token_2026");
+  const [webhookToken, setWebhookToken] = useState("espon_whatsapp_secure_webhook_token_2026");
   const [showToken, setShowToken] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -125,7 +125,7 @@ export default function WhatsAppAPISettingsPage() {
         setManagerId(resWA.credentials.businessManagerId || "");
         setPhoneNumber(resWA.credentials.phoneNumber || "");
         setToken(resWA.credentials.accessToken || "");
-        setWebhookToken(resWA.credentials.webhookVerifyToken || "whatin_whatsapp_secure_webhook_token_2026");
+        setWebhookToken(resWA.credentials.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026");
         setIsConnected(resWA.isConnected || false);
       }
       if (resShopify.success && resShopify.credentials) {
@@ -288,6 +288,48 @@ export default function WhatsAppAPISettingsPage() {
       setAiResultMsg({ success: true, text: "✓ Gemini AI parameters configured successfully!" });
     } else {
       setAiResultMsg({ success: false, text: "Error: " + res.error });
+    }
+  };
+
+  const handleSaveSLASettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSLA(true);
+    setSlaResultMsg(null);
+    const res = await saveWhatsAppSettingsAction({
+      workingHoursStart,
+      workingHoursEnd,
+      slaWarningMinutes: slaMinutes,
+      autoAssignStrategy
+    });
+    setSavingSLA(false);
+    if (res.success) {
+      setSlaResultMsg({ success: true, text: "✓ SLA and Work hours targets configured!" });
+    } else {
+      setSlaResultMsg({ success: false, text: "Error: " + res.error });
+    }
+  };
+
+  const handleCreateCRMContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingCRM(true);
+    setCrmResultMsg(null);
+    const res = await createCRMCustomerAction({
+      contactPerson: newContactName,
+      mobile: newContactPhone,
+      customerType: newContactType
+    });
+    setSavingCRM(false);
+    if (res.success) {
+      setCrmResultMsg({ success: true, text: `✓ Customer "${newContactName}" registered successfully!` });
+      setNewContactName("");
+      setNewContactPhone("");
+      // reload contacts
+      const resCRM = await getCRMCustomersAction();
+      if (resCRM.success && resCRM.customers) {
+        setCrmContacts(resCRM.customers);
+      }
+    } else {
+      setCrmResultMsg({ success: false, text: "Error: " + res.error });
     }
   };
 
@@ -669,7 +711,7 @@ export default function WhatsAppAPISettingsPage() {
               </div>
               <div>
                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Email Address</label>
-                <input type="email" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} required placeholder="e.g. agent@what-in.tinkal.in" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <input type="email" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} required placeholder="e.g. agent@esponsports.com" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
               <div>
                 <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Password</label>
