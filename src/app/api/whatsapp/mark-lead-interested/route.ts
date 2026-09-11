@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!user && !isOwner) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const body = await req.json();
     let { phone, conversationId, eventValue, customEventName = "Lead" } = body;
 

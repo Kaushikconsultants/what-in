@@ -1,12 +1,39 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessageAction } from "@/app/actions/whatsAppPlatformActions";
+
+function verifyShopifyHmac(rawBody: string, hmacHeader: string | null, secret: string): boolean {
+  if (!hmacHeader || !secret) return false;
+  try {
+    const generatedHmac = crypto
+      .createHmac("sha256", secret)
+      .update(rawBody, "utf8")
+      .digest("base64");
+    const hmacBuf = Buffer.from(hmacHeader, "utf8");
+    const genBuf = Buffer.from(generatedHmac, "utf8");
+    if (hmacBuf.length !== genBuf.length) return false;
+    return crypto.timingSafeEqual(hmacBuf, genBuf);
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
     const topic = req.headers.get("x-shopify-topic") || "unknown";
     const shopDomain = req.headers.get("x-shopify-shop-domain") || "";
+    const hmacHeader = req.headers.get("x-shopify-hmac-sha256");
     const rawBody = await req.text();
+
+    const webhookSecret = process.env.SHOPIFY_WEBHOOK_SECRET || process.env.SHOPIFY_API_SECRET;
+    if (webhookSecret) {
+      const isValid = verifyShopifyHmac(rawBody, hmacHeader, webhookSecret);
+      if (!isValid) {
+        console.warn(`[Shopify Webhook] Rejected unauthorized payload (invalid HMAC) from ${shopDomain} for topic ${topic}`);
+        return NextResponse.json({ success: false, error: "Unauthorized: Invalid Shopify HMAC signature" }, { status: 401 });
+      }
+    }
 
     let payload: any = {};
     try {

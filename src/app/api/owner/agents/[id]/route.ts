@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+import { isOwnerAuthenticated, getAuthenticatedUser } from "@/lib/authSession";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
   try {
+    const isOwner = isOwnerAuthenticated(req);
+    const user = await getAuthenticatedUser(req);
+
+    if (!isOwner && (!user || (user.role !== "ADMIN" && user.role !== "OWNER"))) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const resolvedParams = await params;
     const { id } = resolvedParams;
     const body = await req.json();
@@ -13,19 +22,34 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
+    // Tenant boundary check: Admin can only modify agents belonging to their own clientId
+    if (!isOwner && user?.clientId && existingAgent.clientId !== user.clientId) {
+      return NextResponse.json({ error: "Forbidden: Cannot modify agents outside your organization" }, { status: 403 });
+    }
+
     const updateData: any = { name, email, role, isActive };
+    let hashedPassword = "";
     if (password && password.trim() !== "") {
-      updateData.password = password;
+      hashedPassword = await bcrypt.hash(password, 10);
+      updateData.password = hashedPassword;
     }
 
     const agent = await prisma.whatsAppAgentUser.update({
       where: { id },
       data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        mustChangePassword: true,
+        createdAt: true
+      }
     });
 
     // Sync to User and Employee
     try {
-      // Find user by old email, new email, or fallback
       let dbUser = await prisma.user.findFirst({ 
         where: { 
           OR: [
@@ -35,15 +59,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         } 
       });
 
-      // Fallback: search by name if somehow emails got completely out of sync
       if (!dbUser) {
         dbUser = await prisma.user.findFirst({ where: { name: existingAgent.name } });
       }
       
       if (dbUser) {
         const userUpdate: any = { name, email, role: (role === "ADMIN" || role === "SUPER_ADMIN" || role === "MANAGER") ? "ADMIN" : "SALES", isActive };
-        if (password && password.trim() !== "") {
-          userUpdate.password = password;
+        if (hashedPassword) {
+          userUpdate.password = hashedPassword;
         }
         await prisma.user.update({
           where: { id: dbUser.id },
@@ -54,7 +77,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           data: {
             name,
             email,
-            password: password || existingAgent.password || "defaultPassword123!",
+            password: hashedPassword || existingAgent.password || "defaultPassword123!",
             role: (role === "ADMIN" || role === "SUPER_ADMIN" || role === "MANAGER") ? "ADMIN" : "SALES",
             isActive: isActive ?? true
           }

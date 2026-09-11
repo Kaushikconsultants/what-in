@@ -1,11 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { processCampaignQueueAction } from "@/app/actions/whatsAppPlatformActions";
+import { isOwnerAuthenticated, getAuthenticatedUser } from "@/lib/authSession";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = req.headers.get("authorization");
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      const isOwner = isOwnerAuthenticated(req);
+      const user = await getAuthenticatedUser(req);
+      if (!isOwner && !user) {
+        return NextResponse.json({ error: "Unauthorized cron execution" }, { status: 401 });
+      }
+    }
     const now = new Date();
     const pendingCampaigns = await prisma.whatsAppCampaign.findMany({
       where: {

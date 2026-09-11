@@ -1,30 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { callGeminiRest, GEMINI_MODEL_CASCADE } from '@/lib/whatsappAI';
+import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!user && !isOwner) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const message = body.message?.trim();
     if (!message) {
       return NextResponse.json({ success: false, error: 'Message cannot be empty.' }, { status: 400 });
     }
 
-    // Load settings from active client or DB fallback
-    let client: any = null;
+    // Load settings from DB for fallbacks
     let dbSettings: any = null;
     try {
-      const userCookie = req.cookies.get('wm_user')?.value;
-      if (userCookie) {
-        const parsed = JSON.parse(decodeURIComponent(userCookie));
-        if (parsed?.clientId) {
-          client = await prisma.whatsAppClient.findUnique({ where: { id: parsed.clientId } });
-        }
-      }
       dbSettings = await prisma.whatsAppSettings.findFirst();
     } catch (_) {}
 
-    const apiKey = (body.apiKey?.trim() || client?.geminiApiKey?.trim() || dbSettings?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || '');
+    const apiKey = (body.apiKey?.trim() || dbSettings?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || '');
     if (!apiKey) {
       return NextResponse.json({
         success: false,
@@ -32,9 +31,9 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const preferredModel = body.model || client?.aiModel || dbSettings?.aiModel || 'gemini-3.8-flash';
-    const systemRules = body.systemPrompt !== undefined ? body.systemPrompt : (client?.aiSystemPrompt || dbSettings?.aiSystemPrompt || 'You are a helpful customer service assistant.');
-    const knowledgeBase = body.knowledgeBase !== undefined ? body.knowledgeBase : (client?.aiKnowledgeBase || dbSettings?.aiKnowledgeBase || '');
+    const preferredModel = body.model || dbSettings?.aiModel || 'gemini-3.8-flash';
+    const systemRules = body.systemPrompt !== undefined ? body.systemPrompt : (dbSettings?.aiSystemPrompt || 'You are a helpful customer service assistant.');
+    const knowledgeBase = body.knowledgeBase !== undefined ? body.knowledgeBase : (dbSettings?.aiKnowledgeBase || '');
     const fallbackLang = body.fallbackLanguage || dbSettings?.aiFallbackLanguage || 'English';
 
     const fullSystemInstruction = `

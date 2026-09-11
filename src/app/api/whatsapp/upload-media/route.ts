@@ -4,9 +4,16 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!user && !isOwner) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { fileDataUrl, filename, mimeType } = await req.json();
     if (!fileDataUrl) {
       return NextResponse.json({ success: false, error: "fileDataUrl is required" }, { status: 400 });
@@ -37,7 +44,7 @@ export async function POST(req: NextRequest) {
 
       try {
         const ffmpeg = require("ffmpeg-static");
-        await new Promise<void>((resolve, reject) => {
+        await new Promise((resolve, reject) => {
           exec(`"${ffmpeg}" -i "${inputPath}" -codec:a libmp3lame -qscale:a 2 "${outputPath}"`, (error, stdout, stderr) => {
             if (error) {
               console.error("[FFmpeg Transcode Error]:", error, stderr);

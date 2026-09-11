@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!user && !isOwner) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { action = "create_or_sync", audienceName, phone, adAccountId, customAudiences } = body;
 
@@ -44,7 +51,7 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             name: cleanName,
             subtype: "CUSTOM",
-            description: "Dynamic WhatsApp Lead Audience created via What-In",
+            description: "Dynamic WhatsApp Lead Audience created via Whatmore",
             customer_file_source: "USER_PROVIDED_ONLY",
             access_token: accessToken
           })

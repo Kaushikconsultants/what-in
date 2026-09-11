@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isOwnerAuthenticated, getAuthenticatedUser } from "@/lib/authSession";
 
 export async function POST(req: NextRequest) {
   try {
+    const isOwner = isOwnerAuthenticated(req);
+    const user = await getAuthenticatedUser(req);
+
+    if (!isOwner && (!user || (user.role !== "ADMIN" && user.role !== "OWNER"))) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { phoneNumberId, pin, accessToken, wabaId } = await req.json();
 
     if (!phoneNumberId || !pin) {

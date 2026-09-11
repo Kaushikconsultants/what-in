@@ -17,7 +17,8 @@ export function middleware(req: NextRequest) {
   // ── Client/Agent portal auth ───────────────────────────────────────────────
   if (pathname.startsWith("/whatsapp")) {
     const sessionToken = req.cookies.get("wm_session")?.value;
-    if (!sessionToken || sessionToken !== SESSION_SECRET) {
+    const wmToken = req.cookies.get("wm_token")?.value;
+    if (!sessionToken && !wmToken) {
       const loginUrl = new URL("/login", req.url);
       loginUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(loginUrl);
@@ -27,7 +28,8 @@ export function middleware(req: NextRequest) {
   // ── Root redirect ──────────────────────────────────────────────────────────
   if (pathname === "/") {
     const sessionToken = req.cookies.get("wm_session")?.value;
-    if (sessionToken === SESSION_SECRET) {
+    const wmToken = req.cookies.get("wm_token")?.value;
+    if (sessionToken || wmToken) {
       return NextResponse.redirect(new URL("/whatsapp/dashboard", req.url));
     }
     return NextResponse.redirect(new URL("/login", req.url));

@@ -1,8 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!user && !isOwner) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const logs = await prisma.whatsAppChatbotLog.findMany({
       orderBy: { createdAt: 'desc' },
       take: 50

@@ -1,8 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isOwnerAuthenticated, getAuthenticatedUser } from "@/lib/authSession";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const isOwner = isOwnerAuthenticated(req);
+    const user = await getAuthenticatedUser(req);
+
+    if (!isOwner && (!user || (user.role !== "ADMIN" && user.role !== "OWNER"))) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
     const agents = await prisma.whatsAppAgentUser.findMany();
     let synced = 0;
 

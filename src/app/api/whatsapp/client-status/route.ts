@@ -1,25 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 export async function GET(req: NextRequest) {
   try {
     let clientId: string | undefined;
 
-    // Check cookie
-    const userCookie = req.cookies.get("wm_user")?.value;
-    if (userCookie) {
-      try {
-        const parsed = JSON.parse(decodeURIComponent(userCookie));
-        if (parsed?.clientId) clientId = parsed.clientId;
-        else if (parsed?.email) {
-          const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: parsed.email } });
-          if (agent?.clientId) clientId = agent.clientId;
-        }
-      } catch {}
-    }
+    const authUser = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
 
-    // Check query params fallback
-    if (!clientId) {
+    if (authUser?.clientId) {
+      clientId = authUser.clientId;
+    } else if (isOwner) {
       const urlClientId = req.nextUrl.searchParams.get("clientId");
       if (urlClientId) clientId = urlClientId;
     }

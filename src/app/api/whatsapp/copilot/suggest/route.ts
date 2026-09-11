@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 const prisma = new PrismaClient();
 const GROQ_API_KEY = process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY || '';
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!user && !isOwner) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { conversationId } = await req.json();
     if (!conversationId) return NextResponse.json({ error: "No conversationId provided" }, { status: 400 });
 

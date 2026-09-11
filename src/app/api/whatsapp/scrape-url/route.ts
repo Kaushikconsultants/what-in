@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import * as cheerio from 'cheerio';
-import { cookies } from 'next/headers';
+import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!isOwner && (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN" && user.role !== "MANAGER"))) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { url } = await req.json();
     if (!url) {
       return NextResponse.json({ success: false, error: 'No URL provided' }, { status: 400 });
@@ -24,52 +30,17 @@ export async function POST(req: NextRequest) {
 
     const newText = '\n\n--- Source: Web Scrape (' + url + ') ---\n' + extractedText.trim().slice(0, 10000);
 
-    // Resolve active client from cookies
-    const cookieStore = await cookies();
-    const wmUserCookie = cookieStore.get("wm_user")?.value || req.cookies.get("wm_user")?.value;
-    let clientId: string | null = null;
-    
-    if (wmUserCookie) {
-      try {
-        const parsed = JSON.parse(wmUserCookie);
-        if (parsed.clientId) {
-          clientId = parsed.clientId;
-        } else if (parsed.email) {
-          const client = await prisma.whatsAppClient.findFirst({
-            where: {
-              OR: [
-                { adminEmail: parsed.email },
-                { contactEmail: parsed.email },
-                { contactPhone: parsed.phone || parsed.email },
-                { ownerWhatsApp: parsed.phone || parsed.email }
-              ]
-            }
-          });
-          if (client) clientId = client.id;
-        }
-      } catch (_) {}
+    let settings = await prisma.whatsAppSettings.findFirst();
+    if (!settings) {
+      settings = await prisma.whatsAppSettings.create({ data: {} });
     }
 
-    let updatedKnowledgeBase = '';
+    const updatedKnowledgeBase = (settings.aiKnowledgeBase || '') + newText;
 
-    if (clientId) {
-      const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
-      updatedKnowledgeBase = (client?.aiKnowledgeBase || '') + newText;
-      await prisma.whatsAppClient.update({
-        where: { id: clientId },
-        data: { aiKnowledgeBase: updatedKnowledgeBase }
-      });
-    } else {
-      let settings = await prisma.whatsAppSettings.findFirst();
-      if (!settings) {
-        settings = await prisma.whatsAppSettings.create({ data: {} });
-      }
-      updatedKnowledgeBase = (settings.aiKnowledgeBase || '') + newText;
-      await prisma.whatsAppSettings.update({
-        where: { id: settings.id },
-        data: { aiKnowledgeBase: updatedKnowledgeBase }
-      });
-    }
+    await prisma.whatsAppSettings.update({
+      where: { id: settings.id },
+      data: { aiKnowledgeBase: updatedKnowledgeBase }
+    });
 
     return NextResponse.json({ success: true, textExtracted: extractedText.length, newKnowledgeBase: updatedKnowledgeBase });
   } catch (err: any) {
@@ -77,4 +48,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
-

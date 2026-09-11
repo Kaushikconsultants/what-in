@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const rawTags = await prisma.whatsAppTag.findMany({
       orderBy: { createdAt: 'desc' }
@@ -16,17 +17,15 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { name, color, role } = await req.json();
-
-    if (!name || name.trim() === '') {
-      return NextResponse.json({ success: false, error: "Tag name is required." }, { status: 400 });
-    }
-
-    if (role === 'AGENT') {
+    const authUser = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!isOwner && (!authUser || (authUser.role !== "ADMIN" && authUser.role !== "SUPER_ADMIN" && authUser.role !== "MANAGER"))) {
       return NextResponse.json({ success: false, error: "Only admins can create new tags." }, { status: 403 });
     }
+
+    const { name, color } = await req.json();
 
     // Check if tag already exists
     const existing = await prisma.whatsAppTag.findFirst({
