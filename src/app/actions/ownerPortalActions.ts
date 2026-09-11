@@ -1,6 +1,8 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+import { isOwnerAuthenticated, getAuthenticatedUser } from "@/lib/authSession";
 
 const OWNER_SECRET = process.env.OWNER_PORTAL_SECRET || "whatin-owner-2026";
 
@@ -10,6 +12,9 @@ export async function verifyOwnerPasswordAction(password: string) {
 
 export async function getOwnerDashboardStatsAction() {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const clients = await prisma.whatsAppClient.findMany({ include: { agents: true, payments: { orderBy: { createdAt: "desc" }, take: 1 } } });
     const total = clients.length;
     const active = clients.filter(c => c.subscriptionStatus === "ACTIVE").length;
@@ -25,6 +30,10 @@ export async function getOwnerDashboardStatsAction() {
 
 export async function getOwnerClientsAction() {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required", clients: [] };
+    }
+
     // Auto-heal / sync existing records if needed
     await prisma.whatsAppClient.updateMany({
       where: {
@@ -60,7 +69,6 @@ export async function getOwnerClientsAction() {
     return { success: false, error: e.message, clients: [] };
   }
 }
-
 
 // Auto-register webhook with Meta Graph API for a client
 async function registerMetaWebhook(wabaId: string, accessToken: string, webhookClientId: string): Promise<{ success: boolean; error?: string }> {
@@ -111,7 +119,12 @@ export async function createClientAction(data: {
   initialStatus?: string;
 }) {
   try {
-    const password = data.adminPassword?.trim() || "WhatIn@" + Math.floor(100000 + Math.random() * 900000);
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+
+    const rawPassword = data.adminPassword?.trim() || "WhatIn@" + Math.floor(100000 + Math.random() * 900000);
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const initialStatus = data.initialStatus || "ACTIVE";
     const now = new Date();
     const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -122,7 +135,7 @@ export async function createClientAction(data: {
         businessName: data.businessName,
         contactEmail: data.contactEmail,
         adminEmail: data.contactEmail,
-        adminPassword: password,
+        adminPassword: hashedPassword,
         contactPhone: data.contactPhone,
         subscriptionPlan: data.subscriptionPlan,
         monthlyFee: Number(data.monthlyFee) || 0,
@@ -144,13 +157,13 @@ export async function createClientAction(data: {
       }
     });
 
-    // Create the primary Admin user in whatsAppAgentUser so the client can immediately login at /login
+    // Create the primary Admin user in whatsAppAgentUser with bcrypt hashed password
     await prisma.whatsAppAgentUser.upsert({
       where: { email: data.contactEmail },
       update: {
         clientId: client.id,
         name: data.businessName + " Admin",
-        password: password,
+        password: hashedPassword,
         role: "ADMIN",
         isActive: true
       },
@@ -158,7 +171,7 @@ export async function createClientAction(data: {
         clientId: client.id,
         name: data.businessName + " Admin",
         email: data.contactEmail,
-        password: password,
+        password: hashedPassword,
         role: "ADMIN",
         isActive: true
       }
@@ -227,7 +240,7 @@ export async function createClientAction(data: {
         data: { webhookVerifyToken: verifyToken }
       });
     }
-    return { success: true, client, defaultPassword: password, webhookRegistration };
+    return { success: true, client, defaultPassword: rawPassword, webhookRegistration };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
@@ -235,10 +248,12 @@ export async function createClientAction(data: {
 
 export async function markClientPaidAction(clientId: string, notes?: string, extendMonths: number = 1) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
     if (!client) return { success: false, error: "Client not found" };
     const now = new Date();
-    // If client was already active with period in the future, extend from currentPeriodEnd, otherwise from now
     const baseDate = client.currentPeriodEnd && client.currentPeriodEnd > now ? client.currentPeriodEnd : now;
     const periodEnd = new Date(baseDate.getTime() + extendMonths * 30 * 24 * 60 * 60 * 1000);
 
@@ -273,6 +288,9 @@ export async function recordClientPaymentAction(data: {
   notes?: string;
 }) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const client = await prisma.whatsAppClient.findUnique({ where: { id: data.clientId } });
     if (!client) return { success: false, error: "Client not found" };
 
@@ -309,6 +327,9 @@ export async function recordClientPaymentAction(data: {
 
 export async function getClientPaymentsAction(clientId: string) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required", payments: [] };
+    }
     const client = await prisma.whatsAppClient.findUnique({
       where: { id: clientId },
       select: {
@@ -339,6 +360,9 @@ export async function getClientPaymentsAction(clientId: string) {
 
 export async function updateClientAdminPasswordAction(clientId: string, newPassword: string) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     if (!newPassword || newPassword.trim().length < 4) {
       return { success: false, error: "Password must be at least 4 characters" };
     }
@@ -346,16 +370,17 @@ export async function updateClientAdminPasswordAction(clientId: string, newPassw
     if (!client) return { success: false, error: "Client not found" };
 
     const cleanPass = newPassword.trim();
+    const hashedPassword = await bcrypt.hash(cleanPass, 10);
 
     await prisma.whatsAppClient.update({
       where: { id: clientId },
-      data: { adminPassword: cleanPass }
+      data: { adminPassword: hashedPassword }
     });
 
     // Also update in WhatsAppAgentUser if exists
     await prisma.whatsAppAgentUser.updateMany({
       where: { clientId, email: client.contactEmail },
-      data: { password: cleanPass }
+      data: { password: hashedPassword }
     });
 
     return { success: true };
@@ -366,6 +391,9 @@ export async function updateClientAdminPasswordAction(clientId: string, newPassw
 
 export async function updateClientDueDateAction(clientId: string, newDueDate: string | Date, newStatus?: string) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const client = await prisma.whatsAppClient.update({
       where: { id: clientId },
       data: {
@@ -395,19 +423,27 @@ export async function updateClientPlanAction(clientId: string, data: {
   shopifyToken?: string;
 }) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const { adminPassword, ...rest } = data;
+    let hashedPassword = "";
+    if (adminPassword && adminPassword.trim()) {
+      hashedPassword = await bcrypt.hash(adminPassword.trim(), 10);
+    }
+
     const client = await prisma.whatsAppClient.update({
       where: { id: clientId },
       data: {
         ...rest,
-        ...(adminPassword ? { adminPassword: adminPassword.trim() } : {})
+        ...(hashedPassword ? { adminPassword: hashedPassword } : {})
       }
     });
 
-    if (adminPassword && adminPassword.trim()) {
+    if (hashedPassword) {
       await prisma.whatsAppAgentUser.updateMany({
         where: { clientId, email: client.contactEmail },
-        data: { password: adminPassword.trim() }
+        data: { password: hashedPassword }
       });
     }
 
@@ -419,6 +455,9 @@ export async function updateClientPlanAction(clientId: string, data: {
 
 export async function toggleClientBlockAction(clientId: string, block: boolean) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const client = await prisma.whatsAppClient.update({
       where: { id: clientId },
       data: { subscriptionStatus: block ? "BLOCKED" : "ACTIVE", isActive: !block }
@@ -431,6 +470,9 @@ export async function toggleClientBlockAction(clientId: string, block: boolean) 
 
 export async function deleteClientAction(clientId: string) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     await prisma.whatsAppClient.delete({ where: { id: clientId } });
     return { success: true };
   } catch (e: any) {
@@ -440,10 +482,23 @@ export async function deleteClientAction(clientId: string) {
 
 export async function addAgentToClientAction(clientId: string, data: { name: string; email: string; password: string; role: string }) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId }, include: { agents: true } });
     if (!client) return { success: false, error: "Client not found" };
     if (client.agents.length >= client.maxAgents) return { success: false, error: `Seat limit reached. Max ${client.maxAgents} agents allowed.` };
-    const agent = await prisma.whatsAppAgentUser.create({ data: { clientId, ...data } });
+    
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const agent = await prisma.whatsAppAgentUser.create({
+      data: {
+        clientId,
+        name: data.name,
+        email: data.email,
+        password: hashedPassword,
+        role: data.role
+      }
+    });
     return { success: true, agent };
   } catch (e: any) {
     return { success: false, error: e.message };
@@ -467,6 +522,9 @@ export async function getClientStatusAction(clientId: string) {
 // Auto-update past-due statuses (call periodically or on page load)
 export async function syncSubscriptionStatusesAction() {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const now = new Date();
     const overdueClients = await prisma.whatsAppClient.findMany({
       where: { subscriptionStatus: "ACTIVE", currentPeriodEnd: { lt: now } }
@@ -484,8 +542,16 @@ export async function syncSubscriptionStatusesAction() {
 
 export async function getClientMetaCredentialsAction(clientId?: string) {
   try {
-    const client = clientId
-      ? await prisma.whatsAppClient.findUnique({ where: { id: clientId } })
+    const isOwner = await isOwnerAuthenticated();
+    const authUser = await getAuthenticatedUser();
+    if (!isOwner && !authUser) {
+      return { success: false, error: "Unauthorized access" };
+    }
+
+    const effectiveClientId = (!isOwner && authUser?.clientId) ? authUser.clientId : clientId;
+
+    const client = effectiveClientId
+      ? await prisma.whatsAppClient.findUnique({ where: { id: effectiveClientId } })
       : await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" } });
     if (!client) return { success: false, error: "No client found" };
     return {
@@ -517,10 +583,17 @@ export async function saveClientMetaCredentialsAction(data: {
   clientId?: string;
 }) {
   try {
+    const isOwner = await isOwnerAuthenticated();
+    const authUser = await getAuthenticatedUser();
+    if (!isOwner && (!authUser || (authUser.role !== "ADMIN" && authUser.role !== "OWNER"))) {
+      return { success: false, error: "Unauthorized access" };
+    }
+
+    const effectiveClientId = (!isOwner && authUser?.clientId) ? authUser.clientId : data.clientId;
     const { clientId, ...rest } = data;
     let client: any;
-    if (clientId) {
-      client = await prisma.whatsAppClient.update({ where: { id: clientId }, data: rest });
+    if (effectiveClientId) {
+      client = await prisma.whatsAppClient.update({ where: { id: effectiveClientId }, data: rest });
     } else {
       client = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" } });
       if (!client) return { success: false, error: "No client configured yet. Contact your service provider." };
@@ -534,6 +607,9 @@ export async function saveClientMetaCredentialsAction(data: {
 
 export async function registerWebhookForClientAction(clientId: string) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
     if (!client) return { success: false, error: "Client not found" };
     if (!client.wabaId || !client.metaAccessToken) return { success: false, error: "Client is missing WABA ID or Access Token. Update them first." };
@@ -558,6 +634,9 @@ export async function registerWebhookForClientAction(clientId: string) {
 
 export async function setCustomWebhookUrlAction(clientId: string, customWebhookUrl: string) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const client = await prisma.whatsAppClient.update({
       where: { id: clientId },
       data: { customWebhookUrl: customWebhookUrl || null }
@@ -570,6 +649,9 @@ export async function setCustomWebhookUrlAction(clientId: string, customWebhookU
 
 export async function loginAsClientAction(clientId: string) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
     if (!client) return { success: false, error: "Client not found" };
     const adminAgent = await prisma.whatsAppAgentUser.findFirst({
@@ -595,7 +677,14 @@ export async function loginAsClientAction(clientId: string) {
 // -------------------------------------------------------------
 export async function checkClientMetaHealthAction(clientId: string) {
   try {
-    const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+    const isOwner = await isOwnerAuthenticated();
+    const authUser = await getAuthenticatedUser();
+    if (!isOwner && !authUser) {
+      return { success: false, error: "Unauthorized access" };
+    }
+
+    const effectiveClientId = (!isOwner && authUser?.clientId) ? authUser.clientId : clientId;
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: effectiveClientId } });
     if (!client) return { success: false, error: "Client not found" };
 
     if (!client.metaAccessToken || !client.phoneId) {
@@ -674,6 +763,9 @@ export async function updateClientQuotasAction(clientId: string, data: {
   resetCounts?: boolean;
 }) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const updateData: any = {};
     if (data.monthlyMessageQuota !== undefined) updateData.monthlyMessageQuota = Number(data.monthlyMessageQuota);
     if (data.monthlyAiQuota !== undefined) updateData.monthlyAiQuota = Number(data.monthlyAiQuota);
@@ -697,6 +789,9 @@ export async function updateClientQuotasAction(clientId: string, data: {
 // -------------------------------------------------------------
 export async function getAnnouncementsAction() {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required", announcements: [] };
+    }
     const announcements = await prisma.whatsAppAnnouncement.findMany({
       orderBy: { createdAt: "desc" }
     });
@@ -726,6 +821,9 @@ export async function createAnnouncementAction(data: {
   expiresAt?: string;
 }) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const announcement = await prisma.whatsAppAnnouncement.create({
       data: {
         title: data.title.trim(),
@@ -744,6 +842,9 @@ export async function createAnnouncementAction(data: {
 
 export async function toggleAnnouncementAction(id: string, isActive: boolean) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     const announcement = await prisma.whatsAppAnnouncement.update({
       where: { id },
       data: { isActive }
@@ -756,6 +857,9 @@ export async function toggleAnnouncementAction(id: string, isActive: boolean) {
 
 export async function deleteAnnouncementAction(id: string) {
   try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
     await prisma.whatsAppAnnouncement.delete({ where: { id } });
     return { success: true };
   } catch (e: any) {
@@ -768,21 +872,31 @@ export async function deleteAnnouncementAction(id: string) {
 // -------------------------------------------------------------
 export async function changeUserPasswordAction(email: string, newPassword: string) {
   try {
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await getAuthenticatedUser();
+    const isOwner = await isOwnerAuthenticated();
+
+    // Verify caller is either changing their own password or is an authenticated owner
+    if (!isOwner && (!user || user.email.toLowerCase() !== cleanEmail)) {
+      return { success: false, error: "Unauthorized: You can only change your own password" };
+    }
+
     if (!newPassword || newPassword.trim().length < 4) {
       return { success: false, error: "Password must be at least 4 characters long" };
     }
 
     const cleanPass = newPassword.trim();
-    const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email } });
+    const hashedPassword = await bcrypt.hash(cleanPass, 10);
 
+    const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: cleanEmail } });
     if (!agent) {
       return { success: false, error: "User account not found" };
     }
 
     await prisma.whatsAppAgentUser.update({
-      where: { email },
+      where: { email: cleanEmail },
       data: {
-        password: cleanPass,
+        password: hashedPassword,
         mustChangePassword: false
       }
     });
@@ -791,7 +905,7 @@ export async function changeUserPasswordAction(email: string, newPassword: strin
     if (agent.role === "ADMIN" && agent.clientId) {
       await prisma.whatsAppClient.update({
         where: { id: agent.clientId },
-        data: { adminPassword: cleanPass }
+        data: { adminPassword: hashedPassword }
       });
     }
 
@@ -800,5 +914,3 @@ export async function changeUserPasswordAction(email: string, newPassword: strin
     return { success: false, error: e.message };
   }
 }
-
-

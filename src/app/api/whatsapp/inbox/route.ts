@@ -9,6 +9,12 @@ async function getAccount() {
 
 // --- GET --------------------------------------------------------------------
 export async function GET(req: NextRequest) {
+  const authUser = await getAuthenticatedUser(req);
+  const isOwner = isOwnerAuthenticated(req);
+  if (!authUser && !isOwner) {
+    return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const action = searchParams.get("action") || "chats";
 
@@ -28,8 +34,6 @@ export async function GET(req: NextRequest) {
         }
       }).catch(err => console.error("[Auto-Delete Media Old 30 Days Error]:", err));
 
-      const authUser = await getAuthenticatedUser(req);
-      const isOwner = isOwnerAuthenticated(req);
       const userRole = authUser?.role || "SALES";
       const userEmail = authUser?.email || "";
       const isAdmin = isOwner || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'MANAGER';

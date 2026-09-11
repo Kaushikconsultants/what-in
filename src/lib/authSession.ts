@@ -62,11 +62,15 @@ export function verifySessionToken(token: string | undefined | null): SessionUse
 /**
  * Validates whether the request comes from an authenticated Owner/Super-Admin
  */
-export function isOwnerAuthenticated(req?: NextRequest): boolean {
+export async function isOwnerAuthenticated(req?: NextRequest): Promise<boolean> {
   try {
-    const token = req
+    let token = req
       ? req.cookies.get("owner_token")?.value
       : undefined;
+    if (!token) {
+      const cookieStore = await cookies();
+      token = cookieStore.get("owner_token")?.value;
+    }
     if (!token) return false;
     return token === OWNER_SECRET;
   } catch {

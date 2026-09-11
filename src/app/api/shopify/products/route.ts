@@ -1,11 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const isOwner = isOwnerAuthenticated(req);
+    const user = await getAuthenticatedUser(req);
+    if (!isOwner && !user) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     // 1. Get company settings for shopify store domain
     const settings = await prisma.companySettings.findFirst();
-    const domain = settings?.shopifyStoreDomain || "what-in.tinkal.in";
+    const domain = settings?.shopifyStoreDomain || "esponsports.com";
 
     // 2. Fetch products from database
     let products = await prisma.product.findMany({

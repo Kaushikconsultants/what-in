@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser } from "@/lib/authSession";
 
 export async function POST(req: NextRequest) {
   try {
-    const userCookie = req.cookies.get("wm_user")?.value;
-    if (!userCookie) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authUser = await getAuthenticatedUser(req);
+    if (!authUser || !authUser.email) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
 
-    const userData = JSON.parse(userCookie);
-    const userEmail = userData.email;
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const userEmail = authUser.email;
 
     const { endpoint, p256dh, auth } = await req.json();
 

@@ -4,6 +4,12 @@ import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
 
 export async function GET(req: NextRequest) {
   try {
+    const authUser = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!authUser && !isOwner) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     const rawTags = await prisma.whatsAppTag.findMany({
       orderBy: { createdAt: 'desc' }
     });
@@ -49,8 +55,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function PUT(req: Request) {
+export async function PUT(req: NextRequest) {
   try {
+    const authUser = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!authUser && !isOwner) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { conversationId, tagName, action } = await req.json();
 
     if (!conversationId || !tagName || !action) {

@@ -13,6 +13,12 @@ export async function GET(
       return NextResponse.json({ error: "Missing image id" }, { status: 400 });
     }
 
+    // Strict path traversal prevention: ensure id only contains alphanumeric and safe filename characters
+    const cleanId = path.basename(id).replace(/[^a-zA-Z0-9_.-]/g, '');
+    if (!cleanId || cleanId !== id) {
+      return NextResponse.json({ error: "Invalid image id format" }, { status: 400 });
+    }
+
     // Check PostgreSQL database first
     const rows: any[] = await prisma.$queryRawUnsafe(
       `SELECT "data", "mimeType", "size" FROM "ProductUploadedImage" WHERE "id" = $1 LIMIT 1;`,

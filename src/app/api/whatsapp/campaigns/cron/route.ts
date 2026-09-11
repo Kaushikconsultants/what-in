@@ -9,11 +9,13 @@ export async function GET(req: NextRequest) {
   try {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers.get("authorization");
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    const isCronBearerValid = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    
+    if (!isCronBearerValid) {
       const isOwner = isOwnerAuthenticated(req);
       const user = await getAuthenticatedUser(req);
       if (!isOwner && !user) {
-        return NextResponse.json({ error: "Unauthorized cron execution" }, { status: 401 });
+        return NextResponse.json({ error: "Unauthorized cron execution. Valid CRON_SECRET or authenticated session required." }, { status: 401 });
       }
     }
     const now = new Date();

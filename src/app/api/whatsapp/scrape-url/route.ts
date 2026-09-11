@@ -12,11 +12,39 @@ export async function POST(req: NextRequest) {
     }
 
     const { url } = await req.json();
-    if (!url) {
+    if (!url || typeof url !== 'string') {
       return NextResponse.json({ success: false, error: 'No URL provided' }, { status: 400 });
     }
 
-    const response = await fetch(url);
+    // SSRF Protection: Ensure URL is public HTTP/HTTPS and not private/internal/cloud metadata
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return NextResponse.json({ success: false, error: 'Invalid protocol. Only HTTP/HTTPS URLs allowed.' }, { status: 400 });
+      }
+      const host = parsed.hostname.toLowerCase();
+      if (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host === '0.0.0.0' ||
+        host === '::1' ||
+        host.startsWith('10.') ||
+        host.startsWith('192.168.') ||
+        host.startsWith('169.254.') ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+        host.endsWith('.local') ||
+        host.endsWith('.internal')
+      ) {
+        return NextResponse.json({ success: false, error: 'Access to internal network addresses is restricted.' }, { status: 403 });
+      }
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid URL format.' }, { status: 400 });
+    }
+
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) WhatmoreBot/1.0' },
+      signal: AbortSignal.timeout(10000)
+    });
     const html = await response.text();
     const ch = cheerio.load(html);
 

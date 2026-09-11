@@ -1,52 +1,40 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { GoogleGenAI } from '@google/genai';
+import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const isOwner = isOwnerAuthenticated(req);
+    const user = await getAuthenticatedUser(req);
+    if (!isOwner && !user) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { conversationId, customPrompt } = await req.json();
 
     if (!conversationId) {
       return NextResponse.json({ error: "Missing conversationId" }, { status: 400 });
     }
 
-    // 1. Fetch active client & global fallback
-    let client: any = null;
-    let userCookie: string | undefined;
-    try {
-      const cookieHeader = req.headers.get('cookie');
-      if (cookieHeader) {
-        const u = cookieHeader.split(';').find(c => c.trim().startsWith('wm_user='));
-        if (u) {
-          const parsed = JSON.parse(decodeURIComponent(u.split('=')[1]));
-          if (parsed?.clientId) {
-            client = await prisma.whatsAppClient.findUnique({ where: { id: parsed.clientId } });
-          }
-        }
-      }
-    } catch {}
-
-    if (!client) {
-      client = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: 'desc' } });
-    }
-
+    // 1. Fetch settings & company profile
     const [settings, company, account] = await Promise.all([
       prisma.whatsAppSettings.findFirst().catch(() => null),
       prisma.companySettings.findFirst().catch(() => null),
       prisma.whatsAppAccount.findFirst().catch(() => null)
     ]);
 
-    const brandName = client?.businessName || company?.companyName || account?.name || "Business";
-    const brandDomain = client?.shopifyDomain 
-      ? client.shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '') 
-      : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : "what-in.tinkal.in");
-    const brandPhone = client?.phoneNumber || company?.mobile || account?.phoneNumber || "";
-    const brandEmail = client?.contactEmail || company?.email || "";
+    const brandName = company?.companyName || account?.name || "Espon Clothing";
+    const brandDomain = company?.shopifyStoreDomain 
+      ? company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '') 
+      : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : "www.espon.in");
+    const brandPhone = company?.mobile || account?.phoneNumber || "+91 7206066678";
+    const brandEmail = company?.email || `clothingespon@gmail.com`;
 
-    const aiKnowledgeBase = client?.aiKnowledgeBase || settings?.aiKnowledgeBase || "";
-    const aiSystemPrompt = client?.aiSystemPrompt || settings?.aiSystemPrompt || "You are a helpful customer service assistant for our business.";
+    const aiKnowledgeBase = settings?.aiKnowledgeBase || "";
+    const aiSystemPrompt = settings?.aiSystemPrompt || "You are a helpful customer service assistant for our business.";
     const fallbackLanguage = settings?.aiFallbackLanguage || "English";
-    const aiModel = client?.aiModel || settings?.aiModel || "gemini-3.8-flash";
+    const aiModel = settings?.aiModel || "gemini-2.0-flash"; // gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro, gemini-2.5-flash
 
     // 2. Fetch the conversation and its messages
     const conversation = await prisma.whatsAppConversation.findUnique({
@@ -81,7 +69,7 @@ Brand Identity & Contact Details:
 - Support Email: ${brandEmail}
 
 Knowledge Base (Company Information & FAQs):
-${aiKnowledgeBase || "We offer premium services with quick delivery and dedicated support."}
+${aiKnowledgeBase || "We offer premium apparel with quick delivery and easy exchanges."}
 
 Rules:
 - Start the conversation in ${fallbackLanguage}. If the customer speaks another language (like Hindi/Hinglish), smoothly adapt and respond in their language.
@@ -98,9 +86,9 @@ Rules:
     fullPrompt += `\n--- Chat History ---\n${chatHistory}\n\nAgent (Your suggested reply):`;
 
     // 5. Call Gemini API
-    const apiKey = client?.geminiApiKey?.trim() || settings?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || settings?.geminiApiKey;
     if (!apiKey) {
-      return NextResponse.json({ error: "Gemini API Key is not configured for this account." }, { status: 500 });
+      return NextResponse.json({ error: "Gemini API Key is not configured." }, { status: 500 });
     }
 
     const { callGeminiRest, GEMINI_MODEL_CASCADE } = await import('@/lib/whatsappAI');

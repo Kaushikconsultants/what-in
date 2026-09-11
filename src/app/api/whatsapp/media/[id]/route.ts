@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await getAuthenticatedUser(req);
+    const isOwner = await isOwnerAuthenticated(req);
+    if (!user && !isOwner) {
+      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    }
+
     const { id: mediaId } = await params;
-    if (!mediaId) return NextResponse.json({ error: "Missing media ID" }, { status: 400 });
+    if (!mediaId || !/^\d+$/.test(mediaId.trim())) {
+      return NextResponse.json({ error: "Invalid or missing numeric media ID" }, { status: 400 });
+    }
 
     const account = await prisma.whatsAppAccount.findFirst();
     const token = account?.accessToken;

@@ -55,6 +55,7 @@ export async function getMetaApiCredentials() {
 import { getServerSession } from "next-auth";
 import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/authSession";
 
 export interface ConversationFilterOptions {
   search?: string;
@@ -83,13 +84,13 @@ export async function getWhatsAppConversations(filters: ConversationFilterOption
       userEmail = session.user.email;
       userId = (session.user as any).id;
     } else {
-      // B. Fallback to custom cookie-based session (app uses wm_user cookie)
+      // B. Authenticate via secure HMAC-SHA256 signed session
       try {
-        const userCookie = (await cookies()).get("wm_user")?.value;
-        if (userCookie) {
-          const parsed = JSON.parse(userCookie);
-          userRole = parsed.role || 'SALES';
-          userEmail = parsed.email;
+        const authUser = await getAuthenticatedUser();
+        if (authUser) {
+          userRole = authUser.role || 'SALES';
+          userEmail = authUser.email;
+          userId = authUser.id;
         }
       } catch (_) {}
     }
@@ -7068,26 +7069,29 @@ export async function getAllAgentsAction() {
 }
 
 export async function syncSessionRoleAction() {
-  const cookieStore = await cookies();
-  const userCookie = cookieStore.get("wm_user");
-  if (!userCookie?.value) return null;
-  
   try {
-    const parsed = JSON.parse(decodeURIComponent(userCookie.value));
-    if (!parsed.email) return null;
+    const authUser = await getAuthenticatedUser();
+    if (!authUser?.email) return null;
     
     let dbRole = null;
-    const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: parsed.email } });
+    const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: authUser.email } });
     if (agent) dbRole = agent.role;
     else {
-      const user = await prisma.user.findUnique({ where: { email: parsed.email } });
+      const user = await prisma.user.findUnique({ where: { email: authUser.email } });
       if (user) dbRole = user.role;
     }
     
-    if (dbRole && dbRole !== parsed.role) {
-       parsed.role = dbRole;
-       cookieStore.set("wm_user", JSON.stringify(parsed), { httpOnly: false, secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 7, path: "/", sameSite: "lax" });
-       return dbRole;
+    if (dbRole && dbRole !== authUser.role) {
+      const cookieStore = await cookies();
+      const userCookie = cookieStore.get("wm_user");
+      if (userCookie?.value) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(userCookie.value));
+          parsed.role = dbRole;
+          cookieStore.set("wm_user", JSON.stringify(parsed), { httpOnly: false, secure: process.env.NODE_ENV === "production", maxAge: 60 * 60 * 24 * 7, path: "/", sameSite: "lax" });
+        } catch (_) {}
+      }
+      return dbRole;
     }
     
     return null;

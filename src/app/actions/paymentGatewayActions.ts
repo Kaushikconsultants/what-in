@@ -1,57 +1,34 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { cookies } from 'next/headers';
-
-async function getSessionClient() {
-  try {
-    const cookieStore = await cookies();
-    const userCookie = cookieStore.get('wm_user')?.value;
-    if (userCookie) {
-      const parsed = JSON.parse(decodeURIComponent(userCookie));
-      if (parsed?.clientId) {
-        const client = await prisma.whatsAppClient.findUnique({ where: { id: parsed.clientId } });
-        if (client) return client;
-      }
-      if (parsed?.email) {
-        const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: parsed.email } });
-        if (agent?.clientId) {
-          const client = await prisma.whatsAppClient.findUnique({ where: { id: agent.clientId } });
-          if (client) return client;
-        }
-        const clientByEmail = await prisma.whatsAppClient.findFirst({
-          where: { OR: [{ contactEmail: parsed.email }, { adminEmail: parsed.email }, { contactPhone: parsed.phone || parsed.email }] }
-        });
-        if (clientByEmail) return clientByEmail;
-      }
-    }
-  } catch {}
-  return null;
-}
+import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
 
 export async function getPaymentGatewaySettings() {
-  const client = await getSessionClient();
-  if (client) {
+  const user = await getAuthenticatedUser();
+  const isOwner = await isOwnerAuthenticated();
+
+  if (!isOwner && (!user || (user.role !== 'ADMIN' && user.role !== 'OWNER' && user.role !== 'SUPER_ADMIN'))) {
     return {
-      activeGateway: client.activeGateway || null,
-      razorpayKeyId: client.razorpayKeyId || '',
-      razorpayKeySecret: client.razorpayKeySecret || '',
-      cashfreeAppId: client.cashfreeAppId || '',
-      cashfreeSecretKey: client.cashfreeSecretKey || '',
-      merchantUpiId: client.merchantUpiId || '',
-      merchantUpiName: client.merchantUpiName || client.businessName || '',
+      activeGateway: null,
+      razorpayKeyId: '',
+      razorpayKeySecret: '',
+      cashfreeAppId: '',
+      cashfreeSecretKey: '',
+      merchantUpiId: '',
+      merchantUpiName: '',
+      error: "Unauthorized"
     };
   }
 
-  const globalSettings = await prisma.whatsAppSettings.findFirst().catch(() => null);
+  const settings = await prisma.whatsAppSettings.findFirst();
   return {
-    activeGateway: globalSettings?.activeGateway || null,
-    razorpayKeyId: globalSettings?.razorpayKeyId || '',
-    razorpayKeySecret: globalSettings?.razorpayKeySecret || '',
-    cashfreeAppId: globalSettings?.cashfreeAppId || '',
-    cashfreeSecretKey: globalSettings?.cashfreeSecretKey || '',
-    merchantUpiId: globalSettings?.merchantUpiId || '',
-    merchantUpiName: globalSettings?.merchantUpiName || '',
+    activeGateway: settings?.activeGateway || null,
+    razorpayKeyId: settings?.razorpayKeyId || '',
+    razorpayKeySecret: settings?.razorpayKeySecret || '',
+    cashfreeAppId: settings?.cashfreeAppId || '',
+    cashfreeSecretKey: settings?.cashfreeSecretKey || '',
+    merchantUpiId: settings?.merchantUpiId || '',
+    merchantUpiName: settings?.merchantUpiName || '',
   };
 }
 
@@ -64,24 +41,13 @@ export async function savePaymentGatewaySettings(data: {
   merchantUpiId?: string;
   merchantUpiName?: string;
 }) {
-  const client = await getSessionClient();
-  if (client) {
-    await prisma.whatsAppClient.update({
-      where: { id: client.id },
-      data: {
-        activeGateway: data.activeGateway,
-        razorpayKeyId: data.razorpayKeyId,
-        razorpayKeySecret: data.razorpayKeySecret,
-        cashfreeAppId: data.cashfreeAppId,
-        cashfreeSecretKey: data.cashfreeSecretKey,
-        merchantUpiId: data.merchantUpiId,
-        merchantUpiName: data.merchantUpiName,
-      },
-    });
-    return { success: true };
+  const user = await getAuthenticatedUser();
+  const isOwner = await isOwnerAuthenticated();
+
+  if (!isOwner && (!user || (user.role !== 'ADMIN' && user.role !== 'OWNER' && user.role !== 'SUPER_ADMIN'))) {
+    return { success: false, error: "Unauthorized: Admin privileges required to update payment gateways" };
   }
 
-  // Only update global settings if super-admin/no client session
   const existing = await prisma.whatsAppSettings.findFirst();
   if (existing) {
     await prisma.whatsAppSettings.update({
@@ -110,4 +76,19 @@ export async function savePaymentGatewaySettings(data: {
     });
   }
   return { success: true };
+}
+
+/** Helper used by flow engine internally to get active gateway creds */
+export async function getActiveGateway() {
+  const settings = await prisma.whatsAppSettings.findFirst();
+  if (!settings?.activeGateway) return null;
+  return {
+    gateway: settings.activeGateway,
+    razorpayKeyId: settings.razorpayKeyId,
+    razorpayKeySecret: settings.razorpayKeySecret,
+    cashfreeAppId: settings.cashfreeAppId,
+    cashfreeSecretKey: settings.cashfreeSecretKey,
+    merchantUpiId: settings.merchantUpiId,
+    merchantUpiName: settings.merchantUpiName,
+  };
 }

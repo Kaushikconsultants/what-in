@@ -6,7 +6,22 @@ import { assignWhatsAppLeadAction } from "@/app/actions/whatsAppPlatformActions"
 import { formatWhatsAppPhone } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 
-const PROCESSED_WEBHOOK_IDS = new Set<string>();
+const MAX_DEDUP_SIZE = 2000;
+const dedupQueue: string[] = [];
+const dedupSet = new Set<string>();
+
+function isDuplicateMessageId(msgId: string): boolean {
+  if (!msgId) return false;
+  if (dedupSet.has(msgId)) return true;
+  
+  if (dedupQueue.length >= MAX_DEDUP_SIZE) {
+    const oldest = dedupQueue.shift();
+    if (oldest) dedupSet.delete(oldest);
+  }
+  dedupQueue.push(msgId);
+  dedupSet.add(msgId);
+  return false;
+}
 
 // GET Endpoint - Webhook Verification Challenge from Meta WhatsApp API (Global)
 export async function GET(req: NextRequest) {
@@ -231,12 +246,8 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
     const msg = value.messages[0];
 
     // Deduplication Check
-    if (msg.id && PROCESSED_WEBHOOK_IDS.has(msg.id)) {
+    if (msg.id && isDuplicateMessageId(msg.id)) {
       return { status: "ignored - duplicate" };
-    }
-    if (msg.id) {
-      PROCESSED_WEBHOOK_IDS.add(msg.id);
-      if (PROCESSED_WEBHOOK_IDS.size > 1000) PROCESSED_WEBHOOK_IDS.clear();
     }
 
     const fromPhone = msg.from;

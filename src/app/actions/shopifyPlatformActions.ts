@@ -3,6 +3,17 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { sendWhatsAppMessageAction } from "./whatsAppPlatformActions";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
+
+// Helper to check authentication
+async function requireAuth() {
+  const isOwner = await isOwnerAuthenticated();
+  const user = await getAuthenticatedUser();
+  if (!isOwner && !user) {
+    throw new Error("Unauthorized access. Please log in.");
+  }
+  return { isOwner, user };
+}
 
 // Helper to get Shopify credentials from DB or Environment
 async function getShopifyCredentials(clientId?: string) {
@@ -35,6 +46,7 @@ async function getShopifyCredentials(clientId?: string) {
 // ---------------------------------------------------------
 export async function getShopifySummaryMetricsAction() {
   try {
+    await requireAuth();
     const { domain, token } = await getShopifyCredentials();
     const isConfigured = Boolean(domain && token && token.length > 10);
 
@@ -88,6 +100,7 @@ export async function getShopifyOrdersAction(params?: {
   search?: string;
 }) {
   try {
+    await requireAuth();
     const { domain, token } = await getShopifyCredentials();
     if (!domain || !token) {
       return { success: false, error: "Shopify store credentials not configured in Settings." };
@@ -197,6 +210,7 @@ export async function getShopifyOrdersAction(params?: {
 // ---------------------------------------------------------
 export async function getShopifyAbandonedCheckoutsAction(params?: { limit?: number }) {
   try {
+    await requireAuth();
     const { domain, token } = await getShopifyCredentials();
     if (!domain || !token) {
       return { success: false, error: "Shopify credentials not configured." };
@@ -326,6 +340,7 @@ export async function sendShopifyWhatsAppNudgeAction(data: {
   discountCode?: string;
 }) {
   try {
+    await requireAuth();
     const rawPhone = data.phone.replace(/\D/g, '');
     const cleanPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
 
@@ -437,6 +452,7 @@ export async function sendShopifyOrderWhatsAppAction(data: {
   discountPercentage?: number;
 }) {
   try {
+    await requireAuth();
     const rawPhone = data.phone.replace(/\D/g, '');
     const cleanPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
 
@@ -627,6 +643,7 @@ const DEFAULT_PREGENERATED_FLOWS = [
 
 export async function getShopifyAutomationFlowsAction() {
   try {
+    await requireAuth();
     // Ensure all default flows are initialized in database
     for (const def of DEFAULT_PREGENERATED_FLOWS) {
       const existing = await prisma.shopifyAutomationFlow.findUnique({
@@ -651,6 +668,7 @@ export async function getShopifyAutomationFlowsAction() {
 
 export async function toggleShopifyAutomationFlowAction(flowId: string, isActive: boolean) {
   try {
+    await requireAuth();
     const updated = await prisma.shopifyAutomationFlow.update({
       where: { id: flowId },
       data: { isActive }
@@ -670,6 +688,7 @@ export async function updateShopifyAutomationFlowAction(flowId: string, data: {
   templateName?: string;
 }) {
   try {
+    await requireAuth();
     const updated = await prisma.shopifyAutomationFlow.update({
       where: { id: flowId },
       data
@@ -686,6 +705,7 @@ export async function updateShopifyAutomationFlowAction(flowId: string, data: {
 // ---------------------------------------------------------
 export async function registerShopifyWebhooksAction() {
   try {
+    await requireAuth();
     const { domain, token } = await getShopifyCredentials();
     if (!domain || !token) {
       return { success: false, error: "Shopify credentials not found." };
