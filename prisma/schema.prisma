@@ -1363,6 +1363,13 @@ model WhatsAppConversation {
   followUpDueAt      DateTime?
   slaStatus          String   @default("GREEN") // GREEN, ORANGE, RED
 
+  // CSAT & Response Speed Metrics
+  firstResponseTimeSec Int?
+  resolutionTimeSec    Int?
+  csatScore            Int?      // 1 to 5
+  csatFeedback         String?
+  csatSubmittedAt      DateTime?
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -2056,6 +2063,20 @@ model WhatsAppClient {
   aiLogs             WhatsAppAILog[]
   abandonedCheckouts ShopifyAbandonedCheckout[]
   shopifyFlows       ShopifyAutomationFlow[]
+  auditLogs          WhatsAppAuditLog[]
+}
+
+model WhatsAppAuditLog {
+  id             String          @id @default(uuid())
+  clientId       String?
+  client         WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  actorEmail     String
+  actorName      String
+  actorRole      String          @default("AGENT") // AGENT, MANAGER, ADMIN, OWNER
+  actionType     String          // LOGIN, EXPORT_CONTACTS, SETTINGS_UPDATE, AGENT_CREATED, AGENT_ROLE_CHANGE, FLOW_SAVED, CONVERSATION_CLOSED, CSAT_RECORDED, BROADCAST_SENT, DELETE_ACTION
+  detailsJson    String?
+  ipAddress      String?
+  createdAt      DateTime        @default(now())
 }
 
 model WhatsAppClientPayment {

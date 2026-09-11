@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, GitBranch, Play, Square, Activity, Search, Trash2, Edit3, Save, Check, X, Pencil } from 'lucide-react';
-import { getWhatsAppChatbotFlows, toggleWhatsAppChatbotFlowStatusAction, deleteWhatsAppChatbotFlowAction, getWhatsAppChatbotLogsAction, renameWhatsAppChatbotFlowAction } from '@/app/actions/whatsAppPlatformActions';
+import { Bot, GitBranch, Play, Square, Activity, Search, Trash2, Edit3, Save, Check, X, Pencil, Sparkles, Download, Layers, ShieldCheck, ArrowRight, BookOpen, Stethoscope, GraduationCap, Building2, Car, Utensils, Briefcase, ShoppingCart, Wrench } from 'lucide-react';
+import { getWhatsAppChatbotFlows, toggleWhatsAppChatbotFlowStatusAction, deleteWhatsAppChatbotFlowAction, getWhatsAppChatbotLogsAction, renameWhatsAppChatbotFlowAction, installIndustryChatbotPresetAction } from '@/app/actions/whatsAppPlatformActions';
+import { INDUSTRY_CHATBOT_PRESETS, IndustryChatbotPreset } from '@/lib/industryChatbotPresets';
 
 export default function WhatsAppChatbotsComponent() {
   const router = useRouter();
@@ -15,8 +16,13 @@ export default function WhatsAppChatbotsComponent() {
   const [editingName, setEditingName] = useState<string>('');
   const [isSavingName, setIsSavingName] = useState<boolean>(false);
 
+  // Tabs state: bots, templates, logs
+  const [activeTab, setActiveTab] = useState<'bots' | 'templates' | 'logs'>('bots');
+  const [selectedIndustryFilter, setSelectedIndustryFilter] = useState<string>('ALL');
+  const [previewPreset, setPreviewPreset] = useState<IndustryChatbotPreset | null>(null);
+  const [installingPresetId, setInstallingPresetId] = useState<string | null>(null);
+
   // Logs state
-  const [activeTab, setActiveTab] = useState<'bots' | 'logs'>('bots');
   const [searchPhone, setSearchPhone] = useState('');
   const [logs, setLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -34,6 +40,17 @@ export default function WhatsAppChatbotsComponent() {
       setFlows(res.flows);
     }
     setLoading(false);
+  };
+
+  const handleInstallPreset = async (presetId: string) => {
+    setInstallingPresetId(presetId);
+    const res = await installIndustryChatbotPresetAction(presetId);
+    if (res.success && res.flow) {
+      router.push(`/whatsapp/chatbot-builder?flowId=${res.flow.id}`);
+    } else {
+      alert(`Failed to install preset: ${res.error || 'Unknown error'}`);
+      setInstallingPresetId(null);
+    }
   };
 
   const handleStartRename = (flow: any) => {
@@ -86,6 +103,24 @@ export default function WhatsAppChatbotsComponent() {
     setLoadingLogs(false);
   };
 
+  const filteredPresets = selectedIndustryFilter === 'ALL'
+    ? INDUSTRY_CHATBOT_PRESETS
+    : INDUSTRY_CHATBOT_PRESETS.filter(p => p.industry.toLowerCase().includes(selectedIndustryFilter.toLowerCase()) || p.category.toLowerCase().includes(selectedIndustryFilter.toLowerCase()));
+
+  const getPresetIcon = (id: string) => {
+    switch (id) {
+      case 'healthcare-clinic-booking': return <Stethoscope size={20} className="text-rose-500" />;
+      case 'edtech-course-counselor': return <GraduationCap size={20} className="text-blue-500" />;
+      case 'realestate-sitevisit-bot': return <Building2 size={20} className="text-amber-500" />;
+      case 'auto-testdrive-service': return <Car size={20} className="text-indigo-500" />;
+      case 'restaurant-table-booking': return <Utensils size={20} className="text-orange-500" />;
+      case 'b2b-lead-qualification': return <Briefcase size={20} className="text-purple-500" />;
+      case 'ecommerce-catalog-order': return <ShoppingCart size={20} className="text-emerald-500" />;
+      case 'home-field-service': return <Wrench size={20} className="text-cyan-500" />;
+      default: return <Bot size={20} className="text-indigo-500" />;
+    }
+  };
+
   return (
     <div className="w-full flex flex-col gap-6">
       
@@ -96,19 +131,28 @@ export default function WhatsAppChatbotsComponent() {
             <Bot size={22} className="text-indigo-600" />
             Chatbot Automation Hub
           </h2>
-          <p className="text-gray-500 text-sm">Manage your automated WhatsApp flows, keyword triggers, and live debug sessions.</p>
+          <p className="text-gray-500 text-sm">Manage your automated WhatsApp flows, keyword triggers, 8 multi-industry playbooks, and live debug sessions.</p>
         </div>
-        <button 
-          onClick={() => router.push('/whatsapp/chatbot-builder')}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm"
-        >
-          <GitBranch size={16} />
-          Create New Chatbot
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setActiveTab('templates')}
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm"
+          >
+            <Sparkles size={16} />
+            Industry Templates ({INDUSTRY_CHATBOT_PRESETS.length})
+          </button>
+          <button 
+            onClick={() => router.push('/whatsapp/chatbot-builder')}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm"
+          >
+            <GitBranch size={16} />
+            Create Blank Flow
+          </button>
+        </div>
       </div>
 
-      {/* Sub-tabs: Bots vs Logs */}
-      <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+      {/* Sub-tabs: Bots vs Templates vs Logs */}
+      <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', flexWrap: 'wrap' }}>
         <button 
           onClick={() => setActiveTab('bots')}
           style={{ 
@@ -118,6 +162,16 @@ export default function WhatsAppChatbotsComponent() {
           }}
         >
           <Bot size={16} /> All Chatbots ({flows.length})
+        </button>
+        <button 
+          onClick={() => setActiveTab('templates')}
+          style={{ 
+            background: activeTab === 'templates' ? '#f5f3ff' : 'transparent', 
+            color: activeTab === 'templates' ? '#7c3aed' : '#64748b', 
+            border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' 
+          }}
+        >
+          <Sparkles size={16} /> 📚 Industry Playbooks & Templates ({INDUSTRY_CHATBOT_PRESETS.length})
         </button>
         <button 
           onClick={() => setActiveTab('logs')}
@@ -234,6 +288,256 @@ export default function WhatsAppChatbotsComponent() {
         </div>
       )}
 
+      {activeTab === 'templates' && (
+        <div className="flex flex-col gap-6">
+          {/* Industry Category Filter Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-gray-100 dark:border-slate-800">
+            {[
+              { id: 'ALL', label: '🌟 All Industries (8)' },
+              { id: 'Healthcare', label: '🏥 Healthcare & Clinics' },
+              { id: 'EdTech', label: '🏫 EdTech & Coaching' },
+              { id: 'Real Estate', label: '🏡 Real Estate & Builders' },
+              { id: 'Automotive', label: '🚗 Auto Showrooms & Service' },
+              { id: 'Hospitality', label: '🍽️ Restaurants & Dining' },
+              { id: 'B2B', label: '💼 B2B Agencies & SaaS' },
+              { id: 'E-Commerce', label: '🛍️ D2C & Retail Brands' },
+              { id: 'Services', label: '🔧 Home & Field Services' }
+            ].map(pill => (
+              <button
+                key={pill.id}
+                onClick={() => setSelectedIndustryFilter(pill.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  border: selectedIndustryFilter === pill.id ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
+                  background: selectedIndustryFilter === pill.id ? '#ede9fe' : '#ffffff',
+                  color: selectedIndustryFilter === pill.id ? '#4f46e5' : '#475569',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {pill.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Templates Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '20px' }}>
+            {filteredPresets.map(preset => {
+              const parsed = JSON.parse(preset.nodesJson);
+              const nodeCount = parsed.nodes ? parsed.nodes.length : 0;
+
+              return (
+                <div
+                  key={preset.id}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '14px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                    position: 'relative'
+                  }}
+                  className="hover:shadow-md hover:-translate-y-0.5"
+                >
+                  <div className="flex flex-col gap-3">
+                    {/* Header: Icon + Badges */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <div style={{ padding: '10px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                          {getPresetIcon(preset.id)}
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            {preset.industry}
+                          </span>
+                          <h4 style={{ margin: '2px 0 0 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                            {preset.name}
+                          </h4>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '12px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', whiteSpace: 'nowrap' }}>
+                        {preset.badge}
+                      </span>
+                    </div>
+
+                    {/* Description */}
+                    <p style={{ margin: 0, fontSize: '12.5px', color: '#64748b', lineHeight: 1.5 }}>
+                      {preset.description}
+                    </p>
+
+                    {/* Keywords Tag */}
+                    <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '8px', padding: '8px 12px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                        🎯 Keyword Triggers:
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {preset.triggerKeyword.split(',').map((kw, i) => (
+                          <span key={i} style={{ background: '#e2e8f0', color: '#334155', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace' }}>
+                            {kw.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Flow Steps Preview */}
+                    <div style={{ fontSize: '11.5px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Layers size={14} className="text-indigo-500" />
+                      <span><strong>{nodeCount} Nodes</strong> in visual flowchart</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => setPreviewPreset(preset)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: '#f1f5f9',
+                        color: '#334155',
+                        border: 'none',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <BookOpen size={14} /> Preview Flow
+                    </button>
+                    <button
+                      onClick={() => handleInstallPreset(preset.id)}
+                      disabled={installingPresetId === preset.id}
+                      style={{
+                        flex: 1.2,
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        background: '#4f46e5',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        opacity: installingPresetId === preset.id ? 0.7 : 1
+                      }}
+                    >
+                      {installingPresetId === preset.id ? (
+                        <span>Installing...</span>
+                      ) : (
+                        <>
+                          <Download size={14} /> Install & Launch <ArrowRight size={14} />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Preset Preview Modal */}
+      {previewPreset && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setPreviewPreset(null)}>
+          <div style={{ background: '#ffffff', borderRadius: '16px', maxWidth: '700px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div style={{ padding: '10px', borderRadius: '10px', background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+                  {getPresetIcon(previewPreset.id)}
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase' }}>{previewPreset.industry}</span>
+                  <h3 style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{previewPreset.name}</h3>
+                </div>
+              </div>
+              <button onClick={() => setPreviewPreset(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4 py-4">
+              <div>
+                <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 700, color: '#334155' }}>Playbook Description</h5>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>{previewPreset.description}</p>
+              </div>
+
+              <div>
+                <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 700, color: '#334155' }}>Recommended AI System Prompt</h5>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', fontSize: '12.5px', color: '#334155', fontStyle: 'italic', lineHeight: 1.5 }}>
+                  "{previewPreset.recommendedAiSystemPrompt}"
+                </div>
+              </div>
+
+              <div>
+                <h5 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: '#334155' }}>Flowchart Node Hierarchy</h5>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+                  {(() => {
+                    try {
+                      const parsed = JSON.parse(previewPreset.nodesJson);
+                      return (parsed.nodes || []).map((node: any, idx: number) => (
+                        <div key={node.id || idx} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#6366f1', color: '#fff', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {idx + 1}
+                            </span>
+                            <div>
+                              <strong style={{ fontSize: '13px', color: '#0f172a' }}>{node.title || node.type}</strong>
+                              {node.data?.text && (
+                                <p style={{ margin: '2px 0 0 0', fontSize: '11.5px', color: '#64748b', maxWidth: '400px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {node.data.text}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#ede9fe', color: '#6d28d9' }}>
+                            {node.type}
+                          </span>
+                        </div>
+                      ));
+                    } catch (e) {
+                      return <span style={{ color: '#94a3b8' }}>Could not parse flow preview.</span>;
+                    }
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+              <button onClick={() => setPreviewPreset(null)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  const id = previewPreset.id;
+                  setPreviewPreset(null);
+                  handleInstallPreset(id);
+                }}
+                style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#4f46e5', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Download size={15} /> Install Playbook to Database
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'logs' && (
         <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '24px' }}>
           
@@ -252,7 +556,7 @@ export default function WhatsAppChatbotsComponent() {
                 style={{ padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
               />
               <button 
-                onClick={() => handleSearchLogs()}
+                onClick={handleSearchLogs}
                 style={{ background: '#0f172a', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}
               >
                 <Search size={16} /> Search Sessions
