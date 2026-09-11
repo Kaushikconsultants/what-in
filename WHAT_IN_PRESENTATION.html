@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WHAT-IN • Next-Gen WhatsApp Business OS | Developed by tinkal.in</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #10b981;
+      --primary-glow: rgba(16, 185, 129, 0.4);
+      --emerald-dark: #064e3b;
+      --indigo-glow: rgba(99, 102, 241, 0.35);
+      --dark-bg: #070b14;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-hover: rgba(16, 185, 129, 0.5);
+      --text-muted: #94a3b8;
+      --text-light: #f8fafc;
+      --whatsapp: #25D366;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--dark-bg);
+      color: #cbd5e1;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 95px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    h1, h2, h3, h4, .brand-font {
+      font-family: 'Outfit', sans-serif;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+    }
+
+    /* Ambient 3D Glowing Background Orbs */
+    .ambient-glow {
+      position: fixed;
+      pointer-events: none;
+      z-index: 0;
+      border-radius: 50%;
+      filter: blur(130px);
+    }
+    .glow-1 { top: -10%; left: 15%; width: 500px; height: 500px; background: rgba(16, 185, 129, 0.12); }
+    .glow-2 { top: 40%; right: 5%; width: 600px; height: 600px; background: rgba(99, 102, 241, 0.12); }
+    .glow-3 { bottom: 5%; left: 25%; width: 550px; height: 550px; background: rgba(20, 184, 166, 0.09); }
+
+    .grid-bg-overlay {
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 32px 20px;
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Top Developer & Demo Pill Bar */
+    .top-cta-banner {
+      background: linear-gradient(135deg, rgba(6, 78, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 18px;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      box-shadow: 0 10px 30px rgba(6, 78, 59, 0.3);
+      backdrop-filter: blur(12px);
+      margin-bottom: 40px;
+    }
+
+    .badge-dev {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #6ee7b7;
+      padding: 4px 12px;
+      border-radius: 30px;
+      font-size: 11.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .btn-header-wa {
+      background: #25D366;
+      color: #064e3b;
+      padding: 8px 18px;
+      border-radius: 30px;
+      font-weight: 800;
+      font-size: 13px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 14px rgba(37, 211, 102, 0.35);
+    }
+    .btn-header-wa:hover {
+      transform: translateY(-2px);
+      background: #22c55e;
+      box-shadow: 0 6px 20px rgba(37, 211, 102, 0.5);
+    }
+
+    .btn-header-call {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-weight: 700;
+      font-size: 13px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.25s ease;
+    }
+    .btn-header-call:hover {
+      background: rgba(255, 255, 255, 0.18);
+      transform: translateY(-2px);
+    }
+
+    /* 3D Hero Grid */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 40px;
+      align-items: center;
+      margin-bottom: 70px;
+    }
+
+    @media (max-width: 992px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #34d399;
+      padding: 6px 16px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 18px;
+    }
+
+    .hero-title {
+      font-size: 54px;
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #34d399 0%, #2dd4bf 50%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: 18px;
+      color: #94a3b8;
+      margin-bottom: 32px;
+      max-width: 580px;
+    }
+
+    .hero-cta-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 36px;
+    }
+
+    .btn-main-wa {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      padding: 16px 32px;
+      border-radius: 16px;
+      font-weight: 900;
+      font-size: 15px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-main-wa:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 15px 40px rgba(16, 185, 129, 0.6);
+    }
+
+    .btn-main-call {
+      background: rgba(15, 23, 42, 0.9);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 16px 26px;
+      border-radius: 16px;
+      font-weight: 800;
+      font-size: 15px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      transition: all 0.25s ease;
+    }
+    .btn-main-call:hover {
+      background: rgba(30, 41, 59, 0.9);
+      transform: translateY(-3px);
+    }
+
+    .hero-stats-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 24px;
+    }
+    @media (max-width: 640px) {
+      .hero-stats-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    .stat-pill {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+    .stat-pill .num {
+      font-size: 22px;
+      font-weight: 900;
+      color: #34d399;
+      font-family: 'Outfit', sans-serif;
+    }
+    .stat-pill .lbl {
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    /* 3D INTERACTIVE PHONE SIMULATOR CONTAINER */
+    .simulator-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      perspective: 1200px;
+    }
+
+    .sim-nav {
+      display: flex;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    }
+
+    .sim-tab-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 7px 12px;
+      border-radius: 10px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+    .sim-tab-btn.active {
+      background: #10b981;
+      color: #064e3b;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    /* 3D Phone Mockup Shell */
+    .phone-3d {
+      width: 100%;
+      max-width: 340px;
+      background: #020617;
+      border-radius: 42px;
+      padding: 10px;
+      border: 4px solid #1e293b;
+      box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.9), 0 0 50px rgba(16, 185, 129, 0.25);
+      transform-style: preserve-3d;
+      transition: transform 0.15s ease-out;
+      position: relative;
+    }
+
+    .phone-screen {
+      background: #0b141a;
+      border-radius: 34px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 520px;
+      position: relative;
+      border: 1px solid #1e293b;
+    }
+
+    .phone-notch {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90px;
+      height: 16px;
+      background: #020617;
+      border-radius: 20px;
+      z-index: 50;
+    }
+
+    .chat-header {
+      background: #202c33;
+      padding: 30px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .chat-body {
+      flex: 1;
+      padding: 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+
+    .msg-bubble {
+      max-width: 88%;
+      padding: 9px 12px;
+      border-radius: 14px;
+      font-size: 11.5px;
+      line-height: 1.45;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      animation: popIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(6px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .msg-user {
+      align-self: flex-end;
+      background: #005c4b;
+      color: #ffffff;
+      border-top-right-radius: 2px;
+    }
+    .msg-bot {
+      align-self: flex-start;
+      background: #202c33;
+      color: #e2e8f0;
+      border-top-left-radius: 2px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .msg-agent {
+      align-self: flex-start;
+      background: #1e1b4b;
+      color: #e0e7ff;
+      border-top-left-radius: 2px;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+    }
+
+    .spm-product-card {
+      background: #111b21;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      text-align: center;
+    }
+    .spm-product-img {
+      width: 100%;
+      height: 90px;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    .btn-buy-now {
+      width: 100%;
+      background: #10b981;
+      color: #064e3b;
+      font-weight: 800;
+      border: none;
+      padding: 7px 0;
+      border-radius: 8px;
+      font-size: 11px;
+      margin-top: 6px;
+      cursor: pointer;
+    }
+
+    .upi-qr-card {
+      background: #111b21;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+    }
+    .qr-box-sim {
+      width: 90px;
+      height: 90px;
+      background: #ffffff;
+      margin: 8px auto;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #064e3b;
+      font-weight: 800;
+      font-size: 9px;
+    }
+
+    .chat-footer {
+      background: #202c33;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .fake-input {
+      flex: 1;
+      background: #2a3942;
+      border-radius: 20px;
+      padding: 6px 12px;
+      color: #8696a0;
+      font-size: 11px;
+    }
+
+    /* 3D TILT CARDS GRID */
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .section-tag {
+      color: #34d399;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 4px 14px;
+      border-radius: 30px;
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: 38px;
+      font-weight: 900;
+    }
+
+    .cards-3d-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 28px;
+      margin-bottom: 70px;
+    }
+
+    .card-3d {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 34px 28px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      backdrop-filter: blur(14px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card-3d:hover {
+      transform: translateY(-8px) scale(1.01);
+      border-color: var(--card-border-hover);
+      box-shadow: 0 20px 50px -10px rgba(16, 185, 129, 0.25);
+    }
+    .card-3d::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #10b981, #6366f1);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .card-3d:hover::before {
+      opacity: 1;
+    }
+
+    .icon-wrapper-3d {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      margin-bottom: 22px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+
+    .card-3d h3 {
+      font-size: 21px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+    .card-3d p {
+      font-size: 14px;
+      color: #94a3b8;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .feature-list-3d {
+      list-style: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 16px;
+    }
+    .feature-list-3d li {
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-bottom: 9px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .feature-list-3d li::before {
+      content: '✓';
+      color: #34d399;
+      font-weight: 800;
+    }
+
+    /* PRICING SECTION - 3 TIERS, ZERO CONVERSATION LIMITS, CUSTOM ENTERPRISE */
+    .billing-toggle-wrapper {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    .billing-pill {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px;
+      border-radius: 20px;
+      display: inline-flex;
+      gap: 6px;
+    }
+    .bill-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 8px 20px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.25s ease;
+    }
+    .bill-btn.active {
+      background: #10b981;
+      color: #064e3b;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    }
+
+    .pricing-grid-3d {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 28px;
+      margin-bottom: 70px;
+    }
+
+    .pricing-card-3d {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 28px;
+      padding: 38px 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      backdrop-filter: blur(14px);
+      transition: all 0.3s ease;
+      position: relative;
+    }
+    .pricing-card-3d:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    }
+    .pricing-card-3d.featured {
+      border: 2px solid #10b981;
+      box-shadow: 0 15px 45px rgba(16, 185, 129, 0.2);
+    }
+    .pricing-card-3d.custom {
+      border: 2px solid #6366f1;
+      box-shadow: 0 15px 45px rgba(99, 102, 241, 0.15);
+    }
+
+    .featured-tag {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #064e3b;
+      font-weight: 900;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 5px 18px;
+      border-radius: 30px;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+    }
+
+    .price-tag {
+      font-size: 42px;
+      font-weight: 900;
+      color: #ffffff;
+      font-family: 'Outfit', sans-serif;
+      margin: 14px 0 4px;
+    }
+    .price-tag span {
+      font-size: 15px;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+    .price-sub {
+      font-size: 12px;
+      color: #34d399;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+
+    .plan-features-3d {
+      list-style: none;
+      margin-bottom: 30px;
+    }
+    .plan-features-3d li {
+      font-size: 13.5px;
+      color: #cbd5e1;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .plan-features-3d li::before {
+      content: '✓';
+      color: #10b981;
+      font-weight: 900;
+    }
+
+    .btn-plan-act {
+      text-align: center;
+      padding: 14px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 13.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.25s ease;
+    }
+    .btn-plan-starter {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .btn-plan-starter:hover {
+      background: rgba(255, 255, 255, 0.18);
+      transform: translateY(-2px);
+    }
+    .btn-plan-growth {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+    }
+    .btn-plan-growth:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(16, 185, 129, 0.6);
+    }
+    .btn-plan-custom-tier {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: #ffffff;
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+    }
+    .btn-plan-custom-tier:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(99, 102, 241, 0.55);
+    }
+
+    /* Comparison Card */
+    .comp-3d-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 32px;
+      overflow-x: auto;
+      margin-bottom: 70px;
+    }
+    .comp-table-3d {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+    }
+    .comp-table-3d th {
+      padding: 16px;
+      color: #ffffff;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    .comp-table-3d td {
+      padding: 15px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+    }
+
+    /* Bottom Contact Master Card */
+    .master-footer-3d {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(6, 78, 59, 0.5));
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 30px;
+      padding: 50px 30px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Sticky Bottom Floating Quick Bar */
+    .sticky-bar-3d {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(7, 11, 20, 0.92);
+      backdrop-filter: blur(14px);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 9999;
+      box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.7);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Glowing 3D Orbs -->
+  <div class="ambient-glow glow-1"></div>
+  <div class="ambient-glow glow-2"></div>
+  <div class="ambient-glow glow-3"></div>
+  <div class="grid-bg-overlay"></div>
+
+  <!-- Sticky Bottom Floating Contact Bar -->
+  <div class="sticky-bar-3d">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 10px; height: 10px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981;"></div>
+      <div>
+        <div style="font-weight: 800; color: #ffffff; font-size: 13.5px;">🚀 WHAT-IN • Developed by tinkal.in</div>
+        <div style="color: #94a3b8; font-size: 11.5px;">7-Day Free Live Demo Available Now</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <a href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20book%20a%207-day%20free%20demo%20of%20What-In%20WhatsApp%20Automation!" target="_blank" class="btn-header-wa">
+        💬 WhatsApp Chat (8221058716)
+      </a>
+      <a href="tel:+919306817689" class="btn-header-call">
+        📞 Call Now (9306817689)
+      </a>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Top Developer Announcement Banner -->
+    <div class="top-cta-banner">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="badge-dev">⚡ Official Product Presentation</span>
+        <span style="font-size: 13.5px; font-weight: 600; color: #f8fafc;">
+          Developed by <strong style="color: #34d399;">tinkal.in</strong> • No login required
+        </span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <a href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20book%20a%207-day%20free%20demo%20of%20What-In%20WhatsApp%20Automation!" target="_blank" class="btn-header-wa">
+          💬 WhatsApp: 8221058716
+        </a>
+        <a href="tel:+919306817689" class="btn-header-call">
+          📞 Call: 9306817689
+        </a>
+      </div>
+    </div>
+
+    <!-- 3D HERO SECTION WITH INTERACTIVE SMARTPHONE SIMULATOR -->
+    <div class="hero-grid">
+      <!-- Left Value Prop -->
+      <div>
+        <div class="hero-tag">✨ Complete WhatsApp Business Operating System</div>
+        <h1 class="hero-title">
+          Scale WhatsApp into your <br />
+          <span class="gradient-text">#1 24/7 Revenue Channel</span>
+        </h1>
+        <p class="hero-desc">
+          Automate customer inquiries with <strong>Gemini AI</strong>, synchronize <strong>Shopify & Meta Catalogs</strong>, collect <strong>0% fee UPI QR payments</strong>, and supercharge ROAS with <strong>Meta CAPI Server Tracking</strong>.
+        </p>
+
+        <div class="hero-cta-group">
+          <a href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20book%20a%207-day%20free%20demo%20of%20What-In%20WhatsApp%20Automation!" target="_blank" class="btn-main-wa">
+            💬 WhatsApp Chat (8221058716)
+          </a>
+          <a href="tel:+919306817689" class="btn-main-call">
+            📞 Direct Call (9306817689)
+          </a>
+        </div>
+
+        <div class="hero-stats-strip">
+          <div class="stat-pill">
+            <div class="num">0%</div>
+            <div class="lbl">Meta API Markup</div>
+          </div>
+          <div class="stat-pill">
+            <div class="num">24/7</div>
+            <div class="lbl">Gemini AI Support</div>
+          </div>
+          <div class="stat-pill">
+            <div class="num">Instant</div>
+            <div class="lbl">UPI QR Direct Pay</div>
+          </div>
+          <div class="stat-pill">
+            <div class="num">100%</div>
+            <div class="lbl">Lead Attribution</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right 3D Interactive Phone Simulator -->
+      <div class="simulator-wrapper">
+        <!-- Interactive Mode Switcher Tabs -->
+        <div class="sim-nav">
+          <button class="sim-tab-btn active" onclick="switchSimScenario('ai')">🤖 AI Copilot</button>
+          <button class="sim-tab-btn" onclick="switchSimScenario('catalog')">📦 Catalog SPM</button>
+          <button class="sim-tab-btn" onclick="switchSimScenario('payment')">💳 UPI QR Pay</button>
+          <button class="sim-tab-btn" onclick="switchSimScenario('team')">👥 Multi-Agent</button>
+        </div>
+
+        <!-- 3D Phone Shell with Dynamic Mouse Tracking -->
+        <div id="phoneShell" class="phone-3d" onmousemove="handlePhoneMove(event)" onmouseleave="resetPhoneTilt()">
+          <div class="phone-notch"></div>
+          <div class="phone-screen">
+            <!-- Header -->
+            <div class="chat-header">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 30px; height: 30px; border-radius: 50%; background: #10b981; color: #064e3b; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 11px;">WI</div>
+                <div>
+                  <div style="font-weight: 800; font-size: 11.5px; color: #ffffff;">What-In Official <span style="color: #34d399;">✓</span></div>
+                  <div id="simStatus" style="font-size: 9.5px; color: #34d399;">Online • Auto-Assisted</div>
+                </div>
+              </div>
+              <div style="color: #94a3b8; font-size: 14px;">⋮</div>
+            </div>
+
+            <!-- Messages Body -->
+            <div id="chatBody" class="chat-body">
+              <!-- Default AI Inquiries -->
+              <div class="msg-bubble msg-user">
+                Hi, do you have the Emerald Silk Kurti in size L? And how fast can you ship?
+              </div>
+              <div class="msg-bubble msg-bot">
+                Namaste! Yes, the Emerald Silk Kurti (Size L) is in stock at ₹1,499 ✨<br><br>
+                • Fabric: 100% Pure Mulberry Silk<br>
+                • Dispatch: Today by 4 PM (Delivery in 2-3 days)<br><br>
+                Would you like to reserve it now?
+              </div>
+            </div>
+
+            <!-- Footer Mock -->
+            <div class="chat-footer">
+              <div class="fake-input">Type a message...</div>
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #064e3b;">🎤</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 CORE SUPERPOWERS 3D CARDS -->
+    <div class="section-header" style="margin-top: 40px;">
+      <span class="section-tag">High-Performance Architecture</span>
+      <h2 class="section-title">The 7 Power Pillars of WHAT-IN</h2>
+      <p style="color: #94a3b8; font-size: 15px; margin-top: 8px;">
+        Designed to automate sales, maximize return on ad spend, and convert chat into revenue.
+      </p>
+    </div>
+
+    <div class="cards-3d-grid">
+
+      <!-- Superpower 1 -->
+      <div class="card-3d">
+        <div>
+          <div class="icon-wrapper-3d" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">🤖</div>
+          <h3>Gemini AI Product Recommender</h3>
+          <p>
+            Trained directly on your uploaded PDF catalogs, size charts, pricing sheets, and website links.
+          </p>
+          <ul class="feature-list-3d">
+            <li>Answers sizing, fabric, and pricing in Hindi, English & Hinglish</li>
+            <li>Suggests 1-click live response drafts to human agents</li>
+            <li>Seamless fallback to live team reps on complex queries</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Superpower 2 -->
+      <div class="card-3d">
+        <div>
+          <div class="icon-wrapper-3d" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">👥</div>
+          <h3>Multi-Agent Shared Inbox & Routing</h3>
+          <p>
+            Centralize your entire sales & support staff in one high-speed collaborative WhatsApp workspace.
+          </p>
+          <ul class="feature-list-3d">
+            <li>Smart Round-Robin and department lead assignment</li>
+            <li>Private internal @notes with desktop notifications</li>
+            <li>Auto-heals 10-digit numbers into verified Meta E.164 standard</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Superpower 3 -->
+      <div class="card-3d">
+        <div>
+          <div class="icon-wrapper-3d" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">📦</div>
+          <h3>Shopify & Meta Catalog 2-Way Sync</h3>
+          <p>
+            Synchronize live inventory, variants, prices, and collections directly inside WhatsApp chats.
+          </p>
+          <ul class="feature-list-3d">
+            <li>Single Product Messages (SPM) with 1-tap "Buy Now" button</li>
+            <li>Multi-Product Messages (MPM) with interactive shopping carts</li>
+            <li>Real-time stock depletion protection in active conversations</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Superpower 4 -->
+      <div class="card-3d">
+        <div>
+          <div class="icon-wrapper-3d" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">🎯</div>
+          <h3>Meta Ads (CAPI) Server-Side Growth</h3>
+          <p>
+            Track Click-to-WhatsApp (CTWA) ads with server-side CAPI for accurate ad attribution and higher ROAS.
+          </p>
+          <ul class="feature-list-3d">
+            <li>Meta Conversions API server event tracking (Lead, AddToCart, Purchase)</li>
+            <li>Instantly triggers from Facebook/Instagram Lead Ad forms</li>
+            <li>Syncs high-intent WhatsApp contacts to Custom Retargeting Audiences</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Superpower 5 -->
+      <div class="card-3d">
+        <div>
+          <div class="icon-wrapper-3d" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">💳</div>
+          <h3>Direct WhatsApp In-Chat Payments</h3>
+          <p>
+            Collect instant payments inside the chat without sending customers to clunky external checkout pages.
+          </p>
+          <ul class="feature-list-3d">
+            <li>Unified card with dynamic scannable UPI QR code (GPay/PhonePe/Paytm)</li>
+            <li>Direct merchant UPI integration with 0% gateway transaction fees</li>
+            <li>Razorpay & Cashfree auto-verification with instant status badges</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Superpower 6 -->
+      <div class="card-3d">
+        <div>
+          <div class="icon-wrapper-3d" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">📢</div>
+          <h3>Drip Campaigns & High-Volume Broadcasts</h3>
+          <p>
+            Engage thousands of buyers with targeted broadcasts and automated multi-stage follow-up drips.
+          </p>
+          <ul class="feature-list-3d">
+            <li>Filter broadcast lists by customer tags, spend history, and city</li>
+            <li>Official Meta WhatsApp approved template builder & variable mapper</li>
+            <li>Automated multi-stage follow-up drips (Day 1, Day 3, Day 7)</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Superpower 7 -->
+      <div class="card-3d">
+        <div>
+          <div class="icon-wrapper-3d" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8;">📞</div>
+          <h3>Voice Suite & Direct On-Call SLA</h3>
+          <p>
+            Built for modern Indian commerce where voice notes and direct phone calls close the biggest deals.
+          </p>
+          <ul class="feature-list-3d">
+            <li>In-browser audio/voice note playback with lifecycle status</li>
+            <li>High-resolution image zoom viewer & PDF invoice downloader</li>
+            <li>Dedicated on-call phone SLA from tinkal.in engineering team</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- COMPARISON TABLE -->
+    <div class="section-header">
+      <span class="section-tag">Market Differentiation</span>
+      <h2 class="section-title">Why Brands Upgrade to WHAT-IN</h2>
+    </div>
+
+    <div class="comp-3d-card">
+      <table class="comp-table-3d">
+        <thead>
+          <tr>
+            <th>Key Capability</th>
+            <th style="color: #f87171;">❌ Generic Tools (Wati / Interakt)</th>
+            <th style="color: #34d399;">✅ WHAT-IN (by tinkal.in)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color: #ffffff; font-weight: 700;">Meta Cloud API Fee Markup</td>
+            <td style="color: #fca5a5;">Heavy 20%–40% markup on every message</td>
+            <td style="color: #6ee7b7; font-weight: 800;">0% Markup (Official Meta Base Rates)</td>
+          </tr>
+          <tr>
+            <td style="color: #ffffff; font-weight: 700;">AI Product Recommender</td>
+            <td style="color: #fca5a5;">Rigid keyword-based bots</td>
+            <td style="color: #6ee7b7; font-weight: 800;">Gemini AI trained on your PDFs & URLs</td>
+          </tr>
+          <tr>
+            <td style="color: #ffffff; font-weight: 700;">Meta Conversions API (CAPI)</td>
+            <td style="color: #fca5a5;">Not Integrated / Paid Add-on</td>
+            <td style="color: #6ee7b7; font-weight: 800;">Built-In Server-Side CAPI Event Sync</td>
+          </tr>
+          <tr>
+            <td style="color: #ffffff; font-weight: 700;">In-Chat UPI QR Payments</td>
+            <td style="color: #fca5a5;">External browser redirect links only</td>
+            <td style="color: #6ee7b7; font-weight: 800;">Unified Card with Scannable QR + Pay Button</td>
+          </tr>
+          <tr>
+            <td style="color: #ffffff; font-weight: 700;">Shopify & Meta Catalog Sync</td>
+            <td style="color: #fca5a5;">Basic contact sync</td>
+            <td style="color: #6ee7b7; font-weight: 800;">2-Way SPM & MPM In-Chat Cart Sync</td>
+          </tr>
+          <tr>
+            <td style="color: #ffffff; font-weight: 700;">Direct Phone / On-Call Support</td>
+            <td style="color: #fca5a5;">Slow email ticketing queues</td>
+            <td style="color: #6ee7b7; font-weight: 800;">Direct On-Call Phone SLA (9306817689)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PRICING SECTION - 3 TIERS, ZERO CONVERSATION LIMITS, CUSTOM ENTERPRISE -->
+    <div id="pricing" class="section-header">
+      <span class="section-tag">Transparent Pricing</span>
+      <h2 class="section-title">Simple, Scalable Investment</h2>
+      <p style="color: #94a3b8; font-size: 15px; margin-top: 6px;">
+        Zero conversation limits across all plans. 7-day free trial included.
+      </p>
+
+      <div class="billing-toggle-wrapper" style="margin-top: 24px;">
+        <div class="billing-pill">
+          <button id="btnMonthly" class="bill-btn active" onclick="setBilling('monthly')">Monthly Billing</button>
+          <button id="btnAnnual" class="bill-btn" onclick="setBilling('annual')">
+            Annual Billing <span style="background: #064e3b; color: #34d399; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 4px;">Save 20%</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pricing-grid-3d">
+
+      <!-- Plan 1: STARTER -->
+      <div class="pricing-card-3d">
+        <div>
+          <div style="font-weight: 800; font-size: 20px; color: #ffffff;">STARTER</div>
+          <div style="font-size: 12.5px; color: #94a3b8; margin: 4px 0 16px;">
+            Perfect for small growing D2C brands, boutiques & single sales reps.
+          </div>
+
+          <div id="starterPrice" class="price-tag">₹999 <span>/ month</span></div>
+          <div id="starterSub" class="price-sub">₹999 billed monthly</div>
+
+          <ul class="plan-features-3d">
+            <li>1 WhatsApp Business Number</li>
+            <li>Up to 3 Agent Logins</li>
+            <li>Unlimited Customer Contacts & Chats</li>
+            <li>Shared Team Inbox & Internal Mentions</li>
+            <li>Shopify & Meta Catalog Sync</li>
+            <li>Direct UPI QR In-Chat Payments</li>
+            <li>Standard Email & WhatsApp Support</li>
+          </ul>
+        </div>
+
+        <a href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20start%20the%207-Day%20Free%20Demo%20for%20the%20STARTER%20Plan%20(%E2%82%B9999%2Fmo)%20of%20What-In." target="_blank" class="btn-plan-act btn-plan-starter">
+          💬 Start Starter Demo on WhatsApp
+        </a>
+      </div>
+
+      <!-- Plan 2: GROWTH (MOST POPULAR) -->
+      <div class="pricing-card-3d featured">
+        <div class="featured-tag">★ MOST POPULAR</div>
+        <div>
+          <div style="font-weight: 800; font-size: 20px; color: #34d399;">GROWTH</div>
+          <div style="font-size: 12.5px; color: #94a3b8; margin: 4px 0 16px;">
+            For scaling e-commerce brands, active sales reps & wholesale businesses.
+          </div>
+
+          <div id="growthPrice" class="price-tag" style="color: #34d399;">₹2,499 <span>/ month</span></div>
+          <div id="growthSub" class="price-sub">₹2,499 billed monthly</div>
+
+          <ul class="plan-features-3d">
+            <li>1 WhatsApp Business Number</li>
+            <li>Up to 10 Agent Logins</li>
+            <li>Unlimited Active Customer Chats</li>
+            <li>Full Gemini AI Product Recommender</li>
+            <li>PDF & Website Knowledge Scraper</li>
+            <li>Meta Conversions API (CAPI) Server Sync</li>
+            <li>Multi-Stage Automated Drip Sequences</li>
+            <li>Smart Round-Robin Lead Routing</li>
+            <li>Priority On-Call Phone Support (9306817689)</li>
+          </ul>
+        </div>
+
+        <a href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20start%20the%207-Day%20Free%20Demo%20for%20the%20GROWTH%20Plan%20(%E2%82%B92%2C499%2Fmo)%20of%20What-In%20with%20Gemini%20AI!" target="_blank" class="btn-plan-act btn-plan-growth">
+          💬 Start Growth Demo on WhatsApp
+        </a>
+      </div>
+
+      <!-- Plan 3: ENTERPRISE / CUSTOM -->
+      <div class="pricing-card-3d custom">
+        <div>
+          <div style="font-weight: 800; font-size: 20px; color: #818cf8;">ENTERPRISE / CUSTOM</div>
+          <div style="font-size: 12.5px; color: #94a3b8; margin: 4px 0 16px;">
+            Bespoke architecture for large enterprises, multi-store brands & agencies.
+          </div>
+
+          <div class="price-tag" style="font-size: 32px; color: #ffffff;">Custom Plan</div>
+          <div class="price-sub" style="color: #818cf8;">Discuss with our Engineering Team</div>
+
+          <ul class="plan-features-3d">
+            <li>Multiple WhatsApp Business Numbers</li>
+            <li>Unlimited Agent & Team Logins</li>
+            <li>Dedicated Gemini AI Model Fine-Tuning</li>
+            <li>Custom ERP, CRM & Webhook Integrations</li>
+            <li>High-Volume Broadcast & Drip Infrastructure</li>
+            <li>White-Label & Dedicated Custom Domain Options</li>
+            <li>Dedicated Account Manager & Direct Phone SLA</li>
+          </ul>
+        </div>
+
+        <a href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20discuss%20a%20Custom%20%2F%20Enterprise%20Plan%20for%20our%20business%20on%20What-In." target="_blank" class="btn-plan-act btn-plan-custom-tier">
+          💬 Discuss Custom Plan on WhatsApp
+        </a>
+      </div>
+
+    </div>
+
+    <!-- MASTER FOOTER CTA CARD -->
+    <div class="master-footer-3d">
+      <h2 style="font-size: 38px; font-weight: 900; color: #ffffff; margin-bottom: 12px;">
+        Ready to Transform Your WhatsApp Sales?
+      </h2>
+      <p style="font-size: 16px; color: #cbd5e1; max-width: 650px; margin: 0 auto 30px;">
+        Get connected in under 10 minutes. Test live AI auto-replies, catalog sync, and UPI payments on your actual business WhatsApp number with our 7-day risk-free demo.
+      </p>
+
+      <div style="display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 28px;">
+        <a href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20book%20a%207-day%20free%20demo%20of%20What-In%20WhatsApp%20Automation!" target="_blank" class="btn-main-wa">
+          💬 Chat on WhatsApp (+91 8221058716)
+        </a>
+        <a href="tel:+919306817689" class="btn-main-call">
+          📞 Direct Call (+91 93068 17689)
+        </a>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 24px; font-size: 13px; color: #94a3b8; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; flex-wrap: wrap;">
+        <span>⚡ Platform: <strong style="color: #ffffff;">what-in.tinkal.in</strong></span>
+        <span>🏢 Developed by: <strong style="color: #34d399;">tinkal.in</strong></span>
+        <span>💬 WhatsApp: <strong style="color: #ffffff;">+91 8221058716</strong></span>
+        <span>📞 On-Call Support: <strong style="color: #ffffff;">+91 93068 17689</strong></span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // 3D Phone Tilt Tracking
+    function handlePhoneMove(e) {
+      const phone = document.getElementById('phoneShell');
+      const rect = phone.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+      const rotateX = -(y / rect.height) * 16;
+      const rotateY = (x / rect.width) * 16;
+      phone.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    }
+
+    function resetPhoneTilt() {
+      const phone = document.getElementById('phoneShell');
+      phone.style.transform = 'rotateX(0deg) rotateY(0deg)';
+    }
+
+    // Simulator Scenarios
+    function switchSimScenario(type) {
+      const buttons = document.querySelectorAll('.sim-tab-btn');
+      buttons.forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const chat = document.getElementById('chatBody');
+      const status = document.getElementById('simStatus');
+
+      status.innerText = 'AI is typing...';
+      chat.innerHTML = '<div style="color: #94a3b8; font-size: 10px; text-align: center; margin: auto;">Generating simulated response...</div>';
+
+      setTimeout(() => {
+        status.innerText = 'Online • Auto-Assisted';
+        if (type === 'ai') {
+          chat.innerHTML = `
+            <div class="msg-bubble msg-user">What is your exchange policy and size chart?</div>
+            <div class="msg-bubble msg-bot">
+              Here is our 7-Day Easy Exchange Policy 🛡️:<br><br>
+              • Free doorstep size replacement within 7 days<br>
+              • Size L corresponds to Chest 40", Length 44"<br><br>
+              Would you like me to send our latest 2026 Collection catalog?
+            </div>
+          `;
+        } else if (type === 'catalog') {
+          chat.innerHTML = `
+            <div class="msg-bubble msg-user">Show me trending oversized t-shirts</div>
+            <div class="msg-bubble msg-bot">
+              Here is our #1 Best Seller synchronized directly from Shopify:
+              <div class="spm-product-card">
+                <div class="spm-product-img">👕</div>
+                <div style="font-weight: 800; font-size: 11.5px; color: #ffffff;">Heavyweight Graphic Drop-Shoulder Tee</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                  <div>
+                    <span style="color: #34d399; font-weight: 900; font-size: 13px;">₹899</span>
+                    <span style="color: #64748b; font-size: 10px; text-decoration: line-through; margin-left: 4px;">₹1,299</span>
+                  </div>
+                  <span style="font-size: 9px; background: rgba(16,185,129,0.2); color: #34d399; padding: 2px 6px; border-radius: 4px;">In Stock</span>
+                </div>
+                <button class="btn-buy-now">🛍️ 1-Tap Buy Now</button>
+              </div>
+            </div>
+          `;
+        } else if (type === 'payment') {
+          chat.innerHTML = `
+            <div class="msg-bubble msg-user">I'll take 2 pieces. Send me the UPI QR code please.</div>
+            <div class="msg-bubble msg-bot">
+              Order #WH-8842 Summary:<br>
+              • 2x Premium Apparel (₹1,798)<br>
+              • Free Express Shipping Applied 🎉
+              <div class="upi-qr-card">
+                <div style="font-size: 9.5px; color: #34d399; font-weight: 800; text-transform: uppercase;">Direct UPI Instant Payment</div>
+                <div style="font-size: 18px; font-weight: 900; color: #ffffff; margin: 4px 0;">₹1,798</div>
+                <div class="qr-box-sim">
+                  <span>[ UPI QR ]</span>
+                  <span>GPay / Paytm</span>
+                </div>
+                <div style="font-size: 9px; color: #94a3b8;">0% Gateway Fees • Direct to Merchant</div>
+              </div>
+            </div>
+          `;
+        } else if (type === 'team') {
+          chat.innerHTML = `
+            <div class="msg-bubble msg-user">Can I get a custom wholesale quote for 100 units?</div>
+            <div class="msg-bubble msg-bot">Routing you to our B2B Wholesale Specialist right away...</div>
+            <div class="msg-bubble msg-agent">
+              <div style="font-size: 9px; color: #818cf8; font-weight: 800; margin-bottom: 2px;">👤 Team Specialist (Amit - Sales)</div>
+              Hello! Amit here. I have approved a 35% bulk discount for 100 units (₹480/pc). I can send the proforma invoice right here.
+            </div>
+          `;
+        }
+      }, 400);
+    }
+
+    // Billing Switcher (Monthly / Annual)
+    function setBilling(cycle) {
+      const btnMonthly = document.getElementById('btnMonthly');
+      const btnAnnual = document.getElementById('btnAnnual');
+      const starterPrice = document.getElementById('starterPrice');
+      const starterSub = document.getElementById('starterSub');
+      const growthPrice = document.getElementById('growthPrice');
+      const growthSub = document.getElementById('growthSub');
+
+      if (cycle === 'annual') {
+        btnMonthly.classList.remove('active');
+        btnAnnual.classList.add('active');
+        starterPrice.innerHTML = '₹799 <span>/ month</span>';
+        starterSub.innerText = '₹9,599 billed annually (Save 20%)';
+        growthPrice.innerHTML = '₹1,999 <span>/ month</span>';
+        growthSub.innerText = '₹23,999 billed annually (Save 20%)';
+      } else {
+        btnAnnual.classList.remove('active');
+        btnMonthly.classList.add('active');
+        starterPrice.innerHTML = '₹999 <span>/ month</span>';
+        starterSub.innerText = '₹999 billed monthly';
+        growthPrice.innerHTML = '₹2,499 <span>/ month</span>';
+        growthSub.innerText = '₹2,499 billed monthly';
+      }
+    }
+  </script>
+</body>
+</html>
