@@ -119,85 +119,98 @@ export default function PresentationPage() {
     }
   };
 
+  const whatsappBaseUrl = "https://wa.me/918221058716?text=";
+  const demoWhatsAppUrl = `${whatsappBaseUrl}${encodeURIComponent("Hi Tinkal.in, I want to book a 7-day free demo of What-In WhatsApp Automation!")}`;
+  const starterWhatsAppUrl = `${whatsappBaseUrl}${encodeURIComponent("Hi Tinkal.in, I want to start the 7-Day Free Demo for the STARTER Plan (₹999/mo) of What-In.")}`;
+  const growthWhatsAppUrl = `${whatsappBaseUrl}${encodeURIComponent("Hi Tinkal.in, I want to start the 7-Day Free Demo for the GROWTH Plan (₹2,499/mo) of What-In with Gemini AI!")}`;
+  const customWhatsAppUrl = `${whatsappBaseUrl}${encodeURIComponent("Hi Tinkal.in, I want to discuss a Custom / Enterprise Plan for our business on What-In.")}`;
+  const phoneCallUrl = "tel:+919306817689";
+
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans selection:bg-emerald-500 selection:text-white relative overflow-hidden pb-24">
+    <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans selection:bg-emerald-500 selection:text-white relative overflow-hidden">
       {/* Dynamic 3D Glowing Ambient Background Elements */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[15%] w-[500px] h-[500px] bg-emerald-600/15 rounded-full blur-[130px] animate-pulse" />
-        <div className="absolute top-[35%] right-[10%] w-[600px] h-[600px] bg-indigo-600/15 rounded-full blur-[140px]" />
-        <div className="absolute bottom-[5%] left-[20%] w-[550px] h-[550px] bg-teal-600/10 rounded-full blur-[150px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-30" />
+        <div className="absolute top-[-10%] left-[15%] w-[600px] h-[600px] bg-emerald-600/15 rounded-full blur-[140px] animate-pulse" />
+        <div className="absolute top-[35%] right-[10%] w-[650px] h-[650px] bg-indigo-600/15 rounded-full blur-[150px]" />
+        <div className="absolute bottom-[5%] left-[20%] w-[600px] h-[600px] bg-teal-600/10 rounded-full blur-[160px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-25" />
       </div>
 
-      {/* Sticky Bottom Quick Contact Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#0c1222]/95 backdrop-blur-xl border-t border-slate-800/80 px-6 py-3.5 z-50 flex items-center justify-between shadow-2xl">
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
-          <div>
-            <div className="text-sm font-bold text-white flex items-center gap-2">
-              <span>🚀 WHAT-IN</span>
-              <span className="text-xs font-normal text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800/50">
-                developed by tinkal.in
-              </span>
-            </div>
-            <div className="text-xs text-slate-400">7-Day Free Full-Access Live Demo Available</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <a
-            href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20book%20a%207-day%20free%20demo%20of%20What-In%20WhatsApp%20Automation!"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-sm px-5 py-2.5 rounded-full shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
-          >
-            <span>💬</span>
-            <span className="hidden sm:inline">WhatsApp Chat</span> (8221058716)
-          </a>
-          <a
-            href="tel:+919306817689"
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm px-4 py-2.5 rounded-full border border-slate-700 transition-all transform hover:-translate-y-0.5"
-          >
-            <span>📞</span>
-            <span className="hidden sm:inline">Call</span> 9306817689
-          </a>
-        </div>
-      </div>
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        {/* Top Developer & Demo Header Banner */}
-        <div className="bg-gradient-to-r from-emerald-950/80 via-slate-900/90 to-indigo-950/80 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 mb-10 flex flex-wrap items-center justify-between gap-4 shadow-xl shadow-emerald-950/40 backdrop-blur-md">
+      {/* TOP SLEEK STICKY NAVIGATION BAR */}
+      <header className="sticky top-0 left-0 right-0 bg-[#090d16]/85 backdrop-blur-xl border-b border-slate-800/80 z-50 transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+          {/* Brand Logo & Developer Info */}
           <div className="flex items-center gap-3">
-            <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-black uppercase px-3 py-1 rounded-full tracking-wider">
-              ⚡ Public Product Page
-            </span>
-            <span className="text-sm font-semibold text-slate-200">
-              Developed by <strong className="text-emerald-400">tinkal.in</strong> • No login needed
-            </span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-indigo-500 flex items-center justify-center font-black text-slate-950 text-xl shadow-lg shadow-emerald-500/25">
+              ⚡
+            </div>
+            <div>
+              <div className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+                <span>WHAT-IN</span>
+                <span className="hidden sm:inline-block text-[10px] uppercase font-bold tracking-widest bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                  CLOUD OS
+                </span>
+              </div>
+              <div className="text-xs text-slate-400">
+                developed by{" "}
+                <a
+                  href="https://tinkal.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 font-bold hover:text-emerald-300 underline underline-offset-2 transition-colors"
+                >
+                  tinkal.in
+                </a>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2.5">
+
+          {/* Center Navigation Links (Desktop) */}
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
+            <a href="#features" className="hover:text-emerald-400 transition-colors">
+              Features
+            </a>
+            <a href="#simulator" className="hover:text-emerald-400 transition-colors">
+              3D Simulator
+            </a>
+            <a href="#matrix" className="hover:text-emerald-400 transition-colors">
+              Comparison
+            </a>
+            <a href="#pricing" className="hover:text-emerald-400 transition-colors">
+              Pricing
+            </a>
+          </nav>
+
+          {/* Action CTA Buttons */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <a
-              href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20book%20a%207-day%20free%20demo%20of%20What-In%20WhatsApp%20Automation!"
+              href={phoneCallUrl}
+              className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/90 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full border border-slate-700 transition-all transform hover:-translate-y-0.5 shadow-md"
+            >
+              <span>📞</span>
+              <span>Call Now</span>
+            </a>
+            <a
+              href={demoWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5"
+              className="flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs sm:text-sm px-4 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
             >
-              💬 WhatsApp: 8221058716
-            </a>
-            <a
-              href="tel:+919306817689"
-              className="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3.5 py-1.5 rounded-full border border-white/10 transition-all flex items-center gap-1.5"
-            >
-              📞 Call: 9306817689
+              <span>💬</span>
+              <span>Chat on WhatsApp</span>
             </a>
           </div>
         </div>
+      </header>
 
+      {/* MAIN CONTENT AREA */}
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-24">
         {/* HERO SECTION WITH 3D INTERACTIVE SMARTPHONE SIMULATOR */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-20">
+        <div id="simulator" className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center mb-24 pt-4">
           {/* Left Column: Headline & Value Prop */}
           <div className="lg:col-span-7 text-left space-y-6">
-            <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-4 py-1.5 rounded-full text-emerald-400 text-xs font-bold uppercase tracking-wider">
-              <span>✨</span> The Complete WhatsApp Business Operating System
+            <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-4 py-1.5 rounded-full text-emerald-400 text-xs font-bold uppercase tracking-wider shadow-sm">
+              <span className="animate-pulse">✨</span> 7-Day Free Live Demo • Official WhatsApp Cloud OS
             </div>
 
             <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-[1.1]">
@@ -208,24 +221,41 @@ export default function PresentationPage() {
             </h1>
 
             <p className="text-slate-300 text-lg sm:text-xl font-normal max-w-2xl leading-relaxed">
-              Automate customer inquiries with <strong>Gemini AI</strong>, synchronize <strong>Shopify & Meta Catalogs</strong>, collect <strong>0% fee UPI QR payments</strong>, and supercharge ROAS with <strong>Meta CAPI Server Tracking</strong>.
+              Automate customer inquiries with <strong>Gemini AI</strong>, synchronize <strong>Shopify & Meta Catalogs</strong>, collect <strong>0% fee UPI QR payments</strong>, and supercharge ROAS with <strong>Meta CAPI Server Tracking</strong>. Engineered by{" "}
+              <a
+                href="https://tinkal.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 font-bold hover:underline"
+              >
+                tinkal.in
+              </a>
+              .
             </p>
 
             {/* Direct Action Buttons */}
             <div className="flex flex-wrap items-center gap-4 pt-2">
               <a
-                href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20book%20a%207-day%20free%20demo%20of%20What-In%20WhatsApp%20Automation!"
+                href={demoWhatsAppUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-base px-8 py-4 rounded-2xl shadow-xl shadow-emerald-500/30 transform hover:-translate-y-1 transition-all"
               >
-                <span>💬</span> WhatsApp Chat (8221058716)
+                <span className="text-xl">💬</span>
+                <div className="text-left">
+                  <div className="leading-tight">Chat on WhatsApp</div>
+                  <div className="text-[11px] font-semibold text-slate-900/80">Book 7-Day Free Demo</div>
+                </div>
               </a>
               <a
-                href="tel:+919306817689"
-                className="flex items-center gap-3 bg-slate-900/90 hover:bg-slate-800 text-white font-bold text-base px-6 py-4 rounded-2xl border border-slate-700 shadow-xl transform hover:-translate-y-1 transition-all"
+                href={phoneCallUrl}
+                className="flex items-center gap-3 bg-slate-900/90 hover:bg-slate-800 text-white font-bold text-base px-7 py-4 rounded-2xl border border-slate-700 shadow-xl transform hover:-translate-y-1 transition-all"
               >
-                <span>📞</span> Direct Call (9306817689)
+                <span className="text-xl">📞</span>
+                <div className="text-left">
+                  <div className="leading-tight">Direct Call</div>
+                  <div className="text-[11px] font-normal text-slate-400">Instant Engineering Setup</div>
+                </div>
               </a>
             </div>
 
@@ -251,12 +281,12 @@ export default function PresentationPage() {
           </div>
 
           {/* Right Column: 3D Interactive Phone Simulator */}
-          <div className="lg:col-span-5 flex flex-col items-center justify-center">
-            {/* Interactive Mode Switcher Pill */}
-            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 mb-4 shadow-lg">
+          <div className="lg:col-span-5 flex flex-col items-center">
+            {/* Interactive Scenario Switcher Buttons */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-4 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 backdrop-blur-md shadow-lg">
               <button
                 onClick={() => runSimulatorScenario("ai")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all ${
                   activeSimulatorTab === "ai"
                     ? "bg-emerald-500 text-slate-950 shadow-md"
                     : "text-slate-400 hover:text-white"
@@ -266,7 +296,7 @@ export default function PresentationPage() {
               </button>
               <button
                 onClick={() => runSimulatorScenario("catalog")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all ${
                   activeSimulatorTab === "catalog"
                     ? "bg-emerald-500 text-slate-950 shadow-md"
                     : "text-slate-400 hover:text-white"
@@ -276,7 +306,7 @@ export default function PresentationPage() {
               </button>
               <button
                 onClick={() => runSimulatorScenario("payment")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all ${
                   activeSimulatorTab === "payment"
                     ? "bg-emerald-500 text-slate-950 shadow-md"
                     : "text-slate-400 hover:text-white"
@@ -286,7 +316,7 @@ export default function PresentationPage() {
               </button>
               <button
                 onClick={() => runSimulatorScenario("team")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`text-xs font-bold px-3.5 py-1.5 rounded-xl transition-all ${
                   activeSimulatorTab === "team"
                     ? "bg-emerald-500 text-slate-950 shadow-md"
                     : "text-slate-400 hover:text-white"
@@ -296,420 +326,352 @@ export default function PresentationPage() {
               </button>
             </div>
 
-            {/* 3D Phone Shell with Mouse Tracking Tilt */}
+            {/* 3D Smartphone Container with Mouse Parallax */}
             <div
-              style={{
-                perspective: 1200,
-              }}
-              className="w-full max-w-[340px]"
+              className="perspective-[1200px] w-full max-w-[360px] cursor-grab"
+              onMouseMove={handlePhoneMouseMove}
+              onMouseLeave={handlePhoneMouseLeave}
             >
               <div
-                onMouseMove={handlePhoneMouseMove}
-                onMouseLeave={handlePhoneMouseLeave}
                 style={{
                   transform: `rotateX(${phoneTilt.x}deg) rotateY(${phoneTilt.y}deg)`,
                   transition: "transform 0.15s ease-out",
-                  transformStyle: "preserve-3d",
                 }}
-                className="bg-slate-950 rounded-[40px] p-3 border-4 border-slate-800 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_50px_rgba(16,185,129,0.2)] relative"
+                className="relative bg-slate-950 border-[6px] border-slate-800 rounded-[44px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9),0_0_40px_rgba(16,185,129,0.2)] overflow-hidden"
               >
-                {/* Phone Speaker Notch */}
-                <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-4 bg-slate-900 rounded-full z-30 flex items-center justify-center">
-                  <div className="w-3 h-3 rounded-full bg-slate-950 border border-slate-800 mr-2" />
-                  <div className="w-10 h-1 bg-slate-800 rounded-full" />
+                {/* Smartphone Dynamic Island / Speaker Notch */}
+                <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-28 h-4 bg-slate-900 rounded-full z-30 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 bg-slate-950 rounded-full mr-2" />
+                  <div className="w-8 h-1 bg-slate-800 rounded-full" />
                 </div>
 
-                {/* WhatsApp Chat Screen */}
-                <div className="bg-[#0b141a] rounded-[32px] overflow-hidden pt-8 pb-4 flex flex-col h-[520px] text-slate-200 text-xs border border-slate-900 relative">
-                  {/* WhatsApp Chat Header */}
-                  <div className="bg-[#202c33] px-3.5 py-2.5 flex items-center justify-between border-b border-slate-800 shadow-sm">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-slate-950 font-black text-xs shadow">
-                        WI
-                      </div>
-                      <div>
-                        <div className="font-bold text-white text-xs flex items-center gap-1">
-                          What-In Official
-                          <span className="text-[10px] text-emerald-400">✓</span>
-                        </div>
-                        <div className="text-[10px] text-emerald-400 font-medium">
-                          {isAiTyping ? "AI is typing..." : "Online • Auto-Assisted"}
-                        </div>
-                      </div>
+                {/* Smartphone Screen Header */}
+                <div className="bg-[#121b22] px-4 pt-8 pb-3 border-b border-slate-800 flex items-center justify-between relative z-20">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-emerald-600 font-bold text-xs flex items-center justify-center text-white">
+                      WI
                     </div>
-                    <div className="flex items-center gap-2 text-slate-400 text-sm">
-                      <span>📞</span>
-                      <span>⋮</span>
+                    <div>
+                      <div className="text-xs font-bold text-white flex items-center gap-1">
+                        What-In Official <span className="text-emerald-400 text-[10px]">✓</span>
+                      </div>
+                      <div className="text-[10px] text-emerald-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online • Auto-Assisted
+                      </div>
                     </div>
                   </div>
+                  <div className="text-slate-400 text-xs flex items-center gap-2">
+                    <span>📞</span>
+                    <span>⋮</span>
+                  </div>
+                </div>
 
-                  {/* Chat Messages Body */}
-                  <div className="flex-1 p-3 space-y-3 overflow-y-auto bg-[radial-gradient(#1f2c34_1px,transparent_1px)] [background-size:16px_16px]">
-                    {simMessages.map((msg, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex flex-col ${
-                          msg.sender === "user" ? "items-end" : "items-start"
-                        } animate-fade-in`}
-                      >
-                        {msg.sender === "agent" && (
-                          <div className="text-[9px] text-indigo-400 font-bold mb-0.5 ml-1">
-                            👤 Team Specialist (Amit - Sales)
-                          </div>
-                        )}
+                {/* Smartphone Screen Chat Canvas */}
+                <div className="bg-[#0b141a] p-4 h-[380px] overflow-y-auto space-y-3 font-sans text-xs relative">
+                  {/* Subtle WhatsApp chat wallpaper pattern */}
+                  <div className="absolute inset-0 bg-[radial-gradient(#1f2c34_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none" />
+
+                  {simMessages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex flex-col relative z-10 ${
+                        msg.sender === "user" ? "items-end" : "items-start"
+                      }`}
+                    >
+                      {msg.sender === "agent" && (
+                        <span className="text-[9px] text-amber-400 font-bold mb-1 flex items-center gap-1">
+                          👤 Team Specialist (Amit - Sales)
+                        </span>
+                      )}
+
+                      {/* Standard Text Bubble */}
+                      {!msg.type && (
                         <div
-                          className={`max-w-[86%] rounded-2xl px-3 py-2 text-xs shadow-md ${
+                          className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 shadow-sm text-slate-100 whitespace-pre-line leading-relaxed ${
                             msg.sender === "user"
-                              ? "bg-[#005c4b] text-white rounded-tr-none"
-                              : msg.sender === "agent"
-                              ? "bg-[#202c33] text-indigo-100 border border-indigo-500/40 rounded-tl-none"
-                              : "bg-[#202c33] text-slate-100 rounded-tl-none border border-slate-800"
+                              ? "bg-[#005c4b] rounded-tr-none text-emerald-50"
+                              : "bg-[#202c33] rounded-tl-none border border-slate-700/50"
                           }`}
                         >
-                          {/* Rich SPM Product Card */}
-                          {msg.type === "spm" && msg.data && (
-                            <div className="bg-[#111b21] rounded-xl p-2.5 mb-2 border border-slate-800">
-                              <div className="h-24 bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg flex items-center justify-center text-3xl mb-2">
-                                👕
-                              </div>
-                              <div className="font-bold text-white text-xs">{msg.data.title}</div>
-                              <div className="flex items-center justify-between mt-1">
-                                <div>
-                                  <span className="font-extrabold text-emerald-400 text-sm">{msg.data.price}</span>
-                                  <span className="text-[10px] text-slate-500 line-through ml-1">{msg.data.originalPrice}</span>
-                                </div>
-                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">
-                                  {msg.data.tag}
-                                </span>
-                              </div>
-                              <button className="w-full mt-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-1.5 rounded-lg text-xs flex items-center justify-center gap-1 shadow">
-                                🛍️ 1-Tap Buy Now
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Rich Payment Card */}
-                          {msg.type === "payment" && msg.data && (
-                            <div className="bg-[#111b21] rounded-xl p-2.5 mb-2 border border-emerald-500/40 text-center">
-                              <div className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">
-                                Direct UPI Instant Payment
-                              </div>
-                              <div className="text-xl font-black text-white my-1">{msg.data.amount}</div>
-                              <div className="w-24 h-24 bg-white p-1 rounded-lg mx-auto my-1.5 flex items-center justify-center">
-                                <div className="w-full h-full bg-slate-950 rounded flex flex-col items-center justify-center text-[8px] text-emerald-400 font-mono">
-                                  <span>[ UPI QR ]</span>
-                                  <span>GPay / Paytm</span>
-                                </div>
-                              </div>
-                              <div className="text-[9px] text-slate-400 mb-2">0% Gateway Markup • Direct to Merchant</div>
-                              <button className="w-full bg-emerald-500 text-slate-950 font-bold py-1 rounded text-xs">
-                                ⚡ Pay via UPI App
-                              </button>
-                            </div>
-                          )}
-
-                          <div className="whitespace-pre-line leading-relaxed">{msg.text}</div>
+                          {msg.text}
                           <div className="text-[9px] text-slate-400 text-right mt-1">{msg.time}</div>
                         </div>
-                      </div>
-                    ))}
+                      )}
 
-                    {isAiTyping && (
-                      <div className="flex items-center gap-1.5 bg-[#202c33] px-3 py-2 rounded-2xl rounded-tl-none w-16">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.2s]" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.4s]" />
-                      </div>
-                    )}
+                      {/* Interactive Single Product Message (SPM) */}
+                      {msg.type === "spm" && (
+                        <div className="max-w-[90%] bg-[#202c33] border border-slate-700 rounded-2xl overflow-hidden shadow-md rounded-tl-none">
+                          <div className="p-3">
+                            <div className="text-[11px] text-slate-300 mb-2">{msg.text}</div>
+                            <div className="bg-[#111b21] p-2.5 rounded-xl border border-slate-800">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-emerald-400 uppercase bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+                                  {msg.data?.tag}
+                                </span>
+                                <span className="text-[10px] line-through text-slate-500">{msg.data?.originalPrice}</span>
+                              </div>
+                              <div className="font-bold text-white text-xs mt-1">{msg.data?.title}</div>
+                              <div className="text-emerald-400 font-bold text-sm mt-0.5">{msg.data?.price}</div>
+                            </div>
+                          </div>
+                          <div className="bg-[#2a3942] py-2 text-center text-emerald-400 font-bold text-[11px] border-t border-slate-700/80 flex items-center justify-center gap-1.5">
+                            <span>🛒</span> View Catalog & Order
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Interactive UPI QR Payment Message */}
+                      {msg.type === "payment" && (
+                        <div className="max-w-[90%] bg-[#202c33] border border-emerald-500/50 rounded-2xl p-3 shadow-lg rounded-tl-none">
+                          <div className="text-[11px] text-slate-200 whitespace-pre-line mb-2">{msg.text}</div>
+                          <div className="bg-white p-2 rounded-xl text-center shadow-inner my-2">
+                            <div className="text-[10px] font-bold text-slate-900 mb-1">Scan to Pay via UPI (0% Fee)</div>
+                            <div className="w-24 h-24 bg-slate-900 mx-auto rounded-lg flex items-center justify-center text-white text-2xl font-black">
+                              QR
+                            </div>
+                            <div className="text-[9px] text-slate-600 mt-1 font-mono">BHIM • GPay • PhonePe • Paytm</div>
+                          </div>
+                          <div className="bg-emerald-500 text-slate-950 font-black py-2 rounded-xl text-center text-xs shadow-md">
+                            💳 Pay {msg.data?.amount} via UPI
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* AI Typing Animation Indicator */}
+                  {isAiTyping && (
+                    <div className="flex items-center gap-1.5 bg-[#202c33] px-3 py-2 rounded-2xl w-20 rounded-tl-none border border-slate-700">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.2s]" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.4s]" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Smartphone Input Bar */}
+                <div className="bg-[#202c33] p-2.5 border-t border-slate-800 flex items-center gap-2">
+                  <div className="flex-1 bg-[#2a3942] rounded-full px-3 py-1.5 text-[11px] text-slate-400">
+                    Type a message...
                   </div>
-
-                  {/* Input Mock Bar */}
-                  <div className="px-3 pt-2 flex items-center gap-2">
-                    <div className="flex-1 bg-[#2a3942] rounded-full px-3 py-1.5 text-slate-400 text-[11px] flex items-center justify-between">
-                      <span>Type a message...</span>
-                      <span>📎</span>
-                    </div>
-                    <div className="w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-slate-950 text-xs">
-                      🎤
-                    </div>
+                  <div className="w-7 h-7 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-xs font-bold shadow">
+                    🎤
                   </div>
                 </div>
               </div>
             </div>
+            <div className="text-[11px] text-slate-500 mt-3">✨ Hover mouse to interact with 3D tilt</div>
           </div>
         </div>
 
-        {/* 3D CORE CAPABILITY CARDS WITH HOVER DEPTH */}
-        <div className="mt-16 mb-24">
-          <div className="text-center max-w-3xl mx-auto mb-14">
-            <span className="text-emerald-400 font-extrabold text-xs uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1 rounded-full">
-              Engineered for Explosive Growth
-            </span>
-            <h2 className="text-3xl sm:text-5xl font-black text-white mt-3 tracking-tight">
-              The 7 Core Superpowers of What-In
+        {/* THE 7 SUPERPOWER PILLARS */}
+        <div id="features" className="mb-24">
+          <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
+            <div className="inline-block bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-bold uppercase tracking-wider px-3.5 py-1 rounded-full">
+              Enterprise Feature Matrix
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black text-white">
+              7 Reasons Why High-Growth Brands Switch to WHAT-IN
             </h2>
-            <p className="text-slate-400 text-base mt-3">
-              Built ground-up with cutting-edge Meta Cloud APIs and Google Gemini AI to automate sales and support.
+            <p className="text-slate-400 text-sm">
+              Engineered by{" "}
+              <a
+                href="https://tinkal.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 font-bold hover:underline"
+              >
+                tinkal.in
+              </a>{" "}
+              for Shopify merchants, D2C brands, B2B wholesalers, and performance marketing teams.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Card 1 */}
-            <div className="group relative bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 p-8 rounded-3xl transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.2)] flex flex-col justify-between backdrop-blur-sm">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">
+            <div className="bg-slate-900/60 border border-slate-800 hover:border-emerald-500/50 p-6 rounded-3xl transition-all duration-300 hover:shadow-xl hover:shadow-emerald-950/30 flex flex-col justify-between group backdrop-blur-sm">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                   🤖
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-300 transition-colors">
-                  Gemini AI Product Recommender
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                  Autonomous AI model trained directly on your uploaded PDF catalogs, size charts, pricing sheets, and website links.
+                <h3 className="text-lg font-bold text-white">Gemini AI Product Copilot</h3>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Ingests your PDF catalogs, size charts, and website URLs. Automatically answers customer queries in Hindi, English, or Hinglish with 1-click live agent suggestion drafts.
                 </p>
-                <ul className="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-5">
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Answers size, fabric & pricing queries in Hindi, English & Hinglish
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Live Human Agent Co-Pilot with 1-click suggested response drafts
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Instant seamless fallback to live human reps on complex inquiries
-                  </li>
-                </ul>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                <span>✓</span> Zero hallucination knowledge base
               </div>
             </div>
 
             {/* Card 2 */}
-            <div className="group relative bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 p-8 rounded-3xl transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.2)] flex flex-col justify-between backdrop-blur-sm">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">
-                  👥
+            <div className="bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 p-6 rounded-3xl transition-all duration-300 hover:shadow-xl hover:shadow-indigo-950/30 flex flex-col justify-between group backdrop-blur-sm">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                  📦
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-300 transition-colors">
-                  Multi-Agent Shared Inbox & Routing
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                  One centralized, real-time WhatsApp inbox for your entire sales and customer care team.
+                <h3 className="text-lg font-bold text-white">Shopify & Meta Catalog 2-Way Sync</h3>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Live inventory and variant sync. Send Single Product Messages (SPM) or Multi-Product Catalogs (MPM) directly in chat with in-app cart completion.
                 </p>
-                <ul className="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-5">
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Round-robin and department-based automatic lead distribution
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Internal private @notes with desktop push notifications
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Auto-heals 10-digit numbers into verified Meta E.164 standard
-                  </li>
-                </ul>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-[11px] text-indigo-400 font-semibold flex items-center gap-1">
+                <span>✓</span> Live stock depletion protection
               </div>
             </div>
 
             {/* Card 3 */}
-            <div className="group relative bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 p-8 rounded-3xl transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.2)] flex flex-col justify-between backdrop-blur-sm">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">
-                  📦
+            <div className="bg-slate-900/60 border border-slate-800 hover:border-teal-500/50 p-6 rounded-3xl transition-all duration-300 hover:shadow-xl hover:shadow-teal-950/30 flex flex-col justify-between group backdrop-blur-sm">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                  🎯
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-300 transition-colors">
-                  Shopify & Meta Catalog 2-Way Sync
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                  Keep live inventory, prices, variants, and product collections perfectly in sync with WhatsApp.
+                <h3 className="text-lg font-bold text-white">Meta Ads (CAPI) & Audience Sync</h3>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Server-side Conversions API (CAPI) tracking for WhatsApp clicks. Automatically sync high-intent leads into Meta Custom Retargeting Audiences.
                 </p>
-                <ul className="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-5">
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Single Product Messages (SPM) with 1-tap "Buy Now" button
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Multi-Product Messages (MPM) with interactive in-chat carts
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Real-time stock depletion prevention across active chat sessions
-                  </li>
-                </ul>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-[11px] text-teal-400 font-semibold flex items-center gap-1">
+                <span>✓</span> 30%+ ROAS lift on Click-to-WhatsApp ads
               </div>
             </div>
 
             {/* Card 4 */}
-            <div className="group relative bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 p-8 rounded-3xl transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.2)] flex flex-col justify-between backdrop-blur-sm">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">
-                  🎯
+            <div className="bg-slate-900/60 border border-slate-800 hover:border-amber-500/50 p-6 rounded-3xl transition-all duration-300 hover:shadow-xl hover:shadow-amber-950/30 flex flex-col justify-between group backdrop-blur-sm">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                  💳
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-300 transition-colors">
-                  Meta Ads (CAPI) Server-Side Sync
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                  Direct Click-to-WhatsApp (CTWA) and Meta Pixel attribution for maximizing ad return on investment (ROAS).
+                <h3 className="text-lg font-bold text-white">0% Fee Direct UPI QR Payments</h3>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Generate instant unified payment cards with scannable UPI QR codes (GPay, PhonePe, Paytm) directly to merchant VPA without gateway deductions.
                 </p>
-                <ul className="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-5">
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Server-side Meta Conversions API (Lead, AddToCart, Purchase)
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Auto-captures Facebook & Instagram Lead Ad form leads
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Syncs high-intent WhatsApp contacts to Custom Retargeting Audiences
-                  </li>
-                </ul>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-[11px] text-amber-400 font-semibold flex items-center gap-1">
+                <span>✓</span> Instant verification & Razorpay fallback
               </div>
             </div>
 
             {/* Card 5 */}
-            <div className="group relative bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 p-8 rounded-3xl transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.2)] flex flex-col justify-between backdrop-blur-sm">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">
-                  💳
+            <div className="bg-slate-900/60 border border-slate-800 hover:border-emerald-500/50 p-6 rounded-3xl transition-all duration-300 hover:shadow-xl hover:shadow-emerald-950/30 flex flex-col justify-between group backdrop-blur-sm">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                  👥
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-300 transition-colors">
-                  Direct WhatsApp In-Chat Payments
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                  Collect payments inside WhatsApp without redirecting customers away to high-friction external pages.
+                <h3 className="text-lg font-bold text-white">Multi-Agent Shared Team Inbox</h3>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Assign leads to sales reps automatically via Round-Robin. Internal private @notes, customer tags, and live desktop push notifications.
                 </p>
-                <ul className="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-5">
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Unified card with dynamic scannable UPI QR code (GPay / PhonePe / Paytm)
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Direct merchant UPI integration with 0% gateway transaction markup
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Razorpay & Cashfree auto-verification with instant status badges
-                  </li>
-                </ul>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                <span>✓</span> Indian 10-digit number auto-healing
               </div>
             </div>
 
             {/* Card 6 */}
-            <div className="group relative bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 p-8 rounded-3xl transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.2)] flex flex-col justify-between backdrop-blur-sm">
-              <div>
-                <div className="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">
+            <div className="bg-slate-900/60 border border-slate-800 hover:border-pink-500/50 p-6 rounded-3xl transition-all duration-300 hover:shadow-xl hover:shadow-pink-950/30 flex flex-col justify-between group backdrop-blur-sm">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
                   📢
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 group-hover:text-emerald-300 transition-colors">
-                  Drip Campaigns & High-Volume Broadcasts
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed mb-6">
-                  Reach thousands of customers with targeted broadcasts and automated multi-stage follow-up drips.
+                <h3 className="text-lg font-bold text-white">Smart Drip Campaigns & Broadcasts</h3>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Broadcast Meta-approved templates with dynamic variable insertion. Schedule automated multi-stage drip sequences (Day 1, Day 3, Day 7).
                 </p>
-                <ul className="space-y-2.5 text-xs text-slate-300 border-t border-slate-800 pt-5">
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Filter broadcast recipients by tags, purchase value, and city
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Official Meta WhatsApp approved template builder & variable mapper
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span>
-                    Multi-stage automated follow-up sequences (Day 1, Day 3, Day 7)
-                  </li>
-                </ul>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-[11px] text-pink-400 font-semibold flex items-center gap-1">
+                <span>✓</span> High delivery rate & spam protection
               </div>
             </div>
           </div>
         </div>
 
-        {/* COMPARISON MATRIX SECTION */}
-        <div className="mb-24">
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <span className="text-emerald-400 font-extrabold text-xs uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1 rounded-full">
-              Competitive Advantage
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-white mt-3">
-              Why High-Growth Brands Switch to What-In
-            </h2>
+        {/* COMPARISON MATRIX VS TRADITIONAL TOOLS */}
+        <div id="matrix" className="mb-24">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-3xl font-black text-white mb-2">Why Settle for Legacy WhatsApp Tools?</h2>
+            <p className="text-slate-400 text-sm">
+              Compare WHAT-IN against traditional providers like Wati or Interakt.
+            </p>
           </div>
 
-          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-x-auto backdrop-blur-md">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto bg-slate-900/70 border border-slate-800 rounded-3xl p-6 shadow-2xl backdrop-blur-sm">
+            <table className="w-full text-left border-collapse text-xs sm:text-sm">
               <thead>
-                <tr className="border-b border-slate-800">
-                  <th className="py-4 px-4 font-bold text-slate-300">Feature & Architecture</th>
-                  <th className="py-4 px-4 font-bold text-red-400 bg-red-950/20 rounded-t-xl">
-                    ❌ Traditional Tools (Wati / Interakt)
-                  </th>
-                  <th className="py-4 px-4 font-bold text-emerald-400 bg-emerald-950/40 rounded-t-xl">
-                    ✅ WHAT-IN (by tinkal.in)
+                <tr className="border-b border-slate-800 text-slate-400">
+                  <th className="py-4 px-4 font-bold">Key Capability</th>
+                  <th className="py-4 px-4 font-bold text-rose-400">Traditional Market Tools</th>
+                  <th className="py-4 px-4 font-black text-emerald-400 bg-emerald-950/40 rounded-t-xl">
+                    ⚡ WHAT-IN (by tinkal.in)
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-800/60 text-slate-300">
                 <tr>
-                  <td className="py-4 px-4 font-semibold text-white">Meta Cloud API Fee Markup</td>
-                  <td className="py-4 px-4 text-red-300 bg-red-950/10">Heavy 20%–40% markup on every message</td>
-                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">0% Markup (Official Meta Base Rates)</td>
+                  <td className="py-4 px-4 font-semibold text-white">Meta Cloud API Markup</td>
+                  <td className="py-4 px-4 text-rose-300">20% to 40% added margin per message</td>
+                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">0% Markup (Official Base Rates)</td>
                 </tr>
                 <tr>
-                  <td className="py-4 px-4 font-semibold text-white">AI Product Recommender</td>
-                  <td className="py-4 px-4 text-red-300 bg-red-950/10">Rigid keyword-based matchers</td>
+                  <td className="py-4 px-4 font-semibold text-white">AI Product Intelligence</td>
+                  <td className="py-4 px-4 text-slate-400">Rigid keyword-based matchers</td>
                   <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">Gemini AI trained on your PDFs & URLs</td>
                 </tr>
                 <tr>
                   <td className="py-4 px-4 font-semibold text-white">Meta Conversions API (CAPI)</td>
-                  <td className="py-4 px-4 text-red-300 bg-red-950/10">Not available / expensive third-party</td>
-                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">Built-in server-side CAPI event sync</td>
+                  <td className="py-4 px-4 text-slate-400">Not supported or expensive add-on</td>
+                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">Built-in server-side CAPI tracking</td>
                 </tr>
                 <tr>
-                  <td className="py-4 px-4 font-semibold text-white">In-Chat UPI QR Payments</td>
-                  <td className="py-4 px-4 text-red-300 bg-red-950/10">External browser redirect links only</td>
-                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">Unified card with instant scannable UPI QR</td>
+                  <td className="py-4 px-4 font-semibold text-white">Direct UPI QR In-Chat Payments</td>
+                  <td className="py-4 px-4 text-slate-400">External redirect browser links only</td>
+                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">Unified QR Card + 0% Gateway Fees</td>
                 </tr>
                 <tr>
-                  <td className="py-4 px-4 font-semibold text-white">Shopify & Meta Catalog Sync</td>
-                  <td className="py-4 px-4 text-red-300 bg-red-950/10">Basic contact sync</td>
-                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">2-Way SPM & MPM In-Chat Cart Sync</td>
+                  <td className="py-4 px-4 font-semibold text-white">Shopify Catalog 2-Way Sync</td>
+                  <td className="py-4 px-4 text-slate-400">Basic contact sync only</td>
+                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">Native SPM & MPM In-Chat Shopping</td>
                 </tr>
                 <tr>
-                  <td className="py-4 px-4 font-semibold text-white">Onboarding & Phone Support</td>
-                  <td className="py-4 px-4 text-red-300 bg-red-950/10">Slow email ticketing bots</td>
-                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">Direct on-call phone SLA (9306817689)</td>
+                  <td className="py-4 px-4 font-semibold text-white">Phone SLA & Onboarding</td>
+                  <td className="py-4 px-4 text-slate-400">Slow email ticketing queues</td>
+                  <td className="py-4 px-4 text-emerald-300 font-bold bg-emerald-950/20">
+                    Direct On-Call Phone SLA with{" "}
+                    <a
+                      href="https://tinkal.in"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-300 underline font-bold"
+                    >
+                      tinkal.in
+                    </a>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* PRICING PLANS SECTION (UPDATED: NO CONVERSATION LIMITS, ENTERPRISE CUSTOM) */}
-        <div id="pricing" className="mb-24">
-          <div className="text-center max-w-3xl mx-auto mb-10">
-            <span className="text-emerald-400 font-extrabold text-xs uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1 rounded-full">
-              Transparent & Scalable
-            </span>
-            <h2 className="text-3xl sm:text-5xl font-black text-white mt-3">
-              Invest in Growth, Not Markups
+        {/* PRICING PLANS SECTION */}
+        <div id="pricing" className="mb-20">
+          <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
+            <div className="inline-block bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full">
+              Transparent Pricing • Zero Conversation Limits
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-black text-white">
+              Choose the Plan Built for Your Scale
             </h2>
-            <p className="text-slate-400 text-base mt-2">
-              Every plan includes 7 days free trial and zero conversation caps.
+            <p className="text-slate-400 text-sm sm:text-base">
+              Unlimited customer contacts and chats across all plans. No hidden conversation surcharges.
             </p>
 
-            {/* Monthly / Annual Billing Toggle */}
-            <div className="inline-flex items-center bg-slate-900 p-1.5 rounded-2xl border border-slate-800 mt-6 shadow-inner">
+            {/* Monthly / Annual Billing Switcher */}
+            <div className="inline-flex items-center gap-3 bg-slate-900/90 border border-slate-800 p-1.5 rounded-2xl mt-4">
               <button
                 onClick={() => setBillingCycle("monthly")}
-                className={`px-5 py-2 rounded-xl text-xs font-extrabold transition-all ${
+                className={`text-xs font-bold px-5 py-2 rounded-xl transition-all ${
                   billingCycle === "monthly"
-                    ? "bg-emerald-500 text-slate-950 shadow-lg"
+                    ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -717,27 +679,28 @@ export default function PresentationPage() {
               </button>
               <button
                 onClick={() => setBillingCycle("annual")}
-                className={`px-5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                className={`text-xs font-bold px-5 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
                   billingCycle === "annual"
-                    ? "bg-emerald-500 text-slate-950 shadow-lg"
+                    ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
                 <span>Annual Billing</span>
-                <span className="bg-emerald-950 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full border border-emerald-800 font-black">
-                  Save 20%
+                <span className="bg-emerald-400/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-black border border-emerald-400/30">
+                  SAVE 20%
                 </span>
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Pricing Cards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {/* Plan 1: STARTER */}
             <div className="bg-slate-900/70 border border-slate-800 rounded-3xl p-8 flex flex-col justify-between transition-all hover:border-slate-700 hover:shadow-xl backdrop-blur-sm">
               <div>
                 <div className="text-lg font-bold text-white mb-1">STARTER</div>
                 <div className="text-xs text-slate-400 mb-6">
-                  For boutiques, emerging D2C brands & independent sales teams.
+                  Perfect for small shops, boutiques & emerging D2C brands.
                 </div>
 
                 <div className="mb-6">
@@ -779,12 +742,12 @@ export default function PresentationPage() {
               </div>
 
               <a
-                href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20start%20the%207-Day%20Free%20Demo%20for%20the%20STARTER%20Plan%20(%E2%82%B9999%2Fmo)%20of%20What-In."
+                href={starterWhatsAppUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full text-center py-3.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow"
               >
-                <span>💬</span> Start Starter Demo on WhatsApp
+                <span>💬</span> Start Free Demo on WhatsApp
               </a>
             </div>
 
@@ -839,18 +802,18 @@ export default function PresentationPage() {
                     <span className="text-emerald-400 font-bold">✓</span> Smart Round-Robin Lead Routing
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-emerald-400 font-bold">✓</span> Priority On-Call Phone Support (9306817689)
+                    <span className="text-emerald-400 font-bold">✓</span> Priority On-Call Phone Support SLA
                   </li>
                 </ul>
               </div>
 
               <a
-                href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20start%20the%207-Day%20Free%20Demo%20for%20the%20GROWTH%20Plan%20(%E2%82%B92%2C499%2Fmo)%20of%20What-In%20with%20Gemini%20AI!"
+                href={growthWhatsAppUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full text-center py-4 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/30"
               >
-                <span>💬</span> Start Growth Demo on WhatsApp
+                <span>💬</span> Start Growth Demo with AI
               </a>
             </div>
 
@@ -898,12 +861,12 @@ export default function PresentationPage() {
               </div>
 
               <a
-                href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20discuss%20a%20Custom%20%2F%20Enterprise%20Plan%20for%20our%20business%20on%20What-In."
+                href={customWhatsAppUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full text-center py-3.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30"
               >
-                <span>💬</span> Discuss Custom Plan on WhatsApp
+                <span>💬</span> Discuss Custom Plan
               </a>
             </div>
           </div>
@@ -921,30 +884,58 @@ export default function PresentationPage() {
 
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
               <a
-                href="https://wa.me/918221058716?text=Hi%20Tinkal.in%2C%20I%20want%20to%20book%20a%207-day%20free%20demo%20of%20What-In%20WhatsApp%20Automation!"
+                href={demoWhatsAppUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-base px-8 py-4 rounded-2xl shadow-xl shadow-emerald-500/30 transform hover:-translate-y-1 transition-all"
               >
-                <span>💬</span> Chat on WhatsApp (8221058716)
+                <span>💬</span> Chat on WhatsApp
               </a>
               <a
-                href="tel:+919306817689"
+                href={phoneCallUrl}
                 className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-base px-6 py-4 rounded-2xl border border-slate-700 transition-all"
               >
-                <span>📞</span> Call +91 93068 17689
+                <span>📞</span> Call Now
               </a>
             </div>
 
             <div className="pt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400 border-t border-slate-800/80">
               <span>⚡ Platform: <strong className="text-slate-200">what-in.tinkal.in</strong></span>
-              <span>🏢 Developer: <strong className="text-emerald-400">tinkal.in</strong></span>
-              <span>💬 WhatsApp: <strong className="text-slate-200">+91 8221058716</strong></span>
-              <span>📞 On-Call Support: <strong className="text-slate-200">+91 93068 17689</strong></span>
+              <span>
+                🏢 Developed by:{" "}
+                <a
+                  href="https://tinkal.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 font-bold hover:underline"
+                >
+                  tinkal.in
+                </a>
+              </span>
+              <span>
+                💬 WhatsApp:{" "}
+                <a
+                  href={demoWhatsAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-200 hover:text-emerald-400 font-semibold"
+                >
+                  Direct Chat
+                </a>
+              </span>
+              <span>
+                📞 On-Call Support:{" "}
+                <a
+                  href={phoneCallUrl}
+                  className="text-slate-200 hover:text-emerald-400 font-semibold"
+                >
+                  Direct Line
+                </a>
+              </span>
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
