@@ -27,7 +27,9 @@ import {
   updateWhatsAppIntegrationAction, 
   deleteWhatsAppIntegrationAction,
   testMetaCatalogConnectionAction,
-  fetchMetaCatalogsFromTokenAction
+  fetchMetaCatalogsFromTokenAction,
+  fetchMetaPixelsFromTokenAction,
+  testMetaPixelConnectionAction
 } from "@/app/actions/whatsAppIntegrationActions";
 import WhatsAppAIAutomationComponent from "@/components/whatsapp/WhatsAppAIAutomationComponent";
 
@@ -53,6 +55,13 @@ export default function IntegrationsHubPage() {
   const [fetchingCatalogs, setFetchingCatalogs] = useState(false);
   const [fetchedCatalogs, setFetchedCatalogs] = useState<any[]>([]);
   const [catalogFetchError, setCatalogFetchError] = useState<string | null>(null);
+
+  // Meta Pixel & CAPI Discover States
+  const [fetchingPixels, setFetchingPixels] = useState(false);
+  const [fetchedPixels, setFetchedPixels] = useState<any[]>([]);
+  const [pixelFetchError, setPixelFetchError] = useState<string | null>(null);
+  const [testingPixelId, setTestingPixelId] = useState<string | null>(null);
+  const [pixelTestStatus, setPixelTestStatus] = useState<{ id: string; success: boolean; text: string } | null>(null);
 
   // Payment Gateway State
   const [pgActiveGateway, setPgActiveGateway] = useState<string | null>(null);
@@ -129,6 +138,7 @@ export default function IntegrationsHubPage() {
   const [savingAgent, setSavingAgent] = useState(false);
   const [agentResultMsg, setAgentResultMsg] = useState<{ success: boolean; text: string } | null>(null);
   const [clientInfo, setClientInfo] = useState<any>(null);
+  const clientBrandName = clientInfo?.businessName?.trim() || "Your Brand";
   const [agents, setAgents] = useState<any[]>([]);
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
   const [editAgentData, setEditAgentData] = useState<any>({});
@@ -272,6 +282,39 @@ export default function IntegrationsHubPage() {
     }
   };
 
+  const handleTestPixelConnection = async (integration: any) => {
+    if (!integration.url || !integration.token) {
+      alert("Pixel ID and Access Token are required.");
+      return;
+    }
+    setTestingPixelId(integration.id);
+    setPixelTestStatus(null);
+    try {
+      const res = await testMetaPixelConnectionAction(integration.url, integration.token);
+      if (res.success) {
+        setPixelTestStatus({
+          id: integration.id,
+          success: true,
+          text: `Connected to "${res.pixelName}"! (Pixel ID: ${res.pixelId} verified in Meta Business Suite)`
+        });
+      } else {
+        setPixelTestStatus({
+          id: integration.id,
+          success: false,
+          text: res.error || "Failed to verify Meta Pixel."
+        });
+      }
+    } catch (e: any) {
+      setPixelTestStatus({
+        id: integration.id,
+        success: false,
+        text: e.message || "Network error testing pixel."
+      });
+    } finally {
+      setTestingPixelId(null);
+    }
+  };
+
   const handleAutoFetchCatalogs = async (tokenOverride?: string) => {
     const t = (tokenOverride !== undefined ? tokenOverride : formData.token) || "";
     if (!t.trim()) {
@@ -289,7 +332,7 @@ export default function IntegrationsHubPage() {
           setFormData(prev => ({
             ...prev,
             url: first.id,
-            name: prev.name && prev.name !== 'Espon Clothing Catalog' ? prev.name : first.name
+            name: prev.name && !prev.name.toLowerCase().includes('espon') ? prev.name : first.name
           }));
         } else {
           setCatalogFetchError("No product catalogs found assigned to this System User in Meta Business Suite.");
@@ -303,11 +346,46 @@ export default function IntegrationsHubPage() {
       setFetchingCatalogs(false);
     }
   };
+
+  const handleAutoFetchPixels = async (tokenOverride?: string) => {
+    const t = (tokenOverride !== undefined ? tokenOverride : formData.token) || "";
+    if (!t.trim()) {
+      setPixelFetchError("Please paste or enter your Permanent Access Token first.");
+      return;
+    }
+    setFetchingPixels(true);
+    setPixelFetchError(null);
+    try {
+      const res = await fetchMetaPixelsFromTokenAction(t.trim());
+      if (res.success && res.pixels) {
+        setFetchedPixels(res.pixels);
+        if (res.pixels.length > 0) {
+          const first = res.pixels[0];
+          setFormData(prev => ({
+            ...prev,
+            url: first.id,
+            name: prev.name && !prev.name.toLowerCase().includes('espon') ? prev.name : first.name
+          }));
+        } else {
+          setPixelFetchError("No Meta Pixels or Datasets found for this token.");
+        }
+      } else {
+        setPixelFetchError(res.error || "Failed to fetch pixels from Meta.");
+      }
+    } catch (e: any) {
+      setPixelFetchError(e.message || "Network error fetching pixels from Meta.");
+    } finally {
+      setFetchingPixels(false);
+    }
+  };
   
   const handleOpenModal = (integration?: any) => {
     setFetchedCatalogs([]);
     setCatalogFetchError(null);
     setFetchingCatalogs(false);
+    setFetchedPixels([]);
+    setPixelFetchError(null);
+    setFetchingPixels(false);
     if (integration) {
       setEditingId(integration.id);
       setFormData({ name: integration.name, url: integration.url, token: integration.token || "", type: integration.type || "CRM_LEAD" });
@@ -325,6 +403,9 @@ export default function IntegrationsHubPage() {
     setFetchedCatalogs([]);
     setCatalogFetchError(null);
     setFetchingCatalogs(false);
+    setFetchedPixels([]);
+    setPixelFetchError(null);
+    setFetchingPixels(false);
   };
   
   const handleSubmitIntegration = async (e: any) => {
@@ -1087,7 +1168,7 @@ const reloadTeams = async () => {
                 <button
                   onClick={() => {
                     handleOpenModal(null);
-                    setFormData({ name: 'Espon Clothing Catalog', type: 'META_CATALOG', url: '', token: '' });
+                    setFormData({ name: '', type: 'META_CATALOG', url: '', token: '' });
                   }}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all"
                 >
@@ -1100,7 +1181,7 @@ const reloadTeams = async () => {
                       handleOpenModal(existing);
                     } else {
                       handleOpenModal(null);
-                      setFormData({ name: 'Meta Pixel Espon', type: 'META_CAPI', url: '1386264563245511', token: '' });
+                      setFormData({ name: '', type: 'META_CAPI', url: '', token: '' });
                     }
                   }}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all"
@@ -1136,13 +1217,13 @@ const reloadTeams = async () => {
                     <h4 className="font-bold text-purple-950 text-sm">Commerce Catalog API</h4>
                   </div>
                   <p className="text-xs text-purple-800 leading-relaxed mb-3">
-                    Sync Espon Clothing Commerce Catalog directly with WhatsApp to send Single/Multi Product Messages and in-chat shopping carts.
+                    Sync {clientBrandName} Commerce Catalog directly with WhatsApp to send Single/Multi Product Messages and in-chat shopping carts.
                   </p>
                 </div>
                 <button
                   onClick={() => {
                     handleOpenModal(null);
-                    setFormData({ name: 'Espon Clothing Catalog', type: 'META_CATALOG', url: '', token: '' });
+                    setFormData({ name: '', type: 'META_CATALOG', url: '', token: '' });
                   }}
                   className="w-full py-1.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs"
                 >
@@ -1323,6 +1404,17 @@ const reloadTeams = async () => {
                                   {testingCatalogId === wh.id ? "Testing..." : "Test Catalog"}
                                 </button>
                               )}
+                              {wh.type === 'META_CAPI' && (
+                                <button
+                                  onClick={() => handleTestPixelConnection(wh)}
+                                  disabled={testingPixelId === wh.id}
+                                  className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 transition-all"
+                                  title="Verify Meta Pixel / Dataset Connectivity"
+                                >
+                                  {testingPixelId === wh.id ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                                  {testingPixelId === wh.id ? "Testing..." : "Test Pixel"}
+                                </button>
+                              )}
                               <button onClick={() => handleOpenModal(wh)} className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-slate-100" title="Edit Integration">
                                 <Edit size={16} />
                               </button>
@@ -1338,6 +1430,16 @@ const reloadTeams = async () => {
                               <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${catalogTestStatus.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
                                 {catalogTestStatus.success ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertTriangle size={14} className="text-rose-600" />}
                                 <span>{catalogTestStatus.text}</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        {pixelTestStatus && pixelTestStatus.id === wh.id && (
+                          <tr className="bg-slate-50/80">
+                            <td colSpan={6} className="px-4 py-2.5">
+                              <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${pixelTestStatus.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                                {pixelTestStatus.success ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertTriangle size={14} className="text-rose-600" />}
+                                <span>{pixelTestStatus.text}</span>
                               </div>
                             </td>
                           </tr>
@@ -1387,7 +1489,7 @@ const reloadTeams = async () => {
                     <span>Meta Commerce Catalog API Setup</span>
                   </div>
                   <p className="text-[11.5px] text-purple-800 leading-relaxed m-0">
-                    Connect your Espon Clothing product catalog to send product messages and in-chat shopping carts on WhatsApp.
+                    Connect your {clientBrandName} product catalog to send product messages and in-chat shopping carts on WhatsApp.
                   </p>
                   <div className="text-[11px] text-slate-600 space-y-1">
                     <div><strong>Catalog ID:</strong> Find in Meta Commerce Manager (<a href="https://business.facebook.com/commerce" target="_blank" rel="noreferrer" className="underline font-bold text-purple-700">business.facebook.com/commerce ↗</a>) under <em>Settings → Catalog</em>.</div>
@@ -1404,12 +1506,12 @@ const reloadTeams = async () => {
                   </div>
                   <div className="space-y-2 text-[11.5px] leading-relaxed">
                     <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 shadow-2xs">
-                      <strong className="text-blue-950 block mb-1">Step 1: Create a Meta App for CAPI:</strong>
-                      Go to <a href="https://developers.facebook.com/apps/creation/" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline hover:text-blue-800 inline-flex items-center gap-0.5">Meta App Creation ↗ <ExternalLink size={11} /></a>
+                      <strong className="text-blue-950 block mb-1">Step 1: Get or Create Meta Pixel / Dataset:</strong>
+                      Open <a href="https://business.facebook.com/events_manager2" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline hover:text-blue-800 inline-flex items-center gap-0.5">Meta Events Manager ↗ <ExternalLink size={11} /></a>, select your Pixel/Dataset and copy the 15-digit ID.
                     </div>
                     <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 shadow-2xs">
-                      <strong className="text-blue-950 block mb-1">Step 2: Get Meta Pixel / Dataset ID:</strong>
-                      Open <a href="https://business.facebook.com/events_manager2" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline hover:text-blue-800 inline-flex items-center gap-0.5">Meta Events Manager ↗ <ExternalLink size={11} /></a>, select your Pixel/Dataset and copy the 15-digit ID.
+                      <strong className="text-blue-950 block mb-1">Step 2: Generate Access Token:</strong>
+                      Go to Events Manager → Settings → Conversions API → <em>Generate access token</em> or use your System User token with <code>ads_management</code>.
                     </div>
                   </div>
                 </div>
@@ -1441,7 +1543,7 @@ const reloadTeams = async () => {
                       onChange={e => setFormData({...formData, token: e.target.value})} 
                       onPaste={e => {
                         const pasted = e.clipboardData.getData('text');
-                        if (pasted && pasted.trim().startsWith('EAA')) {
+                        if (pasted && (pasted.trim().startsWith('EAA') || pasted.trim().startsWith('EAAT'))) {
                           handleAutoFetchCatalogs(pasted.trim());
                         }
                       }}
@@ -1512,7 +1614,7 @@ const reloadTeams = async () => {
                       onChange={e => setFormData({...formData, name: e.target.value})} 
                       required 
                       className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
-                      placeholder="e.g. Espon Clothing Catalog" 
+                      placeholder={`e.g. ${clientBrandName} Catalog`} 
                     />
                   </div>
 
@@ -1528,6 +1630,103 @@ const reloadTeams = async () => {
                     />
                   </div>
                 </>
+              ) : formData.type === 'META_CAPI' ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Permanent Meta CAPI Access Token (System User Token)</label>
+                    <input 
+                      type="text" 
+                      value={formData.token} 
+                      onChange={e => setFormData({...formData, token: e.target.value})} 
+                      onPaste={e => {
+                        const pasted = e.clipboardData.getData('text');
+                        if (pasted && (pasted.trim().startsWith('EAA') || pasted.trim().startsWith('EAAT') || pasted.trim().startsWith('EAAI'))) {
+                          handleAutoFetchPixels(pasted.trim());
+                        }
+                      }}
+                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
+                      placeholder="EAAI... or EAAT..." 
+                      required 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAutoFetchPixels()}
+                      disabled={fetchingPixels || !formData.token}
+                      className="mt-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs w-full"
+                    >
+                      {fetchingPixels ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                      {fetchingPixels ? "Auto-Fetching Meta Pixels & Datasets..." : "⚡ Auto-Fetch Pixels & Datasets from Token"}
+                    </button>
+                  </div>
+
+                  {pixelFetchError && (
+                    <div className="text-[11.5px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 flex items-center gap-2 font-semibold">
+                      <AlertTriangle size={14} className="text-rose-600 shrink-0" />
+                      <span>{pixelFetchError}</span>
+                    </div>
+                  )}
+
+                  {fetchedPixels.length > 0 && (
+                    <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 flex flex-col gap-2">
+                      <label className="block text-xs font-bold text-blue-950 flex items-center justify-between">
+                        <span>Select Discovered Pixel / Dataset ({fetchedPixels.length} found):</span>
+                        <span className="text-[10px] text-blue-700 font-semibold">Auto-fills below</span>
+                      </label>
+                      <select
+                        value={formData.url}
+                        onChange={e => {
+                          const selectedId = e.target.value;
+                          const px = fetchedPixels.find((p: any) => p.id === selectedId);
+                          if (px) {
+                            setFormData({
+                              ...formData,
+                              url: px.id,
+                              name: px.name
+                            });
+                          }
+                        }}
+                        className="w-full bg-white border border-blue-300 rounded-lg p-2.5 text-xs font-bold text-blue-950 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                      >
+                        <option value="">-- Choose a Pixel / Dataset --</option>
+                        {fetchedPixels.map((px: any) => (
+                          <option key={px.id} value={px.id}>
+                            {px.name} ({px.type || 'Pixel'}) • ID: {px.id}
+                          </option>
+                        ))}
+                      </select>
+                      {formData.url && (
+                        <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center gap-1.5 font-bold">
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                          <span>Selected & Ready: ID {formData.url}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Meta Pixel / Dataset Name</label>
+                    <input 
+                      type="text" 
+                      value={formData.name} 
+                      onChange={e => setFormData({...formData, name: e.target.value})} 
+                      required 
+                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
+                      placeholder={`e.g. ${clientBrandName} Pixel`} 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Meta Pixel / Dataset ID</label>
+                    <input 
+                      type="text" 
+                      value={formData.url} 
+                      onChange={e => setFormData({...formData, url: e.target.value})} 
+                      required 
+                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
+                      placeholder="e.g. 1386264563245511" 
+                    />
+                  </div>
+                </>
               ) : (
                 <>
                   <div>
@@ -1538,33 +1737,28 @@ const reloadTeams = async () => {
                       onChange={e => setFormData({...formData, name: e.target.value})} 
                       required 
                       className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
-                      placeholder="e.g. ERP Push / Pixel 1" 
+                      placeholder={`e.g. ${clientBrandName} Webhook`} 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">
-                      {formData.type === 'META_CAPI' ? 'Meta Pixel ID' : 'Webhook URL'}
-                    </label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Webhook URL</label>
                     <input 
-                      type={formData.type === 'META_CAPI' ? 'text' : 'url'} 
+                      type="url" 
                       value={formData.url} 
                       onChange={e => setFormData({...formData, url: e.target.value})} 
                       required 
                       className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
-                      placeholder={formData.type === 'META_CAPI' ? 'e.g. 1386264563245511' : 'https://...'} 
+                      placeholder="https://..." 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">
-                      {formData.type === 'META_CAPI' ? 'Meta CAPI Access Token' : 'Auth Token (Optional)'}
-                    </label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Auth Token (Optional)</label>
                     <input 
                       type="text" 
                       value={formData.token} 
                       onChange={e => setFormData({...formData, token: e.target.value})} 
                       className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
-                      placeholder={formData.type === 'META_CAPI' ? 'EAAI...' : 'Bearer ...'} 
-                      required={formData.type === 'META_CAPI'} 
+                      placeholder="Bearer ..." 
                     />
                   </div>
                 </>
