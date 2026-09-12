@@ -138,7 +138,7 @@ export default function WhatsAppLogsComponent() {
         const rolesCount = res.logs.filter((l: any) => l.actionType?.includes('ROLE') || l.actionType?.includes('AUTH')).length;
         const flowsCount = res.logs.filter((l: any) => l.actionType?.includes('FLOW') || l.actionType?.includes('CHATBOT')).length;
         setAuditStats({
-          total: res.total || res.logs.length,
+          total: (res as any).total || (res as any).totalCount || res.logs.length,
           exports: exportsCount,
           roles: rolesCount,
           flows: flowsCount

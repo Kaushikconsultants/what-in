@@ -109,7 +109,7 @@ export default function ShopifyHubComponent() {
       if (mRes.success) {
         setMetrics(mRes.metrics);
         setStoreDomain(mRes.domain || "esponsports.com");
-        setIsConfigured(mRes.isConfigured);
+        setIsConfigured(Boolean(mRes.isConfigured));
         setSettingsDomain(mRes.domain || "");
       }
 

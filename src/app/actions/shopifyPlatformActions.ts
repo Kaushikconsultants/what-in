@@ -34,9 +34,9 @@ async function getShopifyCredentials(clientId?: string) {
   const settings = await prisma.whatsAppSettings.findFirst();
   const company = await prisma.companySettings.findFirst();
   
-  const rawDomain = settings?.shopifyStoreDomain || company?.shopifyStoreDomain || process.env.VITE_SHOPIFY_STORE_URL || 'i2tu0d-jc.myshopify.com';
+  const rawDomain = (settings as any)?.shopifyStoreDomain || company?.shopifyStoreDomain || process.env.VITE_SHOPIFY_STORE_URL || 'i2tu0d-jc.myshopify.com';
   const cleanDomain = rawDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
-  const token = settings?.shopifyAccessToken || company?.shopifyAccessToken || process.env.VITE_SHOPIFY_ACCESS_TOKEN || '';
+  const token = (settings as any)?.shopifyAccessToken || company?.shopifyAccessToken || process.env.VITE_SHOPIFY_ACCESS_TOKEN || '';
 
   return { domain: cleanDomain, token };
 }
@@ -362,6 +362,7 @@ export async function sendShopifyWhatsAppNudgeAction(data: {
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
+          businessName: data.customerName || `Customer ${last10}`,
           contactPerson: data.customerName || `Customer ${last10}`,
           mobile: cleanPhone,
           whatsappNumber: cleanPhone,
@@ -374,6 +375,9 @@ export async function sendShopifyWhatsAppNudgeAction(data: {
 
     // Find or create conversation
     let account = await prisma.whatsAppAccount.findFirst({ orderBy: { createdAt: 'desc' } });
+    if (!account) {
+      account = await prisma.whatsAppAccount.create({ data: { name: 'Main Account', phoneNumber: '919876543210' } });
+    }
     let conversation = await prisma.whatsAppConversation.findFirst({
       where: { customerId: customer.id }
     });
@@ -383,7 +387,7 @@ export async function sendShopifyWhatsAppNudgeAction(data: {
         data: {
           clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
           customerId: customer.id,
-          accountId: account?.id,
+          accountId: account.id,
           status: 'OPEN',
           leadStatus: 'Cart Recovery',
           tags: 'Abandoned Cart'
@@ -474,6 +478,7 @@ export async function sendShopifyOrderWhatsAppAction(data: {
     if (!customer) {
       customer = await prisma.customer.create({
         data: {
+          businessName: data.customerName || `Customer ${last10}`,
           contactPerson: data.customerName || `Customer ${last10}`,
           mobile: cleanPhone,
           whatsappNumber: cleanPhone,
@@ -484,6 +489,9 @@ export async function sendShopifyOrderWhatsAppAction(data: {
     }
 
     let account = await prisma.whatsAppAccount.findFirst({ orderBy: { createdAt: 'desc' } });
+    if (!account) {
+      account = await prisma.whatsAppAccount.create({ data: { name: 'Main Account', phoneNumber: '919876543210' } });
+    }
     let conversation = await prisma.whatsAppConversation.findFirst({
       where: { customerId: customer.id }
     });
@@ -493,7 +501,7 @@ export async function sendShopifyOrderWhatsAppAction(data: {
         data: {
           clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
           customerId: customer.id,
-          accountId: account?.id,
+          accountId: account.id,
           status: 'OPEN',
           orderStatus: 'Confirmed'
         }

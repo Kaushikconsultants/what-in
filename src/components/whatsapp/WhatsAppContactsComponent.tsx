@@ -82,6 +82,9 @@ export default function WhatsAppContactsComponent() {
 
   // Export & Import states
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [temperatureFilter, setTemperatureFilter] = useState<string>("ALL");
+  const [orderValueFilter, setOrderValueFilter] = useState<string>("0");
+  const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFileName, setImportFileName] = useState("");
   const [parsingFile, setParsingFile] = useState(false);
@@ -533,7 +536,7 @@ export default function WhatsAppContactsComponent() {
       XLSX.utils.book_append_sheet(wb, wsInstructions, "Instructions & Guide");
 
       // Trigger download
-      XLSX.writeFile(wb, "what-in_contacts_template.xlsx");
+      XLSX.writeFile(wb, "whatmore_contacts_template.xlsx");
       showToast("📥 Sample Excel template downloaded with exact format & dummy data!");
     } catch (err: any) {
       showToast("Failed to download template: " + err.message, "error");
@@ -541,69 +544,48 @@ export default function WhatsAppContactsComponent() {
   };
 
   // ---------------------------------------------------------
-  // EXCEL EXPORT (DOWNLOAD ALL CONTACTS TO SPREADSHEET)
+  // FILTERED LEADS & TRANSCRIPTS EXPORT (STREAMING CSV / EXCEL)
   // ---------------------------------------------------------
-  const handleExportExcel = async () => {
+  const handleExportFilteredLeads = async (includeTranscript = false) => {
     try {
       setExportingExcel(true);
-      showToast("Preparing contacts for Excel export...");
+      showToast(includeTranscript ? "Generating leads with chat transcripts..." : "Exporting filtered leads to CSV...");
 
-      const res = await exportAllWhatsAppContactsAction();
-      const exportList = (res.success && res.contacts && res.contacts.length > 0)
-        ? res.contacts
-        : contacts;
-
-      if (!exportList || exportList.length === 0) {
-        showToast("No contacts available to export.", "error");
-        setExportingExcel(false);
-        return;
-      }
-
-      const headers = [
-        "Phone Number",
-        "Country Code",
-        "Full Name",
-        "Business / Shop Name",
-        "Tags",
-        "Customer Type"
-      ];
-
-      const rows = exportList.map((c: any) => {
-        const rawPhone = c.mobile || c.whatsappNumber || "";
-        const parsed = parseDynamicPhone(rawPhone);
-        const tagsStr = Array.isArray(c.tags) ? c.tags.join(", ") : (c.tags || "");
-
-        return [
-          parsed.nationalNumber || rawPhone,
-          parsed.countryCode || "+91",
-          c.contactPerson || c.name || "",
-          c.businessName || "",
-          tagsStr,
-          c.customerType || "Retailer"
-        ];
+      const queryParams = new URLSearchParams({
+        search: search.trim(),
+        tag: tagFilter !== "ALL" ? tagFilter : "",
+        temperature: temperatureFilter !== "ALL" ? temperatureFilter : "",
+        minOrderValue: orderValueFilter !== "0" ? orderValueFilter : "",
+        includeTranscript: includeTranscript ? "true" : "false"
       });
 
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-      ws["!cols"] = [
-        { wch: 20 },
-        { wch: 14 },
-        { wch: 24 },
-        { wch: 30 },
-        { wch: 35 },
-        { wch: 18 }
-      ];
+      const res = await fetch(`/api/whatsapp/contacts/export?${queryParams.toString()}`);
+      if (!res.ok) {
+        throw new Error(`Export failed with status HTTP ${res.status}`);
+      }
 
-      XLSX.utils.book_append_sheet(wb, ws, "WhatsApp Contacts");
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
       const dateStr = new Date().toISOString().split("T")[0];
-      XLSX.writeFile(wb, `what-in_contacts_${dateStr}.xlsx`);
-      showToast(`✓ Exported ${exportList.length} contacts to Excel!`);
+      const tempSuffix = temperatureFilter !== "ALL" ? `_${temperatureFilter.toLowerCase()}` : "";
+      a.download = `whatsapp_leads${tempSuffix}_${dateStr}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      showToast(includeTranscript ? "✓ Downloaded filtered leads with chat transcripts!" : "✓ Filtered leads exported successfully!");
+      setShowExportModal(false);
     } catch (err: any) {
       showToast(err.message || "Failed to export contacts.", "error");
     } finally {
       setExportingExcel(false);
     }
   };
+
+  const handleExportExcel = () => handleExportFilteredLeads(false);
 
   // Helper to re-map raw sheet rows according to user's column mappings with strict deduplication
   const applyMappingToRows = (
@@ -1052,13 +1034,13 @@ export default function WhatsAppContactsComponent() {
           </button>
 
           <button
-            onClick={handleExportExcel}
+            onClick={() => setShowExportModal(true)}
             disabled={exportingExcel || (contacts.length === 0 && stats.total === 0)}
             className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-            title="Export contacts directory to Excel (.xlsx)"
+            title="Export filtered customer leads into CSV or Excel"
           >
             {exportingExcel ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-            Export Excel
+            Export Leads
           </button>
 
           <button
@@ -1192,6 +1174,36 @@ export default function WhatsAppContactsComponent() {
               </select>
             </div>
           )}
+          {/* Temperature Filter */}
+          <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700">
+            <span className="text-xs font-bold text-gray-500">Lead:</span>
+            <select
+              value={temperatureFilter}
+              onChange={(e) => setTemperatureFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-gray-800 dark:text-gray-200 outline-none cursor-pointer"
+            >
+              <option value="ALL">All Leads</option>
+              <option value="HOT">🔥 Hot</option>
+              <option value="WARM">⚡ Warm</option>
+              <option value="COLD">❄️ Cold</option>
+            </select>
+          </div>
+
+          {/* Order Value Filter */}
+          <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700">
+            <span className="text-xs font-bold text-gray-500">Spend:</span>
+            <select
+              value={orderValueFilter}
+              onChange={(e) => setOrderValueFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-gray-800 dark:text-gray-200 outline-none cursor-pointer"
+            >
+              <option value="0">All Spend</option>
+              <option value="1000">₹1,000+</option>
+              <option value="5000">₹5,000+</option>
+              <option value="10000">₹10,000+</option>
+              <option value="25000">₹25,000+</option>
+            </select>
+          </div>
 
           <span className="text-xs text-gray-500 font-medium ml-2">
             {totalFilteredContacts > 0 ? (
@@ -1961,7 +1973,7 @@ export default function WhatsAppContactsComponent() {
                           </span>
                         </h4>
                         <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          Verify how columns in your spreadsheet connect to What-In fields. You can adjust mappings if needed.
+                          Verify how columns in your spreadsheet connect to WhatMore fields. You can adjust mappings if needed.
                         </p>
                       </div>
                     </div>
@@ -2720,6 +2732,97 @@ export default function WhatsAppContactsComponent() {
                   </span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Options Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-800 rounded-3xl max-w-md w-full shadow-2xl overflow-hidden border border-gray-100 dark:border-slate-700">
+            <div className="p-6 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center">
+                  <Download size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-gray-900 dark:text-white">Export Customer Leads</h3>
+                  <p className="text-xs text-gray-400">Download filtered contacts to CSV / Excel</p>
+                </div>
+              </div>
+              <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4">
+              <div className="p-4 bg-gray-50 dark:bg-slate-900/50 rounded-2xl border border-gray-100 dark:border-slate-800 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Active Search:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">{search || "None (All Contacts)"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tag Filter:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">{tagFilter}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Lead Temperature:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">{temperatureFilter === "ALL" ? "All Temperatures" : temperatureFilter}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Order Spend:</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">{orderValueFilter === "0" ? "Any Order Value" : `₹${Number(orderValueFilter).toLocaleString()}+`}</span>
+                </div>
+              </div>
+
+              {/* Action 1: Standard Leads Export */}
+              <button
+                type="button"
+                onClick={() => handleExportFilteredLeads(false)}
+                disabled={exportingExcel}
+                className="w-full p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 transition-all text-left flex items-center justify-between group cursor-pointer"
+              >
+                <div>
+                  <div className="font-bold text-sm text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                    <FileSpreadsheet size={16} className="text-emerald-600" />
+                    <span>Download Leads (CSV / Excel)</span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Export customer details, phone, tags, orders & total spend.
+                  </p>
+                </div>
+                <Download size={18} className="text-emerald-600 group-hover:translate-y-0.5 transition-transform" />
+              </button>
+
+              {/* Action 2: Leads + Chat Transcripts */}
+              <button
+                type="button"
+                onClick={() => handleExportFilteredLeads(true)}
+                disabled={exportingExcel}
+                className="w-full p-4 rounded-2xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-950/20 hover:bg-indigo-100/50 transition-all text-left flex items-center justify-between group cursor-pointer"
+              >
+                <div>
+                  <div className="font-bold text-sm text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                    <FileText size={16} className="text-indigo-600" />
+                    <span>Download Leads + Chat Transcripts</span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Includes full chronological WhatsApp conversation logs.
+                  </p>
+                </div>
+                <Download size={18} className="text-indigo-600 group-hover:translate-y-0.5 transition-transform" />
+              </button>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="px-5 py-2 text-xs font-bold text-gray-600 hover:text-gray-800 cursor-pointer"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

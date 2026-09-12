@@ -564,11 +564,11 @@ export default function WhatsAppChatbotBuilderPage() {
           const groups = graph.groups || [];
           const edges = graph.edges || [];
           
-          const mappedNodes = [];
+          const mappedNodes: any[] = [];
 
           // Helper to resolve the first block ID of a group
-          const getGroupFirstBlockId = (groupId) => {
-            const grp = groups.find((g) => g.id === groupId);
+          const getGroupFirstBlockId = (groupId: any) => {
+            const grp = groups.find((g: any) => g.id === groupId);
             if (grp && grp.blocks && grp.blocks.length > 0) {
               return grp.blocks[0].id;
             }
@@ -576,12 +576,12 @@ export default function WhatsAppChatbotBuilderPage() {
           };
 
           // Step 1: Create flat nodes from groups and blocks
-          groups.forEach((group) => {
+          groups.forEach((group: any) => {
             const gx = group.position?.x || 100;
             const gy = group.position?.y || 100;
 
-            (group.blocks || []).forEach((block) => {
-              const node = {
+            (group.blocks || []).forEach((block: any) => {
+              const node: any = {
                 id: block.id,
                 x: gx,
                 y: gy,
@@ -601,7 +601,7 @@ export default function WhatsAppChatbotBuilderPage() {
                 node.category = "choice";
                 node.title = "Buttons Option";
                 node.text = block.config?.body?.text || "Options:";
-                node.choices = (block.config?.buttons || []).map((btn) => ({
+                node.choices = (block.config?.buttons || []).map((btn: any) => ({
                   id: btn.id,
                   text: btn.title
                 }));
@@ -627,10 +627,10 @@ export default function WhatsAppChatbotBuilderPage() {
           });
 
           // Step 2: Route edges to output ports
-          mappedNodes.forEach((node) => {
+          mappedNodes.forEach((node: any) => {
             if (node.type === "CHOICE" && node.choices) {
-              node.choices = node.choices.map((choice) => {
-                const matchingEdge = edges.find((edge) => 
+              node.choices = node.choices.map((choice: any) => {
+                const matchingEdge = edges.find((edge: any) => 
                   edge.from?.blockId === node.id && 
                   (edge.from?.portKey === `button:${choice.id}` || edge.from?.portKey === choice.id)
                 );
@@ -643,7 +643,7 @@ export default function WhatsAppChatbotBuilderPage() {
                 return choice;
               });
             } else {
-              const matchingEdge = edges.find((edge) => edge.from?.blockId === node.id);
+              const matchingEdge = edges.find((edge: any) => edge.from?.blockId === node.id);
               if (matchingEdge) {
                 const targetBlockId = getGroupFirstBlockId(matchingEdge.to?.groupId);
                 if (targetBlockId) {

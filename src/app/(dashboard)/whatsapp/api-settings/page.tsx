@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Key, ShieldCheck, RefreshCw, CheckCircle2, AlertTriangle, Eye, EyeOff, Send, Save, ArrowRight, Store, MessageSquare, Users, Bot, Layers, BookOpen, Edit3, X, Plus, Trash2, UserCheck, UserX, Shield } from "lucide-react";
+import { Key, ShieldCheck, RefreshCw, CheckCircle2, AlertTriangle, Eye, EyeOff, Send, Save, ArrowRight, Store, MessageSquare, Users, Bot, Layers, BookOpen, Edit3, X, Plus, Trash2, UserCheck, UserX, Shield, Activity } from "lucide-react";
+import WebhookCapiHealthDashboard from "@/components/whatsapp/WebhookCapiHealthDashboard";
 import { 
   getWhatsAppApiCredentialsAction, 
   saveWhatsAppApiCredentialsAction, 
@@ -444,6 +445,18 @@ export default function WhatsAppAPISettingsPage() {
 
 
         <button
+          onClick={() => setActiveTab("webhook-health")}
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${
+            activeTab === "webhook-health" 
+              ? "border-indigo-600 text-indigo-600" 
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:border-gray-300"
+          }`}
+        >
+          <Activity size={16} />
+          <span>📡 Webhook & CAPI Health</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("team-sla")}
           className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${
             activeTab === "team-sla" 
@@ -480,7 +493,10 @@ export default function WhatsAppAPISettingsPage() {
         </button>
       </div>
 
-
+      {/* Webhook & CAPI Health Tab */}
+      {activeTab === "webhook-health" && (
+        <WebhookCapiHealthDashboard />
+      )}
 
       {/* 3. Teams Tab */}
       {activeTab === "team-sla" && (

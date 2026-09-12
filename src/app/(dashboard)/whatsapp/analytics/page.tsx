@@ -71,7 +71,7 @@ export default function WhatsAppAnalyticsPage() {
       return;
     }
     setSimSubmitting(true);
-    const res = await recordCsatRatingAction(simConversationId.trim(), simScore, simFeedback);
+    const res = await recordCsatRatingAction({ conversationId: simConversationId.trim(), score: simScore, feedback: simFeedback });
     if (res.success) {
       setSimStatus(`✓ CSAT Rating of ${simScore}★ submitted successfully!`);
       await fetchAnalytics();

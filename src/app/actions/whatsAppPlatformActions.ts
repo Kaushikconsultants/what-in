@@ -3,9 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import { seedWhatsAppPlatformData } from "@/lib/seedWhatsApp";
 import { revalidatePath } from "next/cache";
-import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey } from "@/lib/phoneUtils";
+import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey, resolveWhatsAppDispatchPhone } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
-import { getAuthenticatedUser } from "@/lib/authSession";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 export async function getWhatsAppChatbotLogsAction(phone: string) {
   try {
@@ -206,24 +206,7 @@ export async function getWhatsAppConversations(filters: ConversationFilterOption
     const conversations = await prisma.whatsAppConversation.findMany({
       where,
       include: {
-        customer: {
-          select: {
-            id: true,
-            businessName: true,
-            contactPerson: true,
-            mobile: true,
-            email: true,
-            city: true,
-            state: true,
-            customerType: true,
-            status: true,
-            leadStage: true,
-            temperature: true,
-            tags: true,
-            totalOrders: true,
-            totalPurchaseValue: true
-          }
-        },
+        customer: true,
         assignedEmployee: {
           select: {
             id: true,
@@ -420,6 +403,7 @@ export async function sendWhatsAppMessageAction(data: {
 
     let metaMessageId = null;
     let messageStatus = 'SENT';
+    let metaErrorDetails: any = null;
 
     // Call Meta API if it's an outbound message and not an internal note
     if (!data.isInternalNote && data.senderType !== 'CUSTOMER') {
@@ -534,7 +518,7 @@ export async function sendWhatsAppMessageAction(data: {
         }
 
 
-        let metaErrorDetails: any = null;
+        metaErrorDetails = null;
         try {
            const response = await fetch(url, {
              method: 'POST',
@@ -2023,7 +2007,7 @@ export async function getMetaUploadHandle(accessToken: string, appIdOrWabaId: st
         'file_offset': '0',
         'Content-Type': mimeType
       },
-      body: imageBuffer
+      body: new Uint8Array(imageBuffer) as any
     });
     const binaryJson = await binaryRes.json();
     if (binaryJson.h) {
@@ -2528,8 +2512,8 @@ interface BrandIntelligenceContext {
   knowledgeBase?: string;
   systemRules?: string;
   selectedProducts?: Array<any>;
-  activeProducts?: Array<{ id?: string; name: string; sellingPrice?: number; mrp?: number; category?: string; images?: string[]; description?: string; sku?: string; stockQuantity?: number; handle?: string; productUrl?: string; primaryImage?: string }>;
-  activeCombos?: Array<{ combo_name?: string; combo_price?: number; discount_code?: string }>;
+  activeProducts?: Array<any>;
+  activeCombos?: Array<any>;
   cannedFaqs?: string;
 }
 
@@ -2968,6 +2952,7 @@ export async function generateAITemplateAction(prompt: string, context?: {
       account,
       legacySetting,
       organization,
+      clientRec,
       activeProducts,
       activeCombos,
       cannedResponses
@@ -2977,6 +2962,7 @@ export async function generateAITemplateAction(prompt: string, context?: {
       prisma.whatsAppAccount.findFirst().catch(() => null),
       prisma.whatsAppLegacySetting.findFirst().catch(() => null),
       prisma.organization.findFirst().catch(() => null),
+      prisma.whatsAppClient.findFirst().catch(() => null),
       prisma.product.findMany({ 
         where: { status: 'Active' }, 
         take: 30, 
@@ -3937,7 +3923,7 @@ export async function launchWhatsAppBroadcastAction(data: {
 
       const customers = await prisma.customer.findMany({
         where: whereClause,
-        select: { id: true, mobile: true, whatsappNumber: true, contactPerson: true, businessName: true, city: true },
+        select: { id: true, mobile: true, whatsappNumber: true, contactPerson: true, businessName: true, billingAddress: true },
         take: 5000
       });
 
@@ -3947,7 +3933,7 @@ export async function launchWhatsAppBroadcastAction(data: {
         return {
           toPhone: formatted,
           customerName: c.contactPerson || c.businessName || 'Customer',
-          customerCity: c.city || 'India'
+          customerCity: c.billingAddress || 'India'
         };
       }).filter(q => q.toPhone && q.toPhone.length >= 10);
     }
@@ -4036,7 +4022,7 @@ export async function getWhatsAppAudienceSegments() {
           contactPerson: true,
           mobile: true,
           whatsappNumber: true,
-          city: true,
+          billingAddress: true,
           tags: true,
           status: true,
           customerType: true
@@ -4157,12 +4143,12 @@ export async function getBroadcastCampaignAnalyticsAction(campaignId: string) {
               customerId: { in: customerIds },
               createdAt: { gte: campaign.createdAt }
             },
-            select: { id: true, customerId: true, totalAmount: true, createdAt: true }
+            select: { id: true, customerId: true, totalValue: true, createdAt: true }
           });
 
           if (attributedOrders.length > 0) {
             totalOrders = Math.max(totalOrders, attributedOrders.length);
-            const sumRevenue = attributedOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+            const sumRevenue = attributedOrders.reduce((sum, o) => sum + (o.totalValue || 0), 0);
             totalRevenue = Math.max(totalRevenue, sumRevenue);
           }
         }
@@ -4368,7 +4354,7 @@ export async function exportWhatsAppConversationsCSV() {
       `"${(c.customer?.businessName || c.customer?.contactPerson || "").replace(/"/g, '""')}"`,
       `"${c.customer?.mobile || ""}"`,
       `"${c.leadStatus || ""}"`,
-      `"${c.priority || ""}"`,
+      `"${(c.customer as any)?.temperature || c.slaStatus || ""}"`,
       `"${c.assignedEmployee?.user?.name || ""}"`,
       `"${(c.lastMessageText || "").replace(/"/g, '""')}"`,
       `"${c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleString() : ""}"`
@@ -4845,7 +4831,7 @@ export async function createWhatsAppCannedResponseAction(data: {
         footerText: data.footerText || null,
         mediaUrl: data.mediaUrl || null,
         mediaType: data.mediaType || null,
-        buttons: data.buttons ? JSON.stringify(data.buttons) : null,
+        buttons: data.buttons ? JSON.stringify(data.buttons) : (undefined as any),
       }
     });
     return { success: true, response: res };
@@ -4875,7 +4861,7 @@ export async function updateWhatsAppCannedResponseAction(id: string, data: {
         footerText: data.footerText || null,
         mediaUrl: data.mediaUrl || null,
         mediaType: data.mediaType || null,
-        buttons: data.buttons ? JSON.stringify(data.buttons) : null,
+        buttons: data.buttons ? JSON.stringify(data.buttons) : (undefined as any),
       }
     });
     return { success: true, response: res };
@@ -5367,8 +5353,8 @@ export async function syncMetaCatalogProductsAction(options?: { cleanupPrevious?
     let pageCount = 0;
     while (nextUrl && pageCount < 5) {
       pageCount++;
-      const res = await fetch(nextUrl);
-      const data = await res.json();
+      const res: Response = await fetch(nextUrl);
+      const data: any = await res.json();
       if (!res.ok || data.error) {
         throw new Error(data.error?.message || "Failed to fetch products from Meta Catalog");
       }
@@ -6803,7 +6789,7 @@ export async function processCampaignQueueAction(campaignId: string) {
 
         // Media Header parameter support (Image/Video/Document)
         if (activeTemplate?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(activeTemplate.headerType.toUpperCase())) {
-          const mediaUrl = activeTemplate.headerMediaUrl || activeTemplate.headerContent;
+          const mediaUrl = (activeTemplate as any)?.headerMediaUrl || activeTemplate.headerContent;
           if (mediaUrl && mediaUrl.startsWith('http')) {
             const hType = activeTemplate.headerType.toLowerCase();
             components.push({
@@ -6934,7 +6920,7 @@ export async function processCampaignQueueAction(campaignId: string) {
                   contactPerson: item.customerName || "Customer",
                   mobile: phone,
                   whatsappNumber: phone,
-                  city: item.customerCity || "India"
+                  billingAddress: item.customerCity || "India"
                 }
               });
             }
@@ -7246,7 +7232,7 @@ function compileMetaFlowJson(name: string, screenName: string, ctaText: string, 
       "name": "complete",
       "payload": {}
     }
-  });
+  } as any);
 
   return {
     version: "3.1",
@@ -7745,7 +7731,7 @@ export async function toggleContactCrmStatusAction(customerId: string, markDone:
             whatsappNumber: customer.whatsappNumber || customer.mobile,
             tags: customer.tags || '',
             createdAt: customer.createdAt,
-            city: customer.city || '',
+            city: (customer as any).city || customer.billingAddress || '',
             source: 'WhatsApp Contacts Hub'
           };
           const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -8649,7 +8635,7 @@ export async function getWhatsAppBrandDetailsAction() {
       brandDomain = rawDomain.includes("esponsports") ? "esponsports.com" : rawDomain;
     }
 
-    const phoneNumber = company?.mobile || company?.phone || account?.phoneNumber || "+91 7206066678";
+    const phoneNumber = company?.mobile || (company as any)?.phone || account?.phoneNumber || "+91 7206066678";
     const brandEmail = company?.email || org?.email || `support@${brandDomain}`;
     const brandAddress = company?.address 
       ? `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim()
@@ -8873,12 +8859,12 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
       success: true,
       products: formattedProducts,
       categories: categories.map(c => c.name),
-      combos: combos.map(c => ({
+      combos: combos.map((c: any) => ({
         id: c.id,
-        name: c.combo_name,
+        name: c.combo_name || c.product_title || 'Combo Deal',
         price: c.combo_price,
         discountCode: c.discount_code,
-        productsCount: (c.products as any)?.length || 2
+        productsCount: c.combo_count || (c.products as any)?.length || 2
       })),
       brandDomain,
       stats: {

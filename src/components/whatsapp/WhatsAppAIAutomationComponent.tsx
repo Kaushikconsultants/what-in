@@ -134,7 +134,7 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
         if (!testRes.success) {
           const proceed = confirm(
             `⚠️ Google API Verification Notice:\n\n` +
-            `Google rejected this key with message:\n"${testRes.error}"\n\n` +
+            `Google rejected this key with message:\n"${(testRes as any).error || 'Verification failed'}"\n\n` +
             `Do you still wish to save this key? (WhatsApp AI auto-replies will not work until a valid key is provided).`
           );
           if (!proceed) {

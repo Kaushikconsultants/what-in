@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     
     // Dynamically import the Node bundle of pdf-parse to avoid browser polyfill errors
-    const { default: pdfParse } = await import('pdf-parse/node');
+    const pdfModule: any = await import('pdf-parse/node');
+    const pdfParse = pdfModule.default || pdfModule;
     const data = await pdfParse(buffer);
     const newText = '\n\n--- Source: PDF Upload (' + file.name + ') ---\n' + data.text.trim();
     

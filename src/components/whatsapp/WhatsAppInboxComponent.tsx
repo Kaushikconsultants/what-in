@@ -1933,6 +1933,18 @@ export default function WhatsAppInboxComponent() {
                   <span>{activeConvDetail.assignedEmployee?.user?.name ? `Assign (${activeConvDetail.assignedEmployee.user.name})` : "Assign"}</span>
                 </button>
 
+                <button
+                  className="chat-action-btn"
+                  onClick={() => {
+                    if (!activeConvDetail?.id) return;
+                    window.open(`/api/whatsapp/chat/export?conversationId=${activeConvDetail.id}&format=csv`, '_blank');
+                  }}
+                  title="Export full chat transcript to CSV"
+                >
+                  <Download size={14} />
+                  <span>Transcript</span>
+                </button>
+
                 {paymentConfigured && (
                   <button className="chat-action-btn" onClick={() => setShowPaymentModal(true)} title="Send Payment Link">
                     <CreditCard size={14} />

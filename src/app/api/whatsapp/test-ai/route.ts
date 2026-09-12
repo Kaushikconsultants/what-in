@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const preferredModel = (body.model && GEMINI_MODEL_CASCADE.includes(body.model))
       ? body.model
-      : (dbSettings?.aiModel && GEMINI_MODEL_CASCADE.includes(dbSettings.aiModel) ? dbSettings.aiModel : HARDCODED_PRIMARY_MODEL);
+      : (dbSettings?.aiModel && GEMINI_MODEL_CASCADE.includes(dbSettings.aiModel) ? dbSettings.aiModel : (GEMINI_MODEL_CASCADE[0] || 'gemini-2.5-flash'));
     const systemRules = body.systemPrompt !== undefined ? body.systemPrompt : (dbSettings?.aiSystemPrompt || 'You are a helpful customer service assistant.');
     const knowledgeBase = body.knowledgeBase !== undefined ? body.knowledgeBase : (dbSettings?.aiKnowledgeBase || '');
     const fallbackLang = body.fallbackLanguage || dbSettings?.aiFallbackLanguage || 'English';

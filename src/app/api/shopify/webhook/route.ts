@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
         if (!customer) {
           customer = await prisma.customer.create({
             data: {
+              businessName: customerName || `Customer ${last10}`,
               contactPerson: customerName,
               mobile: cleanPhone,
               whatsappNumber: cleanPhone,
@@ -89,6 +90,9 @@ export async function POST(req: NextRequest) {
         }
 
         let account = await prisma.whatsAppAccount.findFirst({ orderBy: { createdAt: 'desc' } });
+        if (!account) {
+          account = await prisma.whatsAppAccount.create({ data: { name: 'Main Account', phoneNumber: '919876543210' } });
+        }
         let conv = await prisma.whatsAppConversation.findFirst({
           where: { customerId: customer.id }
         });
@@ -98,7 +102,7 @@ export async function POST(req: NextRequest) {
             data: {
               clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
               customerId: customer.id,
-              accountId: account?.id,
+              accountId: account.id,
               status: 'OPEN',
               orderStatus: 'Confirmed'
             }

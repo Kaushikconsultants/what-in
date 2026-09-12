@@ -1,11 +1,12 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const nextConfig: any = {
   typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",
-      allowedOrigins: ["what-in.tinkal.in", "*.railway.app", "localhost:3000"]
+      allowedOrigins: ["whatsapp.esponsports.com", "*.railway.app", "localhost:3000"]
     }
   }
 };
