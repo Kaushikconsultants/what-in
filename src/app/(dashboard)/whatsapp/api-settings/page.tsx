@@ -21,9 +21,17 @@ import {
   getAllAgentsAction
 } from "@/app/actions/whatsAppPlatformActions";
 import { getPaymentGatewaySettings, savePaymentGatewaySettings } from "@/app/actions/paymentGatewayActions";
+import { changeUserPasswordAction } from "@/app/actions/ownerPortalActions";
 
 export default function WhatsAppAPISettingsPage() {
-  const [activeTab, setActiveTab] = useState("gemini-ai");
+  const [activeTab, setActiveTab] = useState("team-sla");
+
+  // Admin Password Change State
+  const [adminNewPassword, setAdminNewPassword] = useState("");
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [savingAdminPass, setSavingAdminPass] = useState(false);
+  const [adminPassMsg, setAdminPassMsg] = useState<{ success: boolean; text: string } | null>(null);
 
   // Payment Gateway State
   const [pgActiveGateway, setPgActiveGateway] = useState<string | null>(null);
@@ -291,45 +299,31 @@ export default function WhatsAppAPISettingsPage() {
     }
   };
 
-  const handleSaveSLASettings = async (e: React.FormEvent) => {
+  const handleChangeAdminPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavingSLA(true);
-    setSlaResultMsg(null);
-    const res = await saveWhatsAppSettingsAction({
-      workingHoursStart,
-      workingHoursEnd,
-      slaWarningMinutes: slaMinutes,
-      autoAssignStrategy
-    });
-    setSavingSLA(false);
-    if (res.success) {
-      setSlaResultMsg({ success: true, text: "✓ SLA and Work hours targets configured!" });
-    } else {
-      setSlaResultMsg({ success: false, text: "Error: " + res.error });
-    }
-  };
+    setAdminPassMsg(null);
 
-  const handleCreateCRMContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingCRM(true);
-    setCrmResultMsg(null);
-    const res = await createCRMCustomerAction({
-      contactPerson: newContactName,
-      mobile: newContactPhone,
-      customerType: newContactType
-    });
-    setSavingCRM(false);
+    if (adminNewPassword.length < 6) {
+      setAdminPassMsg({ success: false, text: "Password must be at least 6 characters long." });
+      return;
+    }
+
+    if (adminNewPassword !== adminConfirmPassword) {
+      setAdminPassMsg({ success: false, text: "Passwords do not match." });
+      return;
+    }
+
+    setSavingAdminPass(true);
+    const targetEmail = currentUserEmail || "admin@esponsports.com";
+    const res = await changeUserPasswordAction(targetEmail, adminNewPassword);
+    setSavingAdminPass(false);
+
     if (res.success) {
-      setCrmResultMsg({ success: true, text: `✓ Customer "${newContactName}" registered successfully!` });
-      setNewContactName("");
-      setNewContactPhone("");
-      // reload contacts
-      const resCRM = await getCRMCustomersAction();
-      if (resCRM.success && resCRM.customers) {
-        setCrmContacts(resCRM.customers);
-      }
+      setAdminPassMsg({ success: true, text: "✓ Password updated successfully! Your new password is now active." });
+      setAdminNewPassword("");
+      setAdminConfirmPassword("");
     } else {
-      setCrmResultMsg({ success: false, text: "Error: " + res.error });
+      setAdminPassMsg({ success: false, text: res.error || "Failed to update password." });
     }
   };
 
@@ -471,6 +465,18 @@ export default function WhatsAppAPISettingsPage() {
         >
           <Users size={16} />
           <span>👥 Team Agents</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("security")}
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${
+            activeTab === "security" 
+              ? "border-indigo-600 text-indigo-600" 
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:border-gray-300"
+          }`}
+        >
+          <ShieldCheck size={16} />
+          <span>🔐 Change Password</span>
         </button>
       </div>
 
@@ -783,6 +789,94 @@ export default function WhatsAppAPISettingsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Admin Security & Password Change Tab */}
+      {activeTab === "security" && (
+        <div className="flex flex-col gap-6 w-full max-w-xl">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+              <ShieldCheck size={20} className="text-indigo-600" /> Change Admin Password
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Update your administrative account password anytime. Your new password will take effect immediately.
+            </p>
+
+            {adminPassMsg && (
+              <div className={`p-4 rounded-xl text-sm font-semibold flex items-center gap-2 mb-5 ${
+                adminPassMsg.success 
+                  ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' 
+                  : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+              }`}>
+                {adminPassMsg.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{adminPassMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangeAdminPassword} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                  Admin Account Email
+                </label>
+                <input
+                  type="email"
+                  value={currentUserEmail || "admin@esponsports.com"}
+                  disabled
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/60 text-sm text-gray-500 cursor-not-allowed outline-none"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-bold text-gray-600 dark:text-gray-300 uppercase">
+                    New Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPass(!showAdminPass)}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-1 cursor-pointer"
+                  >
+                    {showAdminPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    <span>{showAdminPass ? "Hide" : "Show"}</span>
+                  </button>
+                </div>
+                <input
+                  type={showAdminPass ? "text" : "password"}
+                  placeholder="Enter new password (min. 6 characters)"
+                  value={adminNewPassword}
+                  onChange={e => setAdminNewPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                  Confirm New Password
+                </label>
+                <input
+                  type={showAdminPass ? "text" : "password"}
+                  placeholder="Re-enter new password"
+                  value={adminConfirmPassword}
+                  onChange={e => setAdminConfirmPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                />
+              </div>
+
+              <div className="pt-3">
+                <button
+                  type="submit"
+                  disabled={savingAdminPass || !adminNewPassword}
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-xl text-sm font-bold shadow-md transition-all cursor-pointer"
+                >
+                  {savingAdminPass ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+                  <span>{savingAdminPass ? "Updating Password..." : "Update Password"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

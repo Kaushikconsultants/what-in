@@ -889,24 +889,34 @@ export async function changeUserPasswordAction(email: string, newPassword: strin
     const hashedPassword = await bcrypt.hash(cleanPass, 10);
 
     const agent = await prisma.whatsAppAgentUser.findUnique({ where: { email: cleanEmail } });
-    if (!agent) {
+    const legacyUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
+    if (!agent && !legacyUser) {
       return { success: false, error: "User account not found" };
     }
 
-    await prisma.whatsAppAgentUser.update({
-      where: { email: cleanEmail },
-      data: {
-        password: hashedPassword,
-        mustChangePassword: false
-      }
-    });
-
-    // If this user is an admin of a client, also update client adminPassword
-    if (agent.role === "ADMIN" && agent.clientId) {
-      await prisma.whatsAppClient.update({
-        where: { id: agent.clientId },
-        data: { adminPassword: hashedPassword }
+    if (agent) {
+      await prisma.whatsAppAgentUser.update({
+        where: { email: cleanEmail },
+        data: {
+          password: hashedPassword,
+          mustChangePassword: false
+        }
       });
+
+      // If this user is an admin of a client, also update client adminPassword
+      if (agent.role === "ADMIN" && agent.clientId) {
+        await prisma.whatsAppClient.update({
+          where: { id: agent.clientId },
+          data: { adminPassword: hashedPassword }
+        }).catch(() => {});
+      }
+    }
+
+    if (legacyUser) {
+      await prisma.user.update({
+        where: { email: cleanEmail },
+        data: { password: hashedPassword }
+      }).catch(() => {});
     }
 
     return { success: true };

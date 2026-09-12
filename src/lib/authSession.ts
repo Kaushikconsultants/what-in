@@ -106,31 +106,65 @@ export async function getAuthenticatedUser(req?: NextRequest): Promise<SessionUs
       resolvedUser = verifySessionToken(token);
     }
 
-    // Fallback: If legacy wm_session exists, verify wm_user payload with database check
+    // Fallback: Check wm_user cookie and verify active user in database
     if (!resolvedUser) {
-      let sessionSecret = req?.cookies.get("wm_session")?.value;
-      if (!sessionSecret) {
-        const cookieStore = await cookies();
-        sessionSecret = cookieStore.get("wm_session")?.value;
-      }
-      if (sessionSecret === SESSION_SECRET) {
-        let rawUser = req?.cookies.get("wm_user")?.value;
-        if (!rawUser) {
+      let rawUser = req?.cookies.get("wm_user")?.value;
+      if (!rawUser) {
+        try {
           const cookieStore = await cookies();
           rawUser = cookieStore.get("wm_user")?.value;
+        } catch {}
+      }
+
+      if (rawUser) {
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(decodeURIComponent(rawUser));
+        } catch {
+          try {
+            parsed = JSON.parse(rawUser);
+          } catch {}
         }
-        if (rawUser) {
-          const parsed = JSON.parse(decodeURIComponent(rawUser));
-          resolvedUser = {
-            id: parsed.id,
-            name: parsed.name,
-            email: parsed.email,
-            role: parsed.role || "AGENT",
-            clientId: parsed.clientId,
-            employeeId: parsed.employeeId,
-            mustChangePassword: parsed.mustChangePassword,
-            exp: Date.now() + 86400000
-          };
+
+        if (parsed && parsed.email) {
+          const cleanEmail = String(parsed.email).trim().toLowerCase();
+
+          try {
+            const agentUser = await prisma.whatsAppAgentUser.findUnique({
+              where: { email: cleanEmail },
+              select: { id: true, name: true, email: true, role: true, clientId: true, isActive: true }
+            });
+            const dbUser = !agentUser ? await prisma.user.findUnique({
+              where: { email: cleanEmail },
+              select: { id: true, name: true, email: true, role: true, isActive: true }
+            }) : null;
+
+            if ((agentUser && agentUser.isActive !== false) || (dbUser && dbUser.isActive !== false)) {
+              const matchedObj = agentUser || dbUser;
+              resolvedUser = {
+                id: matchedObj?.id || parsed.id,
+                name: matchedObj?.name || parsed.name,
+                email: cleanEmail,
+                role: (agentUser?.role || dbUser?.role || parsed.role || "AGENT").toUpperCase(),
+                clientId: agentUser?.clientId || parsed.clientId,
+                employeeId: parsed.employeeId,
+                mustChangePassword: parsed.mustChangePassword,
+                exp: Date.now() + 86400000 * 30
+              };
+            }
+          } catch (dbErr) {
+            console.error("[getAuthenticatedUser DB lookup error]:", dbErr);
+            resolvedUser = {
+              id: parsed.id,
+              name: parsed.name,
+              email: cleanEmail,
+              role: (parsed.role || "AGENT").toUpperCase(),
+              clientId: parsed.clientId,
+              employeeId: parsed.employeeId,
+              mustChangePassword: parsed.mustChangePassword,
+              exp: Date.now() + 86400000
+            };
+          }
         }
       }
     }

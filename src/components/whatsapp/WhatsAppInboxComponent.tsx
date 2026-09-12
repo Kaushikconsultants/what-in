@@ -569,7 +569,7 @@ export default function WhatsAppInboxComponent() {
     try {
       const params = new URLSearchParams({ action: 'chats' });
       if (searchQuery) params.set('search', searchQuery);
-      const res = await fetch('/api/whatsapp/inbox?' + params.toString(), { cache: 'no-store' });
+      const res = await fetch('/api/whatsapp/inbox?' + params.toString(), { cache: 'no-store', credentials: 'include' });
       if (!res.ok) throw new Error('API error ' + res.status);
       const data = await res.json();
 
@@ -745,7 +745,7 @@ export default function WhatsAppInboxComponent() {
     if (!silent) setLoadingDetail(true);
     try {
       const params = new URLSearchParams({ action: 'detail', convId: id });
-      const apiRes = await fetch('/api/whatsapp/inbox?' + params.toString(), { cache: 'no-store' });
+      const apiRes = await fetch('/api/whatsapp/inbox?' + params.toString(), { cache: 'no-store', credentials: 'include' });
       if (!apiRes.ok) throw new Error('API error ' + apiRes.status);
       const res = await apiRes.json();
       if (res.success && res.conversation) {
@@ -1130,7 +1130,8 @@ export default function WhatsAppInboxComponent() {
     
     try {
       const res = await fetch(`/api/whatsapp/inbox?convId=${selectedConvId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       });
       const data = await res.json();
       if (data.success) {
