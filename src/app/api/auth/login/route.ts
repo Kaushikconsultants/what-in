@@ -37,12 +37,15 @@ export async function POST(req: NextRequest) {
 
       if (isMatch) {
         const mustChange = agent.mustChangePassword ?? false;
+        const emp = await prisma.employee.findFirst({ where: { user: { email: cleanEmail } } });
+
         const sessionToken = createSessionToken({
           id: agent.id,
           name: agent.name,
           email: agent.email,
           role: agent.role,
           clientId: agent.clientId,
+          employeeId: emp?.id,
           mustChangePassword: mustChange
         });
 
@@ -51,6 +54,7 @@ export async function POST(req: NextRequest) {
           name: agent.name,
           role: agent.role,
           clientId: agent.clientId,
+          employeeId: emp?.id,
           mustChangePassword: mustChange
         });
 
@@ -79,6 +83,7 @@ export async function POST(req: NextRequest) {
           email: agent.email,
           role: agent.role,
           clientId: agent.clientId,
+          employeeId: emp?.id,
           mustChangePassword: mustChange
         }), {
           httpOnly: false,
@@ -111,14 +116,43 @@ export async function POST(req: NextRequest) {
       }
 
       if (isMatch) {
+        const emp = await prisma.employee.findFirst({ where: { user: { email: cleanEmail } } });
+        const agentRecord = await prisma.whatsAppAgentUser.findUnique({ where: { email: cleanEmail } });
+        let clientId = agentRecord?.clientId;
+        if (!clientId) {
+          const matchedClient = await prisma.whatsAppClient.findFirst({
+            where: {
+              OR: [
+                { adminEmail: cleanEmail },
+                { contactEmail: cleanEmail }
+              ]
+            },
+            select: { id: true }
+          });
+          clientId = matchedClient?.id;
+        }
+        if (!clientId) {
+          const firstClient = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true } });
+          clientId = firstClient?.id || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+        }
+        const effectiveRole = agentRecord?.role || user.role;
+
         const sessionToken = createSessionToken({
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role
+          role: effectiveRole,
+          clientId: clientId,
+          employeeId: emp?.id
         });
 
-        const res = NextResponse.json({ success: true, name: user.name, role: user.role });
+        const res = NextResponse.json({
+          success: true,
+          name: user.name,
+          role: effectiveRole,
+          clientId: clientId,
+          employeeId: emp?.id
+        });
 
         res.cookies.set("wm_token", sessionToken, {
           httpOnly: true,
@@ -142,7 +176,9 @@ export async function POST(req: NextRequest) {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role
+          role: effectiveRole,
+          clientId: clientId,
+          employeeId: emp?.id
         }), {
           httpOnly: false,
           secure: process.env.NODE_ENV === "production",

@@ -371,6 +371,7 @@ export async function sendDirectWhatsAppDispatchAction(phone: string, content: s
     if (!conversation) {
       conversation = await prisma.whatsAppConversation.create({
         data: {
+          clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
           accountId: account.id,
           customerId: customer.id,
           status: 'OPEN',
@@ -1873,6 +1874,7 @@ export async function sendWhatsAppTemplateAction(
             const acc = await prisma.whatsAppAccount.findFirst();
             const conv = await prisma.whatsAppConversation.create({
               data: {
+                clientId: (cust as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
                 accountId: acc?.id || 'default_account',
                 customerId: cust.id,
                 status: 'OPEN',
@@ -6939,6 +6941,7 @@ export async function processCampaignQueueAction(campaignId: string) {
 
             conv = await prisma.whatsAppConversation.create({
               data: {
+                clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
                 accountId: account.id,
                 customerId: customer.id,
                 status: "OPEN",
@@ -7696,6 +7699,7 @@ export async function getOrCreateWhatsAppConversationForContactAction(customerId
 
       conv = await prisma.whatsAppConversation.create({
         data: {
+          clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
           accountId: account.id,
           customerId: customer.id,
           tags: customer.tags || null,
@@ -7904,6 +7908,7 @@ export async function createWhatsAppContactAction(data: {
       if (!conv) {
         await prisma.whatsAppConversation.create({
           data: {
+            clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
             accountId: account.id,
             customerId: customer.id,
             tags: customer.tags || null,
@@ -8364,6 +8369,7 @@ export async function assignImportedContactsBatchAction(params: BatchAssignmentP
         } else {
           conv = await prisma.whatsAppConversation.create({
             data: {
+              clientId: "8c519684-5a75-45be-b74b-5f9553f7ea32",
               accountId: account.id,
               customerId: cid,
               assignedEmployeeId: emp.id,
@@ -8429,6 +8435,7 @@ export async function assignImportedContactsBatchAction(params: BatchAssignmentP
         } else {
           conv = await prisma.whatsAppConversation.create({
             data: {
+              clientId: "8c519684-5a75-45be-b74b-5f9553f7ea32",
               accountId: account.id,
               customerId: cid,
               teamId: team.id,
@@ -8545,6 +8552,7 @@ export async function assignImportedContactsBatchAction(params: BatchAssignmentP
         } else {
           conv = await prisma.whatsAppConversation.create({
             data: {
+              clientId: "8c519684-5a75-45be-b74b-5f9553f7ea32",
               accountId: account.id,
               customerId: cid,
               assignedEmployeeId: assignedEmp.id,

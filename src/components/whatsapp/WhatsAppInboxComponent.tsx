@@ -411,8 +411,12 @@ export default function WhatsAppInboxComponent() {
       if (u) {
         const v = decodeURIComponent(u.split("=")[1]);
         const parsed = JSON.parse(v);
-        setCurrentUserRole(parsed.role || "");
+        const role = parsed.role || "";
+        setCurrentUserRole(role);
         setCurrentEmployeeId(parsed.employeeId || "");
+        if (role === 'AGENT' || role === 'SALES') {
+          setActiveNavTab("assigned_to_me");
+        }
       }
     } catch {}
   }, []);
@@ -592,13 +596,22 @@ export default function WhatsAppInboxComponent() {
         }));
 
         // Read user details from cookie for filtering to avoid stale state in closures
+        let activeRole = currentUserRole;
+        let activeEmpId = currentEmployeeId;
         try {
           const u = document.cookie.split(";").find((c: any) => c.trim().startsWith("wm_user="));
           if (u) {
             const v = decodeURIComponent(u.split("=")[1]);
             const parsed = JSON.parse(v);
-            if (parsed.role) setCurrentUserRole(parsed.role);
+            if (parsed.role) {
+              activeRole = parsed.role;
+              setCurrentUserRole(parsed.role);
+            }
             if (parsed.name) setCurrentUserName(parsed.name);
+            if (parsed.employeeId) {
+              activeEmpId = parsed.employeeId;
+              setCurrentEmployeeId(parsed.employeeId);
+            }
           }
         } catch (e) {
           console.error("Error reading wm_user cookie", e);
@@ -606,15 +619,31 @@ export default function WhatsAppInboxComponent() {
 
         // Apply Tab Filter (All, Assigned, Unassigned, Closed)
         let filtered = mapped;
+        const isAgent = activeRole === 'AGENT' || activeRole === 'SALES';
         
-        if (activeNavTab === 'assigned_to_me' || activeNavTab === 'assigned') {
-          filtered = mapped.filter((c: any) => c._raw.assignedEmployeeId !== null && c.status === 'OPEN');
-        } else if (activeNavTab === 'unassigned') {
-          filtered = mapped.filter((c: any) => c._raw.assignedEmployeeId === null && c.status === 'OPEN');
-        } else if (activeNavTab === 'closed') {
-          filtered = mapped.filter((c: any) => c.status === 'CLOSED');
+        if (isAgent) {
+          // Strict Agent Scoping: Agents can ONLY see chats assigned to them
+          filtered = mapped.filter((c: any) => {
+            const matchesEmp = activeEmpId ? c._raw.assignedEmployeeId === activeEmpId : true;
+            return matchesEmp && (activeNavTab === 'closed' ? c.status === 'CLOSED' : c.status === 'OPEN');
+          });
         } else {
-          filtered = mapped.filter((c: any) => c.status === 'OPEN'); // 'all'
+          // Admin / Manager tab filtering
+          if (activeNavTab === 'assigned_to_me') {
+            filtered = mapped.filter((c: any) => 
+              activeEmpId 
+                ? c._raw.assignedEmployeeId === activeEmpId && c.status === 'OPEN'
+                : c._raw.assignedEmployeeId !== null && c.status === 'OPEN'
+            );
+          } else if (activeNavTab === 'assigned') {
+            filtered = mapped.filter((c: any) => c._raw.assignedEmployeeId !== null && c.status === 'OPEN');
+          } else if (activeNavTab === 'unassigned') {
+            filtered = mapped.filter((c: any) => c._raw.assignedEmployeeId === null && c.status === 'OPEN');
+          } else if (activeNavTab === 'closed') {
+            filtered = mapped.filter((c: any) => c.status === 'CLOSED');
+          } else {
+            filtered = mapped.filter((c: any) => c.status === 'OPEN'); // 'all'
+          }
         }
         // Apply Lead Status Filter
         if (leadStatusFilter) {
@@ -1545,7 +1574,7 @@ export default function WhatsAppInboxComponent() {
                 </div>
 
                 {/* Folder Tabs */}
-                {currentUserRole !== 'AGENT' && (
+                {currentUserRole !== 'AGENT' && currentUserRole !== 'SALES' && (
                 <div className="left-folder-tabs" style={{ margin: 0 }}>
                   <button
                     className={`folder-tab ${activeNavTab === "all" ? "active" : ""}`}
@@ -1606,7 +1635,7 @@ export default function WhatsAppInboxComponent() {
                   <option value="Negotiation">Negotiation</option>
                   <option value="Order Confirmed">Order Confirmed</option>
                 </select>
-                {currentUserRole !== 'AGENT' && (
+                {currentUserRole !== 'AGENT' && currentUserRole !== 'SALES' && (
                 <select
                   className="filter-select"
                   value={filterEmployeeId}
@@ -2030,7 +2059,7 @@ export default function WhatsAppInboxComponent() {
                   <span>{isFullScreen ? "Exit Full Screen" : "Full Screen"}</span>
                 </button>
                 
-                {currentUserRole !== 'AGENT' && (
+                {currentUserRole !== 'AGENT' && currentUserRole !== 'SALES' && (
                   <button
                     className="chat-action-btn"
                     onClick={handleDeleteConversation}
@@ -3961,7 +3990,7 @@ export default function WhatsAppInboxComponent() {
                 </div>
               </div>
 
-              {currentUserRole !== 'AGENT' && (
+              {currentUserRole !== 'AGENT' && currentUserRole !== 'SALES' && (
                 <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid #e2e8f0" }}>
                   <span style={{ fontSize: "12px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", display: 'block', marginBottom: '8px' }}>
                     Create New Tag (Admin)

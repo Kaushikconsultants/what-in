@@ -523,13 +523,26 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       }
     }
 
-    // Step C: Link/Find Conversation (Client Scoped)
+    // Step C: Link/Find Conversation (Client Scoped with adoption fallback)
     let conversation = await prisma.whatsAppConversation.findFirst({
       where: {
         customerId: customer.id,
         ...(clientId ? { clientId } : {})
       }
     });
+
+    if (!conversation) {
+      // Fallback: Check if an existing conversation exists for this customer and adopt it
+      const existingConv = await prisma.whatsAppConversation.findFirst({
+        where: { customerId: customer.id }
+      });
+      if (existingConv) {
+        conversation = await prisma.whatsAppConversation.update({
+          where: { id: existingConv.id },
+          data: { ...(clientId ? { clientId } : {}) }
+        });
+      }
+    }
 
     const account = await prisma.whatsAppAccount.findFirst() || await prisma.whatsAppAccount.create({
       data: {
@@ -577,7 +590,7 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
     if (!conversation) {
       conversation = await prisma.whatsAppConversation.create({
         data: {
-          clientId: clientId,
+          clientId: clientId || client?.id || "8c519684-5a75-45be-b74b-5f9553f7ea32",
           accountId: account.id,
           customerId: customer.id,
           status: "OPEN",

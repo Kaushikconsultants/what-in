@@ -381,6 +381,7 @@ export async function sendShopifyWhatsAppNudgeAction(data: {
     if (!conversation) {
       conversation = await prisma.whatsAppConversation.create({
         data: {
+          clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
           customerId: customer.id,
           accountId: account?.id,
           status: 'OPEN',
@@ -490,6 +491,7 @@ export async function sendShopifyOrderWhatsAppAction(data: {
     if (!conversation) {
       conversation = await prisma.whatsAppConversation.create({
         data: {
+          clientId: (customer as any)?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32",
           customerId: customer.id,
           accountId: account?.id,
           status: 'OPEN',

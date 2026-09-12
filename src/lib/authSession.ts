@@ -1,9 +1,11 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const SESSION_SECRET = process.env.SESSION_SECRET || "whatin_secure_hmac_session_key_2026_prod";
 const OWNER_SECRET = process.env.OWNER_PORTAL_SECRET || "whatin_secure_owner_key_2026_prod";
+const DEFAULT_ESPON_CLIENT_ID = "8c519684-5a75-45be-b74b-5f9553f7ea32";
 
 export interface SessionUser {
   id?: string;
@@ -11,6 +13,7 @@ export interface SessionUser {
   email: string;
   role: string;
   clientId?: string;
+  employeeId?: string;
   mustChangePassword?: boolean;
   exp: number;
 }
@@ -60,19 +63,27 @@ export function verifySessionToken(token: string | undefined | null): SessionUse
 }
 
 /**
- * Validates whether the request comes from an authenticated Owner/Super-Admin
+ * Validates whether the request comes from an authenticated Owner/Super-Admin.
+ * Returns boolean synchronously when NextRequest is provided.
+ * Returns Promise<boolean> when called without NextRequest (Server Actions).
  */
-export async function isOwnerAuthenticated(req?: NextRequest): Promise<boolean> {
+export function isOwnerAuthenticated(req: NextRequest): boolean;
+export function isOwnerAuthenticated(req?: undefined): Promise<boolean>;
+export function isOwnerAuthenticated(req?: NextRequest): boolean | Promise<boolean> {
   try {
-    let token = req
-      ? req.cookies.get("owner_token")?.value
-      : undefined;
-    if (!token) {
-      const cookieStore = await cookies();
-      token = cookieStore.get("owner_token")?.value;
+    if (req) {
+      const token = req.cookies.get("owner_token")?.value;
+      return token === OWNER_SECRET;
     }
-    if (!token) return false;
-    return token === OWNER_SECRET;
+    return (async () => {
+      try {
+        const cookieStore = await cookies();
+        const token = cookieStore.get("owner_token")?.value;
+        return token === OWNER_SECRET;
+      } catch {
+        return false;
+      }
+    })();
   } catch {
     return false;
   }
@@ -80,46 +91,101 @@ export async function isOwnerAuthenticated(req?: NextRequest): Promise<boolean> 
 
 /**
  * Helper to get authenticated user from NextRequest or Server Action cookies
+ * Automatically enriches missing employeeId and clientId from database.
  */
 export async function getAuthenticatedUser(req?: NextRequest): Promise<SessionUser | null> {
   try {
+    let resolvedUser: SessionUser | null = null;
+
     let token = req?.cookies.get("wm_token")?.value;
     if (!token) {
       const cookieStore = await cookies();
       token = cookieStore.get("wm_token")?.value;
     }
     if (token) {
-      const verified = verifySessionToken(token);
-      if (verified) return verified;
+      resolvedUser = verifySessionToken(token);
     }
 
     // Fallback: If legacy wm_session exists, verify wm_user payload with database check
-    let sessionSecret = req?.cookies.get("wm_session")?.value;
-    if (!sessionSecret) {
-      const cookieStore = await cookies();
-      sessionSecret = cookieStore.get("wm_session")?.value;
-    }
-    if (sessionSecret === SESSION_SECRET) {
-      let rawUser = req?.cookies.get("wm_user")?.value;
-      if (!rawUser) {
+    if (!resolvedUser) {
+      let sessionSecret = req?.cookies.get("wm_session")?.value;
+      if (!sessionSecret) {
         const cookieStore = await cookies();
-        rawUser = cookieStore.get("wm_user")?.value;
+        sessionSecret = cookieStore.get("wm_session")?.value;
       }
-      if (rawUser) {
-        const parsed = JSON.parse(decodeURIComponent(rawUser));
-        return {
-          id: parsed.id,
-          name: parsed.name,
-          email: parsed.email,
-          role: parsed.role || "AGENT",
-          clientId: parsed.clientId,
-          mustChangePassword: parsed.mustChangePassword,
-          exp: Date.now() + 86400000
-        };
+      if (sessionSecret === SESSION_SECRET) {
+        let rawUser = req?.cookies.get("wm_user")?.value;
+        if (!rawUser) {
+          const cookieStore = await cookies();
+          rawUser = cookieStore.get("wm_user")?.value;
+        }
+        if (rawUser) {
+          const parsed = JSON.parse(decodeURIComponent(rawUser));
+          resolvedUser = {
+            id: parsed.id,
+            name: parsed.name,
+            email: parsed.email,
+            role: parsed.role || "AGENT",
+            clientId: parsed.clientId,
+            employeeId: parsed.employeeId,
+            mustChangePassword: parsed.mustChangePassword,
+            exp: Date.now() + 86400000
+          };
+        }
       }
     }
-    return null;
+
+    if (!resolvedUser || !resolvedUser.email) return null;
+
+    // Auto-enrich latest role, employeeId, and clientId from database
+    try {
+      const agentUser = await prisma.whatsAppAgentUser.findUnique({
+        where: { email: resolvedUser.email },
+        select: { id: true, clientId: true, role: true }
+      });
+
+      if (agentUser) {
+        if (agentUser.role) resolvedUser.role = agentUser.role;
+        if (agentUser.clientId) resolvedUser.clientId = agentUser.clientId;
+      }
+
+      if (!resolvedUser.clientId) {
+        const matchedClient = await prisma.whatsAppClient.findFirst({
+          where: {
+            OR: [
+              { adminEmail: resolvedUser.email },
+              { contactEmail: resolvedUser.email }
+            ]
+          },
+          select: { id: true }
+        });
+        if (matchedClient) {
+          resolvedUser.clientId = matchedClient.id;
+        } else {
+          const firstClient = await prisma.whatsAppClient.findFirst({
+            orderBy: { createdAt: "asc" },
+            select: { id: true }
+          });
+          resolvedUser.clientId = firstClient?.id || DEFAULT_ESPON_CLIENT_ID;
+        }
+      }
+
+      if (!resolvedUser.employeeId) {
+        const emp = await prisma.employee.findFirst({
+          where: { user: { email: resolvedUser.email } },
+          select: { id: true }
+        });
+        if (emp) {
+          resolvedUser.employeeId = emp.id;
+        }
+      }
+    } catch (dbErr) {
+      console.error("[getAuthenticatedUser DB enrich error]:", dbErr);
+    }
+
+    return resolvedUser;
   } catch {
     return null;
   }
 }
+

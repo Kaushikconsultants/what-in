@@ -10,9 +10,18 @@ async function getAccount() {
 // --- GET --------------------------------------------------------------------
 export async function GET(req: NextRequest) {
   const authUser = await getAuthenticatedUser(req);
-  const isOwner = isOwnerAuthenticated(req);
+  const isOwner = await isOwnerAuthenticated(req);
   if (!authUser && !isOwner) {
     return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+  }
+
+  const userRole = authUser?.role || "SALES";
+  const userEmail = authUser?.email || "";
+  const isAdmin = isOwner || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'MANAGER';
+  let effectiveClientId = authUser?.clientId;
+  if (!effectiveClientId) {
+    const firstClient = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true } });
+    effectiveClientId = firstClient?.id || "8c519684-5a75-45be-b74b-5f9553f7ea32";
   }
 
   const { searchParams } = new URL(req.url);
@@ -34,23 +43,19 @@ export async function GET(req: NextRequest) {
         }
       }).catch(err => console.error("[Auto-Delete Media Old 30 Days Error]:", err));
 
-      const userRole = authUser?.role || "SALES";
-      const userEmail = authUser?.email || "";
-      const isAdmin = isOwner || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'MANAGER';
-      const where: any = {};
-
-      if (authUser?.clientId) {
-        where.clientId = authUser.clientId;
-      }
+      const where: any = {
+        clientId: effectiveClientId
+      };
 
       if (!isAdmin) {
-        if (userEmail) {
-          const emp = await prisma.employee.findFirst({ where: { user: { email: userEmail } } });
-          if (emp) {
-            where.assignedEmployeeId = emp.id;
-          } else {
-            where.assignedEmployeeId = "00000000-0000-0000-0000-000000000000";
-          }
+        let empId = authUser?.employeeId;
+        if (!empId && userEmail) {
+          const emp = await prisma.employee.findFirst({ where: { user: { email: userEmail } }, select: { id: true } });
+          if (emp) empId = emp.id;
+        }
+
+        if (empId) {
+          where.assignedEmployeeId = empId;
         } else {
           where.assignedEmployeeId = "00000000-0000-0000-0000-000000000000";
         }
@@ -102,7 +107,7 @@ export async function GET(req: NextRequest) {
           }
         },
         orderBy: { lastMessageAt: "desc" },
-        take: 100,
+        take: 1000,
       });
 
       const chats = conversations.map((conv) => {
@@ -186,6 +191,23 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: true, messages: [] });
       }
 
+      // Security: Validate client isolation and agent assignment
+      const effectiveClientId = authUser?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+      if ((conversation as any).clientId && (conversation as any).clientId !== effectiveClientId) {
+        return NextResponse.json({ success: false, error: "Unauthorized access to this conversation" }, { status: 403 });
+      }
+
+      if (!isAdmin) {
+        let empId = authUser?.employeeId;
+        if (!empId && userEmail) {
+          const emp = await prisma.employee.findFirst({ where: { user: { email: userEmail } }, select: { id: true } });
+          if (emp) empId = emp.id;
+        }
+        if (empId && conversation.assignedEmployeeId && conversation.assignedEmployeeId !== empId) {
+          return NextResponse.json({ success: false, error: "Unauthorized: Conversation is not assigned to you." }, { status: 403 });
+        }
+      }
+
       // Reset unread count
       await prisma.whatsAppConversation.update({
         where: { id: conversation.id },
@@ -247,8 +269,20 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ success: false, error: "Conversation not found" }, { status: 404 });
       }
 
-      if (authUser?.clientId && (conversation as any).clientId && (conversation as any).clientId !== authUser.clientId) {
+      const effectiveClientId = authUser?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+      if ((conversation as any).clientId && (conversation as any).clientId !== effectiveClientId) {
         return NextResponse.json({ success: false, error: "Unauthorized access to this conversation" }, { status: 403 });
+      }
+
+      if (!isAdmin) {
+        let empId = authUser?.employeeId;
+        if (!empId && userEmail) {
+          const emp = await prisma.employee.findFirst({ where: { user: { email: userEmail } }, select: { id: true } });
+          if (emp) empId = emp.id;
+        }
+        if (empId && conversation.assignedEmployeeId && conversation.assignedEmployeeId !== empId) {
+          return NextResponse.json({ success: false, error: "Unauthorized: Conversation is not assigned to you." }, { status: 403 });
+        }
       }
 
       // Auto-heal customer phone numbers using verified Meta incoming message ID (wamid) or standard E.164
@@ -419,11 +453,35 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const authUser = await getAuthenticatedUser(req);
-    const isOwner = isOwnerAuthenticated(req);
+    const isOwner = await isOwnerAuthenticated(req);
     if (!authUser && !isOwner) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
     const userName = authUser?.name || (isOwner ? "Owner" : "Agent");
+    const userRole = authUser?.role || "SALES";
+    const userEmail = authUser?.email || "";
+    const isAdmin = isOwner || userRole === 'ADMIN' || userRole === 'SUPER_ADMIN' || userRole === 'MANAGER';
+    let effectiveClientId = authUser?.clientId;
+    if (!effectiveClientId) {
+      const firstClient = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" }, select: { id: true } });
+      effectiveClientId = firstClient?.id || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    }
+
+    const checkConvAccess = async (conv: any): Promise<boolean> => {
+      if (!conv) return true;
+      if (conv.clientId && conv.clientId !== effectiveClientId) return false;
+      if (!isAdmin) {
+        let empId = authUser?.employeeId;
+        if (!empId && userEmail) {
+          const emp = await prisma.employee.findFirst({ where: { user: { email: userEmail } }, select: { id: true } });
+          if (emp) empId = emp.id;
+        }
+        if (empId && conv.assignedEmployeeId && conv.assignedEmployeeId !== empId) {
+          return false;
+        }
+      }
+      return true;
+    };
 
     const body = await req.json();
     const { action: postAction, phone, ai_paused, text, media_url, template_name, template_params, type, chat_status, convId } = body;
@@ -455,6 +513,9 @@ export async function POST(req: NextRequest) {
         }
       }
       if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      if (!await checkConvAccess(conversation)) {
+        return NextResponse.json({ error: "Unauthorized: You are only permitted to manage conversations assigned to you." }, { status: 403 });
+      }
 
       await prisma.whatsAppConversation.update({
         where: { id: conversation.id },
@@ -477,6 +538,9 @@ export async function POST(req: NextRequest) {
         }
       }
       if (!conversation) return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      if (!await checkConvAccess(conversation)) {
+        return NextResponse.json({ error: "Unauthorized: You are only permitted to manage conversations assigned to you." }, { status: 403 });
+      }
 
       await prisma.whatsAppConversation.update({
         where: { id: conversation.id },
@@ -488,13 +552,21 @@ export async function POST(req: NextRequest) {
     // -- C. Send Message / Template -------------------------------------------
     if (postAction === "send_message" || postAction === "send_template") {
       // Find or create conversation
+      let conversation: any = null;
+      if (convId) {
+        conversation = await prisma.whatsAppConversation.findUnique({ where: { id: convId } });
+      }
+
       const customer = await prisma.customer.findFirst({
         where: { OR: phoneFilter },
       });
 
-      let conversation: any = null;
-      if (customer) {
+      if (!conversation && customer) {
         conversation = await prisma.whatsAppConversation.findFirst({ where: { customerId: customer.id } });
+      }
+
+      if (conversation && !await checkConvAccess(conversation)) {
+        return NextResponse.json({ error: "Unauthorized: You are only permitted to send messages to conversations assigned to you." }, { status: 403 });
       }
 
       // Get WhatsApp account for token
@@ -612,7 +684,7 @@ export async function POST(req: NextRequest) {
 
 // --- DELETE CONVERSATION ----------------------------------------------------
 export async function DELETE(req: NextRequest) {
-  const isOwner = isOwnerAuthenticated(req);
+  const isOwner = await isOwnerAuthenticated(req);
   const authUser = await getAuthenticatedUser(req);
   const isAdmin = isOwner || (authUser && (authUser.role === "ADMIN" || authUser.role === "SUPER_ADMIN" || authUser.role === "MANAGER"));
   if (!isAdmin) {
