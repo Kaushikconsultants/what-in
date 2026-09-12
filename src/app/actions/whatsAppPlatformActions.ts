@@ -1121,27 +1121,80 @@ export async function getWhatsAppDashboardMetrics() {
       });
     }
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     const [
       account,
       totalConvs,
       openConvs,
       closedConvs,
       totalMessages,
-      sentToday,
+      dbSentToday,
       activeAutomations,
       activeTemplates,
-      activeCampaigns
+      activeCampaigns,
+      activeProducts,
+      totalProducts
     ] = await Promise.all([
       prisma.whatsAppAccount.findFirst(),
-      prisma.whatsAppConversation.count(),
-      prisma.whatsAppConversation.count({ where: { status: 'OPEN' } }),
-      prisma.whatsAppConversation.count({ where: { status: 'CLOSED' } }),
-      prisma.whatsAppMessage.count(),
-      prisma.whatsAppMessage.count({ where: { sentAt: { gte: new Date(new Date().setHours(0,0,0,0)) } } }),
-      prisma.whatsAppAutomationRule.count({ where: { isActive: true } }),
-      prisma.whatsAppTemplate.count({ where: { status: 'APPROVED' } }),
-      prisma.whatsAppCampaign.count({ where: { status: 'COMPLETED' } })
+      prisma.whatsAppConversation.count(client ? { where: { clientId: client.id } } : undefined),
+      prisma.whatsAppConversation.count({ where: { status: 'OPEN', ...(client ? { clientId: client.id } : {}) } }),
+      prisma.whatsAppConversation.count({ where: { status: 'CLOSED', ...(client ? { clientId: client.id } : {}) } }),
+      prisma.whatsAppMessage.count(client ? { where: { conversation: { clientId: client.id } } } : undefined),
+      prisma.whatsAppMessage.count({
+        where: {
+          sentAt: { gte: todayStart },
+          ...(client ? { conversation: { clientId: client.id } } : {})
+        }
+      }),
+      prisma.whatsAppAutomationRule.count({ where: { isActive: true, ...(client ? { clientId: client.id } : {}) } }),
+      prisma.whatsAppTemplate.count({ where: { status: 'APPROVED', ...(client ? { clientId: client.id } : {}) } }),
+      prisma.whatsAppCampaign.count({ where: { status: 'COMPLETED', ...(client ? { clientId: client.id } : {}) } }),
+      prisma.product.count({ where: { status: 'Active' } }),
+      prisma.product.count()
     ]);
+
+    const effectiveSentToday = Math.max(dbSentToday, client?.messagesUsedCount || 0);
+
+    // Dynamic Revenue & Orders Calculation
+    let totalRevenue = 0;
+    let totalOrders = 0;
+    const shopifyDomain = client?.shopifyDomain || (await prisma.companySettings.findFirst())?.shopifyStoreDomain;
+    const shopifyToken = client?.shopifyToken || (await prisma.companySettings.findFirst())?.shopifyAccessToken;
+
+    if (shopifyDomain && shopifyToken) {
+      const cleanDomain = shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+      const now = Date.now();
+      const cache = (globalThis as any)._shopifyRevCache;
+      if (cache && (now - cache.ts < 180000)) {
+        totalRevenue = cache.totalRevenue;
+        totalOrders = cache.totalOrders;
+      } else {
+        try {
+          const sRes = await fetch(`https://${cleanDomain}/admin/api/2024-10/orders.json?status=any&limit=250&fields=id,total_price,financial_status`, {
+            headers: { 'X-Shopify-Access-Token': shopifyToken },
+            signal: AbortSignal.timeout(3500)
+          });
+          if (sRes.ok) {
+            const sData = await sRes.json();
+            const ords = sData.orders || [];
+            totalOrders = ords.length;
+            totalRevenue = Math.round(ords.reduce((acc: number, o: any) => acc + parseFloat(o.total_price || '0'), 0));
+            (globalThis as any)._shopifyRevCache = { ts: now, totalRevenue, totalOrders };
+          }
+        } catch {}
+      }
+    }
+
+    if (totalRevenue === 0) {
+      const orderAgg = await prisma.order.aggregate({
+        _sum: { totalValue: true },
+        _count: { id: true }
+      });
+      totalRevenue = Math.round(orderAgg._sum.totalValue || 0);
+      totalOrders = orderAgg._count.id;
+    }
 
     if (client) {
       const isConnected = !!(client.metaAccessToken && client.phoneId && client.wabaId && !client.metaAccessToken.startsWith("EAAG...meta"));
@@ -1163,16 +1216,23 @@ export async function getWhatsAppDashboardMetrics() {
           accessToken: client.metaAccessToken ? "••••••••••••••••" : "",
           webhookVerifyToken: personalizedToken,
           status: accountStatus,
-          dailyLimit: client.dailyLimit || "10K per day",
-          usedToday: 0,
-          qualityRating: isConnected ? "GREEN" : "PENDING_SETUP"
+          dailyLimit: "10K per day",
+          dailyLimitNumber: 10000,
+          tierName: "Tier 2",
+          usedToday: effectiveSentToday,
+          qualityRating: isConnected ? "GREEN" : "PENDING_SETUP",
+          qualityRatingText: "High"
         },
         metrics: {
           totalConvs: isConnected ? totalConvs : 0,
           openConvs: isConnected ? openConvs : 0,
           closedConvs: isConnected ? closedConvs : 0,
           totalMessages: isConnected ? totalMessages : 0,
-          sentToday: 0,
+          sentToday: effectiveSentToday,
+          activeProducts: activeProducts > 0 ? activeProducts : (totalProducts || 0),
+          totalProducts,
+          totalRevenue,
+          totalOrders,
           activeAutomations: isConnected ? activeAutomations : 0,
           activeTemplates: isConnected ? activeTemplates : 0,
           activeCampaigns: isConnected ? activeCampaigns : 0
@@ -1200,15 +1260,22 @@ export async function getWhatsAppDashboardMetrics() {
         webhookVerifyToken: account?.webhookVerifyToken || "espon_whatsapp_secure_webhook_token_2026",
         status: accountStatus,
         dailyLimit: account?.dailyLimit || "10K per day",
-        usedToday: isConnected ? (account?.usedToday || 0) : 0,
-        qualityRating: isConnected ? (account?.qualityRating || "GREEN") : "PENDING_SETUP"
+        dailyLimitNumber: 10000,
+        tierName: "Tier 2",
+        usedToday: isConnected ? effectiveSentToday : 0,
+        qualityRating: isConnected ? (account?.qualityRating || "GREEN") : "PENDING_SETUP",
+        qualityRatingText: "High"
       },
       metrics: {
         totalConvs,
         openConvs,
         closedConvs,
         totalMessages,
-        sentToday: isConnected ? (sentToday || 0) : 0,
+        sentToday: isConnected ? effectiveSentToday : 0,
+        activeProducts: activeProducts > 0 ? activeProducts : (totalProducts || 0),
+        totalProducts,
+        totalRevenue,
+        totalOrders,
         activeAutomations,
         activeTemplates,
         activeCampaigns
@@ -1222,6 +1289,7 @@ export async function getWhatsAppDashboardMetrics() {
 export async function refreshWhatsAppAccountSyncAction() {
   await ensureSeeded();
   try {
+    (globalThis as any)._shopifyRevCache = null;
     let account = await prisma.whatsAppAccount.findFirst();
     if (account) {
       account = await prisma.whatsAppAccount.update({
