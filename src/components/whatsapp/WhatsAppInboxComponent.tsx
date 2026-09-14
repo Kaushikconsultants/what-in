@@ -2397,7 +2397,7 @@ export default function WhatsAppInboxComponent() {
                   <React.Fragment key={msg.id}>
                     {dateDividerNode}
                     <div className={`message-row ${isAgent ? "outgoing" : "incoming"} ${msg.isInternalNote ? "internal-note-row" : ""}`}>
-                      <div className="message-bubble" style={msg.isInternalNote ? { background: '#fef9c3', color: '#854d0e', border: '1px solid #fde047' } : {}}>
+                      <div className={`message-bubble ${msg.isInternalNote ? "internal-note-bubble" : ""}`}>
                         <div className="message-sender-name">
                           {msg.isInternalNote ? (
                             <span className="sender-badge internal-note"><Lock size={11} /> Internal Note</span>
@@ -2453,7 +2453,7 @@ export default function WhatsAppInboxComponent() {
                                 </button>
                               </div>
                             ) : (
-                              <div style={{ padding: "12px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              <div className="message-media-expired">
                                 <ImageIcon size={14} />
                                 <span>Image expired (Stored only for 30 days)</span>
                               </div>
@@ -2477,11 +2477,11 @@ export default function WhatsAppInboxComponent() {
 
                         {/* Audio Message Renderer */}
                         {msg.messageType === "AUDIO" && (
-                          <div style={{ marginTop: "4px", background: "#f3f4f6", padding: "8px", borderRadius: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>Voice Message</span>
+                          <div className="message-audio-box">
+                            <div className="message-audio-header">
+                              <span className="message-audio-title">Voice Message</span>
                               {msg.mediaUrl && (
-                                <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ background: "transparent", color: "#6b7280", border: "none", cursor: "pointer", padding: "2px" }} title="Download Audio">
+                                <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} className="message-audio-dl" title="Download Audio">
                                   <Download size={14} />
                                 </button>
                               )}
@@ -2489,7 +2489,7 @@ export default function WhatsAppInboxComponent() {
                             {msg.mediaUrl ? (
                               <audio src={msg.mediaUrl} controls style={{ width: "100%", height: "36px" }} />
                             ) : (
-                              <div style={{ padding: "8px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                              <div className="message-media-expired">
                                 <Mic size={14} />
                                 <span>Voice note expired (Stored only for 30 days)</span>
                               </div>
@@ -2511,65 +2511,33 @@ export default function WhatsAppInboxComponent() {
                           const payAmt = payMeta.amount || (msg.content?.match(/₹\s*([0-9,]+)/)?.[1]);
 
                           return (
-                            <div style={{
-                              background: "#ffffff",
-                              border: "1.5px solid #818cf8",
-                              borderRadius: "14px",
-                              overflow: "hidden",
-                              marginTop: "4px",
-                              maxWidth: "340px",
-                              width: "100%",
-                              boxShadow: "0 4px 14px rgba(79, 70, 229, 0.12)"
-                            }}>
+                            <div className="msg-payment-card">
                               {/* Header */}
-                              <div style={{
-                                background: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
-                                color: "#ffffff",
-                                padding: "10px 14px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: "8px"
-                              }}>
+                              <div className="msg-payment-header">
                                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                  <div style={{
-                                    background: "rgba(255,255,255,0.2)",
-                                    borderRadius: "50%",
-                                    width: "26px",
-                                    height: "26px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center"
-                                  }}>
+                                  <div className="msg-payment-icon-wrap">
                                     <CreditCard size={15} color="#ffffff" />
                                   </div>
                                   <div>
-                                    <div style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.2px" }}>
+                                    <div className="msg-payment-title">
                                       Payment Request
                                     </div>
                                     {payAmt && (
-                                      <div style={{ fontSize: "11px", opacity: 0.92, fontWeight: 600 }}>
+                                      <div className="msg-payment-amount">
                                         ₹{typeof payAmt === "number" ? payAmt.toLocaleString("en-IN") : payAmt}
                                       </div>
                                     )}
                                   </div>
                                 </div>
-                                <span style={{
-                                  background: "#fef3c7",
-                                  color: "#b45309",
-                                  padding: "3px 8px",
-                                  borderRadius: "12px",
-                                  fontSize: "10px",
-                                  fontWeight: 700
-                                }}>
+                                <span className="msg-payment-status-badge">
                                   PENDING
                                 </span>
                               </div>
 
                               {/* Scannable QR Code Image */}
                               {qrImg && (
-                                <div style={{ padding: "12px", background: "#f8fafc", textAlign: "center", borderBottom: "1px solid #e2e8f0" }}>
-                                  <div style={{ display: "inline-block", background: "#ffffff", padding: "8px", borderRadius: "10px", border: "1px solid #cbd5e1" }}>
+                                <div className="msg-payment-qr-wrap">
+                                  <div className="msg-payment-qr-box">
                                     <img
                                       src={qrImg}
                                       alt="UPI QR Code"
@@ -2577,48 +2545,27 @@ export default function WhatsAppInboxComponent() {
                                       style={{ width: "160px", height: "160px", display: "block" }}
                                     />
                                   </div>
-                                  <div style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", fontWeight: 500 }}>
+                                  <div className="msg-payment-qr-caption">
                                     Scan with Google Pay, PhonePe, Paytm or UPI
                                   </div>
                                 </div>
                               )}
 
                               {/* Body Text */}
-                              <div style={{
-                                padding: "12px 14px",
-                                fontSize: "12.5px",
-                                color: "#334155",
-                                lineHeight: "1.5",
-                                whiteSpace: "pre-wrap"
-                              }}>
+                              <div className="msg-payment-body">
                                 {msg.content}
                               </div>
 
                               {/* Pay Now Button Link */}
                               {payUrl && (
-                                <div style={{ padding: "0 12px 12px" }}>
+                                <div className="msg-payment-btn-wrap">
                                   <a
                                     href={payUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      gap: "6px",
-                                      background: "#4f46e5",
-                                      color: "#ffffff",
-                                      padding: "10px 14px",
-                                      borderRadius: "8px",
-                                      textDecoration: "none",
-                                      fontSize: "12.5px",
-                                      fontWeight: 700,
-                                      boxShadow: "0 2px 4px rgba(79, 70, 229, 0.25)"
-                                    }}
+                                    className="msg-payment-btn"
                                   >
-                                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                                      <CreditCard size={13} /> Pay Now <ExternalLink size={12} />
-                                    </span>
+                                    <CreditCard size={13} /> Pay Now <ExternalLink size={12} />
                                   </a>
                                 </div>
                               )}
@@ -2644,7 +2591,7 @@ export default function WhatsAppInboxComponent() {
                             )}
                             
                             {/* Text Body */}
-                            <p className="message-text-content" style={{ margin: 0, color: msg.isInternalNote ? '#713f12' : undefined }}>
+                            <p className="message-text-content">
                               {msg.content}
                             </p>
 
@@ -2666,21 +2613,9 @@ export default function WhatsAppInboxComponent() {
                               return (
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px" }}>
                                   {options.map((optText, oIdx) => (
-                                    <div
-                                      key={oIdx}
-                                      style={{
-                                        background: "#f1f5f9",
-                                        border: "1px solid #cbd5e1",
-                                        color: "#475569",
-                                        padding: "5px 12px",
-                                        borderRadius: "16px",
-                                        fontSize: "11px",
-                                        fontWeight: 600,
-                                        userSelect: "none"
-                                      }}
-                                    >
+                                    <div key={oIdx} className="msg-interactive-option">
                                       <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-                                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#6366f1" }} />
+                                        <span className="msg-interactive-dot" />
                                         {optText}
                                       </span>
                                     </div>
@@ -2693,21 +2628,21 @@ export default function WhatsAppInboxComponent() {
 
                         {/* Meta Template Badge */}
                         {msg.messageType === "TEMPLATE" && (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#0284c7", background: "#e0f2fe", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
+                          <div className="msg-type-badge msg-badge-template">
                             <ShieldCheck size={11} /> Meta Approved Template
                           </div>
                         )}
 
                         {/* Interactive Flow Badge */}
                         {msg.messageType === "FLOW" && (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#7c3aed", background: "#f3e8ff", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
+                          <div className="msg-type-badge msg-badge-flow">
                             <Zap size={11} /> Interactive Flow Form
                           </div>
                         )}
 
                         {/* Product Card Badge */}
                         {msg.messageType === "PRODUCT_CARD" && (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#ea580c", background: "#ffedd5", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
+                          <div className="msg-type-badge msg-badge-product">
                             <ShoppingBag size={11} /> Product Card
                           </div>
                         )}
@@ -2737,84 +2672,35 @@ export default function WhatsAppInboxComponent() {
                           const customerNote = orderInfo?.customerNote || orderInfo?.text || '';
 
                           return (
-                            <div style={{
-                              background: '#f0fdf4',
-                              border: '1px solid #bbf7d0',
-                              borderRadius: '12px',
-                              overflow: 'hidden',
-                              marginTop: '4px',
-                              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)',
-                              maxWidth: '380px',
-                              width: '100%'
-                            }}>
+                            <div className="msg-order-card">
                               {/* Header */}
-                              <div style={{
-                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                color: '#ffffff',
-                                padding: '10px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '8px'
-                              }}>
+                              <div className="msg-order-header">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <div style={{
-                                    background: 'rgba(255,255,255,0.2)',
-                                    borderRadius: '50%',
-                                    width: '26px',
-                                    height: '26px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}>
+                                  <div className="msg-order-icon-wrap">
                                     <ShoppingBag size={15} color="#ffffff" />
                                   </div>
                                   <div>
-                                    <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.2px' }}>
+                                    <div className="msg-order-header-title">
                                       WhatsApp Catalog Order
                                     </div>
-                                    <div style={{ fontSize: '10.5px', opacity: 0.9 }}>
+                                    <div className="msg-order-header-subtitle">
                                       {totalQuantity} {totalQuantity === 1 ? 'Item' : 'Items'} Ordered
                                     </div>
                                   </div>
                                 </div>
 
-                                <span style={{
-                                  background: 'rgba(255,255,255,0.22)',
-                                  padding: '3px 8px',
-                                  borderRadius: '12px',
-                                  fontSize: '11px',
-                                  fontWeight: 700
-                                }}>
+                                <span className="msg-order-badge">
                                   Cart Sent
                                 </span>
                               </div>
 
                               {/* Items list */}
-                              <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', background: '#ffffff' }}>
+                              <div className="msg-order-items">
                                 {items.length > 0 ? (
                                   items.map((it: any, idx: number) => (
-                                    <div key={idx} style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px',
-                                      paddingBottom: idx === items.length - 1 ? 0 : '10px',
-                                      borderBottom: idx === items.length - 1 ? 'none' : '1px dashed #e2e8f0'
-                                    }}>
+                                    <div key={idx} className="msg-order-item">
                                       {/* Thumbnail */}
-                                      <div style={{
-                                        width: '52px',
-                                        height: '52px',
-                                        borderRadius: '8px',
-                                        background: '#f8fafc',
-                                        border: '1px solid #e2e8f0',
-                                        overflow: 'hidden',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexShrink: 0,
-                                        position: 'relative'
-                                      }}>
+                                      <div className="msg-order-thumb">
                                         {it.image ? (
                                           <img
                                             src={it.image}
@@ -2841,8 +2727,7 @@ export default function WhatsAppInboxComponent() {
                                             justifyContent: 'center',
                                             width: '100%',
                                             height: '100%',
-                                            color: '#10b981',
-                                            background: '#ecfdf5'
+                                            color: '#10b981'
                                           }}
                                         >
                                           <ShoppingBag size={22} />
@@ -2851,32 +2736,11 @@ export default function WhatsAppInboxComponent() {
 
                                       {/* Title & Qty */}
                                       <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{
-                                          fontSize: '12.5px',
-                                          fontWeight: 600,
-                                          color: '#1e293b',
-                                          whiteSpace: 'normal',
-                                          lineHeight: '1.3',
-                                          overflow: 'hidden',
-                                          textOverflow: 'ellipsis'
-                                        }}>
+                                        <div className="msg-order-item-title">
                                           {it.name || `Product SKU: ${it.sku || it.retailerId}`}
                                         </div>
-                                        <div style={{
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '6px',
-                                          marginTop: '3px',
-                                          fontSize: '11px',
-                                          color: '#64748b'
-                                        }}>
-                                          <span style={{
-                                            background: '#f1f5f9',
-                                            padding: '1px 6px',
-                                            borderRadius: '4px',
-                                            fontWeight: 600,
-                                            color: '#334155'
-                                          }}>
+                                        <div className="msg-order-item-qty-row">
+                                          <span className="msg-order-qty-chip">
                                             Qty: {it.quantity || 1}
                                           </span>
                                           {it.price > 0 && (
@@ -2887,32 +2751,22 @@ export default function WhatsAppInboxComponent() {
 
                                       {/* Subtotal */}
                                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#059669' }}>
+                                        <span className="msg-order-price">
                                           {currencySymbol}{(Number(it.subtotal || (it.price * (it.quantity || 1)))).toLocaleString('en-IN')}
                                         </span>
                                       </div>
                                     </div>
                                   ))
                                 ) : (
-                                  <div style={{ fontSize: '12.5px', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                                  <div className="msg-order-fallback-content">
                                     {msg.content === '[Message]' ? 'Customer sent items from the WhatsApp Catalog.' : msg.content}
                                   </div>
                                 )}
 
-                                {/* Customer Note (Only when explicitly provided by customer) */}
+                                {/* Customer Note */}
                                 {customerNote && String(customerNote).trim() && String(customerNote).trim() !== "null" && String(customerNote).trim() !== "undefined" ? (
-                                  <div style={{
-                                    background: '#fffbeb',
-                                    border: '1px solid #fde68a',
-                                    borderRadius: '6px',
-                                    padding: '8px 10px',
-                                    fontSize: '11.5px',
-                                    color: '#92400e',
-                                    display: 'flex',
-                                    gap: '6px',
-                                    alignItems: 'flex-start'
-                                  }}>
-                                    <MessageSquare size={13} color="#b45309" style={{ flexShrink: 0, marginTop: "2px" }} />
+                                  <div className="msg-order-customer-note">
+                                    <MessageSquare size={13} style={{ flexShrink: 0, marginTop: "2px" }} />
                                     <div style={{ flex: 1 }}>
                                       <strong>Customer Note:</strong> {customerNote}
                                     </div>
@@ -2922,48 +2776,22 @@ export default function WhatsAppInboxComponent() {
 
                               {/* Footer Total */}
                               {totalAmount > 0 && (
-                                <div style={{
-                                  borderTop: '1px dashed #cbd5e1',
-                                  paddingTop: '8px',
-                                  marginTop: '4px',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
-                                }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Estimated Order Total:</span>
-                                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                                <div className="msg-order-footer-total">
+                                  <span className="msg-order-total-label">Estimated Order Total:</span>
+                                  <span className="msg-order-total-value">
                                     {currencySymbol}{Number(totalAmount).toLocaleString('en-IN')}
                                   </span>
                                 </div>
                               )}
 
                               {/* Action Buttons */}
-                              <div style={{
-                                display: 'flex',
-                                gap: '8px',
-                                marginTop: '10px',
-                                flexWrap: 'wrap'
-                              }}>
+                              <div className="msg-order-actions">
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setMessageInput(`Hello ${activeConvDetail?.customer?.contactPerson || ''}! We received your catalog order of ${totalQuantity} item(s) ${totalAmount > 0 ? `(Total: ${currencySymbol}${Number(totalAmount).toLocaleString('en-IN')})` : ''}. We are preparing your quotation / order confirmation now!`);
                                   }}
-                                  style={{
-                                    flex: 1,
-                                    background: '#ffffff',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '6px',
-                                    padding: '6px 8px',
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    color: '#334155',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '4px'
-                                  }}
+                                  className="msg-order-btn msg-order-btn-reply"
                                 >
                                   <Sparkles size={12} color="#10b981" /> Reply Confirmation
                                 </button>
@@ -2976,19 +2804,7 @@ export default function WhatsAppInboxComponent() {
                                       setPaymentDesc(`Payment for WhatsApp Catalog Order (${totalQuantity} items)`);
                                       setShowPaymentModal(true);
                                     }}
-                                    style={{
-                                      background: '#10b981',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      padding: '6px 10px',
-                                      fontSize: '11px',
-                                      fontWeight: 700,
-                                      color: '#ffffff',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px'
-                                    }}
+                                    className="msg-order-btn msg-order-btn-pay"
                                     title="Generate Payment Link"
                                   >
                                     <CreditCard size={12} /> Payment Link
@@ -3007,19 +2823,7 @@ export default function WhatsAppInboxComponent() {
                                     setToastMsg('Order summary copied to clipboard!');
                                     setTimeout(() => setToastMsg(null), 2500);
                                   }}
-                                  style={{
-                                    background: '#ffffff',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '6px',
-                                    padding: '6px 10px',
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    color: '#334155',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                  }}
+                                  className="msg-order-btn msg-order-btn-copy"
                                   title="Copy order details"
                                 >
                                   <FileText size={12} /> Copy
@@ -3031,7 +2835,7 @@ export default function WhatsAppInboxComponent() {
 
                         {/* Standard Text & Unsupported Format Renderer */}
                         {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && msg.messageType !== "ORDER" && (
-                          <p className="message-text-content" style={msg.isInternalNote ? { color: '#713f12' } : { whiteSpace: 'pre-wrap' }}>
+                          <p className="message-text-content">
                             {msg.messageType === "UNSUPPORTED" ? (
                               <span style={{ fontStyle: "italic", color: "#64748b", display: "inline-flex", alignItems: "center", gap: "5px" }}>
                                 <Paperclip size={12} />
@@ -3065,23 +2869,10 @@ export default function WhatsAppInboxComponent() {
 
                           return (
                             <div 
-                              style={{ 
-                                color: isReal24hExpired ? "#b45309" : "#dc2626", 
-                                fontSize: "11.5px", 
-                                display: "flex", 
-                                alignItems: "center", 
-                                flexWrap: "wrap",
-                                gap: "6px", 
-                                marginTop: "6px", 
-                                background: isReal24hExpired ? "#fffbeb" : "#fef2f2", 
-                                padding: "6px 10px", 
-                                borderRadius: "6px", 
-                                border: `1px solid ${isReal24hExpired ? "#fde68a" : "#fecaca"}`, 
-                                width: "fit-content" 
-                              }}
+                              className={`msg-status-banner ${isReal24hExpired ? "expired" : "failed"}`}
                               title={errorObj?.details || errorObj?.message || displayReason}
                             >
-                              <span style={{ fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                              <span className="msg-status-banner-text">
                                 <AlertCircle size={13} style={{ flexShrink: 0 }} />
                                 <span>{displayReason}</span>
                               </span>
@@ -3090,19 +2881,7 @@ export default function WhatsAppInboxComponent() {
                                 <button
                                   type="button"
                                   onClick={() => setShowTemplatePicker(true)}
-                                  style={{
-                                    background: "#d97706",
-                                    color: "#ffffff",
-                                    border: "none",
-                                    borderRadius: "4px",
-                                    padding: "2px 8px",
-                                    fontSize: "10.5px",
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "3px"
-                                  }}
+                                  className="msg-status-banner-btn expired"
                                 >
                                   Send Template
                                 </button>
@@ -3111,19 +2890,7 @@ export default function WhatsAppInboxComponent() {
                                   type="button"
                                   disabled={isRetrying}
                                   onClick={() => handleRetryMessage(msg)}
-                                  style={{
-                                    background: "#dc2626",
-                                    color: "#ffffff",
-                                    border: "none",
-                                    borderRadius: "4px",
-                                    padding: "2px 8px",
-                                    fontSize: "10.5px",
-                                    fontWeight: 700,
-                                    cursor: isRetrying ? "wait" : "pointer",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "3px"
-                                  }}
+                                  className="msg-status-banner-btn failed"
                                 >
                                   <RefreshCw size={11} className={isRetrying ? "animate-spin" : ""} />
                                   {isRetrying ? "Retrying..." : "Retry Send"}
@@ -3134,8 +2901,7 @@ export default function WhatsAppInboxComponent() {
                         })()}
                         <div className="message-meta-line">
                           <span 
-                            className="message-timestamp" 
-                            style={msg.isInternalNote ? { color: '#a16207' } : {}}
+                            className="message-timestamp"
                             title={new Date(msg.sentAt).toLocaleString([], { dateStyle: "full", timeStyle: "medium" })}
                           >
                             {formatMessageBubbleTime(msg.sentAt)}
