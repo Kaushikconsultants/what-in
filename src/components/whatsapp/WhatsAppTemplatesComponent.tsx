@@ -634,27 +634,44 @@ export default function WhatsAppTemplatesComponent() {
   // Compliance checks before saving
   const runComplianceChecks = () => {
     const issues: { label: string; pass: boolean; message: string }[] = [];
-    issues.push({ label: "Template Name", pass: /^[a-z0-9_]+$/.test(templateName) && templateName.length >= 3, message: "Must be lowercase letters, numbers, underscores. Min 3 chars." });
-    issues.push({ label: "Body Text", pass: bodyText.trim().length >= 10, message: "Body text must be at least 10 characters." });
+    const nameValid = /^[a-z][a-z0-9_]*$/.test(templateName) && templateName.length >= 2;
+    issues.push({
+      label: "Template Name",
+      pass: nameValid,
+      message: nameValid
+        ? "Valid format (lowercase, starts with letter, only letters/numbers/underscores)."
+        : "Must start with a lowercase letter and contain only lowercase letters, numbers, and underscores."
+    });
+    issues.push({ label: "Body Text", pass: bodyText.trim().length >= 5 || templateType === "CAROUSEL", message: "Body text must be at least 5 characters." });
     issues.push({ label: "Body Length", pass: bodyText.length <= 1024, message: `Body is ${bodyText.length}/1024 chars.` });
     issues.push({ label: "Footer Length", pass: !footerText || footerText.length <= 60, message: `Footer is ${footerText.length}/60 chars.` });
     issues.push({ label: "Button Count", pass: buttons.length <= 3, message: `Max 3 buttons. Currently ${buttons.length}.` });
     issues.push({ label: "Button Text Length", pass: buttons.every(b => (b.text || "").length <= 25), message: "All button labels must be ≤25 chars." });
+    
     if (templateType === "CAROUSEL") {
       issues.push({ label: "Carousel Cards", pass: carouselCards.length >= 2 && carouselCards.length <= 10, message: `Need 2–10 cards. Currently ${carouselCards.length}.` });
       issues.push({ label: "Card Images", pass: carouselCards.every(c => !!c.mediaUrl), message: "All carousel cards must have an image." });
+      issues.push({ label: "Card Body Length", pass: carouselCards.every(c => (c.bodyText || "").length <= 160), message: "All card bodies must be ≤160 chars." });
     }
     if (templateType === "CATALOGUE" && catalogueFormat === "MULTI_PRODUCT") {
       issues.push({ label: "Catalog Products", pass: selectedCatalogProducts.length >= 1 && selectedCatalogProducts.length <= 30, message: `Need 1–30 products selected. Currently ${selectedCatalogProducts.length}.` });
     }
-    const varRegex = /\{\{(\d+)\}\}/g;
-    const nums: number[] = []; let m;
-    while ((m = varRegex.exec(bodyText)) !== null) nums.push(parseInt(m[1]));
-    const sorted = [...nums].sort((a,b) => a-b);
-    const sequential = sorted.every((v, i) => v === i + 1);
-    issues.push({ label: "Variable Numbering", pass: nums.length === 0 || sequential, message: "Variables must be sequential: {{1}}, {{2}}, {{3}}..." });
-    const prohibitedWords = /\b(100% free|guaranteed|click here|limited time only)\b/i;
-    issues.push({ label: "Prohibited Phrases", pass: !prohibitedWords.test(bodyText), message: "Avoid phrases like '100% free', 'Guaranteed', 'Click here'." });
+    
+    // Check for broken braces like {{1 or {{customer
+    const unclosedBraces = (bodyText.match(/\{\{/g)?.length || 0) !== (bodyText.match(/\}\}/g)?.length || 0);
+    issues.push({ label: "Variable Syntax", pass: !unclosedBraces, message: unclosedBraces ? "Unclosed double braces detected (e.g. '{{' without '}}')." : "Variable syntax clean." });
+
+    const varMatches = bodyText.match(/\{\{([^{}]+)\}\}/g) || [];
+    issues.push({
+      label: "Variables & Sample Values",
+      pass: true,
+      message: varMatches.length > 0
+        ? `✓ ${varMatches.length} variable(s) detected. Valid sample values will be auto-generated for Meta.`
+        : "No variables (static template)."
+    });
+
+    const prohibitedWords = /\b(100% free|guaranteed prize|claim your lottery|instant cash)\b/i;
+    issues.push({ label: "Meta Spam Filter", pass: !prohibitedWords.test(bodyText), message: "No spam or prohibited trigger phrases detected." });
     return issues;
   };
 

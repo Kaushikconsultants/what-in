@@ -2097,11 +2097,18 @@ export async function saveWhatsAppTemplateAction(data: any) {
     const brandDomain = brandDetails.brandDomain || 'esponsports.com';
     const brandPhone = (brandDetails as any).brandPhone || (brandDetails as any).phoneNumber || '+917404388242';
     
-    let templateName = data.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    // 1. Sanitize Template Name to strictly adhere to Meta WABA naming conventions
+    let templateName = (data.name || '').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    if (!templateName) templateName = `espon_template_${Date.now().toString().slice(-4)}`;
+    // Meta requires template names to start with a letter (cannot start with a digit or underscore)
+    if (/^[0-9_]/.test(templateName)) {
+      templateName = `espon_${templateName}`;
+    }
     // Sanitize generic test names that trigger Meta bot spam review
-    if (templateName === 'testing' || templateName === 'test') {
+    if (templateName === 'testing' || templateName === 'test' || templateName === 'espon_test') {
       templateName = `espon_showcase_${Date.now().toString().slice(-4)}`;
     }
+
     const templateType = data.templateType || 'STANDARD';
     const category = data.category || 'MARKETING';
     const language = data.language || 'en_US';
@@ -2110,32 +2117,78 @@ export async function saveWhatsAppTemplateAction(data: any) {
     let metaTemplateId: string | null = null;
     let metaStatus = 'PENDING';
 
+    // Helper: Sanitize text and extract sequential variables with rich realistic sample examples
+    function sanitizeAndExtractVariables(rawText: string, maxLen = 1024): { text: string; examples: string[] } {
+      if (!rawText) return { text: '', examples: [] };
+      let varIndex = 1;
+      const seenVars: Record<string, number> = {};
+      const sampleList: string[] = [];
+
+      // Convert any {{variable_name}} or non-sequential {{3}} into clean sequential {{1}}, {{2}}
+      const sanitized = rawText.replace(/\{\{([^{}]+)\}\}/g, (_, varName) => {
+        const key = varName.trim();
+        if (!seenVars[key]) {
+          seenVars[key] = varIndex++;
+          const lower = key.toLowerCase();
+          if (lower.includes('name') || lower.includes('customer') || lower.includes('user')) sampleList.push('Rohit');
+          else if (lower.includes('order') || lower.includes('id') || lower.includes('num') || lower.includes('ref')) sampleList.push('ESP-9482');
+          else if (lower.includes('price') || lower.includes('amount') || lower.includes('total') || lower.includes('rs') || lower.includes('inr')) sampleList.push('1,499');
+          else if (lower.includes('product') || lower.includes('item') || lower.includes('cloth') || lower.includes('title')) sampleList.push('Dry-Fit Performance Tee');
+          else if (lower.includes('coupon') || lower.includes('code') || lower.includes('promo') || lower.includes('otp')) sampleList.push('FLAT30');
+          else if (lower.includes('track') || lower.includes('url') || lower.includes('link')) sampleList.push(`https://${brandDomain}/track/ESP-9482`);
+          else if (lower.includes('date') || lower.includes('day')) sampleList.push('Tomorrow');
+          else if (lower.includes('time')) sampleList.push('4:00 PM');
+          else sampleList.push(`Sample ${seenVars[key]}`);
+        }
+        return `{{${seenVars[key]}}}`;
+      });
+
+      return {
+        text: sanitized.slice(0, maxLen),
+        examples: sampleList
+      };
+    }
+
     // Build Meta Graph API components payload
     const components: any[] = [];
 
     if (templateType === 'CAROUSEL' || templateType === 'IMAGE_CAROUSEL') {
       // 1. Carousel Introductory Body (Required or optional in Meta)
       if (data.bodyText) {
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
         const bodyObj: any = {
           type: 'BODY',
-          text: data.bodyText.slice(0, 1024)
+          text: cleanBody
         };
-        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
-        if (bodyMatches && bodyMatches.length > 0) {
+        if (examples.length > 0) {
           bodyObj.example = {
-            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+            body_text: [examples]
           };
         }
         components.push(bodyObj);
       }
 
       // 2. Carousel Cards Array (Meta allows 2 to 10 cards)
-      const rawCards = Array.isArray(data.carouselCards) 
+      let rawCards = Array.isArray(data.carouselCards) 
         ? data.carouselCards 
         : (typeof data.carouselCards === 'string' ? JSON.parse(data.carouselCards || '[]') : []);
 
+      // If catalog items passed
+      if (Array.isArray(rawCards) && rawCards.length > 0 && (rawCards[0].sellingPrice || rawCards[0].primaryImage) && !rawCards[0].buttons) {
+        rawCards = rawCards.map((p: any, idx: number) => ({
+          id: `card_${idx + 1}`,
+          headerType: 'IMAGE',
+          mediaUrl: p.primaryImage || p.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80',
+          title: (p.name || `Product ${idx + 1}`).slice(0, 60),
+          bodyText: `₹${p.sellingPrice || '999'} • In Stock`,
+          buttons: [
+            { type: 'URL', text: 'Buy Now', url: p.productUrl || `https://${brandDomain}/products/${p.handle || ''}` },
+            { type: 'URL', text: 'Explore More', url: `https://${brandDomain}/collections/all` }
+          ]
+        }));
+      }
+
       // Check if any card specifies URL buttons. If so, ALL buttons across ALL cards must be Call-to-Action buttons (URL / PHONE).
-      // Meta strictly forbids mixing QUICK_REPLY with Call-To-Action buttons in carousel cards.
       const hasUrlButtons = rawCards.some((c: any) => 
         Array.isArray(c.buttons) && c.buttons.some((b: any) => b.type === 'URL' || b.url)
       );
@@ -2166,16 +2219,15 @@ export async function saveWhatsAppTemplateAction(data: any) {
         } else {
           cardBodyText = body || title || 'Espon Sports Activewear';
         }
-        cardBodyText = cardBodyText.slice(0, 160);
 
+        const { text: cleanCardBody, examples: cardExamples } = sanitizeAndExtractVariables(cardBodyText, 160);
         const cardBody: any = {
           type: 'BODY',
-          text: cardBodyText
+          text: cleanCardBody
         };
-        const cardBodyMatches = cardBodyText.match(/\{\{(\d+)\}\}/g);
-        if (cardBodyMatches && cardBodyMatches.length > 0) {
+        if (cardExamples.length > 0) {
           cardBody.example = {
-            body_text: [cardBodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+            body_text: [cardExamples]
           };
         }
         cardComponents.push(cardBody);
@@ -2190,7 +2242,6 @@ export async function saveWhatsAppTemplateAction(data: any) {
 
         const formattedButtons = cardButtonsList.map((b: any, bIdx: number) => {
           if (hasUrlButtons || b.type === 'URL' || b.url) {
-            // In CTA mode, all buttons MUST be URL or PHONE_NUMBER
             if (b.type === 'PHONE_NUMBER' || b.phone_number) {
               return {
                 type: 'PHONE_NUMBER',
@@ -2198,7 +2249,6 @@ export async function saveWhatsAppTemplateAction(data: any) {
                 phone_number: (b.phone_number || brandPhone).replace(/[^0-9+]/g, '')
               };
             }
-            // Auto-convert any accidental Quick Reply to uniform URL button for Meta fast-track approval
             const buttonText = (b.text || (bIdx === 0 ? 'Buy Now' : 'Explore More')).slice(0, 25);
             let buttonUrl = b.url || (bIdx === 0 ? `https://${brandDomain}/products` : `https://${brandDomain}/collections/all`);
             if (!buttonUrl.startsWith('http')) buttonUrl = `https://${buttonUrl}`;
@@ -2222,7 +2272,6 @@ export async function saveWhatsAppTemplateAction(data: any) {
               url: buttonUrl
             };
           } else {
-            // Pure Quick Reply mode
             return {
               type: 'QUICK_REPLY',
               text: (b.text || 'Inquire').slice(0, 25)
@@ -2260,14 +2309,14 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'CATALOG' || templateType === 'CATALOGUE') {
       // Catalog Template
       if (data.bodyText) {
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
         const bodyObj: any = {
           type: 'BODY',
-          text: data.bodyText
+          text: cleanBody
         };
-        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
-        if (bodyMatches && bodyMatches.length > 0) {
+        if (examples.length > 0) {
           bodyObj.example = {
-            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+            body_text: [examples]
           };
         }
         components.push(bodyObj);
@@ -2275,7 +2324,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (data.footerText) {
         components.push({
           type: 'FOOTER',
-          text: data.footerText
+          text: data.footerText.slice(0, 60)
         });
       }
       components.push({
@@ -2287,14 +2336,14 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'FLOWS') {
       // WhatsApp Flows Form Template
       if (data.bodyText) {
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
         const bodyObj: any = {
           type: 'BODY',
-          text: data.bodyText
+          text: cleanBody
         };
-        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
-        if (bodyMatches && bodyMatches.length > 0) {
+        if (examples.length > 0) {
           bodyObj.example = {
-            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+            body_text: [examples]
           };
         }
         components.push(bodyObj);
@@ -2302,26 +2351,26 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (data.footerText) {
         components.push({
           type: 'FOOTER',
-          text: data.footerText
+          text: data.footerText.slice(0, 60)
         });
       }
       components.push({
         type: 'BUTTONS',
         buttons: [
-          { type: 'FLOW', text: data.flowButtonText || 'View Flow' }
+          { type: 'FLOW', text: (data.flowButtonText || 'View Flow').slice(0, 25) }
         ]
       });
     } else if (templateType === 'ORDER_DETAILS') {
       // Meta Native Order Details Template
       if (data.bodyText) {
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
         const bodyObj: any = {
           type: 'BODY',
-          text: data.bodyText
+          text: cleanBody
         };
-        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
-        if (bodyMatches && bodyMatches.length > 0) {
+        if (examples.length > 0) {
           bodyObj.example = {
-            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+            body_text: [examples]
           };
         }
         components.push(bodyObj);
@@ -2329,7 +2378,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (data.footerText) {
         components.push({
           type: 'FOOTER',
-          text: data.footerText
+          text: data.footerText.slice(0, 60)
         });
       }
       components.push({
@@ -2341,14 +2390,14 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'ORDER_STATUS') {
       // Order Status Dispatch Template
       if (data.bodyText) {
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
         const bodyObj: any = {
           type: 'BODY',
-          text: data.bodyText
+          text: cleanBody
         };
-        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
-        if (bodyMatches && bodyMatches.length > 0) {
+        if (examples.length > 0) {
           bodyObj.example = {
-            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+            body_text: [examples]
           };
         }
         components.push(bodyObj);
@@ -2356,7 +2405,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (data.footerText) {
         components.push({
           type: 'FOOTER',
-          text: data.footerText
+          text: data.footerText.slice(0, 60)
         });
       }
       components.push({
@@ -2373,14 +2422,14 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'CALL_PERMISSIONS') {
       // Calling Permissions Request Template
       if (data.bodyText) {
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
         const bodyObj: any = {
           type: 'BODY',
-          text: data.bodyText
+          text: cleanBody
         };
-        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
-        if (bodyMatches && bodyMatches.length > 0) {
+        if (examples.length > 0) {
           bodyObj.example = {
-            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+            body_text: [examples]
           };
         }
         components.push(bodyObj);
@@ -2388,7 +2437,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (data.footerText) {
         components.push({
           type: 'FOOTER',
-          text: data.footerText
+          text: data.footerText.slice(0, 60)
         });
       }
       components.push({
@@ -2440,11 +2489,11 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (data.headerType && data.headerType !== 'NONE') {
         const headerObj: any = { type: 'HEADER', format: data.headerType };
         if (data.headerType === 'TEXT') {
-          if (data.headerContent) headerObj.text = data.headerContent;
-          const headerMatches = (data.headerContent || '').match(/\{\{(\d+)\}\}/g);
-          if (headerMatches && headerMatches.length > 0) {
+          const { text: cleanHeader, examples: headerExamples } = sanitizeAndExtractVariables(data.headerContent || '', 60);
+          if (cleanHeader) headerObj.text = cleanHeader;
+          if (headerExamples.length > 0) {
             headerObj.example = {
-              header_text: headerMatches.map((_: any, i: number) => `Sample ${i + 1}`)
+              header_text: headerExamples
             };
           }
         } else if (['IMAGE', 'VIDEO', 'DOCUMENT'].includes(data.headerType) && creds.isConnected && creds.accessToken) {
@@ -2457,14 +2506,14 @@ export async function saveWhatsAppTemplateAction(data: any) {
       }
 
       if (data.bodyText) {
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
         const bodyObj: any = {
           type: 'BODY',
-          text: data.bodyText
+          text: cleanBody
         };
-        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
-        if (bodyMatches && bodyMatches.length > 0) {
+        if (examples.length > 0) {
           bodyObj.example = {
-            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+            body_text: [examples]
           };
         }
         components.push(bodyObj);
@@ -2473,7 +2522,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (data.footerText) {
         components.push({
           type: 'FOOTER',
-          text: data.footerText
+          text: data.footerText.slice(0, 60)
         });
       }
 
@@ -2481,7 +2530,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (buttonsList.length > 0) {
         components.push({
           type: 'BUTTONS',
-          buttons: buttonsList.map((b: any) => {
+          buttons: buttonsList.slice(0, 3).map((b: any) => {
             if (b.type === 'URL') {
               const isDyn = b.urlType === 'DYNAMIC' || (b.url && b.url.includes('{{1}}')) || b.isDynamic;
               if (isDyn) {
@@ -2491,15 +2540,15 @@ export async function saveWhatsAppTemplateAction(data: any) {
                   : finalUrl.replace('{{1}}', '12345');
                 return {
                   type: 'URL',
-                  text: b.text || 'Visit Website',
+                  text: (b.text || 'Visit Website').slice(0, 25),
                   url: finalUrl,
                   example: [sample]
                 };
               }
-              return { type: 'URL', text: b.text || 'Visit Website', url: b.url || `https://${brandDomain}` };
+              return { type: 'URL', text: (b.text || 'Visit Website').slice(0, 25), url: b.url || `https://${brandDomain}` };
             }
             if (b.type === 'PHONE_NUMBER') {
-              return { type: 'PHONE_NUMBER', text: b.text || 'Call Us', phone_number: b.phone_number || brandPhone };
+              return { type: 'PHONE_NUMBER', text: (b.text || 'Call Us').slice(0, 25), phone_number: (b.phone_number || brandPhone).replace(/[^0-9+]/g, '') };
             }
             if (b.type === 'COPY_CODE') {
               const isDynCode = b.isDynamicCode || b.code === '{{1}}';
@@ -2509,9 +2558,9 @@ export async function saveWhatsAppTemplateAction(data: any) {
                   example: b.exampleCode || 'FLAT30'
                 };
               }
-              return { type: 'COPY_CODE', text: b.text || 'Copy Code', code: b.code || b.text || 'FLAT30' };
+              return { type: 'COPY_CODE', text: (b.text || 'Copy Code').slice(0, 25), code: b.code || b.text || 'FLAT30' };
             }
-            return { type: 'QUICK_REPLY', text: b.text || 'Reply' };
+            return { type: 'QUICK_REPLY', text: (b.text || 'Reply').slice(0, 25) };
           })
         });
       }
@@ -6452,17 +6501,17 @@ export async function resubmitCarouselTemplateAction(templateName: string) {
     // 2. Short titles <= 60 chars
     // 3. Short bodies <= 160 chars
     const fixedCards = rawCards.map((c: any, idx: number) => {
-      const prodUrl = c.buttons?.[0]?.url && c.buttons[0].url.startsWith('http') 
-        ? c.buttons[0].url 
-        : `https://${brandDomain}/products`;
+      const prodUrl = c.productUrl || (c.buttons?.[0]?.url && c.buttons[0].url.startsWith('http') ? c.buttons[0].url : `https://${brandDomain}/products`);
+      const cardTitle = (c.name || c.title || `Product ${idx + 1}`).slice(0, 60);
+      const cardBody = c.sellingPrice ? `₹${c.sellingPrice} • Limited Stock Available` : (c.bodyText || '₹999 • Premium Activewear').slice(0, 160);
+      const cardMedia = c.primaryImage || c.images?.[0] || c.mediaUrl || (idx === 0 ? 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&auto=format&fit=crop&q=80');
 
       return {
-        ...c,
         id: `card_${idx + 1}`,
         headerType: 'IMAGE',
-        mediaUrl: c.mediaUrl || (idx === 0 ? 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80' : 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&auto=format&fit=crop&q=80'),
-        title: (c.title || `Product ${idx + 1}`).slice(0, 60),
-        bodyText: (c.bodyText || '₹999 • Premium Activewear').slice(0, 160),
+        mediaUrl: cardMedia,
+        title: cardTitle,
+        bodyText: cardBody,
         buttons: [
           {
             type: 'URL',
