@@ -2,8 +2,42 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bot, GitBranch, Play, Square, Activity, Search, Trash2, Edit3, Save, Check, X, Pencil, Sparkles, Download, Layers, ShieldCheck, ArrowRight, BookOpen, Stethoscope, GraduationCap, Building2, Car, Utensils, Briefcase, ShoppingCart, Wrench } from 'lucide-react';
-import { getWhatsAppChatbotFlows, toggleWhatsAppChatbotFlowStatusAction, deleteWhatsAppChatbotFlowAction, getWhatsAppChatbotLogsAction, renameWhatsAppChatbotFlowAction, installIndustryChatbotPresetAction } from '@/app/actions/whatsAppPlatformActions';
+import { 
+  Bot, 
+  GitBranch, 
+  Play, 
+  Square, 
+  Activity, 
+  Search, 
+  Trash2, 
+  Edit3, 
+  Save, 
+  Check, 
+  X, 
+  Pencil, 
+  Sparkles, 
+  Download, 
+  Layers, 
+  ShieldCheck, 
+  ArrowRight, 
+  BookOpen, 
+  Stethoscope, 
+  GraduationCap, 
+  Building2, 
+  Car, 
+  Utensils, 
+  Briefcase, 
+  ShoppingCart, 
+  Wrench 
+} from 'lucide-react';
+import { 
+  getWhatsAppChatbotFlows, 
+  toggleWhatsAppChatbotFlowStatusAction, 
+  deleteWhatsAppChatbotFlowAction, 
+  getWhatsAppChatbotLogsAction, 
+  renameWhatsAppChatbotFlowAction, 
+  installIndustryChatbotPresetAction 
+} from '@/app/actions/whatsAppPlatformActions';
 import { INDUSTRY_CHATBOT_PRESETS, IndustryChatbotPreset } from '@/lib/industryChatbotPresets';
 
 export default function WhatsAppChatbotsComponent() {
@@ -122,28 +156,28 @@ export default function WhatsAppChatbotsComponent() {
   };
 
   return (
-    <div className="w-full flex flex-col gap-6">
+    <div className="w-full flex flex-col gap-6 text-slate-900 dark:text-slate-100 transition-colors">
       
       {/* Top Action Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-slate-800">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Bot size={22} className="text-indigo-600" />
+            <Bot size={22} className="text-indigo-600 dark:text-indigo-400" />
             Chatbot Automation Hub
           </h2>
-          <p className="text-gray-500 text-sm">Manage your automated WhatsApp flows, keyword triggers, 8 multi-industry playbooks, and live debug sessions.</p>
+          <p className="text-gray-500 dark:text-slate-400 text-sm mt-0.5">Manage your automated WhatsApp flows, keyword triggers, 8 multi-industry playbooks, and live debug sessions.</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setActiveTab('templates')}
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm"
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm cursor-pointer"
           >
             <Sparkles size={16} />
             Industry Templates ({INDUSTRY_CHATBOT_PRESETS.length})
           </button>
           <button 
             onClick={() => router.push('/whatsapp/chatbot-builder')}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-sm cursor-pointer"
           >
             <GitBranch size={16} />
             Create Blank Flow
@@ -152,142 +186,140 @@ export default function WhatsAppChatbotsComponent() {
       </div>
 
       {/* Sub-tabs: Bots vs Templates vs Logs */}
-      <div style={{ display: 'flex', gap: '12px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', flexWrap: 'wrap' }}>
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 flex-wrap">
         <button 
           onClick={() => setActiveTab('bots')}
-          style={{ 
-            background: activeTab === 'bots' ? '#eff6ff' : 'transparent', 
-            color: activeTab === 'bots' ? '#2563eb' : '#64748b', 
-            border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' 
-          }}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
+            activeTab === 'bots' 
+              ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-800' 
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+          }`}
         >
           <Bot size={16} /> All Chatbots ({flows.length})
         </button>
         <button 
           onClick={() => setActiveTab('templates')}
-          style={{ 
-            background: activeTab === 'templates' ? '#f5f3ff' : 'transparent', 
-            color: activeTab === 'templates' ? '#7c3aed' : '#64748b', 
-            border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' 
-          }}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
+            activeTab === 'templates' 
+              ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-800' 
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+          }`}
         >
-          <Sparkles size={16} /> 📚 Industry Playbooks & Templates ({INDUSTRY_CHATBOT_PRESETS.length})
+          <Sparkles size={16} /> 📚 Industry Playbooks &amp; Templates ({INDUSTRY_CHATBOT_PRESETS.length})
         </button>
         <button 
           onClick={() => setActiveTab('logs')}
-          style={{ 
-            background: activeTab === 'logs' ? '#fef2f2' : 'transparent', 
-            color: activeTab === 'logs' ? '#dc2626' : '#64748b', 
-            border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' 
-          }}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
+            activeTab === 'logs' 
+              ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800' 
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
+          }`}
         >
           <Activity size={16} /> Session Logs (Debug)
         </button>
       </div>
 
+      {/* TAB 1: ALL CHATBOTS TABLE */}
       {activeTab === 'bots' && (
-        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                <th style={{ padding: '16px', color: '#64748b', fontWeight: 600, fontSize: '13px' }}>Chatbot Name</th>
-                <th style={{ padding: '16px', color: '#64748b', fontWeight: 600, fontSize: '13px' }}>Trigger Keyword</th>
-                <th style={{ padding: '16px', color: '#64748b', fontWeight: 600, fontSize: '13px' }}>Status</th>
-                <th style={{ padding: '16px', color: '#64748b', fontWeight: 600, fontSize: '13px' }}>Last Updated</th>
-                <th style={{ padding: '16px', color: '#64748b', fontWeight: 600, fontSize: '13px', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#94a3b8' }}>Loading bots...</td></tr>
-              ) : flows.length === 0 ? (
-                <tr><td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>No chatbots found. Click "Create New Chatbot" to start.</td></tr>
-              ) : (
-                flows.map(f => (
-                  <tr key={f.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '16px', fontWeight: 500, color: '#0f172a' }}>
-                      {editingId === f.id ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <input
-                            type="text"
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveRename(f.id);
-                              if (e.key === 'Escape') setEditingId(null);
-                            }}
-                            autoFocus
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              border: '1.5px solid #2563eb',
-                              fontSize: '13.5px',
-                              fontWeight: 600,
-                              outline: 'none',
-                              color: '#0f172a'
-                            }}
-                          />
-                          <button
-                            onClick={() => handleSaveRename(f.id)}
-                            disabled={isSavingName}
-                            style={{ background: '#22c55e', color: 'white', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}
-                            title="Save Name"
-                          >
-                            <Check size={15} />
-                          </button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            style={{ background: '#cbd5e1', color: '#334155', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}
-                            title="Cancel"
-                          >
-                            <X size={15} />
-                          </button>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs transition-colors">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
+                  <th className="p-4 text-slate-600 dark:text-slate-400 font-bold text-xs">Chatbot Name</th>
+                  <th className="p-4 text-slate-600 dark:text-slate-400 font-bold text-xs">Trigger Keyword</th>
+                  <th className="p-4 text-slate-600 dark:text-slate-400 font-bold text-xs">Status</th>
+                  <th className="p-4 text-slate-600 dark:text-slate-400 font-bold text-xs">Last Updated</th>
+                  <th className="p-4 text-slate-600 dark:text-slate-400 font-bold text-xs text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {loading ? (
+                  <tr><td colSpan={5} className="p-6 text-center text-slate-400">Loading bots...</td></tr>
+                ) : flows.length === 0 ? (
+                  <tr><td colSpan={5} className="p-10 text-center text-slate-400">No chatbots found. Click &quot;Create Blank Flow&quot; or select an Industry Template to start.</td></tr>
+                ) : (
+                  flows.map(f => (
+                    <tr key={f.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="p-4 font-medium text-slate-900 dark:text-white">
+                        {editingId === f.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveRename(f.id);
+                                if (e.key === 'Escape') setEditingId(null);
+                              }}
+                              autoFocus
+                              className="px-2.5 py-1.5 rounded-lg border-2 border-blue-600 dark:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold outline-none"
+                            />
+                            <button
+                              onClick={() => handleSaveRename(f.id)}
+                              disabled={isSavingName}
+                              className="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-lg cursor-pointer transition-colors"
+                              title="Save Name"
+                            >
+                              <Check size={15} />
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 p-1.5 rounded-lg cursor-pointer transition-colors"
+                              title="Cancel"
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-900 dark:text-white">{f.name}</span>
+                            <button
+                              onClick={() => handleStartRename(f)}
+                              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 cursor-pointer transition-colors inline-flex"
+                              title="Rename Chatbot"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-slate-600 dark:text-slate-400">
+                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-1 rounded-md text-xs font-mono border border-slate-200/80 dark:border-slate-700/80">
+                          {f.triggerKeyword || 'None'}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <button 
+                          onClick={() => handleToggleStatus(f.id, f.isActive)}
+                          className={`border-0 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                            f.isActive 
+                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {f.isActive ? <Play size={12} /> : <Square size={12} />}
+                          {f.isActive ? 'ACTIVE' : 'DRAFT'}
+                        </button>
+                      </td>
+                      <td className="p-4 text-slate-500 dark:text-slate-400 text-xs">{new Date(f.updatedAt).toLocaleDateString()}</td>
+                      <td className="p-4 text-right">
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => handleStartRename(f)} className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border-0 p-1.5 rounded-lg cursor-pointer transition-colors" title="Rename Bot"><Pencil size={15} /></button>
+                          <button onClick={() => handleEdit(f.id)} className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 border-0 p-1.5 rounded-lg cursor-pointer transition-colors" title="Edit Flow"><Edit3 size={16} /></button>
+                          <button onClick={() => handleDelete(f.id)} className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border-0 p-1.5 rounded-lg cursor-pointer transition-colors" title="Delete Flow"><Trash2 size={16} /></button>
                         </div>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 600 }}>{f.name}</span>
-                          <button
-                            onClick={() => handleStartRename(f)}
-                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px', display: 'inline-flex' }}
-                            title="Rename Chatbot"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '16px', color: '#475569' }}>
-                      <span style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontFamily: 'monospace' }}>
-                        {f.triggerKeyword || 'None'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '16px' }}>
-                      <button 
-                        onClick={() => handleToggleStatus(f.id, f.isActive)}
-                        style={{ 
-                          background: f.isActive ? '#dcfce7' : '#f1f5f9', 
-                          color: f.isActive ? '#16a34a' : '#64748b', 
-                          border: 'none', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' 
-                        }}
-                      >
-                        {f.isActive ? <Play size={12} /> : <Square size={12} />}
-                        {f.isActive ? 'ACTIVE' : 'DRAFT'}
-                      </button>
-                    </td>
-                    <td style={{ padding: '16px', color: '#64748b', fontSize: '13px' }}>{new Date(f.updatedAt).toLocaleDateString()}</td>
-                    <td style={{ padding: '16px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                      <button onClick={() => handleStartRename(f)} style={{ background: '#f1f5f9', color: '#475569', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer' }} title="Rename Bot"><Pencil size={15} /></button>
-                      <button onClick={() => handleEdit(f.id)} style={{ background: '#eff6ff', color: '#2563eb', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer' }} title="Edit Flow"><Edit3 size={16} /></button>
-                      <button onClick={() => handleDelete(f.id)} style={{ background: '#fef2f2', color: '#dc2626', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer' }} title="Delete Flow"><Trash2 size={16} /></button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
+      {/* TAB 2: INDUSTRY TEMPLATES */}
       {activeTab === 'templates' && (
         <div className="flex flex-col gap-6">
           {/* Industry Category Filter Pills */}
@@ -306,18 +338,11 @@ export default function WhatsAppChatbotsComponent() {
               <button
                 key={pill.id}
                 onClick={() => setSelectedIndustryFilter(pill.id)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '20px',
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  cursor: 'pointer',
-                  border: selectedIndustryFilter === pill.id ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
-                  background: selectedIndustryFilter === pill.id ? '#ede9fe' : '#ffffff',
-                  color: selectedIndustryFilter === pill.id ? '#4f46e5' : '#475569',
-                  transition: 'all 0.15s ease'
-                }}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border ${
+                  selectedIndustryFilter === pill.id
+                    ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold'
+                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
               >
                 {pill.label}
               </button>
@@ -325,7 +350,7 @@ export default function WhatsAppChatbotsComponent() {
           </div>
 
           {/* Templates Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '20px' }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredPresets.map(preset => {
               const parsed = JSON.parse(preset.nodesJson);
               const nodeCount = parsed.nodes ? parsed.nodes.length : 0;
@@ -333,55 +358,42 @@ export default function WhatsAppChatbotsComponent() {
               return (
                 <div
                   key={preset.id}
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    gap: '14px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                    position: 'relative'
-                  }}
-                  className="hover:shadow-md hover:-translate-y-0.5"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between gap-3.5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all"
                 >
                   <div className="flex flex-col gap-3">
                     {/* Header: Icon + Badges */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div style={{ padding: '10px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #f1f5f9' }}>
+                        <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-800">
                           {getPresetIcon(preset.id)}
                         </div>
                         <div>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">
                             {preset.industry}
                           </span>
-                          <h4 style={{ margin: '2px 0 0 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                          <h4 className="m-0 text-sm font-bold text-slate-900 dark:text-white">
                             {preset.name}
                           </h4>
                         </div>
                       </div>
-                      <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '12px', background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', whiteSpace: 'nowrap' }}>
+                      <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 whitespace-nowrap">
                         {preset.badge}
                       </span>
                     </div>
 
                     {/* Description */}
-                    <p style={{ margin: 0, fontSize: '12.5px', color: '#64748b', lineHeight: 1.5 }}>
+                    <p className="m-0 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                       {preset.description}
                     </p>
 
                     {/* Keywords Tag */}
-                    <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '8px', padding: '8px 12px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/80 rounded-lg p-2.5">
+                      <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                         🎯 Keyword Triggers:
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      <div className="flex flex-wrap gap-1">
                         {preset.triggerKeyword.split(',').map((kw, i) => (
-                          <span key={i} style={{ background: '#e2e8f0', color: '#334155', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontFamily: 'monospace' }}>
+                          <span key={i} className="bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded text-[11px] font-mono">
                             {kw.trim()}
                           </span>
                         ))}
@@ -389,59 +401,30 @@ export default function WhatsAppChatbotsComponent() {
                     </div>
 
                     {/* Flow Steps Preview */}
-                    <div style={{ fontSize: '11.5px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                       <Layers size={14} className="text-indigo-500" />
                       <span><strong>{nodeCount} Nodes</strong> in visual flowchart</span>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                  <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                     <button
                       onClick={() => setPreviewPreset(preset)}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        background: '#f1f5f9',
-                        color: '#334155',
-                        border: 'none',
-                        fontSize: '12.5px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}
+                      className="flex-1 py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-0 text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
                     >
                       <BookOpen size={14} /> Preview Flow
                     </button>
                     <button
                       onClick={() => handleInstallPreset(preset.id)}
                       disabled={installingPresetId === preset.id}
-                      style={{
-                        flex: 1.2,
-                        padding: '8px 12px',
-                        borderRadius: '8px',
-                        background: '#4f46e5',
-                        color: '#ffffff',
-                        border: 'none',
-                        fontSize: '12.5px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        opacity: installingPresetId === preset.id ? 0.7 : 1
-                      }}
+                      className="flex-1 py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 text-white border-0 text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
                     >
                       {installingPresetId === preset.id ? (
                         <span>Installing...</span>
                       ) : (
                         <>
-                          <Download size={14} /> Install & Launch <ArrowRight size={14} />
+                          <Download size={14} /> Install &amp; Launch <ArrowRight size={14} />
                         </>
                       )}
                     </button>
@@ -455,72 +438,72 @@ export default function WhatsAppChatbotsComponent() {
 
       {/* Preset Preview Modal */}
       {previewPreset && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setPreviewPreset(null)}>
-          <div style={{ background: '#ffffff', borderRadius: '16px', maxWidth: '700px', width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }} onClick={e => e.stopPropagation()}>
-            <div className="flex items-start justify-between pb-4 border-b border-gray-100">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setPreviewPreset(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-slate-200 dark:border-slate-800 transition-colors" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <div style={{ padding: '10px', borderRadius: '10px', background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+                <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800">
                   {getPresetIcon(previewPreset.id)}
                 </div>
                 <div>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase' }}>{previewPreset.industry}</span>
-                  <h3 style={{ margin: '2px 0 0 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{previewPreset.name}</h3>
+                  <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">{previewPreset.industry}</span>
+                  <h3 className="m-0 text-base sm:text-lg font-extrabold text-slate-900 dark:text-white">{previewPreset.name}</h3>
                 </div>
               </div>
-              <button onClick={() => setPreviewPreset(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '6px', cursor: 'pointer' }}>
+              <button onClick={() => setPreviewPreset(null)} className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border-0 rounded-lg p-1.5 cursor-pointer transition-colors">
                 <X size={18} />
               </button>
             </div>
 
             <div className="flex flex-col gap-4 py-4">
               <div>
-                <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 700, color: '#334155' }}>Playbook Description</h5>
-                <p style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: 1.5 }}>{previewPreset.description}</p>
+                <h5 className="m-0 mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">Playbook Description</h5>
+                <p className="m-0 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{previewPreset.description}</p>
               </div>
 
               <div>
-                <h5 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 700, color: '#334155' }}>Recommended AI System Prompt</h5>
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', fontSize: '12.5px', color: '#334155', fontStyle: 'italic', lineHeight: 1.5 }}>
-                  "{previewPreset.recommendedAiSystemPrompt}"
+                <h5 className="m-0 mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">Recommended AI System Prompt</h5>
+                <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-xs text-slate-700 dark:text-slate-300 italic leading-relaxed">
+                  &quot;{previewPreset.recommendedAiSystemPrompt}&quot;
                 </div>
               </div>
 
               <div>
-                <h5 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: '#334155' }}>Flowchart Node Hierarchy</h5>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+                <h5 className="m-0 mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">Flowchart Node Hierarchy</h5>
+                <div className="flex flex-col gap-2 max-h-56 overflow-y-auto">
                   {(() => {
                     try {
                       const parsed = JSON.parse(previewPreset.nodesJson);
                       return (parsed.nodes || []).map((node: any, idx: number) => (
-                        <div key={node.id || idx} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#6366f1', color: '#fff', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div key={node.id || idx} className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 sm:p-3 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10.5px] font-bold flex items-center justify-center shrink-0">
                               {idx + 1}
                             </span>
                             <div>
-                              <strong style={{ fontSize: '13px', color: '#0f172a' }}>{node.title || node.type}</strong>
+                              <strong className="text-xs text-slate-900 dark:text-white">{node.title || node.type}</strong>
                               {node.data?.text && (
-                                <p style={{ margin: '2px 0 0 0', fontSize: '11.5px', color: '#64748b', maxWidth: '400px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <p className="m-0 mt-0.5 text-[11px] text-slate-500 dark:text-slate-400 max-w-sm truncate">
                                   {node.data.text}
                                 </p>
                               )}
                             </div>
                           </div>
-                          <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#ede9fe', color: '#6d28d9' }}>
+                          <span className="text-[10.5px] font-bold px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shrink-0">
                             {node.type}
                           </span>
                         </div>
                       ));
                     } catch (e) {
-                      return <span style={{ color: '#94a3b8' }}>Could not parse flow preview.</span>;
+                      return <span className="text-slate-400 text-xs">Could not parse flow preview.</span>;
                     }
                   })()}
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-              <button onClick={() => setPreviewPreset(null)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', color: '#475569', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button onClick={() => setPreviewPreset(null)} className="py-2 px-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
                 Close
               </button>
               <button
@@ -529,7 +512,7 @@ export default function WhatsAppChatbotsComponent() {
                   setPreviewPreset(null);
                   handleInstallPreset(id);
                 }}
-                style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#4f46e5', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                className="py-2 px-4 rounded-lg border-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-colors shadow-2xs"
               >
                 <Download size={15} /> Install Playbook to Database
               </button>
@@ -538,69 +521,74 @@ export default function WhatsAppChatbotsComponent() {
         </div>
       )}
 
+      {/* TAB 3: LOGS TAB */}
       {activeTab === 'logs' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '24px' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
           
-          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', height: 'fit-content' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', color: '#0f172a' }}>Search Logs</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }}>Enter a customer's mobile number to trace their chatbot session and exact webhook errors.</p>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 h-fit shadow-xs transition-colors">
+            <h3 className="m-0 mb-3 text-base font-bold text-slate-900 dark:text-white">Search Logs</h3>
+            <p className="m-0 mb-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Enter a customer&apos;s mobile number to trace their chatbot session and exact webhook errors.</p>
             
-            <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>Mobile Number</label>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Mobile Number</label>
               <input 
                 type="text" 
                 placeholder="e.g. 9999999999" 
                 value={searchPhone}
                 onChange={e => setSearchPhone(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearchLogs()}
-                style={{ padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
+                className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:border-indigo-500 transition-colors"
               />
               <button 
                 onClick={() => handleSearchLogs()}
-                style={{ background: '#0f172a', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}
+                className="bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white border-0 p-2.5 rounded-lg cursor-pointer font-bold text-xs flex items-center justify-center gap-2 mt-2 transition-colors shadow-2xs"
               >
-                <Search size={16} /> Search Sessions
+                <Search size={15} /> Search Sessions
               </button>
             </div>
           </div>
 
-          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a' }}>Session Execution Timeline</h3>
-              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>{logs.length} events</span>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs transition-colors">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex justify-between items-center">
+              <h3 className="m-0 text-sm font-bold text-slate-900 dark:text-white">Session Execution Timeline</h3>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{logs.length} events</span>
             </div>
             
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '600px', overflowY: 'auto' }}>
+            <div className="p-5 flex flex-col gap-4 max-h-[600px] overflow-y-auto">
               {loadingLogs ? (
-                <div style={{ color: '#64748b', textAlign: 'center', padding: '40px' }}>Loading session data...</div>
+                <div className="text-slate-500 dark:text-slate-400 text-center p-10 text-xs">Loading session data...</div>
               ) : logs.length === 0 ? (
-                <div style={{ color: '#64748b', textAlign: 'center', padding: '40px' }}>
-                  <Activity size={40} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                <div className="text-slate-400 text-center p-10 text-xs flex flex-col items-center">
+                  <Activity size={36} className="opacity-25 mb-3" />
                   <div>No logs available yet.</div>
                 </div>
               ) : (
                 logs.map(log => (
-                  <div key={log.id} style={{ borderLeft: `3px solid ${log.responseStatus === 200 || log.responseStatus === 201 ? '#22c55e' : log.responseStatus ? '#ef4444' : '#3b82f6'}`, paddingLeft: '16px', position: 'relative' }}>
-                    <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px' }}>
+                  <div key={log.id} style={{ borderLeft: `3px solid ${log.responseStatus === 200 || log.responseStatus === 201 ? '#22c55e' : log.responseStatus ? '#ef4444' : '#3b82f6'}` }} className="pl-3.5 relative">
+                    <div className="text-[11px] text-slate-400 mb-1">
                       {new Date(log.createdAt).toLocaleString()}
                     </div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
+                    <div className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white mb-1">
                       {log.nodeType}: {log.actionDesc}
                       {log.responseStatus && (
-                        <span style={{ marginLeft: '8px', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', background: log.responseStatus === 200 || log.responseStatus === 201 ? '#dcfce7' : '#fee2e2', color: log.responseStatus === 200 || log.responseStatus === 201 ? '#16a34a' : '#dc2626' }}>
+                        <span className={`ml-2 px-1.5 py-0.5 rounded text-[10.5px] font-bold ${
+                          log.responseStatus === 200 || log.responseStatus === 201
+                            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                        }`}>
                           Status {log.responseStatus}
                         </span>
                       )}
                     </div>
                     {log.errorMessage && (
-                      <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '8px 12px', borderRadius: '6px', fontSize: '12.5px', marginTop: '8px', border: '1px solid #fecaca' }}>
+                      <div className="bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 p-2.5 rounded-lg text-xs mt-2 border border-rose-200 dark:border-rose-800/60">
                         <strong>Error/Response:</strong> {log.errorMessage}
                       </div>
                     )}
                     {log.payload && (
-                      <div style={{ marginTop: '8px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', marginBottom: '4px' }}>PAYLOAD SENT</div>
-                        <pre style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', fontSize: '12px', overflowX: 'auto', border: '1px solid #e2e8f0', margin: 0, color: '#0f172a' }}>
+                      <div className="mt-2">
+                        <div className="text-[10.5px] font-bold text-slate-500 dark:text-slate-400 mb-1">PAYLOAD SENT</div>
+                        <pre className="bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-lg text-[11px] font-mono overflow-x-auto border border-slate-200 dark:border-slate-700 m-0 text-slate-900 dark:text-slate-100">
                           {JSON.stringify(log.payload, null, 2)}
                         </pre>
                       </div>

@@ -2032,7 +2032,7 @@ export default function WhatsAppChatbotBuilderPage() {
             )}
           </select>
 
-          <span className={`flow-status-pill ${isBotActive ? "" : "draft"}`} style={{ background: isBotActive ? "#dcfce7" : "#f1f5f9", color: isBotActive ? "#15803d" : "#64748b" }}>
+          <span className={`flow-status-pill ${isBotActive ? "" : "draft"}`}>
             {isBotActive ? "ACTIVE LIVE" : "DRAFT"}
           </span>
 
@@ -2078,7 +2078,7 @@ export default function WhatsAppChatbotBuilderPage() {
             <Trash2 size={14} /> Delete Bot
           </button>
 
-          <div style={{ width: "1px", height: "24px", background: "#e2e8f0", margin: "0 4px" }} />
+          <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
 
           <button className="circular-history-btn" onClick={handleUndo} title="Undo"><RotateCcw size={15} /></button>
           <button className="circular-history-btn" onClick={handleRedo} title="Redo"><RotateCw size={15} /></button>
@@ -2232,12 +2232,12 @@ export default function WhatsAppChatbotBuilderPage() {
         >
           {/* EMPTY STATE BANNER WHEN ALL BOTS ARE DELETED */}
           {nodes.length === 0 && !isLoadingFlows && (
-            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 10, background: "#ffffff", padding: "36px 44px", borderRadius: "16px", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)", border: "1px solid #e2e8f0", maxWidth: "420px" }}>
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white" style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center", zIndex: 10, padding: "36px 44px", borderRadius: "16px", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)", maxWidth: "420px" }}>
               <div style={{ width: "56px", height: "56px", borderRadius: "50%", background: "#ecfdf5", color: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px auto" }}>
                 <Bot size={28} />
               </div>
-              <h3 style={{ fontSize: "18px", fontWeight: 800, color: "#0f172a", margin: "0 0 8px 0" }}>No Chatbots Created</h3>
-              <p style={{ fontSize: "13px", color: "#64748b", margin: "0 0 24px 0", lineHeight: 1.5 }}>
+              <h3 className="text-slate-900 dark:text-white" style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 8px 0" }}>No Chatbots Created</h3>
+              <p className="text-slate-500 dark:text-slate-400" style={{ fontSize: "13px", margin: "0 0 24px 0", lineHeight: 1.5 }}>
                 You currently have no chatbot flows. Create your first chatbot from scratch or select a pre-built WATI / Galabox template!
               </p>
               <button className="studio-btn primary" style={{ padding: "10px 20px", fontSize: "13.5px", margin: "0 auto" }} onClick={() => setShowCreateModal(true)}>
@@ -2640,7 +2640,7 @@ export default function WhatsAppChatbotBuilderPage() {
                                     background: "transparent",
                                     fontSize: "11.5px",
                                     fontWeight: 600,
-                                    color: isLimitExceeded ? "#991b1b" : "#334155",
+                                    color: isLimitExceeded ? "#ef4444" : undefined,
                                     width: "100%",
                                     outline: "none"
                                   }}
