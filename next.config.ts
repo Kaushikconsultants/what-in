@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: any = {
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",
