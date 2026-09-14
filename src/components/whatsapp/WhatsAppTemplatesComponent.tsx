@@ -231,6 +231,10 @@ export default function WhatsAppTemplatesComponent() {
   const [bodyText, setBodyText] = useState("");
   const [footerText, setFooterText] = useState("");
   const [buttons, setButtons] = useState<any[]>([]);
+
+  // Variable sample values (required by Meta for approval)
+  const [bodyVariableSamples, setBodyVariableSamples] = useState<Record<string, string>>({});
+  const [headerVariableSamples, setHeaderVariableSamples] = useState<Record<string, string>>({});
   
   // Coupon State
   const [couponCode, setCouponCode] = useState("FLAT30");
@@ -1178,6 +1182,8 @@ export default function WhatsAppTemplatesComponent() {
     setHeaderContent("");
     setHeaderMediaPreview(null);
     setBodyText("");
+    setBodyVariableSamples({});
+    setHeaderVariableSamples({});
     setFooterText(`${brandName} | Reply STOP to unsubscribe`);
     setButtons([]);
     setNameError("");
@@ -1231,7 +1237,9 @@ export default function WhatsAppTemplatesComponent() {
       templateType,
       headerType: templateType === "CATALOGUE" ? "NONE" : headerType,
       headerContent: templateType === "CATALOGUE" ? null : headerContent,
+      headerVariableSamples,
       bodyText,
+      bodyVariableSamples,
       footerText,
       catalogSectionTitle: templateType === "CATALOGUE" ? catalogSectionTitle : undefined,
       catalogButtonText: templateType === "CATALOGUE" ? (catalogButtonText || "View catalog") : undefined,
@@ -1523,7 +1531,14 @@ export default function WhatsAppTemplatesComponent() {
 
   const getRenderedPreviewText = (rawText: string) => {
     if (!rawText) return "";
-    return rawText
+    let rendered = rawText;
+    // Live replace user-provided custom sample values first
+    Object.entries(bodyVariableSamples).forEach(([key, val]) => {
+      if (val && val.trim()) {
+        rendered = rendered.split(key).join(val.trim());
+      }
+    });
+    return rendered
       .replace(/\{\{1\}\}/g, "Alex")
       .replace(/\{\{2\}\}/g, "ORD-8921")
       .replace(/\{\{3\}\}/g, "₹1,499")
@@ -3017,7 +3032,7 @@ export default function WhatsAppTemplatesComponent() {
 
                   {/* If Header is TEXT */}
                   {headerType === "TEXT" && (
-                    <div>
+                    <div className="flex flex-col gap-2.5">
                       <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
                         Header Text (Max 60 chars)
                       </label>
@@ -3028,6 +3043,34 @@ export default function WhatsAppTemplatesComponent() {
                         maxLength={60}
                         className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
                       />
+                      {(() => {
+                        const hVars = Array.from(new Set(headerContent.match(/\{\{([^{}]+)\}\}/g) || []));
+                        if (hVars.length === 0) return null;
+                        return (
+                          <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-800 flex flex-col gap-2">
+                            <span className="text-[11px] font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                              <Sparkles size={12} className="text-indigo-600 dark:text-indigo-400" />
+                              Header Variable Sample Values (Required by Meta):
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {hVars.map((v) => (
+                                <div key={v} className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-900 shadow-2xs">
+                                  <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-mono text-[11px] font-black rounded">
+                                    {v}
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={headerVariableSamples[v] || ""}
+                                    onChange={(e) => setHeaderVariableSamples(prev => ({ ...prev, [v]: e.target.value }))}
+                                    placeholder="e.g. Special Offer"
+                                    className="w-full text-xs bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 placeholder:text-slate-400 font-medium"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 
@@ -3128,6 +3171,49 @@ export default function WhatsAppTemplatesComponent() {
               <p className="text-[10px] text-gray-400 text-right">
                 {bodyText.length}/{META_LIMITS.BODY_MAX}
               </p>
+
+              {/* Detected Body Variables & Interactive Sample Value Inputs (Required by Meta) */}
+              {(() => {
+                const detectedVars = Array.from(new Set(bodyText.match(/\{\{([^{}]+)\}\}/g) || []));
+                if (detectedVars.length === 0) return null;
+                return (
+                  <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-2xl border border-indigo-200 dark:border-indigo-800 flex flex-col gap-3 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
+                        <span className="text-xs font-black uppercase text-indigo-900 dark:text-indigo-200 tracking-wide">
+                          Body Variable Sample Values ({detectedVars.length} detected)
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-indigo-700 dark:text-indigo-300 font-bold bg-indigo-100 dark:bg-indigo-900/60 px-2.5 py-0.5 rounded-md">
+                        Required by Meta for approval
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-indigo-950/80 dark:text-indigo-200/80 leading-tight">
+                      Provide sample values for each placeholder. These samples are submitted to Meta reviewers to verify compliance and are previewed live on the right.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                      {detectedVars.map((v, idx) => {
+                        const hint = idx === 0 ? "e.g. Alex" : idx === 1 ? "e.g. ESP-9482" : idx === 2 ? "e.g. ₹1,499" : "e.g. FLAT30";
+                        return (
+                          <div key={v} className="flex items-center gap-2 bg-white dark:bg-slate-800 px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 shadow-2xs">
+                            <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 font-mono text-xs font-black rounded-md shrink-0">
+                              {v}
+                            </span>
+                            <input
+                              type="text"
+                              value={bodyVariableSamples[v] || ""}
+                              onChange={(e) => setBodyVariableSamples(prev => ({ ...prev, [v]: e.target.value }))}
+                              placeholder={hint}
+                              className="w-full text-xs bg-transparent border-none outline-none text-slate-800 dark:text-slate-100 placeholder:text-slate-400 font-semibold"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Coupon Code Input for LTO */}
               {templateType === "LTO_COUPON" && (

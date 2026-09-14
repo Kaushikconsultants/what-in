@@ -2435,28 +2435,47 @@ export async function saveWhatsAppTemplateAction(data: any) {
     let metaTemplateId: string | null = null;
     let metaStatus = 'PENDING';
 
-    // Helper: Sanitize text and extract sequential variables with rich realistic sample examples
-    function sanitizeAndExtractVariables(rawText: string, maxLen = 1024): { text: string; examples: string[] } {
+    // Helper: Sanitize text and extract sequential variables with rich realistic sample examples or custom user samples
+    function sanitizeAndExtractVariables(
+      rawText: string, 
+      maxLen = 1024, 
+      customSamples?: Record<string, string> | string[]
+    ): { text: string; examples: string[] } {
       if (!rawText) return { text: '', examples: [] };
       let varIndex = 1;
       const seenVars: Record<string, number> = {};
       const sampleList: string[] = [];
 
       // Convert any {{variable_name}} or non-sequential {{3}} into clean sequential {{1}}, {{2}}
-      const sanitized = rawText.replace(/\{\{([^{}]+)\}\}/g, (_, varName) => {
+      const sanitized = rawText.replace(/\{\{([^{}]+)\}\}/g, (fullMatch, varName) => {
         const key = varName.trim();
         if (!seenVars[key]) {
-          seenVars[key] = varIndex++;
-          const lower = key.toLowerCase();
-          if (lower.includes('name') || lower.includes('customer') || lower.includes('user')) sampleList.push('Rohit');
-          else if (lower.includes('order') || lower.includes('id') || lower.includes('num') || lower.includes('ref')) sampleList.push('ESP-9482');
-          else if (lower.includes('price') || lower.includes('amount') || lower.includes('total') || lower.includes('rs') || lower.includes('inr')) sampleList.push('1,499');
-          else if (lower.includes('product') || lower.includes('item') || lower.includes('cloth') || lower.includes('title')) sampleList.push('Dry-Fit Performance Tee');
-          else if (lower.includes('coupon') || lower.includes('code') || lower.includes('promo') || lower.includes('otp')) sampleList.push('FLAT30');
-          else if (lower.includes('track') || lower.includes('url') || lower.includes('link')) sampleList.push(`https://${brandDomain}/track/ESP-9482`);
-          else if (lower.includes('date') || lower.includes('day')) sampleList.push('Tomorrow');
-          else if (lower.includes('time')) sampleList.push('4:00 PM');
-          else sampleList.push(`Sample ${seenVars[key]}`);
+          const newIdx = varIndex++;
+          seenVars[key] = newIdx;
+
+          let userVal = '';
+          if (customSamples) {
+            if (Array.isArray(customSamples)) {
+              userVal = customSamples[newIdx - 1];
+            } else if (typeof customSamples === 'object') {
+              userVal = customSamples[fullMatch] || customSamples[key] || customSamples[`{{${newIdx}}}`] || customSamples[String(newIdx)];
+            }
+          }
+
+          if (userVal && userVal.trim()) {
+            sampleList.push(userVal.trim());
+          } else {
+            const lower = key.toLowerCase();
+            if (lower.includes('name') || lower.includes('customer') || lower.includes('user')) sampleList.push('Rohit');
+            else if (lower.includes('order') || lower.includes('id') || lower.includes('num') || lower.includes('ref')) sampleList.push('ESP-9482');
+            else if (lower.includes('price') || lower.includes('amount') || lower.includes('total') || lower.includes('rs') || lower.includes('inr')) sampleList.push('1,499');
+            else if (lower.includes('product') || lower.includes('item') || lower.includes('cloth') || lower.includes('title')) sampleList.push('Dry-Fit Performance Tee');
+            else if (lower.includes('coupon') || lower.includes('code') || lower.includes('promo') || lower.includes('otp')) sampleList.push('FLAT30');
+            else if (lower.includes('track') || lower.includes('url') || lower.includes('link')) sampleList.push(`https://${brandDomain}/track/ESP-9482`);
+            else if (lower.includes('date') || lower.includes('day')) sampleList.push('Tomorrow');
+            else if (lower.includes('time')) sampleList.push('4:00 PM');
+            else sampleList.push(`Sample ${newIdx}`);
+          }
         }
         return `{{${seenVars[key]}}}`;
       });
@@ -2473,7 +2492,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
     if (templateType === 'CAROUSEL' || templateType === 'IMAGE_CAROUSEL') {
       // 1. Carousel Introductory Body (Required or optional in Meta)
       if (data.bodyText) {
-        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024, data.bodyVariableSamples);
         const bodyObj: any = {
           type: 'BODY',
           text: cleanBody
@@ -2627,7 +2646,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'CATALOG' || templateType === 'CATALOGUE') {
       // Catalog Template
       if (data.bodyText) {
-        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024, data.bodyVariableSamples);
         const bodyObj: any = {
           type: 'BODY',
           text: cleanBody
@@ -2648,13 +2667,16 @@ export async function saveWhatsAppTemplateAction(data: any) {
       components.push({
         type: 'BUTTONS',
         buttons: [
-          { type: 'CATALOG' }
+          { 
+            type: 'CATALOG',
+            text: (data.catalogButtonText || data.catalogActionLabel || 'View catalog').slice(0, 25)
+          }
         ]
       });
     } else if (templateType === 'FLOWS') {
       // WhatsApp Flows Form Template
       if (data.bodyText) {
-        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024, data.bodyVariableSamples);
         const bodyObj: any = {
           type: 'BODY',
           text: cleanBody
@@ -2681,7 +2703,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'ORDER_DETAILS') {
       // Meta Native Order Details Template
       if (data.bodyText) {
-        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024, data.bodyVariableSamples);
         const bodyObj: any = {
           type: 'BODY',
           text: cleanBody
@@ -2708,7 +2730,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'ORDER_STATUS') {
       // Order Status Dispatch Template
       if (data.bodyText) {
-        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024, data.bodyVariableSamples);
         const bodyObj: any = {
           type: 'BODY',
           text: cleanBody
@@ -2740,7 +2762,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'CALL_PERMISSIONS') {
       // Calling Permissions Request Template
       if (data.bodyText) {
-        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024, data.bodyVariableSamples);
         const bodyObj: any = {
           type: 'BODY',
           text: cleanBody
@@ -2807,7 +2829,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
       if (data.headerType && data.headerType !== 'NONE') {
         const headerObj: any = { type: 'HEADER', format: data.headerType };
         if (data.headerType === 'TEXT') {
-          const { text: cleanHeader, examples: headerExamples } = sanitizeAndExtractVariables(data.headerContent || '', 60);
+          const { text: cleanHeader, examples: headerExamples } = sanitizeAndExtractVariables(data.headerContent || '', 60, data.headerVariableSamples);
           if (cleanHeader) headerObj.text = cleanHeader;
           if (headerExamples.length > 0) {
             headerObj.example = {
@@ -2824,7 +2846,7 @@ export async function saveWhatsAppTemplateAction(data: any) {
       }
 
       if (data.bodyText) {
-        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024);
+        const { text: cleanBody, examples } = sanitizeAndExtractVariables(data.bodyText, 1024, data.bodyVariableSamples);
         const bodyObj: any = {
           type: 'BODY',
           text: cleanBody
@@ -2912,9 +2934,20 @@ export async function saveWhatsAppTemplateAction(data: any) {
           metaStatus = metaJson.status || 'PENDING';
         } else if (metaJson.error) {
           console.warn("[saveWhatsAppTemplateAction] Meta submission error:", metaJson.error);
+          let errText = metaJson.error.message || metaJson.error.error_user_msg || 'Meta template submission failed.';
+          // If Meta returned localized error in Hindi (like "0 इंडेक्स वाले बटन में ज़रूरी फ़ील्ड (text) मौजूद नहीं है")
+          if (metaJson.error.error_user_msg && /[\u0900-\u097F]/.test(metaJson.error.error_user_msg)) {
+            if (metaJson.error.message) {
+              errText = metaJson.error.message.replace(/\(#\d+\)\s*/, '');
+            } else if (metaJson.error.error_user_msg.includes('बटन')) {
+              errText = "Required field 'text' is missing in button at index 0 (e.g. 'View catalog').";
+            }
+          } else if (metaJson.error.error_user_msg) {
+            errText = metaJson.error.error_user_msg;
+          }
           return {
             success: false,
-            error: metaJson.error.error_user_msg || metaJson.error.message || 'Meta template submission failed.'
+            error: errText
           };
         }
       } catch (metaErr: any) {
