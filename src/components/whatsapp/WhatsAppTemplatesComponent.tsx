@@ -7,7 +7,8 @@ import {
   ArrowUpDown, CheckCheck, Radio, Check, ArrowLeft, Layers, ShoppingBag,
   Tag, ChevronLeft, ChevronRight, ChevronDown, Image as ImageIcon, Link as LinkIcon,
   Phone, Copy, Smartphone, Upload, Clipboard, CheckSquare, PackageCheck,
-  Truck, CreditCard, BellRing, FileText, Video, FileCheck, ExternalLink
+  Truck, CreditCard, BellRing, FileText, Video, FileCheck, ExternalLink,
+  Smile, Paperclip, Camera, Mic, MoreVertical
 } from "lucide-react";
 import {
   getWhatsAppTemplates,
@@ -187,7 +188,7 @@ export default function WhatsAppTemplatesComponent() {
             bodyText: "₹1,199 • Zipper pockets & sweat-wicking",
             buttons: [
               { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "esponsports.com"}/products/shorts`, urlType: "STATIC" },
-              { type: "PHONE_NUMBER", text: "Call Us", phone_number: res.phoneNumber || res.brandPhone || "+917206066878" }
+              { type: "URL", text: "Explore More", url: `https://${res.brandDomain || "esponsports.com"}/collections/all`, urlType: "STATIC" }
             ]
           }
         ]);
@@ -307,6 +308,9 @@ export default function WhatsAppTemplatesComponent() {
       return;
     }
     setTemplateType("CAROUSEL");
+    setHeaderType("NONE");
+    setHeaderContent("");
+    setHeaderMediaPreview(null);
     const cards: CarouselCardItem[] = aiSelectedProducts.map((p, idx) => ({
       id: `card_${idx + 1}_${Date.now()}`,
       mediaUrl: p.primaryImage || (p.images && p.images[0]) || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80",
@@ -320,18 +324,12 @@ export default function WhatsAppTemplatesComponent() {
           url: p.productUrl || `https://${brandDomain}/products/${p.handle || p.sku || 'item'}`,
           urlType: "STATIC"
         },
-        idx % 2 === 0
-          ? {
-              type: "URL",
-              text: "Explore More",
-              url: `https://${brandDomain}/collections/all`,
-              urlType: "STATIC"
-            }
-          : {
-              type: "PHONE_NUMBER",
-              text: "Call Us",
-              phone_number: brandPhone
-            }
+        {
+          type: "URL",
+          text: "Explore More",
+          url: `https://${brandDomain}/collections/all`,
+          urlType: "STATIC"
+        }
       ]
     }));
 
@@ -679,6 +677,9 @@ export default function WhatsAppTemplatesComponent() {
 
   const handleAutoFillCarouselWithTopProducts = () => {
     setTemplateType("CAROUSEL");
+    setHeaderType("NONE");
+    setHeaderContent("");
+    setHeaderMediaPreview(null);
     const inStockList = inventoryProducts.filter(p => p.inStock);
     const itemsToUse = inStockList.length >= 2 ? inStockList.slice(0, 4) : inventoryProducts.slice(0, 3);
 
@@ -700,18 +701,12 @@ export default function WhatsAppTemplatesComponent() {
           url: p.productUrl || `https://${brandDomain}/products/${p.handle || p.sku || 'item'}`,
           urlType: "STATIC"
         },
-        idx % 2 === 0
-          ? {
-              type: "URL",
-              text: "Explore More",
-              url: `https://${brandDomain}/collections/all`,
-              urlType: "STATIC"
-            }
-          : {
-              type: "PHONE_NUMBER",
-              text: "Call Us",
-              phone_number: brandPhone
-            }
+        {
+          type: "URL",
+          text: "Explore More",
+          url: `https://${brandDomain}/collections/all`,
+          urlType: "STATIC"
+        }
       ]
     }));
 
@@ -799,7 +794,38 @@ export default function WhatsAppTemplatesComponent() {
   const handleTemplateTypeSelect = (type: typeof templateType) => {
     setTemplateType(type);
     if (type === "CAROUSEL") {
+      setHeaderType("NONE");
+      setHeaderContent("");
+      setHeaderMediaPreview(null);
       if (!bodyText) setBodyText(`Check out our top ${brandName} collections this season:`);
+      if (inventoryProducts.length >= 2 && (!carouselCards || carouselCards.length < 2)) {
+        const inStock = inventoryProducts.filter(p => p.inStock);
+        const toUse = inStock.length >= 2 ? inStock.slice(0, 3) : inventoryProducts.slice(0, 3);
+        if (toUse.length >= 2) {
+          const generatedCards: CarouselCardItem[] = toUse.map((p, idx) => ({
+            id: `card_${idx + 1}_${Date.now()}`,
+            mediaUrl: p.primaryImage || (p.images && p.images[0]) || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80",
+            headerType: "IMAGE",
+            title: p.name,
+            bodyText: `₹${p.sellingPrice} (MRP ₹${p.mrp}) • ${p.category || 'Apparel'}`,
+            buttons: [
+              {
+                type: "URL",
+                text: "Buy Now",
+                url: p.productUrl || `https://${brandDomain}/products/${p.handle || p.sku || 'item'}`,
+                urlType: "STATIC"
+              },
+              {
+                type: "URL",
+                text: "Explore More",
+                url: `https://${brandDomain}/collections/all`,
+                urlType: "STATIC"
+              }
+            ]
+          }));
+          setCarouselCards(generatedCards);
+        }
+      }
     } else if (type === "CATALOGUE") {
       setBodyText(`Hello {{1}}, explore our full ${brandName} catalogue directly on WhatsApp!`);
       setFooterText(`${brandName} Store`);
@@ -2778,119 +2804,137 @@ export default function WhatsAppTemplatesComponent() {
             <div className="bg-white dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xs flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black uppercase text-gray-700 dark:text-gray-200 tracking-wider">
-                  4. Header (Optional)
+                  4. Header {templateType === "CAROUSEL" ? "(Managed per Carousel Card)" : "(Optional)"}
                 </label>
                 <span className="text-[11px] text-gray-400">
-                  Select header type: Text or Direct Image/Media Upload
+                  {templateType === "CAROUSEL" ? "Meta Carousel rule" : "Select header type: Text or Direct Image/Media Upload"}
                 </span>
               </div>
 
-              {/* Header Type Selector Buttons */}
-              <div className="flex gap-2 flex-wrap">
-                {[
-                  { type: "NONE", label: "None" },
-                  { type: "TEXT", label: "📝 Text" },
-                  { type: "IMAGE", label: "🖼️ Image (Upload / Paste)" },
-                  { type: "VIDEO", label: "🎥 Video" },
-                  { type: "DOCUMENT", label: "📄 Document / PDF" }
-                ].map((ht) => (
-                  <button
-                    key={ht.type}
-                    type="button"
-                    onClick={() => {
-                      setHeaderType(ht.type as any);
-                      if (ht.type === "NONE") {
-                        setHeaderContent("");
-                        setHeaderMediaPreview(null);
-                      }
-                    }}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition border cursor-pointer ${
-                      headerType === ht.type
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                        : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-indigo-300"
-                    }`}
-                  >
-                    {ht.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* If Header is TEXT */}
-              {headerType === "TEXT" && (
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
-                    Header Text (Max 60 chars)
-                  </label>
-                  <input
-                    value={headerContent}
-                    onChange={(e) => setHeaderContent(e.target.value)}
-                    placeholder={`e.g. ${brandName} Exclusive Sale!`}
-                    maxLength={60}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+              {templateType === "CAROUSEL" ? (
+                <div className="p-4 bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/70 rounded-2xl flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300 flex items-center justify-center font-bold flex-shrink-0">
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-black text-purple-950 dark:text-purple-200">
+                      Card-Level Media Headers Active
+                    </div>
+                    <div className="text-[11px] text-purple-700 dark:text-purple-300/80 mt-0.5 leading-relaxed">
+                      Per Meta WhatsApp API standards, carousel templates use dedicated individual product photos on each card (configured in <strong>Step 6: Carousel Cards</strong> below) rather than a global top header.
+                    </div>
+                  </div>
                 </div>
-              )}
-
-              {/* If Header is IMAGE / VIDEO / DOCUMENT - DIRECT DRAG & DROP / CLICK UPLOAD / PASTE DIRECTLY */}
-              {(headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT") && (
-                <div
-                  onPaste={(e) => handlePasteEvent(e, "HEADER")}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const file = e.dataTransfer.files?.[0];
-                    if (file) handleFileProcess(file, "HEADER");
-                  }}
-                  className="p-5 border-2 border-dashed border-indigo-300 dark:border-indigo-800/80 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-2xl flex flex-col items-center justify-center gap-3 text-center transition hover:border-indigo-500 cursor-pointer relative"
-                  onClick={() => headerFileInputRef.current?.click()}
-                >
-                  {headerMediaPreview ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <img
-                        src={headerMediaPreview}
-                        alt="Header preview"
-                        referrerPolicy="no-referrer"
-                        className="max-h-40 rounded-xl object-contain shadow-md border border-gray-200 dark:border-slate-700"
-                      />
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 size={14} /> Media Ready
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
+              ) : (
+                <>
+                  {/* Header Type Selector Buttons */}
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { type: "NONE", label: "None" },
+                      { type: "TEXT", label: "📝 Text" },
+                      { type: "IMAGE", label: "🖼️ Image (Upload / Paste)" },
+                      { type: "VIDEO", label: "🎥 Video" },
+                      { type: "DOCUMENT", label: "📄 Document / PDF" }
+                    ].map((ht) => (
+                      <button
+                        key={ht.type}
+                        type="button"
+                        onClick={() => {
+                          setHeaderType(ht.type as any);
+                          if (ht.type === "NONE") {
                             setHeaderContent("");
                             setHeaderMediaPreview(null);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-300 text-xs font-bold hover:bg-red-200 cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                        <Upload size={24} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-gray-800 dark:text-white">
-                          Click to Upload, Drag & Drop, or Paste Directly (Ctrl+V)
-                        </div>
-                        <div className="text-[11px] text-gray-500 mt-0.5">
-                          Supports PNG, JPG, WEBP, MP4, and PDF
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-sm"
+                          }
+                        }}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-black transition border cursor-pointer ${
+                          headerType === ht.type
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                            : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-indigo-300"
+                        }`}
                       >
-                        Choose File
+                        {ht.label}
                       </button>
-                    </>
+                    ))}
+                  </div>
+
+                  {/* If Header is TEXT */}
+                  {headerType === "TEXT" && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                        Header Text (Max 60 chars)
+                      </label>
+                      <input
+                        value={headerContent}
+                        onChange={(e) => setHeaderContent(e.target.value)}
+                        placeholder={`e.g. ${brandName} Exclusive Sale!`}
+                        maxLength={60}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
                   )}
-                </div>
+
+                  {/* If Header is IMAGE / VIDEO / DOCUMENT - DIRECT DRAG & DROP / CLICK UPLOAD / PASTE DIRECTLY */}
+                  {(headerType === "IMAGE" || headerType === "VIDEO" || headerType === "DOCUMENT") && (
+                    <div
+                      onPaste={(e) => handlePasteEvent(e, "HEADER")}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) handleFileProcess(file, "HEADER");
+                      }}
+                      className="p-5 border-2 border-dashed border-indigo-300 dark:border-indigo-800/80 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-2xl flex flex-col items-center justify-center gap-3 text-center transition hover:border-indigo-500 cursor-pointer relative"
+                      onClick={() => headerFileInputRef.current?.click()}
+                    >
+                      {headerMediaPreview ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <img
+                            src={headerMediaPreview}
+                            alt="Header preview"
+                            referrerPolicy="no-referrer"
+                            className="max-h-40 rounded-xl object-contain shadow-md border border-gray-200 dark:border-slate-700"
+                          />
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                              <CheckCircle2 size={14} /> Media Ready
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setHeaderContent("");
+                                setHeaderMediaPreview(null);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-300 text-xs font-bold hover:bg-red-200 cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                            <Upload size={24} />
+                          </div>
+                          <div>
+                            <div className="text-xs font-black text-gray-800 dark:text-white">
+                              Click to Upload, Drag & Drop, or Paste Directly (Ctrl+V)
+                            </div>
+                            <div className="text-[11px] text-gray-500 mt-0.5">
+                              Supports PNG, JPG, WEBP, MP4, and PDF
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="px-3.5 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-sm"
+                          >
+                            Choose File
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -3617,34 +3661,65 @@ export default function WhatsAppTemplatesComponent() {
                     Live WhatsApp Simulator
                   </span>
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider">
                   {category} • Meta View
                 </span>
               </div>
 
-              {/* Realistic Phone Frame */}
-              <div className="w-full max-w-[340px] mx-auto bg-[#efeae2] dark:bg-slate-950 rounded-3xl border-4 border-gray-800 dark:border-slate-700 shadow-xl overflow-hidden flex flex-col">
-                {/* WhatsApp Chat Header with Dynamic Brand Name & Avatar */}
-                <div className="bg-[#075e54] text-white p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-white/20 text-white font-black text-xs flex items-center justify-center uppercase">
-                      {brandName.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="text-xs font-black flex items-center gap-1">
-                        {brandName} Official
-                        <CheckCircle2 size={11} className="text-emerald-300 fill-emerald-300 text-[#075e54]" />
-                      </div>
-                      <div className="text-[9px] text-emerald-200">Verified Business Account</div>
+              {/* Realistic Mobile Phone Frame with authentic proportions */}
+              <div className="w-[330px] sm:w-[350px] h-[640px] max-h-[640px] mx-auto bg-[#efeae2] dark:bg-[#0b141a] rounded-[44px] border-[9px] border-gray-900 dark:border-slate-900 shadow-2xl overflow-hidden flex flex-col relative select-none">
+                
+                {/* Phone Top Status Bar & Notch */}
+                <div className="bg-[#005d4b] text-white px-5 pt-2.5 pb-1 flex items-center justify-between text-[11px] font-semibold select-none flex-shrink-0 z-20">
+                  <span>9:41</span>
+                  <div className="w-20 h-3.5 bg-black rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 rounded-full bg-slate-900 mr-2" />
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <span>5G</span>
+                    <div className="w-4 h-2.5 border border-white rounded-xs p-0.5 flex items-center">
+                      <div className="w-full h-full bg-white rounded-2xs" />
                     </div>
                   </div>
-                  <div className="text-[10px] opacity-80">{liveCurrentTime}</div>
                 </div>
 
-                {/* WhatsApp Chat Area */}
-                <div className="p-3 flex flex-col gap-3 min-h-[380px] max-h-[500px] overflow-y-auto">
+                {/* WhatsApp Chat Top Header */}
+                <div className="bg-[#008069] dark:bg-[#1f2c34] text-white px-3 py-2 flex items-center justify-between flex-shrink-0 shadow-md z-10">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ArrowLeft size={16} className="text-white flex-shrink-0 cursor-pointer hover:opacity-80" />
+                    <div className="w-8 h-8 rounded-full bg-emerald-800 text-white font-black text-xs flex items-center justify-center uppercase border border-white/20 flex-shrink-0">
+                      {brandName.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold flex items-center gap-1 text-white truncate">
+                        <span className="truncate">{brandName}</span>
+                        <CheckCircle2 size={12} className="text-white fill-[#25d366] flex-shrink-0" />
+                      </div>
+                      <div className="text-[10px] text-emerald-100/90 dark:text-emerald-300/80 truncate">Verified Business Account</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-white/90">
+                    <Video size={15} className="cursor-pointer hover:text-white" />
+                    <Phone size={14} className="cursor-pointer hover:text-white" />
+                    <MoreVertical size={15} className="cursor-pointer hover:text-white" />
+                  </div>
+                </div>
+
+                {/* WhatsApp Chat Scrollable Area */}
+                <div
+                  className="flex-1 p-3 overflow-y-auto overflow-x-hidden flex flex-col gap-2.5 scrollbar-thin relative"
+                  style={{
+                    backgroundImage: "radial-gradient(rgba(0,0,0,0.03) 1px, transparent 1px)",
+                    backgroundSize: "12px 12px"
+                  }}
+                >
+                  {/* Date Pill */}
+                  <div className="self-center px-2.5 py-0.5 rounded-md bg-white/80 dark:bg-slate-800/80 backdrop-blur-xs text-[10px] font-bold text-gray-600 dark:text-gray-300 shadow-2xs">
+                    Today
+                  </div>
+
                   {/* Chat Message Bubble */}
-                  <div className="bg-white dark:bg-slate-800 rounded-2xl rounded-tr-xs p-3 shadow-sm text-xs text-gray-900 dark:text-gray-100 max-w-[95%] flex flex-col gap-2 self-start">
+                  <div className="bg-white dark:bg-[#1f2c34] rounded-2xl rounded-tl-xs p-3 shadow-sm text-xs text-gray-900 dark:text-gray-100 max-w-[95%] flex flex-col gap-2 self-start border border-black/5 dark:border-white/5">
                     
                     {/* Header Display */}
                     {headerType === "TEXT" && headerContent && (
@@ -3687,7 +3762,7 @@ export default function WhatsAppTemplatesComponent() {
 
                     {/* Footer */}
                     {footerText && (
-                      <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 italic">
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 italic">
                         {footerText}
                       </div>
                     )}
@@ -3695,9 +3770,9 @@ export default function WhatsAppTemplatesComponent() {
                     {/* Catalogue Action Preview */}
                     {templateType === "CATALOGUE" && (
                       <div className="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 flex flex-col gap-2">
-                        <div className="p-2.5 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 text-[11px] text-sky-900 dark:text-sky-200 flex items-center gap-2">
-                          <ShoppingBag size={14} className="text-sky-600 flex-shrink-0" />
-                          <span className="font-bold">Catalog items connected from Meta Commerce</span>
+                        <div className="p-2 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 text-[10px] text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
+                          <ShoppingBag size={13} className="text-sky-600 flex-shrink-0" />
+                          <span className="font-bold">Meta Commerce Catalog Connected</span>
                         </div>
                         <div className="bg-[#00a884] text-white rounded-xl py-2 px-3 text-center text-xs font-black flex items-center justify-center gap-1.5 shadow-sm">
                           <ShoppingBag size={13} />
@@ -3709,8 +3784,8 @@ export default function WhatsAppTemplatesComponent() {
                     {/* Flows Action Preview */}
                     {templateType === "FLOWS" && (
                       <div className="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 flex flex-col gap-2">
-                        <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
-                          <CheckSquare size={14} className="text-emerald-600 flex-shrink-0" />
+                        <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-[10px] text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                          <CheckSquare size={13} className="text-emerald-600 flex-shrink-0" />
                           <span className="font-bold">Interactive Meta Flow Form</span>
                         </div>
                         <div className="bg-emerald-600 text-white rounded-xl py-2 px-3 text-center text-xs font-black flex items-center justify-center gap-1.5 shadow-sm">
@@ -3855,24 +3930,24 @@ export default function WhatsAppTemplatesComponent() {
                     </div>
                   </div>
 
-                  {/* CAROUSEL SWIPEABLE PREVIEW */}
+                  {/* CAROUSEL SWIPEABLE PREVIEW (WhatsApp Native Cards) */}
                   {templateType === "CAROUSEL" && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center justify-between text-[10px] font-bold text-purple-700 dark:text-purple-300">
-                        <span>Swipeable Cards Preview ({carouselCards.length}):</span>
-                        <span>← Scroll Horizontally →</span>
+                    <div className="flex flex-col gap-1.5 mt-1 max-w-full">
+                      <div className="flex items-center justify-between text-[10px] font-black text-purple-700 dark:text-purple-300 px-1">
+                        <span>Swipeable Cards ({carouselCards.length}):</span>
+                        <span className="text-[9px] text-gray-500">← Swipe →</span>
                       </div>
 
-                      {/* Scroll container */}
-                      <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
+                      {/* Horizontal Scroll container */}
+                      <div className="flex gap-2.5 overflow-x-auto pb-1.5 pt-0.5 px-0.5 scrollbar-thin snap-x snap-mandatory">
                         {carouselCards.map((card, cIdx) => (
                           <div
                             key={cIdx}
-                            className="w-[200px] flex-shrink-0 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm flex flex-col justify-between"
+                            className="w-[190px] flex-shrink-0 snap-start bg-white dark:bg-[#1f2c34] rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm flex flex-col justify-between"
                           >
                             <div>
                               {/* Media */}
-                              <div className="h-28 bg-gray-100 dark:bg-slate-700 relative overflow-hidden">
+                              <div className="h-28 bg-gray-100 dark:bg-slate-800 relative overflow-hidden">
                                 {card.mediaUrl ? (
                                   <img
                                     src={card.mediaUrl}
@@ -3892,30 +3967,30 @@ export default function WhatsAppTemplatesComponent() {
 
                               {/* Card Content */}
                               <div className="p-2.5 flex flex-col gap-1">
-                                <div className="font-black text-xs text-gray-900 dark:text-white leading-snug">
+                                <div className="font-black text-xs text-gray-900 dark:text-white leading-snug line-clamp-1" title={card.title}>
                                   {card.title || "Product Title"}
                                 </div>
-                                <div className="text-[10px] text-gray-600 dark:text-gray-300 leading-tight">
+                                <div className="text-[10px] text-gray-600 dark:text-gray-300 leading-tight line-clamp-2">
                                   {card.bodyText || "Price and description"}
                                 </div>
                               </div>
                             </div>
 
                             {/* Card Buttons */}
-                            <div className="p-2 pt-0 flex flex-col gap-1 border-t border-gray-100 dark:border-slate-700 mt-2">
+                            <div className="p-2 pt-0 flex flex-col gap-1 border-t border-gray-100 dark:border-slate-700/80 mt-1">
                               {card.buttons.map((b, bi) => {
                                 const isDynamic = b.type === "URL" && (b.urlType === "DYNAMIC" || b.url?.includes("{{1}}"));
                                 return (
                                   <div
                                     key={bi}
-                                    className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-lg py-1 px-2 text-center text-[10px] font-bold border border-indigo-200 dark:border-indigo-800 flex items-center justify-center gap-1"
+                                    className="bg-emerald-50/80 dark:bg-emerald-950/40 text-[#008069] dark:text-emerald-300 rounded-lg py-1 px-2 text-center text-[10px] font-black border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-center gap-1 shadow-2xs"
                                   >
                                     {b.type === "URL" ? (
                                       isDynamic ? <Zap size={10} className="text-amber-500 fill-amber-500" /> : <ExternalLink size={10} />
                                     ) : (
-                                      "↩️ "
+                                      <Phone size={10} />
                                     )}
-                                    <span>{b.text || "Action"}</span>
+                                    <span className="truncate">{b.text || "Action"}</span>
                                     {isDynamic && (
                                       <span className="text-[8px] font-mono text-amber-600 dark:text-amber-300">&#123;&#123;1&#125;&#125;</span>
                                     )}
@@ -3928,6 +4003,24 @@ export default function WhatsAppTemplatesComponent() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* WhatsApp Bottom Chat Input Composer Bar */}
+                <div className="p-2 bg-[#f0f2f5] dark:bg-[#1f2c34] flex items-center gap-2 flex-shrink-0 border-t border-gray-200/60 dark:border-slate-800">
+                  <div className="flex-1 bg-white dark:bg-[#2a3942] rounded-full px-3 py-1.5 flex items-center gap-2 shadow-2xs border border-gray-200 dark:border-slate-700">
+                    <Smile size={16} className="text-gray-500 dark:text-gray-400 cursor-pointer" />
+                    <span className="text-xs text-gray-400 dark:text-gray-500 flex-1 select-none">Message</span>
+                    <Paperclip size={15} className="text-gray-500 dark:text-gray-400 cursor-pointer" />
+                    <Camera size={15} className="text-gray-500 dark:text-gray-400 cursor-pointer" />
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-[#00a884] text-white flex items-center justify-center shadow-md flex-shrink-0 cursor-pointer hover:bg-[#008f6f] transition">
+                    <Mic size={16} />
+                  </div>
+                </div>
+
+                {/* iPhone Bottom Home Indicator Bar */}
+                <div className="bg-[#f0f2f5] dark:bg-[#1f2c34] pb-1.5 pt-0.5 flex justify-center flex-shrink-0">
+                  <div className="w-28 h-1 bg-gray-400 dark:bg-gray-600 rounded-full" />
                 </div>
               </div>
 
