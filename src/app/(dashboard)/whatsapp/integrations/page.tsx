@@ -160,7 +160,11 @@ export default function IntegrationsHubPage() {
       }
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam && ["whatsapp", "ai-automation", "shopify", "payment", "webhooks", "facebook"].includes(tabParam)) {
+      if (tabParam === "shopify") {
+        window.location.replace("/whatsapp/shopify?tab=settings");
+        return;
+      }
+      if (tabParam && ["whatsapp", "ai-automation", "payment", "webhooks", "facebook"].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     } catch {}
@@ -680,23 +684,20 @@ const reloadTeams = async () => {
       </div>
 
       {/* Tabs list bar */}
-      <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto border-b border-gray-200 dark:border-slate-700 pb-1 scrollbar-none">
-        <button onClick={() => handleTabChange("whatsapp")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "whatsapp" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+      <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto border-b border-gray-200 dark:border-slate-800 pb-1 scrollbar-none">
+        <button onClick={() => handleTabChange("whatsapp")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "whatsapp" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
           WhatsApp API
         </button>
-        <button onClick={() => handleTabChange("ai-automation")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "ai-automation" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("ai-automation")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "ai-automation" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
           <Bot size={16} /> AI Automation
         </button>
-        <button onClick={() => handleTabChange("shopify")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "shopify" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
-          Shopify
-        </button>
-        <button onClick={() => handleTabChange("payment")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "payment" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("payment")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "payment" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
           Payment Gateways
         </button>
-        <button onClick={() => handleTabChange("webhooks")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "webhooks" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("webhooks")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "webhooks" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
           Webhooks
         </button>
-        <button onClick={() => handleTabChange("facebook")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "facebook" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("facebook")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "facebook" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
           <Target size={16} /> Meta Ads, CAPI & Catalog
         </button>
       </nav>
@@ -868,54 +869,28 @@ const reloadTeams = async () => {
       )}
 
       {activeTab === "shopify" && (
-        <div className="flex flex-col gap-8 w-full max-w-7xl">
-          {/* Shopify Integration Card */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden mt-2">
-            <div className="border-b border-gray-100 dark:border-slate-700 p-6 flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg"><Store size={20} /></div>
+        <div className="flex flex-col gap-6 w-full max-w-7xl">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 shadow-sm p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-2xl border border-emerald-200 dark:border-emerald-800/60">
+                <Store size={28} />
+              </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white m-0">Shopify Integration</h2>
-                <p className="text-sm text-gray-500 m-0 mt-0.5">Sync your Shopify catalog directly into Whatmore.</p>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white m-0">Shopify Integration Moved to Shopify Hub</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 m-0 mt-1 max-w-xl leading-relaxed">
+                  Shopify store connection credentials, automated order notifications, abandoned checkout recovery drips, and webhooks are now unified in the primary <strong>Shopify</strong> section.
+                </p>
               </div>
             </div>
-
-            <div className="p-6">
-              {shopifyResultMsg && (
-                <div className={`mb-6 p-4 rounded-xl text-sm font-semibold flex items-center gap-2 ${shopifyResultMsg.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                  {shopifyResultMsg.success ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-                  <span>{shopifyResultMsg.text}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSaveShopifyCredentials} className="flex flex-col gap-5">
-                <div className="grid grid-cols-2 gap-5">
-                  <div>
-                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Shopify Store Domain</label>
-                    <input type="text" value={shopifyDomain} onChange={(e) => setShopifyDomain(e.target.value)} placeholder="e.g. mystore.myshopify.com" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
-                    <p className="text-xs text-gray-400 mt-1">Leave blank to use the manual Catalog Maker.</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Admin API Access Token</label>
-                    <div className="relative">
-                      <input type={showShopifyToken ? "text" : "password"} value={shopifyToken} onChange={(e) => setShopifyToken(e.target.value)} placeholder="shpat_..." className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
-                      <button type="button" onClick={() => setShowShopifyToken(!showShopifyToken)} className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
-                        {showShopifyToken ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <button type="submit" disabled={savingShopify} className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white rounded-xl text-sm font-bold shadow-md transition-all">
-                    {savingShopify ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
-                    {savingShopify ? "Connecting..." : "Connect Shopify Store"}
-                  </button>
-                </div>
-              </form>
-            </div>
+            <Link
+              href="/whatsapp/shopify?tab=settings"
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2 shrink-0"
+            >
+              <span>Open Shopify Hub Settings</span>
+              <ArrowRight size={16} />
+            </Link>
           </div>
-
-                  </div>
+        </div>
       )}
       {activeTab === "payment" && (
         <div className="flex flex-col gap-8 w-full max-w-7xl">
@@ -1083,33 +1058,33 @@ const reloadTeams = async () => {
 
       {activeTab === "webhooks" && (
         <div className="flex flex-col gap-8 w-full max-w-7xl">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Custom Webhooks</h3>
-                <p className="text-sm text-slate-500">Configure webhooks to push leads or data to your CRM, ERP or Zapier.</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Custom Webhooks</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Configure webhooks to push leads or data to your CRM, ERP or Zapier.</p>
               </div>
-              <button onClick={() => handleOpenModal()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 text-sm">
+              <button onClick={() => handleOpenModal()} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all cursor-pointer">
                 <Plus size={16} /> Add Webhook
               </button>
             </div>
 
-            <div className="flex gap-2 mb-6">
+            <div className="flex gap-2 mb-6 flex-wrap">
               {['ALL', 'CRM_LEAD', 'ERP', 'PAYMENT', 'ZAPIER', 'META_CAPI'].map(cat => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategoryTab(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${activeCategoryTab === cat ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${activeCategoryTab === cat ? 'bg-slate-900 dark:bg-indigo-600 text-white border-slate-900 dark:border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750'}`}
                 >
                   {cat === 'ALL' ? 'All Integrations' : cat === 'META_CAPI' ? 'Meta CAPI' : cat.replace('_', ' ')}
                 </button>
               ))}
             </div>
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
               <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-xs">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Name</th>
                     <th className="px-4 py-3 font-semibold">Category</th>
@@ -1118,29 +1093,31 @@ const reloadTeams = async () => {
                     <th className="px-4 py-3 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {loadingWebhooks ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Loading...</td></tr>
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 dark:text-slate-500">Loading...</td></tr>
                   ) : filteredWebhooks.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">No webhooks found.</td></tr>
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 dark:text-slate-500">No webhooks found.</td></tr>
                   ) : (
                     filteredWebhooks.map(hook => (
-                      <tr key={hook.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                        <td className="px-4 py-3 font-medium text-slate-800">{hook.name}</td>
+                      <tr key={hook.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">{hook.name}</td>
                         <td className="px-4 py-3">
-                          <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-bold">{hook.type}</span>
+                          <span className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 px-2.5 py-0.5 rounded text-xs font-bold">{hook.type}</span>
                         </td>
-                        <td className="px-4 py-3 text-slate-500 font-mono text-xs">{hook.url}</td>
-                        <td className="px-4 py-3 text-slate-500 font-mono text-xs">
+                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{hook.url}</td>
+                        <td className="px-4 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs">
                            {hook.token ? (
-                             <span className="px-2 py-1 bg-green-50 text-green-700 rounded border border-green-200 text-xs font-medium">Secured</span>
+                             <span className="px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 rounded border border-emerald-200 dark:border-emerald-800/60 text-xs font-bold">Secured</span>
                            ) : (
-                             <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded border border-gray-200 text-xs">None</span>
+                             <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded border border-slate-200 dark:border-slate-700 text-xs">None</span>
                            )}
                         </td>
-                        <td className="px-4 py-3 text-right flex justify-end gap-2">
-                          <button onClick={() => handleOpenModal(hook)} className="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded"><Edit3 size={15} /></button>
-                          <button onClick={() => handleDeleteIntegration(hook.id)} className="text-red-600 hover:bg-red-50 p-1.5 rounded"><Trash2 size={15} /></button>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end items-center gap-1.5">
+                            <button onClick={() => handleOpenModal(hook)} className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 p-1.5 rounded-lg transition-colors cursor-pointer" title="Edit"><Edit3 size={15} /></button>
+                            <button onClick={() => handleDeleteIntegration(hook.id)} className="text-red-600 dark:text-rose-400 hover:bg-red-50 dark:hover:bg-rose-950/50 p-1.5 rounded-lg transition-colors cursor-pointer" title="Delete"><Trash2 size={15} /></button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1154,13 +1131,13 @@ const reloadTeams = async () => {
 
       {activeTab === "facebook" && (
         <div className="flex flex-col gap-8 w-full max-w-7xl">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
-                <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  <Target className="text-indigo-600" size={22} /> Meta Ads, Conversions API & Commerce Catalog
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Target className="text-indigo-600 dark:text-indigo-400" size={22} /> Meta Ads, Conversions API & Commerce Catalog
                 </h3>
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                   Connect Meta Conversions API (CAPI) for Click-to-WhatsApp ads and Meta Commerce Product Catalogs for native WhatsApp in-chat shopping.
                 </p>
               </div>
@@ -1170,7 +1147,7 @@ const reloadTeams = async () => {
                     handleOpenModal(null);
                     setFormData({ name: '', type: 'META_CATALOG', url: '', token: '' });
                   }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all cursor-pointer"
                 >
                   <ShoppingBag size={16} /> + Add Catalog API
                 </button>
@@ -1184,7 +1161,7 @@ const reloadTeams = async () => {
                       setFormData({ name: '', type: 'META_CAPI', url: '', token: '' });
                     }
                   }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all cursor-pointer"
                 >
                   <Plus size={16} /> Configure CAPI Pixel
                 </button>
@@ -1193,30 +1170,30 @@ const reloadTeams = async () => {
 
             {/* Quick Live Test & Status Banner */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col justify-between">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">CAPI</div>
-                    <h4 className="font-bold text-emerald-950 text-sm">Conversions API Engine</h4>
+                    <h4 className="font-bold text-emerald-950 dark:text-emerald-300 text-sm">Conversions API Engine</h4>
                   </div>
-                  <p className="text-xs text-emerald-800 leading-relaxed mb-3">
-                    Click-to-WhatsApp (CTWA) campaigns fire conversions via <code className="bg-emerald-100 px-1 rounded text-emerald-950 font-bold">business_messaging</code> action source.
+                  <p className="text-xs text-emerald-800 dark:text-emerald-400/90 leading-relaxed mb-3">
+                    Click-to-WhatsApp (CTWA) campaigns fire conversions via <code className="bg-emerald-100 dark:bg-emerald-900/60 px-1 rounded text-emerald-950 dark:text-emerald-200 font-bold">business_messaging</code> action source.
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 bg-emerald-100/80 px-2.5 py-1 rounded-full border border-emerald-200 w-fit">
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/60 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60 w-fit">
                   <CheckCircle2 size={13} /> Active & Syncing
                 </span>
               </div>
 
-              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 flex flex-col justify-between">
+              <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 rounded-2xl p-5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-xs">
                       <ShoppingBag size={15} />
                     </div>
-                    <h4 className="font-bold text-purple-950 text-sm">Commerce Catalog API</h4>
+                    <h4 className="font-bold text-purple-950 dark:text-purple-300 text-sm">Commerce Catalog API</h4>
                   </div>
-                  <p className="text-xs text-purple-800 leading-relaxed mb-3">
+                  <p className="text-xs text-purple-800 dark:text-purple-400/90 leading-relaxed mb-3">
                     Sync {clientBrandName} Commerce Catalog directly with WhatsApp to send Single/Multi Product Messages and in-chat shopping carts.
                   </p>
                 </div>
@@ -1225,34 +1202,34 @@ const reloadTeams = async () => {
                     handleOpenModal(null);
                     setFormData({ name: '', type: 'META_CATALOG', url: '', token: '' });
                   }}
-                  className="w-full py-1.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+                  className="w-full py-1.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
                 >
                   <Plus size={13} /> + Add Catalog API
                 </button>
               </div>
 
-              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 flex flex-col justify-between">
+              <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">INBOX</div>
-                    <h4 className="font-bold text-indigo-950 text-sm">Inbox Instant Conversion</h4>
+                    <h4 className="font-bold text-indigo-950 dark:text-indigo-300 text-sm">Inbox Instant Conversion</h4>
                   </div>
-                  <p className="text-xs text-indigo-800 leading-relaxed mb-3">
+                  <p className="text-xs text-indigo-800 dark:text-indigo-400/90 leading-relaxed mb-3">
                     Agents can click <strong>⚡ Mark Interested (₹10k Lead)</strong> in WhatsApp Agent Inbox to trigger high-value conversion to Meta.
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-indigo-700 bg-indigo-100/80 px-2.5 py-1 rounded-full border border-indigo-200 w-fit">
+                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-900/60 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800/60 w-fit">
                   <Zap size={13} /> Ready (Default ₹10k)
                 </span>
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col justify-between">
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold text-xs">AUD</div>
-                    <h4 className="font-bold text-amber-950 text-sm">Meta Custom Audiences</h4>
+                    <h4 className="font-bold text-amber-950 dark:text-amber-300 text-sm">Meta Custom Audiences</h4>
                   </div>
-                  <p className="text-xs text-amber-800 leading-relaxed mb-3">
+                  <p className="text-xs text-amber-800 dark:text-amber-400/90 leading-relaxed mb-3">
                     Create & connect dynamic retargeting audiences for any client niche (Ecommerce, B2B, Services).
                   </p>
                 </div>
@@ -1277,7 +1254,7 @@ const reloadTeams = async () => {
                         alert("Error creating audience: " + e.message);
                       }
                     }}
-                    className="w-full py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+                    className="w-full py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
                   >
                     <Plus size={13} /> Create Audience
                   </button>
@@ -1300,7 +1277,7 @@ const reloadTeams = async () => {
                         alert("Chatbot Custom Audiences scanned and auto-connected!");
                       }
                     }}
-                    className="w-full py-1.5 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                    className="w-full py-1.5 px-3 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Users size={13} /> Auto-Sync Audiences
                   </button>
@@ -1309,50 +1286,50 @@ const reloadTeams = async () => {
             </div>
 
             {/* Meta CAPI Lead Value Config */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 mb-8">
-              <h3 className="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+            <div className="bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6 mb-8">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
                 <Zap className="text-blue-500" size={18} />
                 Meta Conversions API Default Lead Value
               </h3>
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
                 This is the default monetary value (in INR) that will be passed to Meta Ads Manager when an agent clicks ⚡ Mark Interested in the Inbox.
               </p>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <div className="relative w-64">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-slate-500 sm:text-sm">₹</span>
+                    <span className="text-slate-500 dark:text-slate-400 sm:text-sm">₹</span>
                   </div>
                   <input
                     type="number"
                     value={metaCapiLeadValue}
                     onChange={(e) => setMetaCapiLeadValue(Number(e.target.value))}
-                    className="w-full pl-8 py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full pl-8 py-2 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     placeholder="10000"
                   />
                 </div>
                 <button
                   onClick={handleSaveMetaCapi}
                   disabled={savingCapi}
-                  className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-50 flex items-center gap-2">
+                  className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer">
                   {savingCapi ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Save size={16} />}
                   Save Lead Value
                 </button>
               </div>
               {capiResultMsg && (
-                <div className={"mt-3 p-3 rounded-lg text-xs font-semibold " + (capiResultMsg.success ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200")}>
+                <div className={"mt-3 p-3 rounded-lg text-xs font-semibold " + (capiResultMsg.success ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60" : "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60")}>
                   {capiResultMsg.text}
                 </div>
               )}
             </div>
 
             {/* Active Meta Integration Table */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden mb-8">
-              <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 font-bold text-xs text-slate-700 flex justify-between items-center">
+            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-8">
+              <div className="bg-slate-50 dark:bg-slate-800/80 px-4 py-3 border-b border-slate-200 dark:border-slate-700 font-bold text-xs text-slate-700 dark:text-slate-200 flex justify-between items-center">
                 <span>Active Meta Integrations (CAPI & Commerce Catalog)</span>
-                <span className="text-[11px] text-slate-500 font-normal">Pixel ID / Catalog ID & System User Token</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Pixel ID / Catalog ID & System User Token</span>
               </div>
               <table className="w-full text-sm text-left">
-                <thead className="bg-slate-100/60 text-slate-500 border-b border-slate-200 text-xs">
+                <thead className="bg-slate-100/60 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-xs">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Name</th>
                     <th className="px-4 py-3 font-semibold">Type</th>
@@ -1362,32 +1339,32 @@ const reloadTeams = async () => {
                     <th className="px-4 py-3 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {webhookIntegrations.filter((w: any) => w.type === 'META_CAPI' || w.type === 'META_CATALOG').length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-400 text-sm">
+                      <td colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm">
                         No Meta CAPI or Catalog credentials configured. Click <strong>+ Add Catalog API</strong> or <strong>Configure CAPI Pixel</strong> above to connect.
                       </td>
                     </tr>
                   ) : (
                     webhookIntegrations.filter((w: any) => w.type === 'META_CAPI' || w.type === 'META_CATALOG').map((wh: any) => (
                       <React.Fragment key={wh.id}>
-                        <tr className="border-b border-slate-100 hover:bg-slate-50/50">
-                          <td className="px-4 py-3 font-bold text-slate-800 flex items-center gap-2">
-                            {wh.type === 'META_CATALOG' ? <ShoppingBag size={15} className="text-purple-600" /> : <Target size={15} className="text-indigo-600" />}
+                        <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="px-4 py-3 font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                            {wh.type === 'META_CATALOG' ? <ShoppingBag size={15} className="text-purple-600 dark:text-purple-400" /> : <Target size={15} className="text-indigo-600 dark:text-indigo-400" />}
                             {wh.name}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${wh.type === 'META_CATALOG' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                            <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${wh.type === 'META_CATALOG' ? 'bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300' : 'bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-300'}`}>
                               {wh.type === 'META_CATALOG' ? 'Commerce Catalog' : 'Conversions API'}
                             </span>
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs text-slate-700">{wh.url}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                          <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{wh.url}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
                             {wh.token ? `${wh.token.substring(0, 12)}...${wh.token.slice(-6)}` : 'No token'}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${wh.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold ${wh.isActive ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
                               {wh.isActive ? 'Active' : 'Inactive'}
                             </span>
                           </td>
@@ -1397,7 +1374,7 @@ const reloadTeams = async () => {
                                 <button
                                   onClick={() => handleTestCatalogConnection(wh)}
                                   disabled={testingCatalogId === wh.id}
-                                  className="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 flex items-center gap-1 transition-all"
+                                  className="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-800/60 flex items-center gap-1 transition-all cursor-pointer"
                                   title="Verify Meta Catalog Connectivity"
                                 >
                                   {testingCatalogId === wh.id ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
@@ -1408,26 +1385,26 @@ const reloadTeams = async () => {
                                 <button
                                   onClick={() => handleTestPixelConnection(wh)}
                                   disabled={testingPixelId === wh.id}
-                                  className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 transition-all"
+                                  className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800/60 flex items-center gap-1 transition-all cursor-pointer"
                                   title="Verify Meta Pixel / Dataset Connectivity"
                                 >
                                   {testingPixelId === wh.id ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                                   {testingPixelId === wh.id ? "Testing..." : "Test Pixel"}
                                 </button>
                               )}
-                              <button onClick={() => handleOpenModal(wh)} className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-slate-100" title="Edit Integration">
+                              <button onClick={() => handleOpenModal(wh)} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" title="Edit Integration">
                                 <Edit size={16} />
                               </button>
-                              <button onClick={() => handleDeleteIntegration(wh.id)} className="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg hover:bg-slate-100" title="Delete Integration">
+                              <button onClick={() => handleDeleteIntegration(wh.id)} className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" title="Delete Integration">
                                 <Trash2 size={16} />
                               </button>
                             </div>
                           </td>
                         </tr>
                         {catalogTestStatus && catalogTestStatus.id === wh.id && (
-                          <tr className="bg-slate-50/80">
+                          <tr className="bg-slate-50/80 dark:bg-slate-850">
                             <td colSpan={6} className="px-4 py-2.5">
-                              <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${catalogTestStatus.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                              <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${catalogTestStatus.success ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60' : 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60'}`}>
                                 {catalogTestStatus.success ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertTriangle size={14} className="text-rose-600" />}
                                 <span>{catalogTestStatus.text}</span>
                               </div>
@@ -1435,9 +1412,9 @@ const reloadTeams = async () => {
                           </tr>
                         )}
                         {pixelTestStatus && pixelTestStatus.id === wh.id && (
-                          <tr className="bg-slate-50/80">
+                          <tr className="bg-slate-50/80 dark:bg-slate-850">
                             <td colSpan={6} className="px-4 py-2.5">
-                              <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${pixelTestStatus.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                              <div className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${pixelTestStatus.success ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60' : 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60'}`}>
                                 {pixelTestStatus.success ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertTriangle size={14} className="text-rose-600" />}
                                 <span>{pixelTestStatus.text}</span>
                               </div>
@@ -1452,19 +1429,19 @@ const reloadTeams = async () => {
             </div>
 
             {/* Step-by-Step Meta Setup Guide */}
-            <div className="bg-blue-50/60 border border-blue-200 rounded-2xl p-6 text-sm text-blue-900">
-              <h4 className="font-bold text-base text-blue-950 mb-3 flex items-center gap-2">
-                <HelpCircle size={18} className="text-blue-600" /> Meta CAPI & Commerce Catalog Setup Guide
+            <div className="bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-2xl p-6 text-sm text-blue-900 dark:text-blue-200">
+              <h4 className="font-bold text-base text-blue-950 dark:text-blue-100 mb-3 flex items-center gap-2">
+                <HelpCircle size={18} className="text-blue-600 dark:text-blue-400" /> Meta CAPI & Commerce Catalog Setup Guide
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white/90 p-3.5 rounded-xl border border-blue-100 shadow-2xs">
-                  <strong className="text-blue-950 block mb-1 text-xs">Conversions API (CAPI):</strong>
-                  <p className="text-xs text-slate-600 mt-1">Get your 15-digit Pixel ID from <a href="https://business.facebook.com/events_manager2" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline">Meta Events Manager ↗</a> and generate a System User Token with <code>ads_management</code>.</p>
+                <div className="bg-white/90 dark:bg-slate-900/80 p-3.5 rounded-xl border border-blue-100 dark:border-blue-900/50 shadow-2xs">
+                  <strong className="text-blue-950 dark:text-blue-200 block mb-1 text-xs">Conversions API (CAPI):</strong>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Get your 15-digit Pixel ID from <a href="https://business.facebook.com/events_manager2" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 font-bold underline">Meta Events Manager ↗</a> and generate a System User Token with <code>ads_management</code>.</p>
                 </div>
 
-                <div className="bg-white/90 p-3.5 rounded-xl border border-blue-100 shadow-2xs">
-                  <strong className="text-blue-950 block mb-1 text-xs">Commerce Product Catalog API:</strong>
-                  <p className="text-xs text-slate-600 mt-1">Get your Catalog ID from <a href="https://business.facebook.com/commerce" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline">Meta Commerce Manager ↗</a> under <em>Settings → Catalog</em>. Use the generated permanent token with <code>catalog_management</code>.</p>
+                <div className="bg-white/90 dark:bg-slate-900/80 p-3.5 rounded-xl border border-blue-100 dark:border-blue-900/50 shadow-2xs">
+                  <strong className="text-blue-950 dark:text-blue-200 block mb-1 text-xs">Commerce Product Catalog API:</strong>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Get your Catalog ID from <a href="https://business.facebook.com/commerce" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 font-bold underline">Meta Commerce Manager ↗</a> under <em>Settings → Catalog</em>. Use the generated permanent token with <code>catalog_management</code>.</p>
                 </div>
               </div>
             </div>
@@ -1475,42 +1452,42 @@ const reloadTeams = async () => {
 
       {/* Global Shared Modal for Adding/Editing Webhooks and Meta Integrations */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-800">{editingId ? 'Edit Integration / Webhook' : 'Add Integration / Webhook'}</h3>
-              <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden transition-colors">
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-slate-800 dark:text-white">{editingId ? 'Edit Integration / Webhook' : 'Add Integration / Webhook'}</h3>
+              <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"><X size={20}/></button>
             </div>
             <form onSubmit={handleSubmitIntegration} className="p-4 flex flex-col gap-4">
               {formData.type === 'META_CATALOG' && (
-                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-3.5 text-xs text-slate-700 flex flex-col gap-2 shadow-sm">
-                  <div className="flex items-center gap-1.5 font-bold text-purple-900 text-sm">
-                    <ShoppingBag size={16} className="text-purple-600" />
+                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 border border-purple-200 dark:border-purple-800/60 rounded-xl p-3.5 text-xs text-slate-700 dark:text-slate-300 flex flex-col gap-2 shadow-sm">
+                  <div className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-300 text-sm">
+                    <ShoppingBag size={16} className="text-purple-600 dark:text-purple-400" />
                     <span>Meta Commerce Catalog API Setup</span>
                   </div>
-                  <p className="text-[11.5px] text-purple-800 leading-relaxed m-0">
+                  <p className="text-[11.5px] text-purple-800 dark:text-purple-300 leading-relaxed m-0">
                     Connect your {clientBrandName} product catalog to send product messages and in-chat shopping carts on WhatsApp.
                   </p>
-                  <div className="text-[11px] text-slate-600 space-y-1">
-                    <div><strong>Catalog ID:</strong> Find in Meta Commerce Manager (<a href="https://business.facebook.com/commerce" target="_blank" rel="noreferrer" className="underline font-bold text-purple-700">business.facebook.com/commerce ↗</a>) under <em>Settings → Catalog</em>.</div>
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+                    <div><strong>Catalog ID:</strong> Find in Meta Commerce Manager (<a href="https://business.facebook.com/commerce" target="_blank" rel="noreferrer" className="underline font-bold text-purple-700 dark:text-purple-400">business.facebook.com/commerce ↗</a>) under <em>Settings → Catalog</em>.</div>
                     <div><strong>Permanent Token:</strong> Paste your System User Token generated with <code>catalog_management</code> permission.</div>
                   </div>
                 </div>
               )}
 
               {formData.type === 'META_CAPI' && (
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3.5 text-xs text-slate-700 flex flex-col gap-2.5 shadow-sm max-h-[300px] overflow-y-auto">
-                  <div className="flex items-center gap-1.5 font-bold text-blue-900 text-sm">
-                    <Sparkles size={16} className="text-blue-600" />
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl p-3.5 text-xs text-slate-700 dark:text-slate-300 flex flex-col gap-2.5 shadow-sm max-h-[300px] overflow-y-auto">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-900 dark:text-blue-300 text-sm">
+                    <Sparkles size={16} className="text-blue-600 dark:text-blue-400" />
                     <span>Meta CAPI Step-by-Step Setup Guide</span>
                   </div>
                   <div className="space-y-2 text-[11.5px] leading-relaxed">
-                    <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 shadow-2xs">
-                      <strong className="text-blue-950 block mb-1">Step 1: Get or Create Meta Pixel / Dataset:</strong>
-                      Open <a href="https://business.facebook.com/events_manager2" target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline hover:text-blue-800 inline-flex items-center gap-0.5">Meta Events Manager ↗ <ExternalLink size={11} /></a>, select your Pixel/Dataset and copy the 15-digit ID.
+                    <div className="bg-white/90 dark:bg-slate-900/80 p-2.5 rounded-lg border border-blue-100 dark:border-blue-900/50 shadow-2xs">
+                      <strong className="text-blue-950 dark:text-blue-200 block mb-1">Step 1: Get or Create Meta Pixel / Dataset:</strong>
+                      Open <a href="https://business.facebook.com/events_manager2" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 font-bold underline hover:text-blue-800 dark:hover:text-blue-300 inline-flex items-center gap-0.5">Meta Events Manager ↗ <ExternalLink size={11} /></a>, select your Pixel/Dataset and copy the 15-digit ID.
                     </div>
-                    <div className="bg-white/90 p-2.5 rounded-lg border border-blue-100 shadow-2xs">
-                      <strong className="text-blue-950 block mb-1">Step 2: Generate Access Token:</strong>
+                    <div className="bg-white/90 dark:bg-slate-900/80 p-2.5 rounded-lg border border-blue-100 dark:border-blue-900/50 shadow-2xs">
+                      <strong className="text-blue-950 dark:text-blue-200 block mb-1">Step 2: Generate Access Token:</strong>
                       Go to Events Manager → Settings → Conversions API → <em>Generate access token</em> or use your System User token with <code>ads_management</code>.
                     </div>
                   </div>
@@ -1518,11 +1495,11 @@ const reloadTeams = async () => {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Category</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Category</label>
                 <select 
                   value={formData.type} 
                   onChange={e => setFormData({...formData, type: e.target.value})} 
-                  className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"
+                  className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500"
                 >
                   <option value="CRM_LEAD">CRM (Lead Webhook)</option>
                   <option value="ERP">ERP</option>
@@ -1536,7 +1513,7 @@ const reloadTeams = async () => {
               {formData.type === 'META_CATALOG' ? (
                 <>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Permanent Catalog Access Token</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Permanent Catalog Access Token</label>
                     <input 
                       type="text" 
                       value={formData.token} 
@@ -1547,7 +1524,7 @@ const reloadTeams = async () => {
                           handleAutoFetchCatalogs(pasted.trim());
                         }
                       }}
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-purple-500 font-mono" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-purple-500 font-mono" 
                       placeholder="EAAT..." 
                       required 
                     />
@@ -1555,7 +1532,7 @@ const reloadTeams = async () => {
                       type="button"
                       onClick={() => handleAutoFetchCatalogs()}
                       disabled={fetchingCatalogs || !formData.token}
-                      className="mt-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs w-full"
+                      className="mt-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 dark:disabled:bg-purple-900/50 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs w-full"
                     >
                       {fetchingCatalogs ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
                       {fetchingCatalogs ? "Auto-Fetching Catalogs from Meta..." : "⚡ Auto-Fetch Catalogs from Token"}
@@ -1563,17 +1540,17 @@ const reloadTeams = async () => {
                   </div>
 
                   {catalogFetchError && (
-                    <div className="text-[11.5px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 flex items-center gap-2 font-semibold">
+                    <div className="text-[11.5px] text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg p-2.5 flex items-center gap-2 font-semibold">
                       <AlertTriangle size={14} className="text-rose-600 shrink-0" />
                       <span>{catalogFetchError}</span>
                     </div>
                   )}
 
                   {fetchedCatalogs.length > 0 && (
-                    <div className="bg-purple-50/80 border border-purple-200 rounded-xl p-3.5 flex flex-col gap-2">
-                      <label className="block text-xs font-bold text-purple-950 flex items-center justify-between">
+                    <div className="bg-purple-50/80 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 rounded-xl p-3.5 flex flex-col gap-2">
+                      <label className="block text-xs font-bold text-purple-950 dark:text-purple-200 flex items-center justify-between">
                         <span>Select Discovered Catalog ({fetchedCatalogs.length} found):</span>
-                        <span className="text-[10px] text-purple-700 font-semibold">Auto-fills below</span>
+                        <span className="text-[10px] text-purple-700 dark:text-purple-400 font-semibold">Auto-fills below</span>
                       </label>
                       <select
                         value={formData.url}
@@ -1588,7 +1565,7 @@ const reloadTeams = async () => {
                             });
                           }
                         }}
-                        className="w-full bg-white border border-purple-300 rounded-lg p-2.5 text-xs font-bold text-purple-950 outline-none focus:ring-2 focus:ring-purple-500 shadow-2xs"
+                        className="w-full bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-700 rounded-lg p-2.5 text-xs font-bold text-purple-950 dark:text-purple-200 outline-none focus:ring-2 focus:ring-purple-500 shadow-2xs"
                       >
                         <option value="">-- Choose a Catalog --</option>
                         {fetchedCatalogs.map((cat: any) => (
@@ -1598,7 +1575,7 @@ const reloadTeams = async () => {
                         ))}
                       </select>
                       {formData.url && (
-                        <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center gap-1.5 font-bold">
+                        <div className="text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 flex items-center gap-1.5 font-bold">
                           <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
                           <span>Selected & Ready: ID {formData.url}</span>
                         </div>
@@ -1607,25 +1584,25 @@ const reloadTeams = async () => {
                   )}
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Catalog Name</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Catalog Name</label>
                     <input 
                       type="text" 
                       value={formData.name} 
                       onChange={e => setFormData({...formData, name: e.target.value})} 
                       required 
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
                       placeholder={`e.g. ${clientBrandName} Catalog`} 
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Meta Commerce Catalog ID</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Meta Commerce Catalog ID</label>
                     <input 
                       type="text" 
                       value={formData.url} 
                       onChange={e => setFormData({...formData, url: e.target.value})} 
                       required 
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
                       placeholder="e.g. 1614642786353172" 
                     />
                   </div>
@@ -1633,7 +1610,7 @@ const reloadTeams = async () => {
               ) : formData.type === 'META_CAPI' ? (
                 <>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Permanent Meta CAPI Access Token (System User Token)</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Permanent Meta CAPI Access Token (System User Token)</label>
                     <input 
                       type="text" 
                       value={formData.token} 
@@ -1644,7 +1621,7 @@ const reloadTeams = async () => {
                           handleAutoFetchPixels(pasted.trim());
                         }
                       }}
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
                       placeholder="EAAI... or EAAT..." 
                       required 
                     />
@@ -1652,7 +1629,7 @@ const reloadTeams = async () => {
                       type="button"
                       onClick={() => handleAutoFetchPixels()}
                       disabled={fetchingPixels || !formData.token}
-                      className="mt-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs w-full"
+                      className="mt-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 dark:disabled:bg-indigo-900/50 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs w-full"
                     >
                       {fetchingPixels ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
                       {fetchingPixels ? "Auto-Fetching Meta Pixels & Datasets..." : "⚡ Auto-Fetch Pixels & Datasets from Token"}
@@ -1660,17 +1637,17 @@ const reloadTeams = async () => {
                   </div>
 
                   {pixelFetchError && (
-                    <div className="text-[11.5px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2.5 flex items-center gap-2 font-semibold">
+                    <div className="text-[11.5px] text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg p-2.5 flex items-center gap-2 font-semibold">
                       <AlertTriangle size={14} className="text-rose-600 shrink-0" />
                       <span>{pixelFetchError}</span>
                     </div>
                   )}
 
                   {fetchedPixels.length > 0 && (
-                    <div className="bg-blue-50/80 border border-blue-200 rounded-xl p-3.5 flex flex-col gap-2">
-                      <label className="block text-xs font-bold text-blue-950 flex items-center justify-between">
+                    <div className="bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 rounded-xl p-3.5 flex flex-col gap-2">
+                      <label className="block text-xs font-bold text-blue-950 dark:text-blue-200 flex items-center justify-between">
                         <span>Select Discovered Pixel / Dataset ({fetchedPixels.length} found):</span>
-                        <span className="text-[10px] text-blue-700 font-semibold">Auto-fills below</span>
+                        <span className="text-[10px] text-blue-700 dark:text-blue-400 font-semibold">Auto-fills below</span>
                       </label>
                       <select
                         value={formData.url}
@@ -1685,7 +1662,7 @@ const reloadTeams = async () => {
                             });
                           }
                         }}
-                        className="w-full bg-white border border-blue-300 rounded-lg p-2.5 text-xs font-bold text-blue-950 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                        className="w-full bg-white dark:bg-slate-900 border border-blue-300 dark:border-blue-700 rounded-lg p-2.5 text-xs font-bold text-blue-950 dark:text-blue-200 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
                       >
                         <option value="">-- Choose a Pixel / Dataset --</option>
                         {fetchedPixels.map((px: any) => (
@@ -1695,7 +1672,7 @@ const reloadTeams = async () => {
                         ))}
                       </select>
                       {formData.url && (
-                        <div className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2 flex items-center gap-1.5 font-bold">
+                        <div className="text-[11px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-lg p-2 flex items-center gap-1.5 font-bold">
                           <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
                           <span>Selected & Ready: ID {formData.url}</span>
                         </div>
@@ -1704,25 +1681,25 @@ const reloadTeams = async () => {
                   )}
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Meta Pixel / Dataset Name</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Meta Pixel / Dataset Name</label>
                     <input 
                       type="text" 
                       value={formData.name} 
                       onChange={e => setFormData({...formData, name: e.target.value})} 
                       required 
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
                       placeholder={`e.g. ${clientBrandName} Pixel`} 
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Meta Pixel / Dataset ID</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Meta Pixel / Dataset ID</label>
                     <input 
                       type="text" 
                       value={formData.url} 
                       onChange={e => setFormData({...formData, url: e.target.value})} 
                       required 
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
                       placeholder="e.g. 1386264563245511" 
                     />
                   </div>
@@ -1730,42 +1707,42 @@ const reloadTeams = async () => {
               ) : (
                 <>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Name</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Name</label>
                     <input 
                       type="text" 
                       value={formData.name} 
                       onChange={e => setFormData({...formData, name: e.target.value})} 
                       required 
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500" 
                       placeholder={`e.g. ${clientBrandName} Webhook`} 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Webhook URL</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Webhook URL</label>
                     <input 
                       type="url" 
                       value={formData.url} 
                       onChange={e => setFormData({...formData, url: e.target.value})} 
                       required 
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
                       placeholder="https://..." 
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Auth Token (Optional)</label>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Auth Token (Optional)</label>
                     <input 
                       type="text" 
                       value={formData.token} 
                       onChange={e => setFormData({...formData, token: e.target.value})} 
-                      className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
+                      className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg p-2.5 text-sm outline-none focus:border-indigo-500 font-mono" 
                       placeholder="Bearer ..." 
                     />
                   </div>
                 </>
               )}
               <div className="flex justify-end gap-2 mt-2">
-                <button type="button" onClick={handleCloseModal} className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 text-slate-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700">Save</button>
+                <button type="button" onClick={handleCloseModal} className="px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-2xs">Save</button>
               </div>
             </form>
           </div>
