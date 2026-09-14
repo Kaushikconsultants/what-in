@@ -2538,7 +2538,12 @@ export async function saveWhatsAppTemplateAction(data: any) {
         buttons: JSON.stringify(data.buttons || []),
         variables: JSON.stringify(data.variables || []),
         templateType,
-        carouselCards: data.carouselCards ? (typeof data.carouselCards === 'string' ? data.carouselCards : JSON.stringify(data.carouselCards)) : null,
+        carouselCards: data.carouselCards 
+          ? (typeof data.carouselCards === 'string' ? data.carouselCards : JSON.stringify(data.carouselCards)) 
+          : (data.selectedProducts ? JSON.stringify(data.selectedProducts) : null),
+        variables: data.variables 
+          ? (typeof data.variables === 'string' ? data.variables : JSON.stringify(data.variables)) 
+          : (data.selectedProducts ? JSON.stringify(data.selectedProducts) : null),
         catalogId: data.catalogId || null,
         status: metaStatus
       },
@@ -2552,9 +2557,13 @@ export async function saveWhatsAppTemplateAction(data: any) {
         bodyText: data.bodyText || '',
         footerText: data.footerText || null,
         buttons: JSON.stringify(data.buttons || []),
-        variables: JSON.stringify(data.variables || []),
+        variables: data.variables 
+          ? (typeof data.variables === 'string' ? data.variables : JSON.stringify(data.variables)) 
+          : (data.selectedProducts ? JSON.stringify(data.selectedProducts) : null),
         templateType,
-        carouselCards: data.carouselCards ? (typeof data.carouselCards === 'string' ? data.carouselCards : JSON.stringify(data.carouselCards)) : null,
+        carouselCards: data.carouselCards 
+          ? (typeof data.carouselCards === 'string' ? data.carouselCards : JSON.stringify(data.carouselCards)) 
+          : (data.selectedProducts ? JSON.stringify(data.selectedProducts) : null),
         catalogId: data.catalogId || null,
         status: metaStatus
       }

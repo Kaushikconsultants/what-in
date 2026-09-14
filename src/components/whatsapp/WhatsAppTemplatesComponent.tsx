@@ -223,7 +223,16 @@ export default function WhatsAppTemplatesComponent() {
   const [couponCode, setCouponCode] = useState("FLAT30");
 
   // Meta Official Extension States
-  const [catalogueFormat, setCatalogueFormat] = useState<"CATALOGUE_MESSAGE" | "MULTI_PRODUCT">("CATALOGUE_MESSAGE");
+  const [catalogueFormat, setCatalogueFormat] = useState<"CATALOGUE_MESSAGE" | "MULTI_PRODUCT">("MULTI_PRODUCT");
+  const [selectedCatalogProducts, setSelectedCatalogProducts] = useState<any[]>([]);
+  const [catalogSectionTitle, setCatalogSectionTitle] = useState("Featured Products");
+  const [catalogButtonText, setCatalogButtonText] = useState("View catalog");
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState("ALL");
+  const [catalogInStockOnly, setCatalogInStockOnly] = useState(false);
+  const [simulatorCatalogDrawerOpen, setSimulatorCatalogDrawerOpen] = useState(false);
+  const [simulatorCartCount, setSimulatorCartCount] = useState(0);
+
   const [flowButtonText, setFlowButtonText] = useState("View Flow");
   const [authCodeDelivery, setAuthCodeDelivery] = useState<"COPY_CODE" | "ONE_TAP" | "ZERO_TAP">("COPY_CODE");
   const [authSecurityRecommendation, setAuthSecurityRecommendation] = useState(true);
@@ -300,6 +309,70 @@ export default function WhatsAppTemplatesComponent() {
         return [...prev, p];
       }
     });
+  };
+
+  // Catalog Products Selection Handlers
+  const toggleSelectCatalogProduct = (p: any) => {
+    setSelectedCatalogProducts((prev) => {
+      const exists = prev.some((item) => item.id === p.id || item.handle === p.handle);
+      if (exists) {
+        return prev.filter((item) => item.id !== p.id && item.handle !== p.handle);
+      } else {
+        if (prev.length >= 30) {
+          showToast("Maximum 30 products can be selected for WhatsApp Multi-Product Messages.", "error");
+          return prev;
+        }
+        return [...prev, p];
+      }
+    });
+  };
+
+  const handleSelectTopBestsellers = (count = 5) => {
+    const inStock = inventoryProducts.filter((p) => p.inStock);
+    const toSelect = (inStock.length > 0 ? inStock : inventoryProducts).slice(0, count);
+    setSelectedCatalogProducts(toSelect);
+    showToast(`⚡ Selected top ${toSelect.length} in-stock products for catalog!`, "success");
+  };
+
+  const handleSelectAllInStock = () => {
+    const inStock = inventoryProducts.filter((p) => {
+      if (!p.inStock) return false;
+      if (catalogCategoryFilter !== "ALL" && p.category !== catalogCategoryFilter) return false;
+      if (catalogSearch) {
+        const s = catalogSearch.toLowerCase();
+        return (
+          p.name?.toLowerCase().includes(s) ||
+          p.category?.toLowerCase().includes(s) ||
+          p.handle?.toLowerCase().includes(s)
+        );
+      }
+      return true;
+    }).slice(0, 30);
+    setSelectedCatalogProducts(inStock);
+    showToast(`📦 Selected ${inStock.length} in-stock products for catalog!`, "success");
+  };
+
+  const handleClearCatalogSelection = () => {
+    setSelectedCatalogProducts([]);
+    showToast("Cleared catalog product selection.", "info");
+  };
+
+  const handleGenerateAICatalogCopy = () => {
+    if (selectedCatalogProducts.length === 0) {
+      showToast("Please select at least 1 product from the catalog below.", "error");
+      return;
+    }
+    const names = selectedCatalogProducts.map((p) => p.name).slice(0, 3).join(", ");
+    const dynamicBody = `Hi {{1}}, explore our *${catalogSectionTitle || "Featured Collection"}* at ${brandName}! 🔥\n\nFeaturing top picks like ${names}${selectedCatalogProducts.length > 3 ? ` and ${selectedCatalogProducts.length - 3} more` : ''}. Tap *${catalogButtonText || "View catalog"}* below to browse styles, check sizes, and place orders directly on WhatsApp!\n\nUse code *${couponCode || 'FLAT30'}* for special discounts.`;
+    setBodyText(dynamicBody);
+    setFooterText(`${brandName} Store | Official Online Shop`);
+    showToast("✨ AI generated personalized catalog message copy!", "success");
+  };
+
+  const handleInjectProductIntoCatalog = (p: any) => {
+    setTemplateType("CATALOGUE");
+    toggleSelectCatalogProduct(p);
+    showToast(`🛍️ Added "${p.name}" to Catalog selection!`, "success");
   };
 
   const handleBuildCarouselFromAiSelected = () => {
@@ -531,6 +604,15 @@ export default function WhatsAppTemplatesComponent() {
     if (t.templateType === "CAROUSEL" && t.carouselCards) {
       try { const cards = JSON.parse(t.carouselCards); if (Array.isArray(cards)) setCarouselCards(cards); } catch {}
     }
+    if ((t.templateType === "CATALOGUE" || t.templateType === "CATALOG") && (t.carouselCards || t.variables)) {
+      try {
+        const cards = JSON.parse(t.carouselCards || t.variables || "[]");
+        if (Array.isArray(cards) && cards.length > 0) {
+          setSelectedCatalogProducts(cards);
+          setCatalogueFormat("MULTI_PRODUCT");
+        }
+      } catch {}
+    }
     setViewMode("CREATE");
     showToast(`📋 Cloned "${t.name}" — edit and save as "${clonedName}"`, "success");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -548,6 +630,9 @@ export default function WhatsAppTemplatesComponent() {
     if (templateType === "CAROUSEL") {
       issues.push({ label: "Carousel Cards", pass: carouselCards.length >= 2 && carouselCards.length <= 10, message: `Need 2–10 cards. Currently ${carouselCards.length}.` });
       issues.push({ label: "Card Images", pass: carouselCards.every(c => !!c.mediaUrl), message: "All carousel cards must have an image." });
+    }
+    if (templateType === "CATALOGUE" && catalogueFormat === "MULTI_PRODUCT") {
+      issues.push({ label: "Catalog Products", pass: selectedCatalogProducts.length >= 1 && selectedCatalogProducts.length <= 30, message: `Need 1–30 products selected. Currently ${selectedCatalogProducts.length}.` });
     }
     const varRegex = /\{\{(\d+)\}\}/g;
     const nums: number[] = []; let m;
@@ -827,10 +912,15 @@ export default function WhatsAppTemplatesComponent() {
         }
       }
     } else if (type === "CATALOGUE") {
-      setBodyText(`Hello {{1}}, explore our full ${brandName} catalogue directly on WhatsApp!`);
-      setFooterText(`${brandName} Store`);
+      setBodyText(`Hello {{1}}, explore our *${catalogSectionTitle || "Featured Collection"}* directly on WhatsApp! Tap below to browse items and shop:`);
+      setFooterText(`${brandName} Store | Official Online Shop`);
       setHeaderType("NONE");
-      setButtons([{ type: "CATALOG", text: "View catalog" }]);
+      setButtons([{ type: "CATALOG", text: catalogButtonText || "View catalog" }]);
+      if (selectedCatalogProducts.length === 0 && inventoryProducts.length > 0) {
+        const inStock = inventoryProducts.filter((p) => p.inStock);
+        const topProds = inStock.length > 0 ? inStock.slice(0, 4) : inventoryProducts.slice(0, 4);
+        setSelectedCatalogProducts(topProds);
+      }
     } else if (type === "FLOWS") {
       setBodyText(`Hello {{1}}, please fill out this quick form so our ${brandName} team can assist you:`);
       setFooterText(`${brandName} Support`);
@@ -1062,7 +1152,14 @@ export default function WhatsAppTemplatesComponent() {
     setButtons([]);
     setNameError("");
     setCouponCode("FLAT30");
-    setCatalogueFormat("CATALOGUE_MESSAGE");
+    setCatalogueFormat("MULTI_PRODUCT");
+    setSelectedCatalogProducts([]);
+    setCatalogSectionTitle("Featured Products");
+    setCatalogButtonText("View catalog");
+    setCatalogSearch("");
+    setCatalogCategoryFilter("ALL");
+    setSimulatorCatalogDrawerOpen(false);
+    setSimulatorCartCount(0);
     setFlowButtonText("View Flow");
     setAuthCodeDelivery("COPY_CODE");
     setAuthSecurityRecommendation(true);
@@ -1091,6 +1188,11 @@ export default function WhatsAppTemplatesComponent() {
       return;
     }
 
+    if (templateType === "CATALOGUE" && catalogueFormat === "MULTI_PRODUCT" && selectedCatalogProducts.length === 0) {
+      showToast("Please select at least 1 product from the catalog below.", "error");
+      return;
+    }
+
     setSaving(true);
     const payload = {
       name: templateName,
@@ -1101,10 +1203,13 @@ export default function WhatsAppTemplatesComponent() {
       headerContent: templateType === "CATALOGUE" ? null : headerContent,
       bodyText,
       footerText,
+      catalogSectionTitle: templateType === "CATALOGUE" ? catalogSectionTitle : undefined,
+      catalogButtonText: templateType === "CATALOGUE" ? (catalogButtonText || "View catalog") : undefined,
+      selectedProducts: templateType === "CATALOGUE" ? selectedCatalogProducts : undefined,
       buttons: templateType === "LTO_COUPON" 
         ? [{ type: "COPY_CODE", text: couponCode || "FLAT30", code: couponCode || "FLAT30" }]
         : templateType === "CATALOGUE"
-        ? [{ type: "CATALOG", text: "View catalog" }]
+        ? [{ type: "CATALOG", text: catalogButtonText || "View catalog" }]
         : templateType === "FLOWS"
         ? [{ type: "FLOW", text: flowButtonText || "View Flow" }]
         : templateType === "ORDER_DETAILS"
@@ -1116,7 +1221,8 @@ export default function WhatsAppTemplatesComponent() {
         : templateType === "AUTHENTICATION"
         ? [{ type: "COPY_CODE", text: "Copy code", code: "{{1}}" }]
         : buttons,
-      carouselCards: templateType === "CAROUSEL" ? carouselCards : null
+      carouselCards: templateType === "CAROUSEL" ? carouselCards : templateType === "CATALOGUE" ? selectedCatalogProducts : null,
+      variables: templateType === "CATALOGUE" && selectedCatalogProducts.length > 0 ? selectedCatalogProducts : undefined
     };
 
     const res = await saveWhatsAppTemplateAction(payload);
@@ -2296,22 +2402,22 @@ export default function WhatsAppTemplatesComponent() {
 
                             <button
                               type="button"
+                              onClick={() => handleInjectProductIntoCatalog(prod)}
+                              className="px-2 py-1.5 bg-white dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/40 border border-gray-200 dark:border-slate-700 hover:border-sky-400 text-sky-700 dark:text-sky-300 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                              title="Add to WhatsApp Catalog Template selection"
+                            >
+                              <ShoppingBag size={11} />
+                              <span>+ Catalog</span>
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => handleInjectProductAsCarouselCard(prod)}
                               className="px-2 py-1.5 bg-white dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 border border-gray-200 dark:border-slate-700 hover:border-purple-400 text-purple-700 dark:text-purple-300 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
                               title="Add as Carousel Card with image, title, price, and store link"
                             >
                               <Plus size={11} />
                               <span>+ Carousel</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleInjectProductIntoBody(prod)}
-                              className="px-2 py-1 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 rounded-lg text-[9px] font-bold transition cursor-pointer flex items-center justify-center gap-1"
-                              title="Insert product title & price into message body text"
-                            >
-                              <FileText size={10} />
-                              <span>In Body</span>
                             </button>
 
                             <button
@@ -3279,6 +3385,316 @@ export default function WhatsAppTemplatesComponent() {
               </div>
             )}
 
+            {/* STEP 6B: CONNECTED CATALOG & PRODUCT SELECTOR (Only when Catalogue is selected) */}
+            {templateType === "CATALOGUE" && (
+              <div className="bg-white dark:bg-slate-800/90 border border-sky-200 dark:border-sky-800/60 rounded-3xl p-6 shadow-2xs flex flex-col gap-5">
+                {/* Header with Badges */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="block text-xs font-black uppercase text-sky-600 dark:text-sky-400 tracking-wider flex items-center gap-1.5">
+                      <ShoppingBag size={14} />
+                      6. Connected Catalog & Product Selection ({selectedCatalogProducts.length}/30 Selected)
+                    </label>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Select individual products from your live connected store catalog to send to customers on WhatsApp.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-[10px] font-black flex items-center gap-1">
+                      <CheckCircle2 size={11} />
+                      {inventoryStats.inStockProducts || inventoryProducts.length} In-Stock in Store
+                    </span>
+                    <span className="px-2.5 py-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 rounded-xl text-[10px] font-black">
+                      🛍️ {selectedCatalogProducts.length} Selected
+                    </span>
+                  </div>
+                </div>
+
+                {/* Format Toggle: Multi-Product vs Full Catalog */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogueFormat("MULTI_PRODUCT")}
+                    className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 cursor-pointer ${
+                      catalogueFormat === "MULTI_PRODUCT"
+                        ? "border-sky-600 bg-sky-50/70 dark:bg-sky-950/50 text-sky-950 dark:text-sky-200 ring-2 ring-sky-500/30 shadow-2xs"
+                        : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:border-sky-300"
+                    }`}
+                  >
+                    <div className={`p-2 rounded-xl ${catalogueFormat === "MULTI_PRODUCT" ? "bg-sky-600 text-white" : "bg-gray-100 dark:bg-slate-700 text-gray-500"}`}>
+                      <Layers size={16} />
+                    </div>
+                    <div>
+                      <div className="font-black text-xs">Multi-Product Showcase (Selected Items)</div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
+                        Send up to 30 curated products with direct add-to-cart in WhatsApp.
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCatalogueFormat("CATALOGUE_MESSAGE")}
+                    className={`p-3.5 rounded-2xl border text-left transition flex items-start gap-3 cursor-pointer ${
+                      catalogueFormat === "CATALOGUE_MESSAGE"
+                        ? "border-sky-600 bg-sky-50/70 dark:bg-sky-950/50 text-sky-950 dark:text-sky-200 ring-2 ring-sky-500/30 shadow-2xs"
+                        : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:border-sky-300"
+                    }`}
+                  >
+                    <div className={`p-2 rounded-xl ${catalogueFormat === "CATALOGUE_MESSAGE" ? "bg-sky-600 text-white" : "bg-gray-100 dark:bg-slate-700 text-gray-500"}`}>
+                      <ShoppingBag size={16} />
+                    </div>
+                    <div>
+                      <div className="font-black text-xs">Full Storefront Catalog</div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
+                        Opens your full Meta Commerce storefront with all categories.
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Section Title & Button Label Inputs */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-sky-50/40 dark:bg-sky-950/20 rounded-2xl border border-sky-100 dark:border-sky-900/40">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Section / Collection Header
+                    </label>
+                    <input
+                      type="text"
+                      value={catalogSectionTitle}
+                      onChange={(e) => setCatalogSectionTitle(e.target.value)}
+                      placeholder="e.g. 🔥 Featured Collection, ⚡ Today's Deals"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 border border-sky-200 dark:border-slate-700 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Catalog Action Button Label
+                    </label>
+                    <input
+                      type="text"
+                      value={catalogButtonText}
+                      onChange={(e) => setCatalogButtonText(e.target.value)}
+                      placeholder="e.g. View catalog, Shop Now"
+                      maxLength={META_LIMITS.BUTTON_TEXT_MAX}
+                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 border border-sky-200 dark:border-slate-700 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Selection & Smart Action Chips */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-100 dark:border-slate-700">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase mr-1">Quick Select:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectTopBestsellers(5)}
+                      className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800/60 rounded-xl text-[11px] font-black transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                    >
+                      <Zap size={11} className="text-amber-600 fill-amber-500" />
+                      <span>⚡ Top 5 Bestsellers</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllInStock}
+                      className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-[11px] font-black transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                    >
+                      <CheckSquare size={11} className="text-emerald-600" />
+                      <span>📦 Select In-Stock</span>
+                    </button>
+                    {selectedCatalogProducts.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearCatalogSelection}
+                        className="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 rounded-xl text-[11px] font-bold transition cursor-pointer flex items-center gap-1"
+                      >
+                        <Trash2 size={11} />
+                        <span>Clear All</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateAICatalogCopy}
+                    disabled={selectedCatalogProducts.length === 0}
+                    className="px-3 py-1.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                  >
+                    <Sparkles size={12} />
+                    <span>✨ Write AI Catalog Copy</span>
+                  </button>
+                </div>
+
+                {/* Selected Products Strip */}
+                {selectedCatalogProducts.length > 0 && (
+                  <div className="p-3 bg-sky-50/50 dark:bg-sky-950/30 rounded-2xl border border-sky-200/80 dark:border-sky-800/60 flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-sky-950 dark:text-sky-200">
+                      <span>Selected Products Tray ({selectedCatalogProducts.length}):</span>
+                      <span className="text-[10px] text-gray-500">Tap ✕ to remove item</span>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                      {selectedCatalogProducts.map((p, idx) => (
+                        <div
+                          key={p.id || idx}
+                          className="flex-shrink-0 flex items-center gap-2 pl-1.5 pr-2 py-1 bg-white dark:bg-slate-800 rounded-xl border border-sky-200 dark:border-slate-700 text-xs shadow-2xs"
+                        >
+                          <div className="w-7 h-7 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+                            <img src={p.primaryImage || p.images?.[0]} alt={p.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-900 dark:text-gray-100 text-[11px] truncate max-w-[120px]">{p.name}</span>
+                            <span className="text-[10px] font-black text-emerald-600">₹{p.sellingPrice}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectCatalogProduct(p)}
+                            className="text-gray-400 hover:text-red-500 cursor-pointer ml-1 p-0.5 rounded hover:bg-red-50"
+                            title="Remove product"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Search & Category Filter Bar */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        value={catalogSearch}
+                        onChange={(e) => setCatalogSearch(e.target.value)}
+                        placeholder="Search products by title, SKU, fabric (e.g. Dry-Fit, Lycra, Shorts)..."
+                        className="w-full pl-9 pr-8 py-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-sky-500"
+                      />
+                      {catalogSearch && (
+                        <button type="button" onClick={() => setCatalogSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Category Pills */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+                    <button
+                      type="button"
+                      onClick={() => setCatalogCategoryFilter("ALL")}
+                      className={`px-3 py-1 rounded-xl text-[11px] font-black whitespace-nowrap transition cursor-pointer ${
+                        catalogCategoryFilter === "ALL"
+                          ? "bg-sky-600 text-white shadow-2xs"
+                          : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+                      }`}
+                    >
+                      All ({inventoryProducts.length})
+                    </button>
+                    {inventoryCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setCatalogCategoryFilter(cat)}
+                        className={`px-3 py-1 rounded-xl text-[11px] font-black whitespace-nowrap transition cursor-pointer ${
+                          catalogCategoryFilter === cat
+                            ? "bg-sky-600 text-white shadow-2xs"
+                            : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Products Grid */}
+                {inventoryLoading ? (
+                  <div className="p-8 flex items-center justify-center gap-2 text-sky-600 text-xs font-bold">
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Loading store catalog products...</span>
+                  </div>
+                ) : inventoryProducts.length === 0 ? (
+                  <div className="p-8 text-center bg-gray-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 text-xs text-gray-500">
+                    No products found in inventory. Add products to your catalog to enable multi-product selection.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-96 overflow-y-auto pr-1 scrollbar-thin">
+                    {inventoryProducts
+                      .filter((p) => {
+                        if (catalogCategoryFilter !== "ALL" && p.category !== catalogCategoryFilter) return false;
+                        if (!catalogSearch) return true;
+                        const s = catalogSearch.toLowerCase();
+                        return (
+                          p.name?.toLowerCase().includes(s) ||
+                          p.category?.toLowerCase().includes(s) ||
+                          p.fabric?.toLowerCase().includes(s) ||
+                          p.handle?.toLowerCase().includes(s) ||
+                          p.sku?.toLowerCase().includes(s)
+                        );
+                      })
+                      .map((p) => {
+                        const isSelected = selectedCatalogProducts.some((item) => item.id === p.id || item.handle === p.handle);
+                        return (
+                          <div
+                            key={p.id || p.handle}
+                            onClick={() => toggleSelectCatalogProduct(p)}
+                            className={`p-2.5 rounded-2xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                              isSelected
+                                ? "bg-sky-50 dark:bg-sky-950/60 border-sky-500 ring-2 ring-sky-500/30 shadow-2xs"
+                                : "bg-gray-50/70 dark:bg-slate-900/60 border-gray-200 dark:border-slate-700/80 hover:border-sky-300 hover:bg-white dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            {/* Product Image Thumbnail */}
+                            <div className="w-14 h-14 rounded-xl overflow-hidden bg-white dark:bg-slate-800 flex-shrink-0 border border-gray-200 dark:border-slate-700 relative">
+                              <img
+                                src={p.primaryImage || p.images?.[0]}
+                                alt={p.name}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover"
+                                onError={(e: any) => {
+                                  e.target.src = "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80";
+                                }}
+                              />
+                              {isSelected && (
+                                <div className="absolute top-1 left-1 w-4 h-4 bg-sky-600 rounded-full flex items-center justify-center text-white shadow-xs">
+                                  <Check size={10} strokeWidth={3} />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Product Information */}
+                            <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
+                              <div>
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-[9px] font-black uppercase text-sky-600 dark:text-sky-400 truncate">
+                                    {p.category || "General"}
+                                  </span>
+                                  <span className={`text-[9px] font-bold ${p.inStock ? "text-emerald-600" : "text-gray-400"}`}>
+                                    {p.inStock ? "● In Stock" : "● Out of Stock"}
+                                  </span>
+                                </div>
+                                <h6 className="font-bold text-xs text-gray-900 dark:text-gray-100 line-clamp-1 mt-0.5" title={p.name}>
+                                  {p.name}
+                                </h6>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 mt-1.5">
+                                <span className="font-black text-xs text-gray-900 dark:text-white">₹{p.sellingPrice}</span>
+                                {p.mrp > p.sellingPrice && (
+                                  <span className="text-[10px] text-gray-400 line-through">₹{p.mrp}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* STEP 7: PROMINENT FOOTER SECTION (AVAILABLE ACROSS ALL TEMPLATE TYPES!) */}
             <div className="bg-white dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xs flex flex-col gap-3">
               <div className="flex items-center justify-between">
@@ -3770,14 +4186,50 @@ export default function WhatsAppTemplatesComponent() {
                     {/* Catalogue Action Preview */}
                     {templateType === "CATALOGUE" && (
                       <div className="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 flex flex-col gap-2">
-                        <div className="p-2 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 text-[10px] text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
-                          <ShoppingBag size={13} className="text-sky-600 flex-shrink-0" />
-                          <span className="font-bold">Meta Commerce Catalog Connected</span>
+                        {/* Cover Image banner if products exist */}
+                        {(selectedCatalogProducts.length > 0 || inventoryProducts.length > 0) && (
+                          <div className="relative rounded-xl overflow-hidden h-32 bg-gray-900 border border-gray-200 dark:border-slate-700">
+                            <img
+                              src={selectedCatalogProducts[0]?.primaryImage || inventoryProducts[0]?.primaryImage || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80"}
+                              alt="Catalog cover"
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover opacity-85"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-2.5">
+                              <div className="text-white font-black text-xs drop-shadow-sm flex items-center gap-1.5">
+                                <ShoppingBag size={13} className="text-sky-400" />
+                                <span>{catalogSectionTitle || `${brandName} Catalog`}</span>
+                              </div>
+                              <div className="text-[10px] text-gray-200">
+                                {selectedCatalogProducts.length > 0
+                                  ? `${selectedCatalogProducts.length} selected items • Tap to view`
+                                  : "Full collection catalogue"}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="p-2 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 text-[10px] text-sky-900 dark:text-sky-200 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <ShoppingBag size={13} className="text-sky-600 flex-shrink-0" />
+                            <span className="font-bold">
+                              {catalogueFormat === "MULTI_PRODUCT" && selectedCatalogProducts.length > 0
+                                ? `Multi-Product (${selectedCatalogProducts.length} Items)`
+                                : "Meta Commerce Storefront"}
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-sky-600 font-extrabold uppercase">Interactive</span>
                         </div>
-                        <div className="bg-[#00a884] text-white rounded-xl py-2 px-3 text-center text-xs font-black flex items-center justify-center gap-1.5 shadow-sm">
+
+                        {/* Interactive View Catalog button */}
+                        <button
+                          type="button"
+                          onClick={() => setSimulatorCatalogDrawerOpen(true)}
+                          className="w-full bg-[#00a884] hover:bg-[#008f6f] text-white rounded-xl py-2 px-3 text-center text-xs font-black flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition active:scale-95"
+                        >
                           <ShoppingBag size={13} />
-                          <span>View catalog</span>
-                        </div>
+                          <span>{catalogButtonText || "View catalog"}</span>
+                        </button>
                       </div>
                     )}
 
@@ -4022,6 +4474,112 @@ export default function WhatsAppTemplatesComponent() {
                 <div className="bg-[#f0f2f5] dark:bg-[#1f2c34] pb-1.5 pt-0.5 flex justify-center flex-shrink-0">
                   <div className="w-28 h-1 bg-gray-400 dark:bg-gray-600 rounded-full" />
                 </div>
+
+                {/* IN-PHONE INTERACTIVE CATALOG PRODUCTS DRAWER / MODAL */}
+                {templateType === "CATALOGUE" && simulatorCatalogDrawerOpen && (
+                  <div className="absolute inset-0 bg-black/50 backdrop-blur-xs z-30 flex flex-col justify-end animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-[#1f2c34] rounded-t-3xl max-h-[88%] flex flex-col shadow-2xl border-t border-gray-200 dark:border-slate-700 animate-in slide-in-from-bottom duration-250">
+                      {/* Drawer Header */}
+                      <div className="p-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between bg-gray-50 dark:bg-slate-800/80 rounded-t-3xl">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                            {brandName[0] || 'E'}
+                          </div>
+                          <div>
+                            <div className="font-black text-xs text-gray-900 dark:text-white flex items-center gap-1">
+                              <span>{brandName} Store</span>
+                              <CheckCircle2 size={12} className="text-sky-500 fill-sky-500 text-white" />
+                            </div>
+                            <div className="text-[10px] text-gray-400">
+                              {selectedCatalogProducts.length > 0 ? `${selectedCatalogProducts.length} items` : "All catalog items"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="relative p-1 text-gray-600 dark:text-gray-300">
+                            <ShoppingBag size={16} />
+                            {simulatorCartCount > 0 && (
+                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-600 text-white rounded-full text-[9px] font-black flex items-center justify-center">
+                                {simulatorCartCount}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSimulatorCatalogDrawerOpen(false)}
+                            className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Section Header */}
+                      <div className="px-3.5 py-2 bg-sky-50/60 dark:bg-sky-950/40 border-b border-sky-100 dark:border-sky-900/40 flex items-center justify-between text-[11px] font-bold text-sky-950 dark:text-sky-200">
+                        <span>{catalogSectionTitle || "Featured Collection"}</span>
+                        <span className="text-[10px] text-sky-600 font-extrabold">WhatsApp Direct</span>
+                      </div>
+
+                      {/* Product List in Drawer */}
+                      <div className="p-3 overflow-y-auto flex flex-col gap-2.5 max-h-64 scrollbar-thin">
+                        {(selectedCatalogProducts.length > 0 ? selectedCatalogProducts : inventoryProducts.slice(0, 5)).map((p, pIdx) => (
+                          <div
+                            key={p.id || pIdx}
+                            className="p-2 bg-gray-50/80 dark:bg-slate-800/80 rounded-2xl border border-gray-200 dark:border-slate-700 flex items-center justify-between gap-2.5"
+                          >
+                            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white dark:bg-slate-700 flex-shrink-0 border border-gray-200 dark:border-slate-600">
+                              <img
+                                src={p.primaryImage || p.images?.[0]}
+                                alt={p.name}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover"
+                                onError={(e: any) => {
+                                  e.target.src = "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80";
+                                }}
+                              />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[11px] font-bold text-gray-900 dark:text-white truncate">{p.name}</div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-xs font-black text-emerald-600">₹{p.sellingPrice}</span>
+                                {p.mrp > p.sellingPrice && (
+                                  <span className="text-[9px] text-gray-400 line-through">₹{p.mrp}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSimulatorCartCount(prev => prev + 1);
+                                showToast(`🛒 Added "${p.name}" to simulated cart!`, "success");
+                              }}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black cursor-pointer shadow-2xs active:scale-95 transition"
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Sticky Bottom Checkout simulation */}
+                      <div className="p-3 bg-white dark:bg-[#1f2c34] border-t border-gray-100 dark:border-slate-700 flex flex-col gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            showToast("🎉 WhatsApp Catalog Order simulated successfully!", "success");
+                            setSimulatorCatalogDrawerOpen(false);
+                          }}
+                          className="w-full py-2 bg-[#00a884] hover:bg-[#008f6f] text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                        >
+                          <ShoppingBag size={13} />
+                          <span>View Cart ({simulatorCartCount}) • Place Order</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Meta Approval SLA Box */}
@@ -4343,6 +4901,17 @@ export default function WhatsAppTemplatesComponent() {
                           {parsedCards.length} Product Cards
                         </span>
                         <span className="text-[9px] uppercase font-black">Swipeable</span>
+                      </div>
+                    )}
+
+                    {/* Catalog indicator snippet */}
+                    {(t.templateType === "CATALOGUE" || t.templateType === "CATALOG") && (
+                      <div className="mt-2.5 p-2 bg-sky-100/70 dark:bg-sky-950/60 rounded-xl border border-sky-200 dark:border-sky-800 text-[10px] text-sky-900 dark:text-sky-200 font-bold flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <ShoppingBag size={12} />
+                          {parsedCards.length > 0 ? `${parsedCards.length} Selected Products` : "Full Store Catalog"}
+                        </span>
+                        <span className="text-[9px] uppercase font-black">Meta Catalog</span>
                       </div>
                     )}
 
