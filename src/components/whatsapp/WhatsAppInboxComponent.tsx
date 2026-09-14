@@ -220,6 +220,7 @@ export default function WhatsAppInboxComponent() {
   const [integrations, setIntegrations] = useState<any[]>([]);
   const [pushingToCrm, setPushingToCrm] = useState(false);
   const [showIntegrationsMenu, setShowIntegrationsMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   // Toggle Full Screen Mode (Overlay + Native Fullscreen API)
   const toggleFullScreenMode = () => {
@@ -1733,14 +1734,16 @@ export default function WhatsAppInboxComponent() {
                         {conv.tags && conv.tags.split(',').filter(Boolean).map((t: string) => {
                           const tagClean = t.trim();
                           if (!tagClean || tagClean === "Auto Created" || tagClean === "WhatsApp Lead") return null;
+                          const assignedName = conv._raw?.assignedEmployee?.user?.name || conv.assignedEmployee?.user?.name;
+                          if (assignedName && tagClean.toLowerCase() === assignedName.toLowerCase()) return null;
                           return (
-                            <span key={tagClean} style={{ fontSize: "9.5px", padding: "1px 6px", borderRadius: "10px", background: "#e0e7ff", color: "#4338ca", fontWeight: 700, border: "1px solid #c7d2fe" }}>
+                            <span key={tagClean} className="conv-custom-tag">
                               🏷️ {tagClean}
                             </span>
                           );
                         })}
                         {conv._raw?.assignedEmployee && (
-                          <span style={{ fontSize: "9.5px", padding: "2px 6px", borderRadius: "12px", background: "#ffffff", color: "#334155", fontWeight: 600, display: "inline-flex", alignItems: "center", border: "1px solid #cbd5e1", marginLeft: "2px", gap: "3px" }}>
+                          <span className="conv-assigned-badge">
                             <User size={10} /> {conv._raw.assignedEmployee.user?.name || "Assigned"}
                           </span>
                         )}
@@ -1753,13 +1756,13 @@ export default function WhatsAppInboxComponent() {
                         )}
 
                         {conv.status === 'CLOSED' && (
-                          <span style={{ fontSize: "9px", padding: "1px 5px", borderRadius: "4px", background: "#f1f5f9", color: "#64748b", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "2px", border: "1px solid #cbd5e1" }}>
+                          <span className="conv-closed-badge">
                             ✓ Closed
                           </span>
                         )}
 
                         {isExpired && (
-                          <span style={{ fontSize: "9px", padding: "1px 5px", borderRadius: "4px", background: "#fee2e2", color: "#ef4444", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "2px", border: "1px solid rgba(239,68,68,0.2)" }}>
+                          <span className="conv-expired-badge">
                             🔒 Expired
                           </span>
                         )}
@@ -1918,39 +1921,31 @@ export default function WhatsAppInboxComponent() {
                     )}
                   </div>
                   <div className="chat-sub-line">
-                    <span>{formatWhatsAppPhone(activeConvDetail.customer?.whatsappNumber || activeConvDetail.customer?.mobile)}</span>
+                    <span 
+                      style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "5px" }}
+                      title="Click to copy phone number"
+                      onClick={() => {
+                        const p = activeConvDetail.customer?.whatsappNumber || activeConvDetail.customer?.mobile || "";
+                        if (p) {
+                          navigator.clipboard.writeText(p);
+                          setToastMsg(`Copied ${formatWhatsAppPhone(p)} to clipboard!`);
+                          setTimeout(() => setToastMsg(null), 2500);
+                        }
+                      }}
+                    >
+                      {formatWhatsAppPhone(activeConvDetail.customer?.whatsappNumber || activeConvDetail.customer?.mobile)}
+                      <span style={{ fontSize: "10.5px", color: "#6366f1" }}>📋</span>
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div className="chat-header-actions">
-                <button className="chat-action-btn highlight-tags" onClick={() => setShowTagsModal(true)} title="Manage Tags">
-                  <Tag size={14} />
-                  <span>Tags ({activeTagsList.length})</span>
-                </button>
                 <button className="chat-action-btn highlight-assign" onClick={() => setShowAssignModal(true)} title="Assign WhatsApp Lead">
-                  <UserCheck size={14} />
-                  <span>{activeConvDetail.assignedEmployee?.user?.name ? `Assign (${activeConvDetail.assignedEmployee.user.name})` : "Assign"}</span>
+                  <UserCheck size={13} />
+                  <span>{activeConvDetail.assignedEmployee?.user?.name ? activeConvDetail.assignedEmployee.user.name : "Assign"}</span>
                 </button>
 
-                <button
-                  className="chat-action-btn"
-                  onClick={() => {
-                    if (!activeConvDetail?.id) return;
-                    window.open(`/api/whatsapp/chat/export?conversationId=${activeConvDetail.id}&format=csv`, '_blank');
-                  }}
-                  title="Export full chat transcript to CSV"
-                >
-                  <Download size={14} />
-                  <span>Transcript</span>
-                </button>
-
-                {paymentConfigured && (
-                  <button className="chat-action-btn" onClick={() => setShowPaymentModal(true)} title="Send Payment Link">
-                    <CreditCard size={14} />
-                    <span>Payment</span>
-                  </button>
-                )}
                 <button
                   className="chat-action-btn"
                   disabled={aiToggleLoading}
@@ -1968,14 +1963,15 @@ export default function WhatsAppInboxComponent() {
                   }}
                   title={activeConvDetail.aiHandled ? "AI is ON — Click to switch to Manual Mode" : "AI is OFF — Click to enable AI auto-replies"}
                   style={{
-                    background: activeConvDetail.aiHandled ? "#f0fdf4" : "#fef3c7",
-                    border: `1px solid ${activeConvDetail.aiHandled ? "#bbf7d0" : "#fde68a"}`,
-                    color: activeConvDetail.aiHandled ? "#15803d" : "#b45309"
+                    background: activeConvDetail.aiHandled ? "#f0fdf4" : "#f8fafc",
+                    border: `1px solid ${activeConvDetail.aiHandled ? "#bbf7d0" : "#e2e8f0"}`,
+                    color: activeConvDetail.aiHandled ? "#15803d" : "#64748b"
                   }}
                 >
-                  <Bot size={14} />
-                  <span>{aiToggleLoading ? "..." : activeConvDetail.aiHandled ? "AI: ON" : "AI: OFF"}</span>
+                  <Bot size={13} />
+                  <span>{aiToggleLoading ? "..." : activeConvDetail.aiHandled ? "AI: ON" : "Manual"}</span>
                 </button>
+
                 <button
                   className="chat-action-btn"
                   disabled={statusToggleLoading}
@@ -1992,102 +1988,148 @@ export default function WhatsAppInboxComponent() {
                     }
                     setStatusToggleLoading(false);
                   }}
-                  title={activeConvDetail.status === 'CLOSED' ? "Click to Reopen Chat" : "Click to Close Chat (Reduces agent active open chat count)"}
+                  title={activeConvDetail.status === 'CLOSED' ? "Click to Reopen Chat" : "Click to Close Chat"}
                   style={{
-                    background: activeConvDetail.status === 'CLOSED' ? "#f1f5f9" : "#fff1f2",
-                    border: `1px solid ${activeConvDetail.status === 'CLOSED' ? "#cbd5e1" : "#fecdd3"}`,
-                    color: activeConvDetail.status === 'CLOSED' ? "#475569" : "#e11d48",
-                    fontWeight: 600
+                    background: activeConvDetail.status === 'CLOSED' ? "#f1f5f9" : "#ffffff",
+                    border: `1px solid ${activeConvDetail.status === 'CLOSED' ? "#cbd5e1" : "#e2e8f0"}`,
+                    color: activeConvDetail.status === 'CLOSED' ? "#475569" : "#0f172a"
                   }}
                 >
-                  <CheckCircle2 size={14} />
-                  <span>{statusToggleLoading ? "..." : activeConvDetail.status === 'CLOSED' ? "Reopen Chat" : "Close Chat"}</span>
+                  <CheckCircle2 size={13} />
+                  <span>{statusToggleLoading ? "..." : activeConvDetail.status === 'CLOSED' ? "Reopen" : "Close"}</span>
                 </button>
-
-                {integrations && integrations.length > 0 && (
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      className="chat-action-btn"
-                      onClick={() => {
-                        if (integrations.length === 1) {
-                          handlePushToCrm(integrations[0].id);
-                        } else if (integrations.length > 1) {
-                          setShowIntegrationsMenu(!showIntegrationsMenu);
-                        } else {
-                          setToastMsg("No CRM integrations configured.");
-                          setTimeout(() => setToastMsg(null), 3000);
-                        }
-                      }}
-                      disabled={pushingToCrm}
-                      title={integrations.length === 1 ? `Push lead to ${integrations[0].name}` : "Push Lead to CRM"}
-                      style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", fontWeight: 600 }}
-                    >
-                      <Activity size={14} />
-                      <span>{pushingToCrm ? "Pushing..." : "Push to CRM"}</span>
-                    </button>
-                    
-                    {showIntegrationsMenu && integrations.length > 1 && (
-                      <>
-                        <div 
-                          style={{ position: 'fixed', inset: 0, zIndex: 49 }} 
-                          onClick={() => setShowIntegrationsMenu(false)} 
-                        />
-                        <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '4px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', zIndex: 50, minWidth: '180px', overflow: 'hidden' }}>
-                          {integrations.map(int => (
-                            <div 
-                              key={int.id}
-                              onClick={() => handlePushToCrm(int.id)}
-                              style={{ padding: '8px 12px', fontSize: '12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', color: '#334155' }}
-                              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'white'}
-                            >
-                              {int.name}
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {hasMetaCapi && (
-                  <button
-                    className="chat-action-btn"
-                    onClick={handleMarkLeadInterested}
-                    disabled={firingMetaLead}
-                    style={{ background: "#fef3c7", border: "1px solid #fde68a", color: "#b45309", fontWeight: 700 }}
-                    title="Mark Lead Interested & Fire Meta Conversion Event"
-                  >
-                    <Zap size={14} className={firingMetaLead ? "animate-spin text-amber-600" : "text-amber-600"} />
-                    <span>{firingMetaLead ? "Firing..." : "Mark Interested"}</span>
-                  </button>
-                )}
 
                 <button
-                  className={`chat-action-btn ${isFullScreen ? "active-fullscreen" : ""}`}
-                  onClick={toggleFullScreenMode}
-                  title={isFullScreen ? "Exit Full Screen Mode (Esc)" : "Full Screen WhatsApp Inbox"}
+                  className={`chat-action-btn ${!isRightCollapsed ? "active-profile" : ""}`}
+                  onClick={() => setIsRightCollapsed(prev => !prev)}
+                  title="Toggle Customer 360° Profile & CRM Data"
+                  style={{
+                    background: !isRightCollapsed ? "#f5f3ff" : "#ffffff",
+                    borderColor: !isRightCollapsed ? "#a78bfa" : "#e2e8f0",
+                    color: !isRightCollapsed ? "#6d28d9" : "#334155"
+                  }}
                 >
-                  {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                  <span>{isFullScreen ? "Exit Full Screen" : "Full Screen"}</span>
+                  <User size={13} />
+                  <span>Profile</span>
                 </button>
-                
-                {currentUserRole !== 'AGENT' && currentUserRole !== 'SALES' && (
-                  <button
-                    className="chat-action-btn"
-                    onClick={handleDeleteConversation}
-                    title="Delete Conversation"
-                    style={{
-                      background: "#fef2f2",
-                      border: "1px solid #fee2e2",
-                      color: "#ef4444"
-                    }}
-                  >
-                    <UserX size={14} />
-                    <span>Delete Chat</span>
-                  </button>
-                )}
 
+                {/* More Actions Dropdown Menu */}
+                <div style={{ position: "relative" }}>
+                  <button
+                    className={`chat-action-btn ${showMoreMenu ? "active-more" : ""}`}
+                    onClick={() => setShowMoreMenu(prev => !prev)}
+                    title="More Conversation Actions"
+                    style={{ padding: "6px 8px" }}
+                  >
+                    <MoreVertical size={14} />
+                  </button>
+
+                  {showMoreMenu && (
+                    <>
+                      <div 
+                        style={{ position: "fixed", inset: 0, zIndex: 998 }} 
+                        onClick={() => setShowMoreMenu(false)} 
+                      />
+                      <div className="chat-header-dropdown-menu">
+                        <button
+                          className="dropdown-menu-item"
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            setShowTagsModal(true);
+                          }}
+                        >
+                          <Tag size={14} color="#6366f1" />
+                          <span>Manage Tags ({activeTagsList.length})</span>
+                        </button>
+
+                        <button
+                          className="dropdown-menu-item"
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            if (activeConvDetail?.id) {
+                              window.open(`/api/whatsapp/chat/export?conversationId=${activeConvDetail.id}&format=csv`, '_blank');
+                            }
+                          }}
+                        >
+                          <Download size={14} color="#059669" />
+                          <span>Export Transcript (CSV)</span>
+                        </button>
+
+                        {paymentConfigured && (
+                          <button
+                            className="dropdown-menu-item"
+                            onClick={() => {
+                              setShowMoreMenu(false);
+                              setShowPaymentModal(true);
+                            }}
+                          >
+                            <CreditCard size={14} color="#d97706" />
+                            <span>Send Payment Link</span>
+                          </button>
+                        )}
+
+                        {hasMetaCapi && (
+                          <button
+                            className="dropdown-menu-item"
+                            onClick={() => {
+                              setShowMoreMenu(false);
+                              handleMarkLeadInterested();
+                            }}
+                            disabled={firingMetaLead}
+                          >
+                            <Zap size={14} color="#eab308" />
+                            <span>{firingMetaLead ? "Firing..." : "Mark Interested (Meta CAPI)"}</span>
+                          </button>
+                        )}
+
+                        {integrations && integrations.length > 0 && (
+                          <button
+                            className="dropdown-menu-item"
+                            onClick={() => {
+                              setShowMoreMenu(false);
+                              if (integrations.length === 1) {
+                                handlePushToCrm(integrations[0].id);
+                              } else {
+                                setShowIntegrationsMenu(true);
+                              }
+                            }}
+                            disabled={pushingToCrm}
+                          >
+                            <Activity size={14} color="#2563eb" />
+                            <span>{pushingToCrm ? "Pushing..." : "Push to CRM"}</span>
+                          </button>
+                        )}
+
+                        <button
+                          className="dropdown-menu-item"
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            toggleFullScreenMode();
+                          }}
+                        >
+                          {isFullScreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                          <span>{isFullScreen ? "Exit Full Screen" : "Full Screen Mode"}</span>
+                        </button>
+
+                        {currentUserRole !== 'AGENT' && currentUserRole !== 'SALES' && (
+                          <>
+                            <div className="dropdown-menu-divider" />
+                            <button
+                              className="dropdown-menu-item destructive"
+                              onClick={() => {
+                                setShowMoreMenu(false);
+                                handleDeleteConversation();
+                              }}
+                            >
+                              <UserX size={14} color="#ef4444" />
+                              <span>Delete Conversation</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -3102,10 +3144,19 @@ export default function WhatsAppInboxComponent() {
               ) : (
                 <>
                 {sessionStatus.expired && !isInternalNote && (
-                  <div style={{ padding: "10px 14px", background: "#fffbeb", borderBottom: "1px solid #fef3c7", color: "#b45309", fontSize: "12.5px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px", borderRadius: "8px 8px 0 0" }}>
-                    <AlertCircle size={15} color="#d97706" />
-                    <span>24-Hour WhatsApp Session Window has expired. You can only send pre-approved template messages until the customer responds.</span>
-                    <button type="button" onClick={() => setShowTemplatePicker(true)} style={{ marginLeft: "auto", background: "#d97706", color: "white", border: "none", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>Send Template</button>
+                  <div className="session-expired-banner">
+                    <div className="session-expired-content">
+                      <Clock size={15} className="session-expired-icon" />
+                      <span><strong>24h Window Closed</strong> · Pre-approved Meta templates required to start conversations after 24h.</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowTemplatePicker(true)} 
+                      className="session-template-btn"
+                    >
+                      <Zap size={13} />
+                      <span>Send Template</span>
+                    </button>
                   </div>
                 )}
                 <form className={`chat-input-form ${isInternalNote ? "internal-mode" : ""}`} onSubmit={handleSendMessage} style={{ display: "flex", gap: "12px", alignItems: "flex-end", padding: "12px", background: isInternalNote ? "#fffdf5" : "#ffffff", borderTop: "1px solid #e2e8f0" }}>
@@ -3257,7 +3308,7 @@ export default function WhatsAppInboxComponent() {
                     isInternalNote
                       ? "Add an internal note visible only to your team..."
                       : sessionStatus.expired
-                        ? "⚠️ 24-Hour Session Window Expired. Select a Template or Flow to resume..."
+                        ? "24-Hour session window expired. Send a pre-approved template or Flow above to resume..."
                         : "Type a WhatsApp message or use shortcuts like /catalog, /price..."
                   }
                   value={messageInput}
@@ -3372,13 +3423,15 @@ export default function WhatsAppInboxComponent() {
       {/* ----------------------------------------------------------------- */}
       {/* RIGHT COLUMN: CRM 360° CUSTOMER PROFILE PANEL */}
       {/* ----------------------------------------------------------------- */}
-      <div className="inbox-right-panel collapsed" style={{ display: 'none' }}>
+      <div className={`inbox-right-panel ${isRightCollapsed ? "collapsed" : ""}`}>
         {!isRightCollapsed && activeConvDetail && (
           <div className="crm-panel-container">
             {/* Panel Header */}
             <div className="crm-panel-header">
-              <h3>CRM 360° Profile</h3>
-              <div className="crm-header-btns">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <h3>CRM 360° Profile</h3>
+              </div>
+              <div className="crm-header-btns" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 {isEditingCRM ? (
                   <button className="crm-save-btn" onClick={handleSaveCRMProfile}>
                     <Check size={14} /> Save
@@ -3388,6 +3441,14 @@ export default function WhatsAppInboxComponent() {
                     <Edit3 size={14} /> Edit
                   </button>
                 )}
+                <button 
+                  className="panel-toggle-btn"
+                  onClick={() => setIsRightCollapsed(true)} 
+                  title="Close Profile Panel"
+                  style={{ color: "#64748b", padding: "4px" }}
+                >
+                  <X size={16} />
+                </button>
               </div>
             </div>
 
