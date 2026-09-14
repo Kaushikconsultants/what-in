@@ -2260,10 +2260,17 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'CATALOG' || templateType === 'CATALOGUE') {
       // Catalog Template
       if (data.bodyText) {
-        components.push({
+        const bodyObj: any = {
           type: 'BODY',
           text: data.bodyText
-        });
+        };
+        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
+        if (bodyMatches && bodyMatches.length > 0) {
+          bodyObj.example = {
+            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+          };
+        }
+        components.push(bodyObj);
       }
       if (data.footerText) {
         components.push({
@@ -2274,16 +2281,23 @@ export async function saveWhatsAppTemplateAction(data: any) {
       components.push({
         type: 'BUTTONS',
         buttons: [
-          { type: 'CATALOG', text: data.catalogButtonText || 'View catalog' }
+          { type: 'CATALOG' }
         ]
       });
     } else if (templateType === 'FLOWS') {
       // WhatsApp Flows Form Template
       if (data.bodyText) {
-        components.push({
+        const bodyObj: any = {
           type: 'BODY',
           text: data.bodyText
-        });
+        };
+        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
+        if (bodyMatches && bodyMatches.length > 0) {
+          bodyObj.example = {
+            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+          };
+        }
+        components.push(bodyObj);
       }
       if (data.footerText) {
         components.push({
@@ -2300,10 +2314,17 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'ORDER_DETAILS') {
       // Meta Native Order Details Template
       if (data.bodyText) {
-        components.push({
+        const bodyObj: any = {
           type: 'BODY',
           text: data.bodyText
-        });
+        };
+        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
+        if (bodyMatches && bodyMatches.length > 0) {
+          bodyObj.example = {
+            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+          };
+        }
+        components.push(bodyObj);
       }
       if (data.footerText) {
         components.push({
@@ -2320,10 +2341,17 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'ORDER_STATUS') {
       // Order Status Dispatch Template
       if (data.bodyText) {
-        components.push({
+        const bodyObj: any = {
           type: 'BODY',
           text: data.bodyText
-        });
+        };
+        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
+        if (bodyMatches && bodyMatches.length > 0) {
+          bodyObj.example = {
+            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+          };
+        }
+        components.push(bodyObj);
       }
       if (data.footerText) {
         components.push({
@@ -2345,10 +2373,17 @@ export async function saveWhatsAppTemplateAction(data: any) {
     } else if (templateType === 'CALL_PERMISSIONS') {
       // Calling Permissions Request Template
       if (data.bodyText) {
-        components.push({
+        const bodyObj: any = {
           type: 'BODY',
           text: data.bodyText
-        });
+        };
+        const bodyMatches = (data.bodyText || '').match(/\{\{(\d+)\}\}/g);
+        if (bodyMatches && bodyMatches.length > 0) {
+          bodyObj.example = {
+            body_text: [bodyMatches.map((_: any, i: number) => `Sample ${i + 1}`)]
+          };
+        }
+        components.push(bodyObj);
       }
       if (data.footerText) {
         components.push({
