@@ -221,16 +221,6 @@ export default function WhatsAppHeaderNav() {
           </div>
         </div>
         
-        <Link
-          href="/whatsapp/integrations"
-          className={`status-badge ${accountInfo.isConnected ? "active" : "inactive"}`}
-        >
-          <span className="beacon-container">
-            <span className="pulse-dot"></span>
-            {accountInfo.isConnected && <span className="beacon-ping"></span>}
-          </span>
-          <span className="status-text"><span className="status-prefix">WhatsApp API: </span>{accountInfo.status}</span>
-        </Link>
 
         <div className="whatmore-header-actions">
           {/* Theme Toggle Button */}

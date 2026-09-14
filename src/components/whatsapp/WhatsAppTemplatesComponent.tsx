@@ -125,10 +125,10 @@ export default function WhatsAppTemplatesComponent() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "most_used" | "highest_read" | "alphabetical">("newest");
   
   // Dynamic Brand Details & Intelligence from Database
-  const [brandName, setBrandName] = useState("What-In Business");
-  const [brandDomain, setBrandDomain] = useState("what-in.tinkal.in");
-  const [brandPhone, setBrandPhone] = useState("");
-  const [brandEmail, setBrandEmail] = useState("support@what-in.tinkal.in");
+  const [brandName, setBrandName] = useState("Espon Clothing");
+  const [brandDomain, setBrandDomain] = useState("www.espon.in");
+  const [brandPhone, setBrandPhone] = useState("+91 7206066678");
+  const [brandEmail, setBrandEmail] = useState("clothingespon@gmail.com");
   const [hasAiKnowledge, setHasAiKnowledge] = useState(true);
   const [productsCount, setProductsCount] = useState<number>(0);
   const [combosCount, setCombosCount] = useState<number>(0);
@@ -175,8 +175,8 @@ export default function WhatsAppTemplatesComponent() {
             title: `${res.brandName} Performance Tee`,
             bodyText: "₹899 • Breathable 4-way stretch fabric",
             buttons: [
-              { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "what-in.tinkal.in"}/products/tee`, urlType: "STATIC" },
-              { type: "URL", text: "Explore More", url: `https://${res.brandDomain || "what-in.tinkal.in"}/collections/all`, urlType: "STATIC" }
+              { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "esponsports.com"}/products/tee`, urlType: "STATIC" },
+              { type: "URL", text: "Explore More", url: `https://${res.brandDomain || "esponsports.com"}/collections/all`, urlType: "STATIC" }
             ]
           },
           {
@@ -186,7 +186,7 @@ export default function WhatsAppTemplatesComponent() {
             title: `${res.brandName} Pro Shorts`,
             bodyText: "₹1,199 • Zipper pockets & sweat-wicking",
             buttons: [
-              { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "what-in.tinkal.in"}/products/shorts`, urlType: "STATIC" },
+              { type: "URL", text: "Buy Now", url: `https://${res.brandDomain || "esponsports.com"}/products/shorts`, urlType: "STATIC" },
               { type: "PHONE_NUMBER", text: "Call Us", phone_number: res.phoneNumber || res.brandPhone || "+917206066878" }
             ]
           }
@@ -228,7 +228,7 @@ export default function WhatsAppTemplatesComponent() {
   const [authSecurityRecommendation, setAuthSecurityRecommendation] = useState(true);
   const [authExpiryTime, setAuthExpiryTime] = useState(false);
   const [authExpiryMinutes, setAuthExpiryMinutes] = useState(10);
-  const [authPackageName, setAuthPackageName] = useState("com.whatin.app");
+  const [authPackageName, setAuthPackageName] = useState("com.esponsports.app");
   const [authAppSignatureHash, setAuthAppSignatureHash] = useState("K4w8v9N2q1P");
   const [enableValidityPeriod, setEnableValidityPeriod] = useState(false);
   const [messageValidityPeriod, setMessageValidityPeriod] = useState(10);
@@ -239,22 +239,22 @@ export default function WhatsAppTemplatesComponent() {
       id: "card_1",
       mediaUrl: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80",
       headerType: "IMAGE",
-      title: "Featured Product 1",
-      bodyText: "High quality premium selection",
+      title: "Espon Performance Tee",
+      bodyText: "₹899 • Breathable 4-way stretch fabric",
       buttons: [
-        { type: "URL", text: "Buy Now", url: "https://what-in.tinkal.in", urlType: "STATIC" },
-        { type: "URL", text: "Explore More", url: "https://what-in.tinkal.in", urlType: "STATIC" }
+        { type: "URL", text: "Buy Now", url: "https://esponsports.com/products/tee", urlType: "STATIC" },
+        { type: "URL", text: "Explore More", url: "https://esponsports.com/collections/all", urlType: "STATIC" }
       ]
     },
     {
       id: "card_2",
       mediaUrl: "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=500&auto=format&fit=crop&q=80",
       headerType: "IMAGE",
-      title: "Featured Product 2",
-      bodyText: "Exclusive special offer",
+      title: "Espon Pro Shorts",
+      bodyText: "₹1,199 • Zipper pockets & sweat-wicking",
       buttons: [
-        { type: "URL", text: "Buy Now", url: "https://what-in.tinkal.in", urlType: "STATIC" },
-        { type: "URL", text: "Explore More", url: "https://what-in.tinkal.in", urlType: "STATIC" }
+        { type: "URL", text: "Buy Now", url: "https://esponsports.com/products/shorts", urlType: "STATIC" },
+        { type: "URL", text: "Explore More", url: "https://esponsports.com/collections/all", urlType: "STATIC" }
       ]
     }
   ]);
@@ -1672,7 +1672,7 @@ export default function WhatsAppTemplatesComponent() {
                             className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 rounded-xl flex items-center gap-2 text-xs shadow-2xs animate-in zoom-in-95 duration-150"
                           >
                             <div className="w-5 h-5 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
-                              <img src={p.primaryImage || p.images?.[0]} alt={p.name} className="w-full h-full object-cover" />
+                              <img src={p.primaryImage || p.images?.[0]} alt={p.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                             </div>
                             <span className="font-bold text-gray-800 dark:text-gray-100 truncate max-w-[140px]">{p.name}</span>
                             <span className="text-[10px] font-bold text-emerald-600">₹{p.sellingPrice}</span>
@@ -1759,7 +1759,7 @@ export default function WhatsAppTemplatesComponent() {
                                       className="rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer pointer-events-none flex-shrink-0"
                                     />
                                     <div className="w-9 h-9 rounded-lg overflow-hidden bg-white dark:bg-slate-800 border border-gray-200 flex-shrink-0">
-                                      <img src={p.primaryImage || p.images?.[0]} alt={p.name} className="w-full h-full object-cover" />
+                                      <img src={p.primaryImage || p.images?.[0]} alt={p.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="text-xs font-bold text-gray-800 dark:text-gray-100 truncate">{p.name}</div>
@@ -1969,6 +1969,7 @@ export default function WhatsAppTemplatesComponent() {
                                 <img
                                   src={aiDraft.template.headerMediaUrl}
                                   alt="Header preview"
+                                  referrerPolicy="no-referrer"
                                   className="w-10 h-10 rounded-lg object-cover border border-gray-200"
                                   onError={(e: any) => { e.target.style.display = 'none'; }}
                                 />
@@ -2012,7 +2013,7 @@ export default function WhatsAppTemplatesComponent() {
                                 className="min-w-[190px] max-w-[210px] bg-gray-50/80 dark:bg-slate-900/80 border border-gray-200 dark:border-slate-700 rounded-xl p-2.5 flex flex-col gap-1.5 flex-shrink-0"
                               >
                                 <div className="w-full h-24 rounded-lg overflow-hidden bg-white dark:bg-slate-800 border border-gray-200 flex-shrink-0">
-                                  <img src={card.mediaUrl} alt={card.title} className="w-full h-full object-cover" />
+                                  <img src={card.mediaUrl} alt={card.title} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                                 </div>
                                 <div className="font-bold text-xs text-gray-900 dark:text-white truncate" title={card.title}>
                                   #{cIdx + 1} {card.title}
@@ -2223,6 +2224,7 @@ export default function WhatsAppTemplatesComponent() {
                             <img
                               src={prod.primaryImage}
                               alt={prod.name}
+                              referrerPolicy="no-referrer"
                               className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
                               onError={(e: any) => {
                                 e.target.src = "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80";
@@ -2847,6 +2849,7 @@ export default function WhatsAppTemplatesComponent() {
                       <img
                         src={headerMediaPreview}
                         alt="Header preview"
+                        referrerPolicy="no-referrer"
                         className="max-h-40 rounded-xl object-contain shadow-md border border-gray-200 dark:border-slate-700"
                       />
                       <div className="flex items-center gap-2 mt-1">
@@ -3033,6 +3036,7 @@ export default function WhatsAppTemplatesComponent() {
                             <img
                               src={carouselCards[activeCarouselCardIndex].mediaUrl}
                               alt="Card media"
+                              referrerPolicy="no-referrer"
                               className="w-full h-full object-cover"
                             />
                           </div>
@@ -3654,6 +3658,7 @@ export default function WhatsAppTemplatesComponent() {
                         <img
                           src={headerMediaPreview}
                           alt="Header media preview"
+                          referrerPolicy="no-referrer"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -3872,6 +3877,7 @@ export default function WhatsAppTemplatesComponent() {
                                   <img
                                     src={card.mediaUrl}
                                     alt={card.title}
+                                    referrerPolicy="no-referrer"
                                     className="w-full h-full object-cover"
                                   />
                                 ) : (
@@ -3972,29 +3978,37 @@ export default function WhatsAppTemplatesComponent() {
       )}
 
       {/* Top Action Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200 dark:border-slate-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-            <FileCode size={22} className="text-indigo-600" />
-            Meta Message Templates & Live Preview
-          </h2>
-          <p className="text-gray-500 text-xs mt-0.5">
+          <div className="flex items-center gap-2.5 mb-1">
+            <h2 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <FileCode size={22} className="text-indigo-600 dark:text-indigo-400" />
+              <span>Meta Message Templates & Live Preview</span>
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+              {filtered.length} {filtered.length === 1 ? "Template" : "Templates"}
+            </span>
+          </div>
+          <p className="text-slate-500 dark:text-slate-400 text-xs">
             Connected Brand: <span className="font-bold text-indigo-600 dark:text-indigo-400">{brandName}</span> • Standard, Product Carousel (Swipeable), and Coupon templates.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <input
-            value={testPhone}
-            onChange={(e) => setTestPhone(e.target.value)}
-            placeholder="Test phone (91XXXXXXXXXX)"
-            className="px-3 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48 shadow-2xs"
-          />
+          <div className="relative">
+            <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              placeholder="Test phone (91XXXXXXXXXX)"
+              className="pl-8 pr-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48 shadow-2xs"
+            />
+          </div>
           <button
             onClick={fetchTemplates}
             disabled={loading}
-            className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 transition flex items-center gap-2 shadow-2xs cursor-pointer"
+            className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-2xs cursor-pointer active:scale-95"
           >
-            <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : ""} />
+            <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : "text-slate-400"} />
             <span>Sync Meta</span>
           </button>
           <button
@@ -4002,7 +4016,7 @@ export default function WhatsAppTemplatesComponent() {
               resetForm();
               setViewMode("CREATE");
             }}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition flex items-center gap-2 shadow-md shadow-indigo-500/20 active:scale-95 cursor-pointer"
+            className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-md shadow-indigo-500/20 active:scale-95 cursor-pointer"
           >
             <Plus size={15} />
             <span>New Template Studio</span>
@@ -4011,16 +4025,16 @@ export default function WhatsAppTemplatesComponent() {
       </div>
 
       {/* Filter & Sort Toolbar */}
-      <div className="p-3 bg-gray-50 dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xs">
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Search */}
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search templates or body text..."
-              className="pl-9 pr-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 w-56"
+              className="pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 w-56"
             />
           </div>
 
@@ -4028,7 +4042,7 @@ export default function WhatsAppTemplatesComponent() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
           >
             <option value="ALL">All Categories</option>
             {CATEGORIES.map((c) => (
@@ -4042,91 +4056,100 @@ export default function WhatsAppTemplatesComponent() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer text-purple-600 dark:text-purple-400"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer text-indigo-600 dark:text-indigo-400"
           >
             <option value="ALL">All Message Types</option>
-            <option value="STANDARD">📄 Default</option>
-            <option value="CAROUSEL">🖼️ Image Carousel</option>
-            <option value="CATALOGUE">🛍️ Catalogue</option>
-            <option value="FLOWS">📋 Flows</option>
-            <option value="ORDER_DETAILS">💳 Order details</option>
-            <option value="ORDER_STATUS">🚚 Order status</option>
-            <option value="CALL_PERMISSIONS">📞 Call permissions</option>
-            <option value="LTO_COUPON">🏷️ LTO Coupon</option>
-            <option value="AUTHENTICATION">🔐 Authentication</option>
+            <option value="STANDARD">Default (Text/Media)</option>
+            <option value="CAROUSEL">Image Carousel</option>
+            <option value="CATALOGUE">Product Catalogue</option>
+            <option value="FLOWS">Interactive Flows</option>
+            <option value="ORDER_DETAILS">Order Details</option>
+            <option value="ORDER_STATUS">Order Status</option>
+            <option value="CALL_PERMISSIONS">Call Permissions</option>
+            <option value="LTO_COUPON">Limited-Time Coupon</option>
+            <option value="AUTHENTICATION">Authentication (OTP)</option>
           </select>
 
           {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
-            <option value="APPROVED">✅ Approved</option>
-            <option value="PENDING">⏳ Pending / In Review</option>
-            <option value="REJECTED">❌ Rejected</option>
-            <option value="PAUSED">⏸️ Paused</option>
+            <option value="APPROVED">Approved</option>
+            <option value="PENDING">Pending / In Review</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="PAUSED">Paused</option>
           </select>
 
           {/* Time Range Filter */}
           <select
             value={timeRangeFilter}
             onChange={(e) => setTimeRangeFilter(e.target.value as any)}
-            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer text-indigo-600 dark:text-indigo-400"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer text-slate-700 dark:text-slate-200"
           >
-            <option value="ALL">🕒 All Time</option>
-            <option value="TODAY">📅 Created Today</option>
-            <option value="7D">⚡ Last 7 Days</option>
-            <option value="30D">📊 Last 30 Days</option>
+            <option value="ALL">All Time</option>
+            <option value="TODAY">Created Today</option>
+            <option value="7D">Last 7 Days</option>
+            <option value="30D">Last 30 Days</option>
           </select>
         </div>
 
         {/* Sort selector */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1">
-            <ArrowUpDown size={12} /> Sort By:
+          <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-1 uppercase tracking-wider">
+            <ArrowUpDown size={12} /> Sort:
           </span>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-black outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
           >
-            <option value="newest">🕒 Newest Created</option>
-            <option value="oldest">⏳ Oldest First</option>
-            <option value="most_used">🚀 Most Sent / Dispatched</option>
-            <option value="highest_read">👁️ Highest Read Rate</option>
-            <option value="alphabetical">🔤 Name (A-Z)</option>
+            <option value="newest">Newest Created</option>
+            <option value="oldest">Oldest First</option>
+            <option value="most_used">Most Sent / Dispatched</option>
+            <option value="highest_read">Highest Read Rate</option>
+            <option value="alphabetical">Name (A-Z)</option>
           </select>
-
-          <span className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-[11px] font-bold text-gray-600 dark:text-gray-300">
-            {filtered.length} {filtered.length === 1 ? "Template" : "Templates"}
-          </span>
         </div>
       </div>
 
       {/* Template Cards Grid */}
       {loading ? (
-        <div className="text-center py-20 text-gray-400">
+        <div className="text-center py-24 text-slate-400">
           <RefreshCw size={28} className="animate-spin mx-auto mb-3 text-indigo-500" />
           <div className="font-bold text-xs">Syncing templates from Meta Cloud API...</div>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20 bg-gray-50/50 dark:bg-slate-900/50 rounded-3xl border border-dashed border-gray-200 dark:border-slate-800">
-          <FileCode size={44} className="mx-auto mb-3 text-gray-300 dark:text-gray-600" />
-          <h3 className="font-black text-gray-800 dark:text-white text-base mb-1">No message templates found</h3>
-          <p className="text-xs text-gray-500 max-w-sm mx-auto mb-4">
-            Create your first Meta WhatsApp template using the dedicated Template Studio.
+        <div className="flex flex-col items-center justify-center py-20 px-4 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 text-center shadow-2xs">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900/50 flex items-center justify-center mb-4 text-indigo-600 dark:text-indigo-400 shadow-2xs">
+            <FileCode size={30} />
+          </div>
+          <h3 className="font-black text-slate-900 dark:text-white text-base mb-1.5">No message templates found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6 leading-relaxed">
+            Sync existing Meta-approved templates from WhatsApp Cloud API or open the Template Studio to draft and submit high-converting broadcast templates.
           </p>
-          <button
-            onClick={() => {
-              resetForm();
-              setViewMode("CREATE");
-            }}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
-          >
-            + Open Template Studio
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                resetForm();
+                setViewMode("CREATE");
+              }}
+              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-500/20 active:scale-95 cursor-pointer flex items-center gap-2"
+            >
+              <Plus size={14} />
+              <span>Open Template Studio</span>
+            </button>
+            <button
+              onClick={fetchTemplates}
+              disabled={loading}
+              className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-2 active:scale-95"
+            >
+              <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : "text-slate-400"} />
+              <span>Sync from Meta</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

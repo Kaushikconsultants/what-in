@@ -1960,18 +1960,7 @@ export default function WhatsAppInboxComponent() {
                     )}
                     {!sessionStatus.neverMessaged && (
                       <span 
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          background: sessionStatus.expired ? '#fff1f2' : '#f0fdf4',
-                          color: sessionStatus.expired ? '#e11d48' : '#15803d',
-                          border: `1px solid ${sessionStatus.expired ? '#fecdd3' : '#bbf7d0'}`
-                        }}
+                        className={`chat-header-session-badge ${sessionStatus.expired ? "expired" : "active"}`}
                         title={sessionStatus.reason}
                       >
                         <Clock size={11} />
@@ -2006,7 +1995,7 @@ export default function WhatsAppInboxComponent() {
                 </button>
 
                 <button
-                  className="chat-action-btn"
+                  className={`chat-action-btn ${activeConvDetail.aiHandled ? "ai-active" : "ai-manual"}`}
                   disabled={aiToggleLoading}
                   onClick={async () => {
                     if (!activeConvDetail?.id) return;
@@ -2021,18 +2010,13 @@ export default function WhatsAppInboxComponent() {
                     setAiToggleLoading(false);
                   }}
                   title={activeConvDetail.aiHandled ? "AI is ON — Click to switch to Manual Mode" : "AI is OFF — Click to enable AI auto-replies"}
-                  style={{
-                    background: activeConvDetail.aiHandled ? "#f0fdf4" : "#f8fafc",
-                    border: `1px solid ${activeConvDetail.aiHandled ? "#bbf7d0" : "#e2e8f0"}`,
-                    color: activeConvDetail.aiHandled ? "#15803d" : "#64748b"
-                  }}
                 >
                   <Bot size={13} />
                   <span>{aiToggleLoading ? "..." : activeConvDetail.aiHandled ? "AI: ON" : "Manual"}</span>
                 </button>
 
                 <button
-                  className="chat-action-btn"
+                  className={`chat-action-btn ${activeConvDetail.status === 'CLOSED' ? "chat-closed" : ""}`}
                   disabled={statusToggleLoading}
                   onClick={async () => {
                     if (!activeConvDetail?.id) return;
@@ -2048,11 +2032,6 @@ export default function WhatsAppInboxComponent() {
                     setStatusToggleLoading(false);
                   }}
                   title={activeConvDetail.status === 'CLOSED' ? "Click to Reopen Chat" : "Click to Close Chat"}
-                  style={{
-                    background: activeConvDetail.status === 'CLOSED' ? "#f1f5f9" : "#ffffff",
-                    border: `1px solid ${activeConvDetail.status === 'CLOSED' ? "#cbd5e1" : "#e2e8f0"}`,
-                    color: activeConvDetail.status === 'CLOSED' ? "#475569" : "#0f172a"
-                  }}
                 >
                   <CheckCircle2 size={13} />
                   <span>{statusToggleLoading ? "..." : activeConvDetail.status === 'CLOSED' ? "Reopen" : "Close"}</span>
@@ -2062,11 +2041,6 @@ export default function WhatsAppInboxComponent() {
                   className={`chat-action-btn ${!isRightCollapsed ? "active-profile" : ""}`}
                   onClick={() => setIsRightCollapsed(prev => !prev)}
                   title="Toggle Customer 360° Profile & CRM Data"
-                  style={{
-                    background: !isRightCollapsed ? "#f5f3ff" : "#ffffff",
-                    borderColor: !isRightCollapsed ? "#a78bfa" : "#e2e8f0",
-                    color: !isRightCollapsed ? "#6d28d9" : "#334155"
-                  }}
                 >
                   <User size={13} />
                   <span>Profile</span>
@@ -2204,28 +2178,9 @@ export default function WhatsAppInboxComponent() {
                 const showDateDivider = !prevDate || msgDate.toDateString() !== prevDate.toDateString();
 
                 const dateDividerNode = showDateDivider ? (
-                  <div key={`date-div-${msg.id}`} style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "16px 0 10px 0"
-                  }}>
-                    <span style={{
-                      background: "rgba(248, 250, 252, 0.95)",
-                      backdropFilter: "blur(6px)",
-                      color: "#475569",
-                      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "14px",
-                      padding: "3px 12px",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      userSelect: "none",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px"
-                    }}>
-                      <Calendar size={12} color="#64748b" />
+                  <div key={`date-div-${msg.id}`} className="chat-date-wrapper">
+                    <span className="chat-date-pill">
+                      <Calendar size={12} />
                       <span>{formatChatDividerDate(msg.sentAt)}</span>
                     </span>
                   </div>
@@ -3146,7 +3101,7 @@ export default function WhatsAppInboxComponent() {
                 <button className="quick-chip highlight" onClick={() => setShowReplyLibraryModal(true)}>
                   <MessageSquare size={12} /> Reply Library
                 </button>
-                <button className="quick-chip ai-suggest" onClick={handleSuggestReply} disabled={aiSuggesting} style={{ background: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0' }}>
+                <button className="quick-chip ai-suggest" onClick={handleSuggestReply} disabled={aiSuggesting}>
                   <Sparkles size={12} /> {aiSuggesting ? "Generating..." : "Suggest Reply AI"}
                 </button>
                 <button
@@ -3168,12 +3123,12 @@ export default function WhatsAppInboxComponent() {
 
               {/* Emoji Picker Popup */}
               {showEmojiPicker && (
-                <div style={{ display: "flex", gap: "6px", padding: "8px 12px", background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", marginBottom: "6px", width: "fit-content" }}>
+                <div className="emoji-picker-popup">
                   {EMOJI_LIST.map((emoji) => (
                     <span
                       key={emoji}
                       onClick={() => handleInsertEmoji(emoji)}
-                      style={{ fontSize: "16px", cursor: "pointer", padding: "2px 4px", borderRadius: "4px" }}
+                      className="emoji-picker-item"
                     >
                       {emoji}
                     </span>
@@ -3183,22 +3138,22 @@ export default function WhatsAppInboxComponent() {
 
               {/* Text Area Form */}
               {isRecording ? (
-                <div className="voice-recorder-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '24px', flex: 1, margin: '0 8px' }}>
-                  <span className="record-dot-blink" style={{ width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%', display: 'inline-block', animation: 'pulse 1s infinite' }} />
-                  <span style={{ fontSize: '13px', color: '#991b1b', fontWeight: 600, flex: 1 }}>
+                <div className="voice-recorder-bar">
+                  <span className="record-dot-blink" />
+                  <span className="voice-recorder-text">
                     Recording Voice Note... {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
                   </span>
                   <button
                     type="button"
                     onClick={cancelRecording}
-                    style={{ background: '#ef4444', color: '#ffffff', border: 'none', padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    className="voice-recorder-cancel-btn"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={stopAndSendRecording}
-                    style={{ background: '#10b981', color: '#ffffff', border: 'none', padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    className="voice-recorder-send-btn"
                   >
                     Send Voice Note
                   </button>
@@ -3221,9 +3176,9 @@ export default function WhatsAppInboxComponent() {
                     </button>
                   </div>
                 )}
-                <form className={`chat-input-form ${isInternalNote ? "internal-mode" : ""}`} onSubmit={handleSendMessage} style={{ display: "flex", gap: "12px", alignItems: "flex-end", padding: "12px", background: isInternalNote ? "#fffdf5" : "#ffffff", borderTop: "1px solid #e2e8f0" }}>
+                <form className={`chat-input-form ${isInternalNote ? "internal-mode" : ""}`} onSubmit={handleSendMessage}>
                   
-                  <div style={{ display: "flex", gap: "2px", background: "#f8fafc", padding: "4px 8px", borderRadius: "24px", border: "1px solid #e2e8f0", alignItems: "center" }}>
+                  <div className="composer-attachments-bar">
                     <button
                       type="button"
                       className="input-attachment-btn"
@@ -3235,10 +3190,9 @@ export default function WhatsAppInboxComponent() {
                     
                     <button
                       type="button"
-                      className="input-attachment-btn"
+                      className="input-attachment-btn btn-record"
                       title="Record Voice Note"
                       onClick={startRecording}
-                      style={{ color: '#ef4444' }}
                     >
                       <Mic size={18} />
                     </button>
@@ -3246,10 +3200,9 @@ export default function WhatsAppInboxComponent() {
                     {/* Template Picker Button */}
                     <button
                       type="button"
-                      className="input-attachment-btn"
+                      className={`input-attachment-btn ${showTemplatePicker ? "btn-active-template" : ""}`}
                       title="Send Template Message"
                       onClick={() => setShowTemplatePicker(true)}
-                      style={{ color: showTemplatePicker ? '#4f46e5' : '#64748b' }}
                     >
                       <FileCode size={18} />
                     </button>
@@ -3257,10 +3210,9 @@ export default function WhatsAppInboxComponent() {
                     {/* Product Catalog Button */}
                     <button
                       type="button"
-                      className="input-attachment-btn"
+                      className={`input-attachment-btn ${showProductPanel ? "btn-active-product" : ""}`}
                       title="Send Product from Catalog"
                       onClick={() => setShowProductPanel(v => !v)}
-                      style={{ color: showProductPanel ? '#10b981' : '#64748b' }}
                     >
                       <ShoppingBag size={18} />
                     </button>
@@ -3268,10 +3220,9 @@ export default function WhatsAppInboxComponent() {
                     {/* Flow Picker Button */}
                     <button
                       type="button"
-                      className="input-attachment-btn"
+                      className={`input-attachment-btn ${showFlowPicker ? "btn-active-flow" : ""}`}
                       title="Send Interactive Flow Form"
                       onClick={() => setShowFlowPicker(true)}
-                      style={{ color: showFlowPicker ? '#a78bfa' : '#64748b' }}
                     >
                       <Zap size={18} />
                     </button>
@@ -3279,21 +3230,21 @@ export default function WhatsAppInboxComponent() {
                     <div style={{ position: "relative" }}>
                       <button
                         type="button"
-                        className="input-attachment-btn"
+                        className={`input-attachment-btn ${showCannedResponses ? "btn-active-quick" : ""}`}
                         title="Quick Replies / Canned Responses"
                         onClick={() => setShowCannedResponses(!showCannedResponses)}
                       >
-                        <MessageSquare size={18} color={showCannedResponses ? "#f59e0b" : "#64748b"} />
+                        <MessageSquare size={18} />
                       </button>
 
                       {/* Canned Responses Popup Menu */}
                       {showCannedResponses && (
-                        <div style={{ position: "absolute", bottom: "100%", left: "0", marginBottom: "14px", width: "300px", background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)", zIndex: 10, overflow: "hidden" }}>
-                          <div style={{ padding: "10px 14px", borderBottom: "1px solid #e2e8f0", fontSize: "12px", fontWeight: 700, color: "#64748b", background: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div className="canned-responses-popup">
+                          <div className="canned-responses-header">
                             <span>Quick Replies</span>
-                            <button type="button" onClick={() => setShowCannedResponses(false)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex" }}><X size={14} /></button>
+                            <button type="button" onClick={() => setShowCannedResponses(false)} className="popup-close-btn"><X size={14} /></button>
                           </div>
-                          <div style={{ maxHeight: "250px", overflowY: "auto", padding: "6px" }}>
+                          <div className="canned-responses-list">
                             {cannedResponses.length > 0 ? (
                               cannedResponses.map(cr => (
                                 <button
@@ -3303,16 +3254,14 @@ export default function WhatsAppInboxComponent() {
                                     setMessageInput(prev => prev ? `${prev} ${cr.content}` : cr.content);
                                     setShowCannedResponses(false);
                                   }}
-                                  style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "none", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "12.5px", transition: "background 0.2s" }}
-                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
-                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                                  className="canned-response-item"
                                 >
-                                  <strong style={{ color: "#0f172a", display: "block", marginBottom: "4px" }}>{cr.title} <span style={{ color: "#3b82f6", fontSize: "11px", fontWeight: "normal", marginLeft: "4px" }}>{cr.shortcut}</span></strong>
-                                  <span style={{ color: "#64748b", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cr.content}</span>
+                                  <strong className="canned-response-title">{cr.title} <span className="canned-response-shortcut">{cr.shortcut}</span></strong>
+                                  <span className="canned-response-snippet">{cr.content}</span>
                                 </button>
                               ))
                             ) : (
-                              <div style={{ padding: "16px", textAlign: "center", fontSize: "13px", color: "#64748b" }}>No quick replies found.</div>
+                              <div className="canned-response-empty">No quick replies found.</div>
                             )}
                           </div>
                         </div>
@@ -3321,21 +3270,21 @@ export default function WhatsAppInboxComponent() {
 
                     <button
                       type="button"
-                      className="input-attachment-btn"
+                      className={`input-attachment-btn ${showEmojiPicker ? "btn-active-emoji" : ""}`}
                       title="Quick Emojis"
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                     >
-                      <Smile size={18} color={showEmojiPicker ? "#10b981" : "#64748b"} />
+                      <Smile size={18} />
                     </button>
                   </div>
 
                 {/* Team Mentions Popup Menu */}
                 {showMentionsMenu && (
-                  <div style={{ position: "absolute", bottom: "100%", left: "40px", marginBottom: "8px", width: "200px", background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)", zIndex: 10 }}>
-                    <div style={{ padding: "8px 12px", borderBottom: "1px solid #e2e8f0", fontSize: "12px", fontWeight: 700, color: "#64748b", background: "#f8fafc", borderRadius: "8px 8px 0 0" }}>
+                  <div className="mentions-popup-menu">
+                    <div className="mentions-popup-header">
                       Mention Teammate
                     </div>
-                    <div style={{ maxHeight: "150px", overflowY: "auto", padding: "4px" }}>
+                    <div className="mentions-popup-list">
                       {employeesList.filter(emp => emp.firstName?.toLowerCase().includes(mentionSearch) || emp.name?.toLowerCase().includes(mentionSearch)).length > 0 ? (
                         employeesList.filter(emp => emp.firstName?.toLowerCase().includes(mentionSearch) || emp.name?.toLowerCase().includes(mentionSearch)).map(emp => (
                           <button
@@ -3347,16 +3296,14 @@ export default function WhatsAppInboxComponent() {
                               setMessageInput(newText);
                               setShowMentionsMenu(false);
                             }}
-                            style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", padding: "6px 8px", background: "none", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f1f5f9"}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                            className="mention-item-btn"
                           >
                             <User size={14} color="#3b82f6" />
-                            <strong style={{ color: "#0f172a" }}>{emp.firstName || emp.name}</strong>
+                            <strong className="mention-item-name">{emp.firstName || emp.name}</strong>
                           </button>
                         ))
                       ) : (
-                        <div style={{ padding: "12px", textAlign: "center", fontSize: "12px", color: "#64748b" }}>No team members found.</div>
+                        <div className="mention-empty">No team members found.</div>
                       )}
                     </div>
                   </div>
