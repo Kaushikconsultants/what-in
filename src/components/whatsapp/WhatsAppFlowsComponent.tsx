@@ -342,116 +342,108 @@ export default function WhatsAppFlowsComponent() {
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: "flex", gap: "16px", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px" }}>
+      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
         <button
           onClick={() => setActiveTab("flows")}
-          style={{
-            background: activeTab === "flows" ? "#eff6ff" : "transparent",
-            border: "none",
-            borderRadius: "6px",
-            padding: "8px 16px",
-            fontSize: "13px",
-            fontWeight: 700,
-            color: activeTab === "flows" ? "#2563eb" : "#64748b",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px"
-          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "flows"
+              ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700 shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50"
+          }`}
         >
-          <GitBranch size={16} /> Interactive Meta Flows ({flows.length})
+          <GitBranch size={15} />
+          <span>Interactive Meta Flows ({flows.length})</span>
         </button>
         <button
           onClick={() => setActiveTab("replies")}
-          style={{
-            background: activeTab === "replies" ? "#eff6ff" : "transparent",
-            border: "none",
-            borderRadius: "6px",
-            padding: "8px 16px",
-            fontSize: "13px",
-            fontWeight: 700,
-            color: activeTab === "replies" ? "#2563eb" : "#64748b",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px"
-          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "replies"
+              ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700 shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50"
+          }`}
         >
-          <MessageSquare size={16} /> Quick Replies / Canned ({cannedResponses.length})
+          <MessageSquare size={15} />
+          <span>Quick Replies / Canned ({cannedResponses.length})</span>
         </button>
       </div>
 
       {activeTab === "flows" && (
         <>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", alignItems: "center" }}>
+          <div className="flex flex-wrap justify-end gap-2.5 items-center">
             <input
               value={testPhone}
               onChange={e => setTestPhone(e.target.value)}
               placeholder="Test Phone (91XXXXXXXXXX)"
-              style={{ padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", width: "200px", outline: "none" }}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-xs w-48 outline-none focus:ring-2 focus:ring-indigo-500"
             />
-            <button onClick={fetchFlows} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", background: "white", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", fontWeight: 600, color: "#475569", cursor: "pointer" }}>
-              <RefreshCw size={14} /> Refresh
+            <button
+              onClick={fetchFlows}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 transition-all shadow-sm cursor-pointer"
+            >
+              <RefreshCw size={13} />
+              <span>Refresh</span>
             </button>
-            <button onClick={() => { resetForm(); setShowCreateModal(true); }} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", background: "#4f46e5", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: 700, color: "white", cursor: "pointer", boxShadow: "0 2px 8px rgba(79,70,229,0.2)" }}>
-              <Plus size={16} /> Create Flow
+            <button
+              onClick={() => { resetForm(); setShowCreateModal(true); }}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              <Plus size={15} />
+              <span>Create Flow</span>
             </button>
           </div>
 
           {/* List of Flows */}
           {loading ? (
-            <div style={{ textAlign: "center", padding: "60px", color: "#9ca3af" }}>
-              <RefreshCw size={24} style={{ animation: "spin 1s linear infinite", marginBottom: "12px" }} /><br />
-              Loading Flows...
+            <div className="text-center py-16 text-slate-400 dark:text-slate-500 flex flex-col items-center gap-3">
+              <RefreshCw size={24} className="animate-spin text-indigo-500" />
+              <span className="text-sm font-medium">Loading Flows...</span>
             </div>
           ) : flows.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "80px 20px", color: "#9ca3af" }}>
-              <GitBranch size={48} style={{ marginBottom: "16px", opacity: 0.3 }} />
-              <h3 style={{ fontWeight: 700, marginBottom: "8px", color: "#374151" }}>No Flows registered yet</h3>
-              <p style={{ fontSize: "14px", maxWidth: "420px", margin: "0 auto 16px" }}>Add your Meta Flow configuration to enable in-chat custom surveys, bookings, and size finders.</p>
-              <button onClick={() => setShowCreateModal(true)} className="btn-primary">+ Register Flow</button>
+            <div className="text-center py-20 px-4 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+              <GitBranch size={44} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+              <h3 className="font-bold text-base text-slate-800 dark:text-slate-200 mb-1">No Flows registered yet</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-4">Add your Meta Flow configuration to enable in-chat custom surveys, bookings, and size finders.</p>
+              <button onClick={() => setShowCreateModal(true)} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer">+ Register Flow</button>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {flows.map(f => (
-                <div key={f.id} style={{
-                  background: "white", border: "1px solid #e5e7eb", borderRadius: "16px",
-                  padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                  display: "flex", flexDirection: "column", gap: "12px"
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div
+                  key={f.id}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col gap-3 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
+                >
+                  <div className="flex justify-between items-start gap-2">
                     <div>
-                      <h3 style={{ fontWeight: 800, fontSize: "15px", color: "#111827", margin: 0 }}>{f.name}</h3>
-                      <code style={{ fontSize: "11px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "4px", marginTop: "4px", display: "inline-block" }}>ID: {f.flowId}</code>
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white">{f.name}</h3>
+                      <code className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md mt-1 inline-block">ID: {f.flowId}</code>
                     </div>
-                    <button onClick={() => handleDelete(f.id, f.name)} disabled={deleting === f.id} style={{ background: "rgba(239,68,68,0.08)", border: "none", borderRadius: "6px", padding: "6px", cursor: "pointer", color: "#ef4444" }}>
-                      {deleting === f.id ? <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Trash2 size={12} />}
+                    <button
+                      onClick={() => handleDelete(f.id, f.name)}
+                      disabled={deleting === f.id}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
+                    >
+                      {deleting === f.id ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
                     </button>
                   </div>
 
-                  <p style={{ fontSize: "12.5px", color: "#4b5563", margin: 0, minHeight: "36px", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 min-h-[32px]">
                     {f.description || "No description provided."}
                   </p>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "#6b7280" }}>
-                    <span>CTA: <strong>{f.ctaText}</strong></span>
+                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span>CTA: <strong className="text-slate-700 dark:text-slate-200">{f.ctaText}</strong></span>
                     <span>•</span>
-                    <span>Screen: <strong>{f.screenName}</strong></span>
+                    <span>Screen: <strong className="text-slate-700 dark:text-slate-200">{f.screenName}</strong></span>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 mt-auto">
                     <button
                       onClick={() => handleTestSend(f.flowId)}
                       disabled={testingFlow === f.flowId}
-                      style={{
-                        flex: 1, padding: "8px 12px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
-                        color: "white", border: "none", borderRadius: "8px", fontSize: "12px",
-                        fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px"
-                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
                     >
-                      {testingFlow === f.flowId ? <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Send size={12} />}
-                      Send Test Message
+                      {testingFlow === f.flowId ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
+                      <span>Send Test Message</span>
                     </button>
                   </div>
                 </div>
@@ -462,44 +454,47 @@ export default function WhatsAppFlowsComponent() {
       )}
 
       {activeTab === "replies" && (
-        <div style={{ display: "flex", gap: "24px", alignItems: "flex-start" }}>
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
           
           {/* Create / Edit Form */}
-          <form onSubmit={handleCreateOrUpdateCannedResponse} style={{ flex: "0 0 350px", background: "white", padding: "20px", borderRadius: "16px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", position: "sticky", top: "20px" }}>
-            <h4 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: "0" }}>
-              {editingReply ? "📝 Edit Canned Response" : "＋ Create New Canned Response"}
+          <form
+            onSubmit={handleCreateOrUpdateCannedResponse}
+            className="w-full lg:w-[350px] shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col gap-4 sticky top-6 text-slate-900 dark:text-white"
+          >
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+              {editingReply ? "📝 Edit Canned Response" : "+ Create New Canned Response"}
             </h4>
             
             <div>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "6px" }}>TITLE *</label>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase">TITLE *</label>
               <input
                 type="text"
                 placeholder="e.g. Greeting"
                 value={newReplyTitle}
                 onChange={(e) => setNewReplyTitle(e.target.value)}
-                style={{ width: "100%", padding: "10px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13.5px", outline: "none" }}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 required
               />
             </div>
             
             <div>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "6px" }}>SHORTCUT CODE *</label>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase">SHORTCUT CODE *</label>
               <input
                 type="text"
                 placeholder="e.g. /hi"
                 value={newReplyShortcut}
                 onChange={(e) => setNewReplyShortcut(e.target.value)}
-                style={{ width: "100%", padding: "10px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13.5px", outline: "none" }}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 required
               />
             </div>
 
             {/* Rich Fields */}
-            <div style={{ borderTop: "1px dashed #cbd5e1", paddingTop: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>Rich Media & Interactive (Optional)</div>
+            <div className="border-t border-dashed border-slate-200 dark:border-slate-800 pt-4 flex flex-col gap-3">
+              <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Rich Media & Interactive (Optional)</div>
               
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     placeholder="Image URL or Paste Image here..."
@@ -507,11 +502,11 @@ export default function WhatsAppFlowsComponent() {
                     onChange={(e) => setNewReplyMediaUrl(e.target.value)}
                     onPaste={handlePasteImage}
                     disabled={uploadingImage}
-                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", outline: "none" }}
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                   />
-                  <label style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "8px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "8px", cursor: "pointer", color: "#475569" }}>
+                  <label className="flex items-center justify-center p-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                     <ImagePlus size={16} />
-                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => e.target.files && handleImageUpload(e.target.files[0])} />
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files && handleImageUpload(e.target.files[0])} />
                   </label>
                 </div>
               </div>
@@ -523,18 +518,18 @@ export default function WhatsAppFlowsComponent() {
                   value={newReplyHeader}
                   onChange={(e) => setNewReplyHeader(e.target.value)}
                   maxLength={60}
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", outline: "none", marginBottom: "8px" }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "6px" }}>REPLY BODY CONTENT *</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase">REPLY BODY CONTENT *</label>
                 <textarea
                   rows={4}
                   placeholder="Type the message body..."
                   value={newReplyContent}
                   onChange={(e) => setNewReplyContent(e.target.value)}
-                  style={{ width: "100%", padding: "10px 14px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13.5px", resize: "vertical", outline: "none" }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-xs resize-y outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                   required
                 />
               </div>
@@ -546,44 +541,44 @@ export default function WhatsAppFlowsComponent() {
                   value={newReplyFooter}
                   onChange={(e) => setNewReplyFooter(e.target.value)}
                   maxLength={60}
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "13px", outline: "none", marginBottom: "8px" }}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               {/* Buttons Builder */}
               <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label style={{ fontSize: "12px", fontWeight: 700, color: "#64748b" }}>INTERACTIVE BUTTONS ({newReplyButtons.length}/3)</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase">INTERACTIVE BUTTONS ({newReplyButtons.length}/3)</label>
                   {newReplyButtons.length < 3 && (
-                    <button type="button" onClick={addReplyButton} style={{ background: "none", border: "none", color: "#4f46e5", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
+                    <button type="button" onClick={addReplyButton} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 text-xs font-bold cursor-pointer flex items-center gap-1">
                       <Plus size={12} /> Add Button
                     </button>
                   )}
                 </div>
                 
                 {newReplyButtons.map((btn, i) => (
-                  <div key={i} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px", marginBottom: "8px", position: "relative" }}>
-                    <button type="button" onClick={() => removeReplyButton(i)} style={{ position: "absolute", top: "6px", right: "6px", background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}><X size={14} /></button>
+                  <div key={i} className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3 mb-2 relative">
+                    <button type="button" onClick={() => removeReplyButton(i)} className="absolute top-2 right-2 text-red-500 hover:text-red-700 cursor-pointer"><X size={14} /></button>
                     
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "8px", position: "relative" }}>
+                    <div className="flex gap-2 mb-2 pr-6">
                       <select 
                         value={btn.type} 
                         onChange={(e) => updateReplyButton(i, "type", e.target.value)}
-                        style={{ padding: "6px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", outline: "none" }}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none"
                       >
                         <option value="reply">Quick Reply</option>
                         <option value="url">URL Link</option>
                       </select>
-                      <div style={{ flex: 1, position: "relative" }}>
+                      <div className="flex-1 relative">
                         <input 
                           type="text" 
                           placeholder="Button Text" 
                           value={btn.text} 
                           onChange={(e) => updateReplyButton(i, "text", e.target.value)}
                           maxLength={20}
-                          style={{ width: "100%", padding: "6px", paddingRight: "40px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", outline: "none" }}
+                          className="w-full px-2.5 py-1.5 pr-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none"
                         />
-                        <span style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", fontSize: "10px", color: (btn.text?.length || 0) >= 20 ? "#ef4444" : "#94a3b8" }}>
+                        <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[10px] ${btn.text?.length >= 20 ? 'text-red-500' : 'text-slate-400'}`}>
                           {(btn.text?.length || 0)}/20
                         </span>
                       </div>
@@ -594,7 +589,7 @@ export default function WhatsAppFlowsComponent() {
                         placeholder="https://example.com" 
                         value={btn.url || ""} 
                         onChange={(e) => updateReplyButton(i, "url", e.target.value)}
-                        style={{ width: "100%", padding: "6px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px", outline: "none" }}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none"
                       />
                     )}
                   </div>
@@ -602,12 +597,12 @@ export default function WhatsAppFlowsComponent() {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+            <div className="flex gap-2 mt-2">
               {editingReply && (
                 <button
                   type="button"
                   onClick={handleCancelEdit}
-                  style={{ flex: 1, background: "#f1f5f9", border: "none", borderRadius: "8px", padding: "10px", fontSize: "13.5px", fontWeight: 600, color: "#475569", cursor: "pointer" }}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -616,7 +611,7 @@ export default function WhatsAppFlowsComponent() {
               <button
                 type="submit"
                 disabled={savingCanned}
-                style={{ flex: 2, background: "#4f46e5", border: "none", borderRadius: "8px", padding: "10px", fontSize: "13.5px", fontWeight: 700, color: "#ffffff", cursor: "pointer", boxShadow: "0 4px 12px rgba(79,70,229,0.2)" }}
+                className="flex-[2] bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 rounded-xl shadow-md transition-all cursor-pointer"
               >
                 {savingCanned ? "Saving..." : editingReply ? "Save Changes" : "Create Reply"}
               </button>
@@ -624,24 +619,24 @@ export default function WhatsAppFlowsComponent() {
           </form>
 
           {/* Live Preview Side Panel */}
-          <div style={{ flex: "0 0 300px", backgroundColor: "#e5ddd5", padding: "16px", borderRadius: "16px", position: "sticky", top: "20px", border: "1px solid #cbd5e1", display: "flex", flexDirection: "column", gap: "10px", backgroundImage: "radial-gradient(#cbd5e1 1px, transparent 1px)", backgroundSize: "12px 12px" }}>
-            <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#111827", margin: "0 0 8px", textAlign: "center", background: "rgba(255,255,255,0.9)", padding: "6px", borderRadius: "8px" }}>
+          <div className="w-full lg:w-[300px] shrink-0 bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sticky top-6 backdrop-blur-sm flex flex-col gap-2.5">
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 py-1.5 rounded-lg uppercase tracking-wider">
               Live Preview
             </h4>
-            <div style={{ background: "white", borderRadius: "0 8px 8px 8px", padding: "8px", maxWidth: "90%", boxShadow: "0 1px 2px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div className="bg-white dark:bg-[#1f2c34] rounded-2xl rounded-tl-sm p-3.5 border border-slate-200/80 dark:border-slate-700/60 shadow-sm flex flex-col gap-2 max-w-[95%]">
               {newReplyMediaUrl && (
-                <img src={newReplyMediaUrl} alt="Preview" style={{ width: "100%", height: "140px", objectFit: "cover", borderRadius: "6px" }} onError={(e) => e.currentTarget.style.display = 'none'} />
+                <img src={newReplyMediaUrl} alt="Preview" className="w-full h-32 object-cover rounded-lg" onError={(e) => e.currentTarget.style.display = 'none'} />
               )}
-              {newReplyHeader && <strong style={{ fontSize: "12px", color: "#334155" }}>{newReplyHeader}</strong>}
-              <div style={{ fontSize: "13.5px", color: "#0f172a", whiteSpace: "pre-wrap", lineHeight: 1.4 }}>
+              {newReplyHeader && <strong className="text-xs font-bold text-slate-800 dark:text-emerald-400">{newReplyHeader}</strong>}
+              <div className="text-xs text-slate-900 dark:text-slate-100 whitespace-pre-wrap leading-relaxed">
                 {newReplyContent || "Type a message body..."}
               </div>
-              {newReplyFooter && <span style={{ fontSize: "11px", color: "#94a3b8" }}>{newReplyFooter}</span>}
+              {newReplyFooter && <span className="text-[10px] text-slate-400 dark:text-slate-400">{newReplyFooter}</span>}
             </div>
             {newReplyButtons.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxWidth: "90%" }}>
+              <div className="flex flex-col gap-1.5 max-w-[95%]">
                 {newReplyButtons.map((btn, i) => (
-                  <div key={i} style={{ background: "white", padding: "8px", borderRadius: "8px", textAlign: "center", fontSize: "13px", fontWeight: 600, color: "#00a884", boxShadow: "0 1px 2px rgba(0,0,0,0.1)", cursor: "default", display: "flex", justifyContent: "center", alignItems: "center", gap: "6px" }}>
+                  <div key={i} className="bg-white dark:bg-[#202c33] hover:bg-slate-50 dark:hover:bg-[#2a3942] border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 font-semibold text-xs py-2 px-3 rounded-lg text-center shadow-xs flex items-center justify-center gap-1.5">
                     {btn.type === "url" ? <><Link size={14} />{btn.text || "URL Link"}</> : btn.text || "Quick Reply"}
                   </div>
                 ))}
@@ -650,50 +645,41 @@ export default function WhatsAppFlowsComponent() {
           </div>
 
           {/* List */}
-          <div style={{ flex: 1 }}>
+          <div className="flex-1 w-full">
             {loadingCanned ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "#9ca3af" }}>Loading...</div>
+              <div className="text-center py-12 text-slate-400 dark:text-slate-500">Loading...</div>
             ) : cannedResponses.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "60px 20px", color: "#9ca3af", background: "white", borderRadius: "16px", border: "1px solid #e2e8f0" }}>
-                <MessageSquare size={40} style={{ marginBottom: "16px", opacity: 0.3 }} />
-                <h3 style={{ fontWeight: 700, marginBottom: "8px", color: "#374151" }}>No Quick Replies</h3>
-                <p style={{ fontSize: "13px" }}>Create your first canned response using the form on the left.</p>
+              <div className="text-center py-16 px-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                <MessageSquare size={40} className="mx-auto mb-3 text-slate-300 dark:text-slate-600 opacity-40" />
+                <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-1">No Quick Replies</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Create your first canned response using the form on the left.</p>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {cannedResponses.map((cr) => (
                   <div
                     key={cr.id}
-                    style={{
-                      background: "white",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "12px",
-                      padding: "16px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "12px",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)"
-                    }}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col gap-3 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-all"
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                        <strong style={{ fontSize: "14px", color: "#0f172a" }}>{cr.title}</strong>
-                        <span style={{ background: "#f8fafc", border: "1px solid #e2e8f0", color: "#3b82f6", padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, alignSelf: "flex-start" }}>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex flex-col gap-1">
+                        <strong className="text-sm font-bold text-slate-900 dark:text-white">{cr.title}</strong>
+                        <span className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md text-xs font-mono font-semibold self-start">
                           {cr.shortcut}
                         </span>
                       </div>
-                      <div style={{ display: "flex", gap: "6px" }}>
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleEditClick(cr)}
-                          style={{ background: "#eff6ff", border: "none", color: "#3b82f6", padding: "6px", borderRadius: "6px", cursor: "pointer" }}
+                          className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 transition-colors cursor-pointer"
                         >
                           <Edit size={14} />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteCannedResponse(cr.id)}
-                          style={{ background: "#fef2f2", border: "none", color: "#ef4444", padding: "6px", borderRadius: "6px", cursor: "pointer" }}
+                          className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors cursor-pointer"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -701,24 +687,24 @@ export default function WhatsAppFlowsComponent() {
                     </div>
                     
                     {cr.mediaUrl && (
-                      <img src={cr.mediaUrl} alt="Media" style={{ width: "100%", height: "120px", objectFit: "cover", borderRadius: "6px" }} />
+                      <img src={cr.mediaUrl} alt="Media" referrerPolicy="no-referrer" className="w-full h-28 object-cover rounded-lg" />
                     )}
                     
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {cr.headerText && <strong style={{ fontSize: "12px", color: "#334155" }}>{cr.headerText}</strong>}
-                      <p style={{ fontSize: "13px", color: "#475569", margin: 0, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                    <div className="flex flex-col gap-1.5">
+                      {cr.headerText && <strong className="text-xs font-bold text-slate-800 dark:text-slate-200">{cr.headerText}</strong>}
+                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap m-0">
                         {cr.content}
                       </p>
-                      {cr.footerText && <span style={{ fontSize: "11px", color: "#94a3b8" }}>{cr.footerText}</span>}
+                      {cr.footerText && <span className="text-[11px] text-slate-400 dark:text-slate-500">{cr.footerText}</span>}
                     </div>
 
                     {cr.buttons && (() => {
                       const btns = typeof cr.buttons === 'string' ? JSON.parse(cr.buttons) : cr.buttons;
-                      if (btns.length === 0) return null;
+                      if (!btns || btns.length === 0) return null;
                       return (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
+                        <div className="flex flex-col gap-1 mt-1">
                           {btns.map((btn: any, i: number) => (
-                            <div key={i} style={{ padding: "6px", textAlign: "center", background: "#f1f5f9", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#3b82f6" }}>
+                            <div key={i} className="py-1.5 px-3 rounded-lg text-center bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-xs font-medium text-indigo-600 dark:text-indigo-400">
                               {btn.type === "url" ? `🔗 ${btn.text}` : btn.text}
                             </div>
                           ))}
@@ -735,38 +721,39 @@ export default function WhatsAppFlowsComponent() {
 
       {/* Create Flow Modal */}
       {showCreateModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-          <div style={{ background: "white", borderRadius: "20px", width: "100%", maxWidth: "800px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 25px 60px rgba(0,0,0,0.2)", overflow: "hidden" }}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             
             {/* Header */}
-            <div style={{ padding: "20px 24px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
               <div>
-                <h2 style={{ fontWeight: 900, fontSize: "18px", color: "#111827", margin: 0 }}>⚡ Create Interactive WhatsApp Flow</h2>
-                <p style={{ fontSize: "13px", color: "#6b7280", margin: "4px 0 0" }}>Register a Meta Flow ID or configure one using a pre-built template.</p>
+                <h2 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>⚡</span> Create Interactive WhatsApp Flow
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Register a Meta Flow ID or configure one using a pre-built template.</p>
               </div>
-              <button onClick={() => { setShowCreateModal(false); resetForm(); }} style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", padding: "6px", cursor: "pointer" }}><X size={18} color="#6b7280" /></button>
+              <button
+                onClick={() => { setShowCreateModal(false); resetForm(); }}
+                className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+            <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
               {/* Left Column: Form config */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
                 
                 {/* Prebuilt Quick selector */}
                 <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#4b5563", marginBottom: "6px", textTransform: "uppercase" }}>Quick Start Templates</label>
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Quick Start Templates</label>
+                  <div className="flex gap-2 flex-wrap">
                     {PREBUILT_TEMPLATES.map(t => (
                       <button
                         key={t.name}
                         type="button"
                         onClick={() => selectPrebuiltTemplate(t)}
-                        style={{
-                          padding: "6px 10px", borderRadius: "8px", border: "1px solid #e2e8f0",
-                          fontSize: "12px", background: "#f8fafc", cursor: "pointer", fontWeight: 600,
-                          color: "#374151"
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = "#4f46e5"}
-                        onMouseLeave={e => e.currentTarget.style.borderColor = "#e2e8f0"}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors cursor-pointer"
                       >
                         {t.name}
                       </button>
@@ -774,53 +761,83 @@ export default function WhatsAppFlowsComponent() {
                   </div>
                 </div>
 
-                <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <form onSubmit={handleCreate} className="flex flex-col gap-3.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>FLOW NAME *</label>
-                      <input value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Size Calculator" style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">FLOW NAME *</label>
+                      <input
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        required
+                        placeholder="e.g. Size Calculator"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>META FLOW ID *</label>
-                      <input value={flowId} onChange={e => setFlowId(e.target.value)} required placeholder="e.g. 9876543210123" style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">META FLOW ID *</label>
+                      <input
+                        value={flowId}
+                        onChange={e => setFlowId(e.target.value)}
+                        required
+                        placeholder="e.g. 9876543210123"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>BODY DESCRIPTION TEXT (Sent in WhatsApp message)</label>
-                    <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Please answer these quick fit questions so we can get your custom sizing perfect." style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">BODY DESCRIPTION TEXT (Sent in WhatsApp message)</label>
+                    <textarea
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      rows={3}
+                      placeholder="Please answer these quick fit questions so we can get your custom sizing perfect."
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>STARTING SCREEN NAME *</label>
-                      <input value={screenName} onChange={e => setScreenName(e.target.value)} required placeholder="e.g. SIZE_SCREEN" style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">STARTING SCREEN NAME *</label>
+                      <input
+                        value={screenName}
+                        onChange={e => setScreenName(e.target.value)}
+                        required
+                        placeholder="e.g. SIZE_SCREEN"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#374151", marginBottom: "4px" }}>CTA BUTTON TEXT *</label>
-                      <input value={ctaText} onChange={e => setCtaText(e.target.value)} required placeholder="e.g. Open Size Finder" style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">CTA BUTTON TEXT *</label>
+                      <input
+                        value={ctaText}
+                        onChange={e => setCtaText(e.target.value)}
+                        required
+                        placeholder="e.g. Open Size Finder"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
                     </div>
                   </div>
 
                   {/* Visual Fields Builder */}
-                  <div style={{ border: "1px solid #e2e8f0", padding: "14px", borderRadius: "12px", background: "#f8fafc", marginTop: "10px" }}>
-                    <label style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#1e293b", marginBottom: "8px", textTransform: "uppercase" }}>Form Questionnaire Fields</label>
+                  <div className="border border-slate-200 dark:border-slate-700 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">Form Questionnaire Fields</label>
                     
                     {/* Render current fields */}
                     {formFields.length === 0 ? (
-                      <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 10px 0" }}>No fields added yet. Add custom fields below or choose a template above.</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">No fields added yet. Add custom fields below or choose a template above.</p>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "12px" }}>
+                      <div className="flex flex-col gap-1.5 mb-3">
                         {formFields.map((f, idx) => (
-                          <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "white", padding: "8px 10px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-                            <div style={{ display: "flex", flexDirection: "column" }}>
-                              <span style={{ fontSize: "12px", fontWeight: 700, color: "#1e293b" }}>{f.label}</span>
-                              <span style={{ fontSize: "10px", color: "#64748b" }}>Type: {f.type} {f.options ? `(${f.options.join(", ")})` : ''}</span>
+                          <div key={idx} className="flex justify-between items-center bg-white dark:bg-slate-800 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-900 dark:text-white">{f.label}</span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400">Type: {f.type} {f.options ? `(${f.options.join(", ")})` : ''}</span>
                             </div>
                             <button
                               type="button"
                               onClick={() => setFormFields(formFields.filter((_, i) => i !== idx))}
-                              style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "2px" }}
+                              className="text-red-500 hover:text-red-700 cursor-pointer p-1"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -830,15 +847,15 @@ export default function WhatsAppFlowsComponent() {
                     )}
 
                     {/* Add new field form row */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", borderTop: "1px dashed #cbd5e1", paddingTop: "10px" }}>
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#475569" }}>➕ ADD NEW QUESTION FIELD</span>
+                    <div className="flex flex-col gap-2 border-t border-dashed border-slate-200 dark:border-slate-700 pt-3">
+                      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">ADD NEW QUESTION FIELD</span>
                       <input
                         type="text"
                         placeholder="e.g. Enter your jersey size"
                         id="new-field-label"
-                        style={{ padding: "6px 8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12.5px", outline: "none" }}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none"
                       />
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      <div className="grid grid-cols-2 gap-2">
                         <select
                           id="new-field-type"
                           defaultValue="text"
@@ -848,7 +865,7 @@ export default function WhatsAppFlowsComponent() {
                               optEl.style.display = (e.target.value === 'select' || e.target.value === 'radio') ? 'block' : 'none';
                             }
                           }}
-                          style={{ padding: "6px 8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12.5px" }}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none"
                         >
                           <option value="text">Text Input</option>
                           <option value="number">Number Input</option>
@@ -879,70 +896,74 @@ export default function WhatsAppFlowsComponent() {
                               alert("Please enter a field label first.");
                             }
                           }}
-                          style={{ padding: "6px", background: "#4f46e5", color: "white", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}
+                          className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer"
                         >
                           Add Field
                         </button>
                       </div>
                       <div id="new-field-options-row" style={{ display: "none" }}>
-                        <label style={{ display: "block", fontSize: "10.5px", color: "#64748b", marginBottom: "2px" }}>OPTIONS (separated by commas)</label>
+                        <label className="block text-[10.5px] text-slate-500 dark:text-slate-400 mb-1">OPTIONS (separated by commas)</label>
                         <input
                           type="text"
                           id="new-field-options"
                           placeholder="e.g. Small, Medium, Large"
-                          style={{ width: "100%", padding: "6px 8px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "12px", boxSizing: "border-box" }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <button type="submit" disabled={saving} style={{ width: "100%", padding: "10px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "white", border: "none", borderRadius: "8px", fontWeight: 700, fontSize: "14px", cursor: "pointer", marginTop: "8px" }}>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer mt-2"
+                  >
                     {saving ? "Registering..." : "⚡ Register Meta Flow Configuration"}
                   </button>
                 </form>
               </div>
 
               {/* Right Column: Visual Mockup Render */}
-              <div style={{ width: "300px", borderLeft: "1px solid #f3f4f6", padding: "20px", background: "#f8fafc", overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", flexShrink: 0 }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>Flow Preview inside Chat</div>
+              <div className="w-full md:w-72 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 p-5 bg-slate-50 dark:bg-slate-950/40 overflow-y-auto flex flex-col gap-3 shrink-0">
+                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Flow Preview inside Chat</div>
                 
                 {/* Chat Bubble Message */}
-                <div style={{ background: "#e5ddd5", borderRadius: "10px", padding: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                  <div style={{ background: "white", borderRadius: "6px", padding: "8px", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
-                    <div style={{ fontWeight: 700, fontSize: "13px", color: "#111827", borderBottom: "1px solid #f3f4f6", paddingBottom: "4px", marginBottom: "4px" }}>{name || "Flow Header"}</div>
-                    <div style={{ fontSize: "12px", color: "#374151" }}>{description || "Please tap the button to open the form."}</div>
-                    <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "4px", textAlign: "right" }}>Powered by What-In</div>
+                <div className="bg-[#e5ddd5] dark:bg-slate-900 rounded-2xl rounded-tl-sm p-3 border border-slate-200 dark:border-slate-800 flex flex-col gap-1.5 shadow-sm">
+                  <div className="bg-white dark:bg-[#1f2c34] rounded-xl p-3 shadow-xs">
+                    <div className="font-bold text-xs text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-1 mb-1">{name || "Flow Header"}</div>
+                    <div className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">{description || "Please tap the button to open the form."}</div>
+                    <div className="text-[10px] text-slate-400 mt-1 text-right">Powered by Whatmore</div>
                   </div>
                   {/* CTA button mock */}
-                  <div style={{ background: "white", borderRadius: "6px", padding: "8px", textAlign: "center", fontSize: "12.5px", fontWeight: 700, color: "#00a5f4", cursor: "pointer", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
+                  <div className="bg-white dark:bg-[#202c33] hover:bg-slate-50 dark:hover:bg-[#2a3942] rounded-xl py-2 px-3 text-center text-xs font-bold text-[#00a5f4] dark:text-[#53bdeb] shadow-xs cursor-pointer">
                     {ctaText || "Open Form"}
                   </div>
                 </div>
 
                 {/* Form fields mockup render */}
                 {formFields.length > 0 && (
-                  <div style={{ marginTop: "12px" }}>
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", marginBottom: "8px" }}>Form Fields Mockup</div>
-                    <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "12px" }}>
+                  <div className="mt-2">
+                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Form Fields Mockup</div>
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex flex-col gap-2.5">
                       {formFields.map((f, i) => (
-                        <div key={i} style={{ marginBottom: "10px" }}>
-                          <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#4b5563", marginBottom: "4px" }}>{f.label}</label>
+                        <div key={i} className="flex flex-col gap-1">
+                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{f.label}</label>
                           {f.type === "textarea" ? (
-                            <textarea readOnly placeholder={f.placeholder} style={{ width: "100%", padding: "6px", fontSize: "11.5px", border: "1px solid #e2e8f0", borderRadius: "6px", outline: "none", boxSizing: "border-box" }} />
+                            <textarea readOnly placeholder={f.placeholder} className="w-full p-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none resize-none" rows={2} />
                           ) : f.type === "select" ? (
-                            <select disabled style={{ width: "100%", padding: "6px", fontSize: "11.5px", border: "1px solid #e2e8f0", borderRadius: "6px", outline: "none" }}>
+                            <select disabled className="w-full p-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none">
                               <option>{f.options?.[0] || "Select option..."}</option>
                             </select>
                           ) : f.type === "radio" ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <div className="flex flex-col gap-1">
                               {f.options?.slice(0, 2).map((opt: string) => (
-                                <label key={opt} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#374151" }}>
+                                <label key={opt} className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
                                   <input type="radio" disabled checked={opt === f.options[0]} /> {opt}
                                 </label>
                               ))}
                             </div>
                           ) : (
-                            <input readOnly type={f.type} placeholder={f.placeholder} style={{ width: "100%", padding: "6px", fontSize: "11.5px", border: "1px solid #e2e8f0", borderRadius: "6px", outline: "none", boxSizing: "border-box" }} />
+                            <input readOnly type={f.type} placeholder={f.placeholder} className="w-full p-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 outline-none" />
                           )}
                         </div>
                       ))}

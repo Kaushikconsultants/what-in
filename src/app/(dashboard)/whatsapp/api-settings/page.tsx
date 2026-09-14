@@ -435,61 +435,57 @@ export default function WhatsAppAPISettingsPage() {
       {/* Header title */}
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-1">Settings & Directory</h1>
-        <p className="text-gray-500 dark:text-gray-400">Configure core external APIs, Gemini LLM cascades, team members auto-routing and CRM contact list.</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Configure core external APIs, Gemini LLM cascades, team members auto-routing and CRM contact list.</p>
       </div>
 
       {/* Tabs list bar */}
-      <div className="flex border-b border-gray-200 dark:border-slate-700 gap-1">
-        
-
-
-
+      <div className="flex border-b border-gray-200 dark:border-slate-800 gap-1">
         <button
           onClick={() => setActiveTab("webhook-health")}
-          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
             activeTab === "webhook-health" 
-              ? "border-indigo-600 text-indigo-600" 
-              : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:border-gray-300"
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
           }`}
         >
           <Activity size={16} />
-          <span>📡 Webhook & CAPI Health</span>
+          <span>Webhook & CAPI Health</span>
         </button>
 
         <button
           onClick={() => setActiveTab("team-sla")}
-          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
             activeTab === "team-sla" 
-              ? "border-indigo-600 text-indigo-600" 
-              : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:border-gray-300"
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
           }`}
         >
           <Users size={16} />
-          <span>👥 Teams</span>
+          <span>Teams</span>
         </button>
 
         <button
           onClick={() => setActiveTab("agents")}
-          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
             activeTab === "agents" 
-              ? "border-indigo-600 text-indigo-600" 
-              : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:border-gray-300"
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
           }`}
         >
-          <Users size={16} />
-          <span>👥 Team Agents</span>
+          <UserCheck size={16} />
+          <span>Team Agents</span>
         </button>
 
         <button
           onClick={() => setActiveTab("security")}
-          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
             activeTab === "security" 
-              ? "border-indigo-600 text-indigo-600" 
-              : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:border-gray-300"
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
           }`}
         >
           <ShieldCheck size={16} />
-          <span>🔐 Change Password</span>
+          <span>Change Password</span>
         </button>
       </div>
 
@@ -504,24 +500,24 @@ export default function WhatsAppAPISettingsPage() {
 
           {/* Notification bar */}
           {teamMsg && (
-            <div className={`p-4 rounded-xl text-sm font-semibold flex items-center gap-2 ${teamMsg.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+            <div className={`p-4 rounded-xl text-sm font-semibold flex items-center gap-2 ${teamMsg.success ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'}`}>
               <CheckCircle2 size={16} /><span>{teamMsg.text}</span>
             </div>
           )}
 
           {/* Create New Team */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
               <Plus size={18} className="text-indigo-500" /> Create New Team
             </h2>
-            <p className="text-sm text-gray-500 mb-5">Teams group agents for Round Robin chat assignment in the chatbot builder.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Teams group agents for Round Robin chat assignment in the chatbot builder.</p>
             <div className="flex gap-3 flex-wrap">
               <input
                 type="text"
                 placeholder="Team name (e.g. Sales, Support)"
                 value={newTeamName}
                 onChange={e => setNewTeamName(e.target.value)}
-                className="flex-1 min-w-[180px] px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="flex-1 min-w-[180px] px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                 onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
               />
               <input
@@ -529,12 +525,12 @@ export default function WhatsAppAPISettingsPage() {
                 placeholder="Description (optional)"
                 value={newTeamDesc}
                 onChange={e => setNewTeamDesc(e.target.value)}
-                className="flex-1 min-w-[200px] px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="flex-1 min-w-[200px] px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
               />
               <button
                 onClick={handleCreateTeam}
                 disabled={creatingTeam || !newTeamName.trim()}
-                className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-xl text-sm font-bold shadow-sm transition-all"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-bold shadow-sm transition-all cursor-pointer"
               >
                 {creatingTeam ? <RefreshCw size={15} className="animate-spin" /> : <Plus size={15} />}
                 Create Team
@@ -544,16 +540,16 @@ export default function WhatsAppAPISettingsPage() {
 
           {/* Teams List */}
           {teams.length === 0 ? (
-            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 p-12 text-center text-gray-400">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 p-12 text-center text-gray-400">
               <Users size={36} className="mx-auto mb-3 opacity-30" />
               <p className="text-sm font-medium">No teams yet. Create your first team above.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
               {teams.map(team => (
-                <div key={team.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div key={team.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                   {/* Team Header */}
-                  <div className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50/50 dark:hover:bg-slate-700/30 transition-colors" onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}>
+                  <div className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors" onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}>
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
                         <Shield size={16} className="text-indigo-600 dark:text-indigo-400" />
@@ -577,15 +573,15 @@ export default function WhatsAppAPISettingsPage() {
 
                   {/* Expanded: Agent List */}
                   {expandedTeam === team.id && (
-                    <div className="border-t border-gray-100 dark:border-slate-700 px-6 py-4">
+                    <div className="border-t border-slate-100 dark:border-slate-800 px-6 py-4">
                       <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Select agents for this team</p>
                       <div className="flex flex-col gap-2">
                         {allAgents.map(agent => {
                           const isInThisTeam = agent.teamId === team.id;
                           return (
-                            <div key={agent.id} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border transition-all ${isInThisTeam ? 'border-indigo-200 bg-indigo-50/50 dark:border-indigo-500/30 dark:bg-indigo-500/5' : 'border-gray-100 dark:border-slate-700 hover:border-gray-200'}`}>
+                            <div key={agent.id} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border transition-all ${isInThisTeam ? 'border-indigo-200 bg-indigo-50/50 dark:border-indigo-500/30 dark:bg-indigo-500/5' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}`}>
                               <div className="flex items-center gap-3">
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${isInThisTeam ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-slate-600 text-gray-600 dark:text-gray-300'}`}>
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${isInThisTeam ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-gray-300'}`}>
                                   {(agent.user?.name || 'A').charAt(0).toUpperCase()}
                                 </div>
                                 <div>
@@ -593,12 +589,12 @@ export default function WhatsAppAPISettingsPage() {
                                   <p className="text-xs text-gray-400">{agent.user?.email}</p>
                                 </div>
                                 {agent.teamId && agent.teamId !== team.id && (
-                                  <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">In: {teams.find(t => t.id === agent.teamId)?.name}</span>
+                                  <span className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full">In: {teams.find(t => t.id === agent.teamId)?.name}</span>
                                 )}
                               </div>
                               <button
                                 onClick={() => handleToggleAgentInTeam(agent.id, agent.teamId, team.id)}
-                                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${isInThisTeam ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer ${isInThisTeam ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
                               >
                                 {isInThisTeam ? 'Remove' : 'Add to Team'}
                               </button>
@@ -615,16 +611,16 @@ export default function WhatsAppAPISettingsPage() {
           )}
 
           {/* Agent Chat Availability */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
               <UserCheck size={18} className="text-green-500" /> Agent Chat Availability
             </h2>
-            <p className="text-sm text-gray-500 mb-5">Temporarily mark agents as unavailable for chat assignment without changing their employment status.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Temporarily mark agents as unavailable for chat assignment without changing their employment status.</p>
             <div className="flex flex-col gap-3">
               {allAgents.map(agent => (
-                <div key={agent.id} className="flex items-center justify-between px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:bg-gray-50/50 dark:hover:bg-slate-700/30">
+                <div key={agent.id} className="flex items-center justify-between px-4 py-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                   <div className="flex items-center gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${agent.chatAvailable !== false ? 'bg-green-400' : 'bg-gray-300'}`} />
+                    <div className={`w-2.5 h-2.5 rounded-full ${agent.chatAvailable !== false ? 'bg-green-400' : 'bg-gray-300 dark:bg-slate-600'}`} />
                     <div>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">{agent.user?.name || 'Agent'}</p>
                       <p className="text-xs text-gray-400">{agent.team ? `Team: ${agent.team.name}` : 'No team assigned'}</p>
@@ -632,7 +628,7 @@ export default function WhatsAppAPISettingsPage() {
                   </div>
                   <button
                     onClick={() => handleToggleChatAvailable(agent.id, agent.chatAvailable !== false)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${agent.chatAvailable !== false ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${agent.chatAvailable !== false ? 'bg-green-500' : 'bg-gray-300 dark:bg-slate-600'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${agent.chatAvailable !== false ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -675,9 +671,12 @@ export default function WhatsAppAPISettingsPage() {
           )}
 
           {/* Seat limit progress indicator */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">👥 Agent Seat Usage</h3>
-            <p className="text-sm text-gray-500 mb-4">You can add team agents up to your subscription seat limit.</p>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+              <Users size={18} className="text-indigo-500" />
+              <span>Agent Seat Usage</span>
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">You can add team agents up to your subscription seat limit.</p>
             
             {clientInfo && (
               <div className="space-y-3">
@@ -685,7 +684,7 @@ export default function WhatsAppAPISettingsPage() {
                   <span>Seats Occupied</span>
                   <span>{agents.length} / {clientInfo.maxAgents || 3} Agents</span>
                 </div>
-                <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-3 overflow-hidden">
                   <div 
                     className="bg-indigo-600 h-full rounded-full transition-all duration-500" 
                     style={{ width: `${Math.min(100, (agents.length / (clientInfo.maxAgents || 3)) * 100)}%` }}
@@ -701,12 +700,15 @@ export default function WhatsAppAPISettingsPage() {
           </div>
 
           {/* Add Agent Card */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">📝 Add Team Agent</h2>
-            <p className="text-sm text-gray-500 mb-6">Create login credentials for agents to join the workspace and handle chats.</p>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+              <Plus size={18} className="text-indigo-500" />
+              <span>Add Team Agent</span>
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Create login credentials for agents to join the workspace and handle chats.</p>
 
             {agentResultMsg && (
-              <div className={`mb-4 p-4 rounded-xl text-sm font-semibold flex items-center gap-2 ${agentResultMsg.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              <div className={`mb-4 p-4 rounded-xl text-sm font-semibold flex items-center gap-2 ${agentResultMsg.success ? 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'}`}>
                 <CheckCircle2 size={18} />
                 <span>{agentResultMsg.text}</span>
               </div>
@@ -726,28 +728,28 @@ export default function WhatsAppAPISettingsPage() {
                 } else { setAgentResultMsg({ success: false, text: data.error || 'Failed to add agent.' }); }
               } catch { setAgentResultMsg({ success: false, text: 'Connection error.' }); }
               setSavingAgent(false);
-            }} className="grid grid-cols-2 gap-5">
+            }} className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Agent Name</label>
-                <input type="text" value={newAgentName} onChange={(e) => setNewAgentName(e.target.value)} required placeholder="e.g. John Doe" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-2 uppercase">Agent Name</label>
+                <input type="text" value={newAgentName} onChange={(e) => setNewAgentName(e.target.value)} required placeholder="e.g. John Doe" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
               <div>
-                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Email Address</label>
-                <input type="email" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} required placeholder="e.g. agent@esponsports.com" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-2 uppercase">Email Address</label>
+                <input type="email" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} required placeholder="e.g. agent@esponsports.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
               <div>
-                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Password</label>
-                <input type="password" value={newAgentPassword} onChange={(e) => setNewAgentPassword(e.target.value)} required placeholder="Set password" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-2 uppercase">Password</label>
+                <input type="password" value={newAgentPassword} onChange={(e) => setNewAgentPassword(e.target.value)} required placeholder="Set password" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
               <div>
-                <label className="text-sm font-bold text-gray-700 dark:text-gray-300 block mb-2">Workspace Role</label>
-                <select value={newAgentRole} onChange={(e) => setNewAgentRole(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-2 uppercase">Workspace Role</label>
+                <select value={newAgentRole} onChange={(e) => setNewAgentRole(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
                   <option value="AGENT">Agent (Chats only)</option>
                   <option value="ADMIN">Admin (Settings & API)</option>
                 </select>
               </div>
-              <div className="col-span-2 flex justify-end">
-                <button type="submit" disabled={savingAgent || (clientInfo && agents.length >= clientInfo.maxAgents)} className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-xl text-sm font-bold shadow-md transition-all">
+              <div className="md:col-span-2 flex justify-end">
+                <button type="submit" disabled={savingAgent || (clientInfo && agents.length >= clientInfo.maxAgents)} className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-xl text-sm font-bold shadow-md transition-all cursor-pointer">
                   {savingAgent ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
                   Add Team Agent
                 </button>
@@ -756,14 +758,17 @@ export default function WhatsAppAPISettingsPage() {
           </div>
 
           {/* Agents List Card */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">📒 Active Team Agents</h2>
-            <p className="text-sm text-gray-500 mb-6">List of users who can sign in and manage conversations in this workspace.</p>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+              <Users size={18} className="text-indigo-500" />
+              <span>Active Team Agents</span>
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">List of users who can sign in and manage conversations in this workspace.</p>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-slate-700 text-gray-500 font-semibold">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-gray-500 dark:text-gray-400 font-semibold">
                     <th className="py-3 px-4">Agent Name</th>
                     <th className="py-3 px-4">Email</th>
                     <th className="py-3 px-4">Role</th>
@@ -771,9 +776,9 @@ export default function WhatsAppAPISettingsPage() {
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-slate-700 bg-white dark:bg-slate-900">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
                   {agents.map(a => (
-                    <tr key={a.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50">
+                    <tr key={a.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-3 px-4 font-bold text-gray-900 dark:text-white">{a.name}</td>
                       <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{a.email}</td>
                       <td className="py-3 px-4">
@@ -791,7 +796,7 @@ export default function WhatsAppAPISettingsPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <button onClick={() => { setEditingAgentId(a.id); setEditAgentData({...a, password: ""}); }} className="text-gray-400 hover:text-indigo-600 transition-colors">
+                        <button onClick={() => { setEditingAgentId(a.id); setEditAgentData({...a, password: ""}); }} className="text-gray-400 hover:text-indigo-600 transition-colors cursor-pointer">
                           <Edit3 size={16} />
                         </button>
                       </td>
@@ -799,7 +804,7 @@ export default function WhatsAppAPISettingsPage() {
                   ))}
                   {agents.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-gray-400">No agents found in this workspace.</td>
+                      <td colSpan={5} className="py-8 text-center text-gray-400 dark:text-gray-500">No agents found in this workspace.</td>
                     </tr>
                   )}
                 </tbody>
@@ -812,11 +817,11 @@ export default function WhatsAppAPISettingsPage() {
       {/* 4. Admin Security & Password Change Tab */}
       {activeTab === "security" && (
         <div className="flex flex-col gap-6 w-full max-w-xl">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-              <ShieldCheck size={20} className="text-indigo-600" /> Change Admin Password
+              <ShieldCheck size={20} className="text-indigo-600 dark:text-indigo-400" /> Change Admin Password
             </h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
               Update your administrative account password anytime. Your new password will take effect immediately.
             </p>
 
@@ -840,7 +845,7 @@ export default function WhatsAppAPISettingsPage() {
                   type="email"
                   value={currentUserEmail || "admin@esponsports.com"}
                   disabled
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/60 text-sm text-gray-500 cursor-not-allowed outline-none"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 text-sm text-gray-500 dark:text-gray-400 cursor-not-allowed outline-none"
                 />
               </div>
 
@@ -864,7 +869,7 @@ export default function WhatsAppAPISettingsPage() {
                   value={adminNewPassword}
                   onChange={e => setAdminNewPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 />
               </div>
 
@@ -878,7 +883,7 @@ export default function WhatsAppAPISettingsPage() {
                   value={adminConfirmPassword}
                   onChange={e => setAdminConfirmPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 />
               </div>
 
@@ -886,7 +891,7 @@ export default function WhatsAppAPISettingsPage() {
                 <button
                   type="submit"
                   disabled={savingAdminPass || !adminNewPassword}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-xl text-sm font-bold shadow-md transition-all cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-bold shadow-md transition-all cursor-pointer"
                 >
                   {savingAdminPass ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
                   <span>{savingAdminPass ? "Updating Password..." : "Update Password"}</span>
@@ -897,47 +902,47 @@ export default function WhatsAppAPISettingsPage() {
         </div>
       )}
       {editingAgentId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <h3 className="font-bold text-gray-900 dark:text-white">Edit Team Agent</h3>
-              <button onClick={() => setEditingAgentId(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setEditingAgentId(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">
                 <X size={20} />
               </button>
             </div>
             <div className="p-5 flex flex-col gap-4">
               <div>
-                <label className="text-xs font-bold text-gray-600 block mb-1">Name</label>
-                <input type="text" value={editAgentData.name || ''} onChange={(e) => setEditAgentData({...editAgentData, name: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
+                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">Name</label>
+                <input type="text" value={editAgentData.name || ''} onChange={(e) => setEditAgentData({...editAgentData, name: e.target.value})} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm outline-none" />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-600 block mb-1">Email</label>
-                <input type="email" value={editAgentData.email || ''} onChange={(e) => setEditAgentData({...editAgentData, email: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
+                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">Email</label>
+                <input type="email" value={editAgentData.email || ''} onChange={(e) => setEditAgentData({...editAgentData, email: e.target.value})} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm outline-none" />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-600 block mb-1">New Password (optional)</label>
-                <input type="password" value={editAgentData.password || ''} onChange={(e) => setEditAgentData({...editAgentData, password: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
+                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">New Password (optional)</label>
+                <input type="password" value={editAgentData.password || ''} onChange={(e) => setEditAgentData({...editAgentData, password: e.target.value})} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-gray-600 block mb-1">Role</label>
-                  <select value={editAgentData.role || 'AGENT'} onChange={(e) => setEditAgentData({...editAgentData, role: e.target.value})} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white">
+                  <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">Role</label>
+                  <select value={editAgentData.role || 'AGENT'} onChange={(e) => setEditAgentData({...editAgentData, role: e.target.value})} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm outline-none">
                     <option value="AGENT">AGENT</option>
                     <option value="ADMIN">ADMIN</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-600 block mb-1">Status</label>
-                  <select value={editAgentData.isActive ? "true" : "false"} onChange={(e) => setEditAgentData({...editAgentData, isActive: e.target.value === "true"})} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white">
+                  <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-1">Status</label>
+                  <select value={editAgentData.isActive ? "true" : "false"} onChange={(e) => setEditAgentData({...editAgentData, isActive: e.target.value === "true"})} className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm outline-none">
                     <option value="true">Active</option>
                     <option value="false">Inactive</option>
                   </select>
                 </div>
               </div>
             </div>
-            <div className="p-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => setEditingAgentId(null)} className="px-4 py-2 text-sm font-bold text-gray-600 hover:text-gray-800">Cancel</button>
-              <button onClick={() => handleSaveEditAgent(editingAgentId)} disabled={savingEdit} className="px-5 py-2 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 flex items-center gap-2">
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3">
+              <button onClick={() => setEditingAgentId(null)} className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white cursor-pointer">Cancel</button>
+              <button onClick={() => handleSaveEditAgent(editingAgentId)} disabled={savingEdit} className="px-5 py-2 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 flex items-center gap-2 cursor-pointer">
                 {savingEdit ? <RefreshCw size={16} className="animate-spin" /> : "Save Changes"}
               </button>
             </div>
