@@ -672,31 +672,31 @@ const reloadTeams = async () => {
     : webhookIntegrations.filter(h => h.type === activeCategoryTab);
 
   return (
-    <div className="p-8 w-full max-w-none flex flex-col gap-8">
+    <div className="p-4 sm:p-8 w-full max-w-none flex flex-col gap-6 sm:gap-8">
       {/* Header title */}
       <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-1">Settings & Directory</h1>
-        <p className="text-gray-500 dark:text-gray-400">Configure core external APIs, Gemini LLM cascades, team members auto-routing and CRM contact list.</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-1">Settings & Directory</h1>
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Configure core external APIs, Gemini LLM cascades, team members auto-routing and CRM contact list.</p>
       </div>
 
       {/* Tabs list bar */}
-      <nav className="-mb-px flex space-x-8 overflow-x-auto border-b border-gray-200 dark:border-slate-700">
-        <button onClick={() => handleTabChange("whatsapp")} className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === "whatsapp" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+      <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto border-b border-gray-200 dark:border-slate-700 pb-1 scrollbar-none">
+        <button onClick={() => handleTabChange("whatsapp")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "whatsapp" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
           WhatsApp API
         </button>
-        <button onClick={() => handleTabChange("ai-automation")} className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === "ai-automation" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("ai-automation")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "ai-automation" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
           <Bot size={16} /> AI Automation
         </button>
-        <button onClick={() => handleTabChange("shopify")} className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === "shopify" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("shopify")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "shopify" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
           Shopify
         </button>
-        <button onClick={() => handleTabChange("payment")} className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === "payment" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("payment")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "payment" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
           Payment Gateways
         </button>
-        <button onClick={() => handleTabChange("webhooks")} className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === "webhooks" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("webhooks")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "webhooks" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
           Webhooks
         </button>
-        <button onClick={() => handleTabChange("facebook")} className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === "facebook" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
+        <button onClick={() => handleTabChange("facebook")} className={`px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "facebook" ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
           <Target size={16} /> Meta Ads, CAPI & Catalog
         </button>
       </nav>

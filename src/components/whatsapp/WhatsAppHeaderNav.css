@@ -340,3 +340,47 @@ html.dark .nav-pill.active,
   color: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
+
+/* ----------------------------------------------------------------- */
+/* MOBILE RESPONSIVE STYLES */
+/* ----------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .whatmore-header-top {
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .status-badge {
+    padding: 3px 8px;
+    font-size: 11px;
+    gap: 6px;
+  }
+
+  .status-badge .status-prefix {
+    display: none;
+  }
+
+  .user-info-text {
+    display: none;
+  }
+
+  .user-profile-chip {
+    padding: 2px 4px;
+    gap: 4px;
+  }
+
+  .whatmore-nav-container {
+    padding: 0 12px 6px;
+  }
+
+  .whatmore-nav-track {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .whatmore-nav-track::-webkit-scrollbar {
+    display: none;
+  }
+}
+

@@ -22,11 +22,33 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    // Dynamically import the Node bundle of pdf-parse to avoid browser polyfill errors
-    const pdfModule: any = await import('pdf-parse/node');
-    const pdfParse = pdfModule.default || pdfModule;
-    const data = await pdfParse(buffer);
-    const newText = '\n\n--- Source: PDF Upload (' + file.name + ') ---\n' + data.text.trim();
+    let extractedText = '';
+    const pdfModule: any = await import('pdf-parse');
+    if (typeof pdfModule === 'function') {
+      const data = await pdfModule(buffer);
+      extractedText = data.text || '';
+    } else if (typeof pdfModule.default === 'function') {
+      const data = await pdfModule.default(buffer);
+      extractedText = data.text || '';
+    } else if (pdfModule.PDFParse) {
+      const parser = new pdfModule.PDFParse({ data: buffer });
+      const data = await parser.getText();
+      extractedText = data.text || '';
+      if (typeof parser.destroy === 'function') {
+        await parser.destroy();
+      }
+    } else if (pdfModule.default?.PDFParse) {
+      const parser = new pdfModule.default.PDFParse({ data: buffer });
+      const data = await parser.getText();
+      extractedText = data.text || '';
+      if (typeof parser.destroy === 'function') {
+        await parser.destroy();
+      }
+    } else {
+      throw new Error('PDF parser engine could not be initialized');
+    }
+
+    const newText = '\n\n--- Source: PDF Upload (' + file.name + ') ---\n' + extractedText.trim();
     
     let settings = await prisma.whatsAppSettings.findFirst();
     if (!settings) {
@@ -40,7 +62,7 @@ export async function POST(req: NextRequest) {
       data: { aiKnowledgeBase: updatedKnowledgeBase }
     });
     
-    return NextResponse.json({ success: true, textExtracted: data.text.length, newKnowledgeBase: updatedKnowledgeBase });
+    return NextResponse.json({ success: true, textExtracted: extractedText.length, newKnowledgeBase: updatedKnowledgeBase });
   } catch (err: any) {
     console.error('PDF Upload Error:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

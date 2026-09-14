@@ -16,6 +16,7 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
 
   const [settings, setSettings] = useState({
     aiModel: "gemini-flash-lite-latest",
@@ -211,47 +212,28 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
   const isKeyVerified = hasApiKey && keyTestResult?.success;
 
   return (
-    <div style={{ 
-      maxWidth: embedded ? "100%" : "1100px", 
-      margin: embedded ? "0" : "0 auto", 
-      padding: embedded ? "0" : "28px 36px", 
-      fontFamily: "Inter, sans-serif", 
-      color: "#111827" 
-    }}>
+    <div className={`w-full max-w-[1100px] ${embedded ? "p-0 m-0" : "mx-auto py-6 px-4 sm:px-8"} font-sans text-gray-900 dark:text-gray-100`}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px" }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: "10px" }}>
-            <Bot size={26} color="#6d28d9" />
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2.5 text-gray-900 dark:text-white m-0">
+            <Bot size={26} className="text-purple-600 dark:text-purple-400" />
             AI Assistant Configuration
           </h1>
-          <p style={{ color: "#6b7280", margin: "4px 0 0 0", fontSize: "14px" }}>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 max-w-2xl">
             Configure real Google Gemini intelligence for WhatsApp auto-replies, lead qualification, and customer support.
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
           {saveSuccess && (
-            <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#16a34a", fontWeight: 600, fontSize: "14px", background: "#dcfce7", padding: "6px 12px", borderRadius: "8px" }}>
+            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-xs sm:text-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg">
               <CheckCircle2 size={16} /> Settings Saved & Verified!
             </span>
           )}
           <button
             onClick={saveSettings}
             disabled={saving}
-            style={{
-              background: saving ? "#9ca3af" : "#111827",
-              color: "white",
-              border: "none",
-              padding: "10px 22px",
-              borderRadius: "8px",
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              cursor: saving ? "not-allowed" : "pointer",
-              fontSize: "14px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-            }}
+            className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
             {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
             {saving ? "Validating & Saving..." : "Save Settings"}
@@ -259,36 +241,43 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "28px" }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
         {/* Main Editor Section */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div className="flex flex-col gap-6">
 
           {/* Card: Knowledge Base */}
-          <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-            <h2 style={{ fontSize: "16px", fontWeight: 600, margin: "0 0 4px 0", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Database size={18} color="#3b82f6" /> Business Knowledge Base
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white m-0 mb-1 flex items-center gap-2">
+              <Database size={18} className="text-blue-500" /> Business Knowledge Base
             </h2>
-            <p style={{ color: "#6b7280", fontSize: "13px", marginBottom: "16px" }}>
+            <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm mb-4">
               Provide facts, wholesale pricing, policies, and FAQs. The Gemini model uses this data to answer customer queries with 100% accuracy.
             </p>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-              <span style={{ fontSize: "13px", color: "#374151", fontWeight: 600 }}>Knowledge Base Content</span>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <label style={{ cursor: "pointer", background: "#f3f4f6", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#4b5563", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: "5px" }}>
-                  Upload PDF
-                  <input type="file" accept="application/pdf" style={{ display: "none" }} onChange={async (e) => {
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+              <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-semibold">Knowledge Base Content</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-slate-600 flex items-center gap-1.5 transition-colors">
+                  {uploadingPdf ? <RefreshCw size={13} className="animate-spin text-indigo-500" /> : null}
+                  {uploadingPdf ? "Processing PDF..." : "Upload PDF"}
+                  <input type="file" accept="application/pdf" disabled={uploadingPdf} className="hidden" onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
+                    setUploadingPdf(true);
                     const formData = new FormData();
                     formData.append("file", file);
                     try {
                       const res = await fetch("/api/whatsapp/upload-pdf", { method: "POST", body: formData });
                       const data = await res.json();
                       if (data.success) {
-                        setSettings({ ...settings, aiKnowledgeBase: data.newKnowledgeBase });
+                        setSettings(prev => ({ ...prev, aiKnowledgeBase: data.newKnowledgeBase }));
                         alert("PDF processed and added to Knowledge Base!");
-                      } else { alert("Error: " + data.error); }
-                    } catch { alert("Upload failed"); }
+                      } else { alert("Error: " + (data.error || "Failed to process PDF")); }
+                    } catch (err: any) {
+                      alert("Upload failed: " + (err.message || "Network error"));
+                    } finally {
+                      setUploadingPdf(false);
+                      e.target.value = "";
+                    }
                   }} />
                 </label>
                 <button onClick={async () => {
@@ -298,11 +287,11 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
                     const res = await fetch("/api/whatsapp/scrape-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
                     const data = await res.json();
                     if (data.success) {
-                      setSettings({ ...settings, aiKnowledgeBase: data.newKnowledgeBase });
+                      setSettings(prev => ({ ...prev, aiKnowledgeBase: data.newKnowledgeBase }));
                       alert("Website scraped and added to Knowledge Base!");
-                    } else { alert("Error: " + data.error); }
+                    } else { alert("Error: " + (data.error || "Failed to scrape")); }
                   } catch { alert("Scrape failed"); }
-                }} style={{ cursor: "pointer", background: "#f3f4f6", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#4b5563", border: "1px solid #e5e7eb" }}>
+                }} className="cursor-pointer bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-slate-600 transition-colors">
                   Scrape URL
                 </button>
               </div>
@@ -311,35 +300,35 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
               value={settings.aiKnowledgeBase}
               onChange={(e) => setSettings({...settings, aiKnowledgeBase: e.target.value})}
               placeholder="e.g. Return policy: 7 days for defective wholesale lots. Minimum Order Quantity (MOQ) is 50 pcs. Free delivery across India on orders over ₹10,000..."
-              style={{ width: "100%", minHeight: "260px", padding: "12px", border: "1px solid #d1d5db", borderRadius: "8px", fontFamily: "monospace", fontSize: "13px", resize: "vertical", boxSizing: "border-box" }}
+              className="w-full min-h-[240px] p-3 border border-gray-300 dark:border-slate-600 rounded-xl font-mono text-xs sm:text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none resize-y transition-all"
             />
           </div>
 
           {/* Card: System Prompt */}
-          <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-            <h2 style={{ fontSize: "16px", fontWeight: 600, margin: "0 0 4px 0", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Settings2 size={18} color="#10b981" /> AI Persona & System Rules
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <h2 className="text-base font-bold text-gray-900 dark:text-white m-0 mb-1 flex items-center gap-2">
+              <Settings2 size={18} className="text-emerald-500" /> AI Persona & System Rules
             </h2>
-            <p style={{ color: "#6b7280", fontSize: "13px", marginBottom: "16px" }}>
+            <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm mb-4">
               Define personality, tone, language guidelines, and strict boundaries the AI must enforce on WhatsApp.
             </p>
             <textarea
               value={settings.aiSystemPrompt}
               onChange={(e) => setSettings({...settings, aiSystemPrompt: e.target.value})}
               placeholder="e.g. You are Alex, a friendly sales manager for Espon Sports. Keep replies short (1-2 sentences). Always prioritize wholesale orders. If customer asks for B2C/single piece, politely explain we are wholesale only."
-              style={{ width: "100%", minHeight: "130px", padding: "12px", border: "1px solid #d1d5db", borderRadius: "8px", fontFamily: "monospace", fontSize: "13px", resize: "vertical", boxSizing: "border-box" }}
+              className="w-full min-h-[130px] p-3 border border-gray-300 dark:border-slate-600 rounded-xl font-mono text-xs sm:text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none resize-y transition-all"
             />
           </div>
 
         </div>
 
         {/* Sidebar Configuration Section */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div className="flex flex-col gap-6">
 
           {/* Card: Model Settings & Real-time Key Testing */}
-          <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "22px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-            <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Cpu size={18} color="#8b5cf6" /> Model Configuration
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 sm:p-6 shadow-sm">
+            <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white m-0 mb-4 flex items-center gap-2">
+              <Cpu size={18} className="text-purple-600 dark:text-purple-400" /> Model Configuration
             </h2>
 
             {/* Gemini API Key with Real-Time "Test Key" Button */}
@@ -504,84 +493,69 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
           </div>
 
           {/* Card: Live Simulator (Connected to Real Gemini API) */}
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-              <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-                <Sparkles size={18} color="#f59e0b" /> Real AI Simulator
+          <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-2 mb-2.5">
+              <h2 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white m-0 flex items-center gap-2">
+                <Sparkles size={18} className="text-amber-500" /> Real AI Simulator
               </h2>
-              <span style={{ fontSize: "11px", background: "#e0e7ff", color: "#4338ca", padding: "2px 8px", borderRadius: "10px", fontWeight: 600 }}>
+              <span className="text-[11px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-semibold border border-indigo-200 dark:border-indigo-800">
                 Live Test
               </span>
             </div>
-            <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 10px 0" }}>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
               Test how Google Gemini will respond using your real API key, persona, and knowledge base.
             </p>
             <textarea
               value={testMessage}
               onChange={(e) => setTestMessage(e.target.value)}
               placeholder="e.g. What is your wholesale price for jerseys?"
-              style={{ width: "100%", minHeight: "80px", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", marginBottom: "8px", boxSizing: "border-box" }}
+              className="w-full min-h-[80px] p-2.5 border border-gray-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 outline-none resize-y mb-2 transition-all"
             />
             <button
               onClick={testAiPrompt}
               disabled={testing || !testMessage.trim()}
-              style={{
-                width: "100%",
-                padding: "9px",
-                background: testing ? "#f1f5f9" : "white",
-                color: testing ? "#94a3b8" : "#1e293b",
-                border: "1px solid #cbd5e1",
-                borderRadius: "6px",
-                fontSize: "13px",
-                fontWeight: 700,
-                cursor: (testing || !testMessage.trim()) ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "6px"
-              }}
+              className="w-full py-2.5 px-4 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-800 dark:text-gray-200 border border-gray-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             >
-              {testing ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} color="#6d28d9" />}
+              {testing ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} className="text-purple-600 dark:text-purple-400" />}
               {testing ? "Calling Gemini API..." : "Test AI Response"}
             </button>
 
             {testResponse && (
-              <div style={{ marginTop: "12px", padding: "12px", background: "#f1f5f9", borderRadius: "8px", fontSize: "12.5px", color: "#1e293b", borderLeft: "3px solid #6d28d9" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <strong style={{ color: "#6d28d9" }}>Gemini AI Response:</strong>
-                  <span style={{ fontSize: "10.5px", background: "#e2e8f0", padding: "2px 6px", borderRadius: "4px", color: "#475569" }}>
+              <div className="mt-3 p-3 bg-gray-100 dark:bg-slate-800 rounded-xl text-xs sm:text-sm text-gray-800 dark:text-gray-200 border-l-4 border-purple-600">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <strong className="text-purple-600 dark:text-purple-400 font-bold">Gemini AI Response:</strong>
+                  <span className="text-[10px] bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 font-mono">
                     {testedModelUsed}
                   </span>
                 </div>
-                <div style={{ lineHeight: "1.45" }}>{testResponse}</div>
+                <div className="leading-relaxed whitespace-pre-wrap">{testResponse}</div>
               </div>
             )}
 
             {testError && (
-              <div style={{ marginTop: "12px", padding: "12px", background: "#fef2f2", borderRadius: "8px", fontSize: "12px", color: "#991b1b", borderLeft: "3px solid #ef4444" }}>
-                <strong style={{ display: "block", marginBottom: "3px" }}>Simulation Error:</strong>
+              <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/40 rounded-xl text-xs text-red-700 dark:text-red-300 border-l-4 border-red-500">
+                <strong className="block mb-1 font-bold">Simulation Error:</strong>
                 {testError}
               </div>
             )}
           </div>
 
           {/* Dynamic Status Card */}
-          <div style={{
-            background: isKeyVerified ? "#f0fdf4" : (hasApiKey ? "#fffbeb" : "#fef2f2"),
-            border: "1px solid " + (isKeyVerified ? "#bbf7d0" : (hasApiKey ? "#fde68a" : "#fecaca")),
-            borderRadius: "12px",
-            padding: "16px",
-            display: "flex",
-            gap: "12px"
-          }}>
+          <div className={`p-4 rounded-2xl border flex items-start gap-3 text-xs sm:text-sm shadow-sm ${
+            isKeyVerified
+              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
+              : hasApiKey
+                ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300"
+                : "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300"
+          }`}>
             {isKeyVerified ? (
-              <CheckCircle2 size={20} color="#16a34a" style={{ flexShrink: 0, marginTop: "2px" }} />
+              <CheckCircle2 size={20} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
             ) : hasApiKey ? (
-              <AlertCircle size={20} color="#d97706" style={{ flexShrink: 0, marginTop: "2px" }} />
+              <AlertCircle size={20} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: "2px" }} />
+              <AlertCircle size={20} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
             )}
-            <div style={{ fontSize: "12.5px", color: isKeyVerified ? "#166534" : (hasApiKey ? "#92400e" : "#991b1b") }}>
+            <div>
               {isKeyVerified ? (
                 <>
                   <strong>Gemini API Key Verified!</strong> Auto-replies are active using <strong>{settings.aiModel}</strong>.

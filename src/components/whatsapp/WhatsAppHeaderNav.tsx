@@ -229,7 +229,7 @@ export default function WhatsAppHeaderNav() {
             <span className="pulse-dot"></span>
             {accountInfo.isConnected && <span className="beacon-ping"></span>}
           </span>
-          <span className="status-text">WhatsApp API: {accountInfo.status}</span>
+          <span className="status-text"><span className="status-prefix">WhatsApp API: </span>{accountInfo.status}</span>
         </Link>
 
         <div className="whatmore-header-actions">
