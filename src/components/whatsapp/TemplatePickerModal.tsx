@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { X, Search, CheckCircle2, Clock, AlertCircle, Send, ChevronRight, Sparkles, Check, Tag, User, Phone, MapPin, Building } from "lucide-react";
+import { X, Search, CheckCircle2, Clock, AlertCircle, Send, ChevronRight, Sparkles, Check, Tag, User, Phone, MapPin, Building, FileCode, Zap, ExternalLink, ShoppingBag } from "lucide-react";
 
 interface Template {
   id?: string; name: string; category: string; status: string;
@@ -60,7 +60,7 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
   const businessName = activeConvDetail?.customer?.businessName || "";
   const phone = activeConvDetail?.customer?.whatsappNumber || activeConvDetail?.customer?.mobile || "";
   const agentName = activeConvDetail?.assignedEmployee?.user?.name || "Sales Rep";
-  const brandName = "What-In";
+  const brandName = "Whatmore";
   const city = (activeConvDetail?.customer as any)?.city || "";
   const state = (activeConvDetail?.customer as any)?.state || "";
 
@@ -74,15 +74,15 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
     });
   })();
 
-  const suggestions: { label: string; value: string; icon: string; category: string }[] = [
-    ...(customerName ? [{ label: "Customer Name", value: customerName, icon: "👤", category: "Customer" }] : []),
-    ...(businessName && businessName !== customerName ? [{ label: "Business Name", value: businessName, icon: "🏢", category: "Customer" }] : []),
-    ...(agentName ? [{ label: "Agent Name", value: agentName, icon: "👨‍💼", category: "Agent" }] : []),
-    { label: "Brand Name", value: brandName, icon: "🏬", category: "Company" },
-    ...(phone ? [{ label: "Customer Phone", value: phone, icon: "📱", category: "Contact" }] : []),
-    ...(city ? [{ label: "City", value: city, icon: "📍", category: "Location" }] : []),
-    ...(state ? [{ label: "State", value: state, icon: "🗺️", category: "Location" }] : []),
-    ...tagsList.map(tag => ({ label: `Tag: ${tag}`, value: tag, icon: "🏷️", category: "Tag" })),
+  const suggestions: { label: string; value: string; icon: React.ReactNode; category: string }[] = [
+    ...(customerName ? [{ label: "Customer Name", value: customerName, icon: <User size={12} />, category: "Customer" }] : []),
+    ...(businessName && businessName !== customerName ? [{ label: "Business Name", value: businessName, icon: <Building size={12} />, category: "Customer" }] : []),
+    ...(agentName ? [{ label: "Agent Name", value: agentName, icon: <User size={12} />, category: "Agent" }] : []),
+    { label: "Brand Name", value: brandName, icon: <Building size={12} />, category: "Company" },
+    ...(phone ? [{ label: "Customer Phone", value: phone, icon: <Phone size={12} />, category: "Contact" }] : []),
+    ...(city ? [{ label: "City", value: city, icon: <MapPin size={12} />, category: "Location" }] : []),
+    ...(state ? [{ label: "State", value: state, icon: <MapPin size={12} />, category: "Location" }] : []),
+    ...tagsList.map(tag => ({ label: `Tag: ${tag}`, value: tag, icon: <Tag size={12} />, category: "Tag" })),
   ];
 
   // Auto-fill variables helper
@@ -200,7 +200,8 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
         <div style={{ padding: "18px 24px 14px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc" }}>
           <div>
             <h3 style={{ fontWeight: 800, fontSize: "16px", color: "#0f172a", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
-              <span>📄 Send Template Message</span>
+              <FileCode size={16} color="#4f46e5" />
+              <span>Send Template Message</span>
               {customerName && (
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "#4f46e5", background: "#eef2ff", padding: "2px 8px", borderRadius: "12px" }}>
                   To: {customerName}
@@ -379,16 +380,18 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
                   {/* Dynamic Button Parameters */}
                   {dynamicButtons.length > 0 && (
                     <div style={{ marginBottom: "16px" }}>
-                      <div style={{ fontSize: "11px", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
-                        ⚡ Dynamic Button Parameters ({dynamicButtons.length})
+                      <div style={{ fontSize: "11px", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Zap size={13} color="#6366f1" />
+                        <span>Dynamic Button Parameters ({dynamicButtons.length})</span>
                       </div>
                       {dynamicButtons.map(btn => {
                         const key = `btn_${btn.originalIndex}`;
                         return (
                           <div key={key} style={{ marginBottom: "12px", background: "white", padding: "10px 12px", borderRadius: "10px", border: "1px solid #c7d2fe", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                              <label style={{ fontSize: "12px", fontWeight: 700, color: "#3730a3" }}>
-                                🔗 {btn.text || "Dynamic Button"} (Suffix / Value)
+                              <label style={{ fontSize: "12px", fontWeight: 700, color: "#3730a3", display: "flex", alignItems: "center", gap: "5px" }}>
+                                <ExternalLink size={12} color="#6366f1" />
+                                <span>{btn.text || "Dynamic Button"} (Suffix / Value)</span>
                               </label>
                               <span style={{ fontSize: "10px", color: "#6366f1", fontWeight: 600 }}>{btn.url || btn.code}</span>
                             </div>
@@ -413,17 +416,19 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
                                 <button
                                   type="button"
                                   onClick={() => setButtonVariables(prev => ({ ...prev, [key]: phone.slice(-10) }))}
-                                  style={{ padding: "2px 8px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "11px", cursor: "pointer" }}
+                                  style={{ padding: "3px 8px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "11px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
                                 >
-                                  📱 Phone: {phone.slice(-10)}
+                                  <Phone size={11} color="#64748b" />
+                                  <span>Phone: {phone.slice(-10)}</span>
                                 </button>
                               )}
                               <button
                                 type="button"
                                 onClick={() => setButtonVariables(prev => ({ ...prev, [key]: `ESP-${Date.now().toString().slice(-5)}` }))}
-                                style={{ padding: "2px 8px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "11px", cursor: "pointer" }}
+                                style={{ padding: "3px 8px", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "12px", fontSize: "11px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
                               >
-                                📦 Random Order ID
+                                <ShoppingBag size={11} color="#64748b" />
+                                <span>Random Order ID</span>
                               </button>
                             </div>
                           </div>

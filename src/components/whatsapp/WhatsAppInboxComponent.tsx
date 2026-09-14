@@ -61,7 +61,10 @@ import {
   CheckCircle2,
   Pause,
   Settings,
-  CheckCircle
+  CheckCircle,
+  Copy,
+  Lock,
+  ArrowLeft
 } from "lucide-react";
 import {
   getWhatsAppConversations,
@@ -315,12 +318,12 @@ export default function WhatsAppInboxComponent() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setToastMsg(`⚡ Fired Meta Lead Conversion (₹10,000)! Trace ID: ${data.fbtrace_id}`);
+        setToastMsg(`Meta Lead Conversion fired successfully (₹10,000)! Trace ID: ${data.fbtrace_id}`);
       } else {
-        setToastMsg(`⚠️ Meta CAPI: ${data.error || "Failed to send conversion"}`);
+        setToastMsg(`Meta CAPI: ${data.error || "Failed to send conversion"}`);
       }
     } catch (err: any) {
-      setToastMsg("⚠️ Error firing Meta Lead conversion: " + err.message);
+      setToastMsg("Error firing Meta Lead conversion: " + err.message);
     } finally {
       setFiringMetaLead(false);
       setTimeout(() => setToastMsg(null), 4000);
@@ -460,15 +463,15 @@ export default function WhatsAppInboxComponent() {
     });
 
     if (d.toDateString() === now.toDateString()) {
-      return `📅 Today • ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+      return `Today • ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
     }
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     if (d.toDateString() === yesterday.toDateString()) {
-      return `📅 Yesterday • ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+      return `Yesterday • ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
     }
 
-    return `📅 ${formattedDate}`;
+    return formattedDate;
   };
 
   const formatMessageBubbleTime = (dateInput: string | Date | null | undefined) => {
@@ -919,15 +922,15 @@ export default function WhatsAppInboxComponent() {
     try {
       const res = await retryFailedWhatsAppMessageAction(msg.id);
       if (res.success) {
-        setToastMsg("✓ Message delivered successfully via WhatsApp!");
+        setToastMsg("Message delivered successfully via WhatsApp!");
         await fetchConversationDetail(selectedConvId, true);
         await fetchConversationsList(true);
       } else {
-        setToastMsg(`❌ Retry failed: ${res.error || "Delivery failed"}`);
+        setToastMsg(`Retry failed: ${res.error || "Delivery failed"}`);
         await fetchConversationDetail(selectedConvId, true);
       }
     } catch (err: any) {
-      setToastMsg(`❌ Error retrying message: ${err.message}`);
+      setToastMsg(`Error retrying message: ${err.message}`);
     } finally {
       setRetryingMsgId(null);
       setTimeout(() => setToastMsg(null), 4000);
@@ -992,13 +995,13 @@ export default function WhatsAppInboxComponent() {
               });
               
               if (res.success) {
-                setToastMsg('✓ Voice note sent to customer!');
+                setToastMsg('Voice note sent to customer!');
                 setTimeout(() => setToastMsg(null), 3000);
                 await fetchConversationDetail(selectedConvId!, true);
                 await fetchConversationsList(true);
               }
             } else {
-              setToastMsg(`❌ Failed to upload voice note: ${uploadRes.error}`);
+              setToastMsg(`Failed to upload voice note: ${uploadRes.error}`);
               setTimeout(() => setToastMsg(null), 4000);
             }
           } catch (err: any) {
@@ -1047,7 +1050,7 @@ export default function WhatsAppInboxComponent() {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       clearInterval(recordingTimerRef.current);
-      setToastMsg('🗑 Voice note discarded');
+      setToastMsg('Voice note discarded');
       setTimeout(() => setToastMsg(null), 2000);
     }
   };
@@ -1083,7 +1086,7 @@ export default function WhatsAppInboxComponent() {
             if (!apiRes.ok) throw new Error('Upload API error ' + apiRes.status);
             const uploadRes = await apiRes.json();
             if (!uploadRes.success || !uploadRes.mediaId) {
-              setToastMsg(`❌ Upload Failed: ${uploadRes.error}`);
+              setToastMsg(`Upload failed: ${uploadRes.error}`);
               setTimeout(() => setToastMsg(null), 4000);
               resolve();
               return;
@@ -1100,11 +1103,11 @@ export default function WhatsAppInboxComponent() {
             });
 
             if (res.success) {
-              setToastMsg(`✓ Direct attachment "${file.name}" sent to customer!`);
+              setToastMsg(`Direct attachment "${file.name}" sent to customer!`);
               setTimeout(() => setToastMsg(null), 3000);
             }
           } catch (err: any) {
-            setToastMsg(`❌ Failed to send ${file.name}: ${err.message}`);
+            setToastMsg(`Failed to send ${file.name}: ${err.message}`);
             setTimeout(() => setToastMsg(null), 4000);
           }
           resolve();
@@ -1136,7 +1139,7 @@ export default function WhatsAppInboxComponent() {
       });
       const data = await res.json();
       if (data.success) {
-        setToastMsg("✓ Conversation deleted successfully");
+        setToastMsg("Conversation deleted successfully");
         setTimeout(() => setToastMsg(null), 3000);
         setSelectedConvId(null);
         setActiveConvDetail(null);
@@ -1178,7 +1181,7 @@ export default function WhatsAppInboxComponent() {
       contactPerson: tempCustomerName.trim()
     });
     if (res.success) {
-      setToastMsg("✓ Customer name updated!");
+      setToastMsg("Customer name updated!");
       setIsEditingName(false);
       await fetchConversationDetail(selectedConvId, false);
       await fetchConversationsList(false);
@@ -1220,7 +1223,7 @@ export default function WhatsAppInboxComponent() {
     }
 
     if (res.success) {
-      setToastMsg(editingReply ? "✓ Canned reply updated!" : "✓ Canned reply created!");
+      setToastMsg(editingReply ? "Canned reply updated!" : "Canned reply created!");
       setNewReplyTitle("");
       setNewReplyShortcut("");
       setNewReplyContent("");
@@ -1237,7 +1240,7 @@ export default function WhatsAppInboxComponent() {
     if (!confirm("Are you sure you want to delete this canned response?")) return;
     const res = await deleteWhatsAppCannedResponseAction(id);
     if (res.success) {
-      setToastMsg("✓ Canned reply deleted.");
+      setToastMsg("Canned reply deleted.");
       await fetchCannedResponses();
       setTimeout(() => setToastMsg(null), 3000);
     } else {
@@ -1722,7 +1725,13 @@ export default function WhatsAppInboxComponent() {
 
                       <div className="conv-snippet-line">
                         <span className="conv-last-msg">
-                          {conv.lastMessageText === "[Message]" ? "🛍️ Catalog Order" : (conv.lastMessageText || "No messages yet")}
+                          {conv.lastMessageText === "[Message]" ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                              <ShoppingBag size={11} /> Catalog Order
+                            </span>
+                          ) : (
+                            conv.lastMessageText || "No messages yet"
+                          )}
                         </span>
                         {isUnread && <span className="unread-counter-badge">{conv.unreadCount}</span>}
                       </div>
@@ -1738,7 +1747,7 @@ export default function WhatsAppInboxComponent() {
                           if (assignedName && tagClean.toLowerCase() === assignedName.toLowerCase()) return null;
                           return (
                             <span key={tagClean} className="conv-custom-tag">
-                              🏷️ {tagClean}
+                              <Tag size={9} /> {tagClean}
                             </span>
                           );
                         })}
@@ -1757,13 +1766,13 @@ export default function WhatsAppInboxComponent() {
 
                         {conv.status === 'CLOSED' && (
                           <span className="conv-closed-badge">
-                            ✓ Closed
+                            <Check size={9} /> Closed
                           </span>
                         )}
 
                         {isExpired && (
                           <span className="conv-expired-badge">
-                            🔒 Expired
+                            <Clock size={9} /> Expired
                           </span>
                         )}
                       </div>
@@ -1916,7 +1925,8 @@ export default function WhatsAppInboxComponent() {
                         }}
                         title={sessionStatus.reason}
                       >
-                        ⏱️ {sessionStatus.expired ? "24h Window: Expired" : `24h Window: ${sessionStatus.hoursLeft?.toFixed(1)}h left`}
+                        <Clock size={11} />
+                        <span>{sessionStatus.expired ? "24h Window: Expired" : `24h Window: ${sessionStatus.hoursLeft?.toFixed(1)}h left`}</span>
                       </span>
                     )}
                   </div>
@@ -1934,7 +1944,7 @@ export default function WhatsAppInboxComponent() {
                       }}
                     >
                       {formatWhatsAppPhone(activeConvDetail.customer?.whatsappNumber || activeConvDetail.customer?.mobile)}
-                      <span style={{ fontSize: "10.5px", color: "#6366f1" }}>📋</span>
+                      <Copy size={11} color="#6366f1" />
                     </span>
                   </div>
                 </div>
@@ -1956,7 +1966,7 @@ export default function WhatsAppInboxComponent() {
                     const res = await toggleConversationAIAction(activeConvDetail.id, newVal);
                     if (res.success) {
                       setActiveConvDetail((prev: any) => ({ ...prev, aiHandled: newVal }));
-                      setToastMsg(newVal ? "🤖 AI Assistant turned ON for this chat" : "👤 Manual Mode — AI paused for this chat");
+                      setToastMsg(newVal ? "AI Assistant enabled for this chat" : "Manual Mode — AI auto-replies paused");
                       setTimeout(() => setToastMsg(null), 3000);
                     }
                     setAiToggleLoading(false);
@@ -1982,7 +1992,7 @@ export default function WhatsAppInboxComponent() {
                     const res = await toggleConversationStatusAction(activeConvDetail.id, newStatus);
                     if (res.success) {
                       setActiveConvDetail((prev: any) => ({ ...prev, status: newStatus }));
-                      setToastMsg(newStatus === 'CLOSED' ? "✅ Chat Closed — Active workload reduced" : "🔓 Chat Reopened");
+                      setToastMsg(newStatus === 'CLOSED' ? "Chat marked as Closed" : "Chat reopened");
                       setTimeout(() => setToastMsg(null), 3000);
                       fetchConversationsList(true);
                     }
@@ -2149,39 +2159,26 @@ export default function WhatsAppInboxComponent() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    margin: "18px 0 12px 0",
-                    position: "sticky",
-                    top: "4px",
-                    zIndex: 6
+                    margin: "16px 0 10px 0"
                   }}>
-                    <div style={{
-                      display: "flex",
+                    <span style={{
+                      background: "rgba(248, 250, 252, 0.95)",
+                      backdropFilter: "blur(6px)",
+                      color: "#475569",
+                      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "14px",
+                      padding: "3px 12px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      userSelect: "none",
+                      display: "inline-flex",
                       alignItems: "center",
-                      gap: "10px",
-                      width: "100%",
-                      maxWidth: "480px"
+                      gap: "6px"
                     }}>
-                      <div style={{ flex: 1, height: "1px", background: "linear-gradient(to right, transparent, #cbd5e1)" }} />
-                      <span style={{
-                        background: "rgba(255, 255, 255, 0.96)",
-                        backdropFilter: "blur(8px)",
-                        color: "#334155",
-                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04)",
-                        border: "1px solid #cbd5e1",
-                        borderRadius: "12px",
-                        padding: "4px 14px",
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        letterSpacing: "0.2px",
-                        userSelect: "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px"
-                      }}>
-                        {formatChatDividerDate(msg.sentAt)}
-                      </span>
-                      <div style={{ flex: 1, height: "1px", background: "linear-gradient(to left, transparent, #cbd5e1)" }} />
-                    </div>
+                      <Calendar size={12} color="#64748b" />
+                      <span>{formatChatDividerDate(msg.sentAt)}</span>
+                    </span>
                   </div>
                 ) : null;
 
@@ -2229,7 +2226,7 @@ export default function WhatsAppInboxComponent() {
                                 fontSize: "12px",
                                 fontWeight: "bold"
                               }}>
-                                🎯
+                                <Sparkles size={14} />
                               </div>
                               <div>
                                 <span style={{ fontSize: "11px", fontWeight: 800, color: "#1d4ed8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
@@ -2372,8 +2369,9 @@ export default function WhatsAppInboxComponent() {
                                 </button>
                               </div>
                             ) : (
-                              <div style={{ padding: "12px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center" }}>
-                                📷 Image expired (Stored only for 30 days)
+                              <div style={{ padding: "12px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                                <ImageIcon size={14} />
+                                <span>Image expired (Stored only for 30 days)</span>
                               </div>
                             )}
                             {msg.content && msg.content !== "[IMAGE]" && !msg.content.startsWith("Attached file:") && <p className="message-text-content" style={{ marginTop: "4px" }}>{msg.content}</p>}
@@ -2407,8 +2405,9 @@ export default function WhatsAppInboxComponent() {
                             {msg.mediaUrl ? (
                               <audio src={msg.mediaUrl} controls style={{ width: "100%", height: "36px" }} />
                             ) : (
-                              <div style={{ padding: "8px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center" }}>
-                                🎙 Voice note expired (Stored only for 30 days)
+                              <div style={{ padding: "8px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", fontSize: "11.5px", color: "#64748b", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                                <Mic size={14} />
+                                <span>Voice note expired (Stored only for 30 days)</span>
                               </div>
                             )}
                           </div>
@@ -2533,7 +2532,9 @@ export default function WhatsAppInboxComponent() {
                                       boxShadow: "0 2px 4px rgba(79, 70, 229, 0.25)"
                                     }}
                                   >
-                                    💳 Pay Now ↗
+                                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                                      <CreditCard size={13} /> Pay Now <ExternalLink size={12} />
+                                    </span>
                                   </a>
                                 </div>
                               )}
@@ -2594,7 +2595,10 @@ export default function WhatsAppInboxComponent() {
                                         userSelect: "none"
                                       }}
                                     >
-                                      🔘 {optText}
+                                      <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#6366f1" }} />
+                                        {optText}
+                                      </span>
                                     </div>
                                   ))}
                                 </div>
@@ -2606,21 +2610,21 @@ export default function WhatsAppInboxComponent() {
                         {/* Meta Template Badge */}
                         {msg.messageType === "TEMPLATE" && (
                           <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#0284c7", background: "#e0f2fe", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
-                            📋 Meta Approved Template
+                            <ShieldCheck size={11} /> Meta Approved Template
                           </div>
                         )}
 
                         {/* Interactive Flow Badge */}
                         {msg.messageType === "FLOW" && (
                           <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#7c3aed", background: "#f3e8ff", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
-                            ⚡ Interactive Flow Form
+                            <Zap size={11} /> Interactive Flow Form
                           </div>
                         )}
 
                         {/* Product Card Badge */}
                         {msg.messageType === "PRODUCT_CARD" && (
                           <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700, color: "#ea580c", background: "#ffedd5", padding: "2px 7px", borderRadius: "4px", marginBottom: "6px" }}>
-                            🛍️ Product Card
+                            <ShoppingBag size={11} /> Product Card
                           </div>
                         )}
 
@@ -2807,7 +2811,7 @@ export default function WhatsAppInboxComponent() {
                                   ))
                                 ) : (
                                   <div style={{ fontSize: '12.5px', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                                    {msg.content === '[Message]' ? '🛍️ Customer sent items from the WhatsApp Catalog.' : msg.content}
+                                    {msg.content === '[Message]' ? 'Customer sent items from the WhatsApp Catalog.' : msg.content}
                                   </div>
                                 )}
 
@@ -2824,7 +2828,7 @@ export default function WhatsAppInboxComponent() {
                                     gap: '6px',
                                     alignItems: 'flex-start'
                                   }}>
-                                    <span>💬</span>
+                                    <MessageSquare size={13} color="#b45309" style={{ flexShrink: 0, marginTop: "2px" }} />
                                     <div style={{ flex: 1 }}>
                                       <strong>Customer Note:</strong> {customerNote}
                                     </div>
@@ -2835,17 +2839,15 @@ export default function WhatsAppInboxComponent() {
                               {/* Footer Total */}
                               {totalAmount > 0 && (
                                 <div style={{
-                                  background: '#f8fafc',
-                                  borderTop: '1px solid #e2e8f0',
-                                  padding: '10px 14px',
+                                  borderTop: '1px dashed #cbd5e1',
+                                  paddingTop: '8px',
+                                  marginTop: '4px',
                                   display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between'
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
                                 }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>
-                                    Estimated Total
-                                  </span>
-                                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#059669' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Estimated Order Total:</span>
+                                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
                                     {currencySymbol}{Number(totalAmount).toLocaleString('en-IN')}
                                   </span>
                                 </div>
@@ -2853,17 +2855,15 @@ export default function WhatsAppInboxComponent() {
 
                               {/* Action Buttons */}
                               <div style={{
-                                background: '#f8fafc',
-                                borderTop: '1px solid #e2e8f0',
-                                padding: '8px 12px',
                                 display: 'flex',
-                                gap: '6px',
+                                gap: '8px',
+                                marginTop: '10px',
                                 flexWrap: 'wrap'
                               }}>
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setMessageInput(`Hello ${activeConvDetail?.customer?.contactPerson || ''}! We received your catalog order of ${totalQuantity} item(s) ${totalAmount > 0 ? `(Total: ${currencySymbol}${Number(totalAmount).toLocaleString('en-IN')})` : ''}. We are preparing your quotation / order confirmation now! 👍`);
+                                    setMessageInput(`Hello ${activeConvDetail?.customer?.contactPerson || ''}! We received your catalog order of ${totalQuantity} item(s) ${totalAmount > 0 ? `(Total: ${currencySymbol}${Number(totalAmount).toLocaleString('en-IN')})` : ''}. We are preparing your quotation / order confirmation now!`);
                                   }}
                                   style={{
                                     flex: 1,
@@ -2914,13 +2914,13 @@ export default function WhatsAppInboxComponent() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const summary = `🛍️ WhatsApp Catalog Order:\n` +
+                                    const summary = `WhatsApp Catalog Order:\n` +
                                       (items.length > 0
                                         ? items.map((i: any) => `• ${i.quantity}x ${i.name} - ${currencySymbol}${i.subtotal}`).join('\n')
                                         : msg.content) +
                                       (totalAmount > 0 ? `\nTotal: ${currencySymbol}${totalAmount}` : '');
                                     navigator.clipboard.writeText(summary);
-                                    setToastMsg('✓ Order summary copied to clipboard!');
+                                    setToastMsg('Order summary copied to clipboard!');
                                     setTimeout(() => setToastMsg(null), 2500);
                                   }}
                                   style={{
@@ -2949,8 +2949,9 @@ export default function WhatsAppInboxComponent() {
                         {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && msg.messageType !== "ORDER" && (
                           <p className="message-text-content" style={msg.isInternalNote ? { color: '#713f12' } : { whiteSpace: 'pre-wrap' }}>
                             {msg.messageType === "UNSUPPORTED" ? (
-                              <span style={{ fontStyle: "italic", color: "#64748b", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                                📎 [Unsupported message format (e.g. Sticker, Location, or Poll)]
+                              <span style={{ fontStyle: "italic", color: "#64748b", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                                <Paperclip size={12} />
+                                <span>[Unsupported message format (e.g. Sticker, Location, or Poll)]</span>
                               </span>
                             ) : (
                               msg.content
@@ -2996,7 +2997,10 @@ export default function WhatsAppInboxComponent() {
                               }}
                               title={errorObj?.details || errorObj?.message || displayReason}
                             >
-                              <span style={{ fontWeight: 600 }}>⚠️ {displayReason}</span>
+                              <span style={{ fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                                <span>{displayReason}</span>
+                              </span>
                               
                               {isReal24hExpired ? (
                                 <button
@@ -3059,7 +3063,7 @@ export default function WhatsAppInboxComponent() {
                               ) : msg.status?.toUpperCase() === "DELIVERED" ? (
                                 <span title="Delivered" style={{ display: "inline-flex" }}><CheckCheck size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} /></span>
                               ) : msg.status?.toUpperCase() === "FAILED" ? (
-                                <span style={{ color: "#ef4444", fontSize: "11px", marginLeft: "4px" }} title="Failed to send">⚠️</span>
+                                <span style={{ color: "#ef4444", display: "inline-flex", marginLeft: "4px" }} title="Failed to send"><AlertCircle size={13} /></span>
                               ) : (
                                 <span title="Sent" style={{ display: "inline-flex" }}><Check size={14} style={{ color: "#94a3b8", marginLeft: "4px" }} /></span>
                               )}
@@ -3640,8 +3644,16 @@ export default function WhatsAppInboxComponent() {
         <div className="inbox-modal-backdrop" onClick={() => { setShowReplyLibraryModal(false); setIsManagingReplies(false); handleCancelEdit(); }}>
           <div className="inbox-modal-content" onClick={(e) => e.stopPropagation()} style={{ width: "90%", maxWidth: "650px", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
             <div className="modal-header-row" style={{ paddingBottom: "12px", borderBottom: "1px solid #e2e8f0" }}>
-              <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#1e293b" }}>
-                {isManagingReplies ? "⚙️ Manage Quick Replies" : "📚 WhatsApp Reply Library & Shortcuts"}
+              <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: "8px" }}>
+                {isManagingReplies ? (
+                  <>
+                    <Settings size={16} /> Manage Quick Replies
+                  </>
+                ) : (
+                  <>
+                    <BookOpen size={16} /> WhatsApp Reply Library & Shortcuts
+                  </>
+                )}
               </h3>
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <button
@@ -3658,10 +3670,21 @@ export default function WhatsAppInboxComponent() {
                     fontSize: "12px",
                     fontWeight: 600,
                     color: "#475569",
-                    cursor: "pointer"
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px"
                   }}
                 >
-                  {isManagingReplies ? "👈 Back to List" : "⚙️ Manage Replies"}
+                  {isManagingReplies ? (
+                    <>
+                      <ArrowLeft size={13} /> Back to List
+                    </>
+                  ) : (
+                    <>
+                      <Settings size={13} /> Manage Replies
+                    </>
+                  )}
                 </button>
                 <button onClick={() => { setShowReplyLibraryModal(false); setIsManagingReplies(false); handleCancelEdit(); }} style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer", color: "#64748b" }}>×</button>
               </div>
@@ -3734,8 +3757,16 @@ export default function WhatsAppInboxComponent() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                   {/* Create / Edit Form */}
                   <form onSubmit={handleCreateOrUpdateCannedResponse} style={{ background: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: "12px" }}>
-                    <h4 style={{ fontSize: "13.5px", fontWeight: 700, color: "#334155", margin: "0 0 4px 0" }}>
-                      {editingReply ? "📝 Edit Canned Response" : "＋ Create New Canned Response"}
+                    <h4 style={{ fontSize: "13.5px", fontWeight: 700, color: "#334155", margin: "0 0 4px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+                      {editingReply ? (
+                        <>
+                          <Edit3 size={14} /> Edit Canned Response
+                        </>
+                      ) : (
+                        <>
+                          <PlusCircle size={14} /> Create New Canned Response
+                        </>
+                      )}
                     </h4>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                       <div>
@@ -4014,7 +4045,7 @@ export default function WhatsAppInboxComponent() {
           <div className="inbox-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-row">
               <h3>Manage Conversation Tags</h3>
-              <button onClick={() => setShowTagsModal(false)}>✕</button>
+              <button onClick={() => setShowTagsModal(false)}><X size={16} /></button>
             </div>
             <div className="modal-form-body">
               
