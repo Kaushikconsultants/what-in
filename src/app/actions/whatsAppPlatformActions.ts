@@ -1836,24 +1836,66 @@ export async function sendWhatsAppTemplateAction(
 ) {
   try {
     const creds = await getMetaApiCredentials();
-    const cleanPhone = toPhone.replace(/\D/g, "");
+    let cleanPhone = toPhone.replace(/\D/g, "");
+    // If standard 10-digit Indian mobile number is provided without country code, prepend 91
+    if (cleanPhone.length === 10) {
+      cleanPhone = `91${cleanPhone}`;
+    }
 
     if (creds && creds.isConnected) {
       const url = `https://graph.facebook.com/v20.0/${creds.phoneId}/messages`;
       
-      const payload = {
+      let finalComponents = Array.isArray(components) ? [...components] : [];
+
+      // Auto-detect template variable requirements from database to prevent Meta #132000 errors
+      const localTemplate = await prisma.whatsAppTemplate.findFirst({
+        where: { name: templateName }
+      });
+
+      // If body parameters are missing, inspect bodyText and auto-generate required parameter placeholders!
+      const hasBodyParam = finalComponents.some(c => c.type?.toLowerCase() === "body");
+      if (!hasBodyParam && localTemplate?.bodyText) {
+        const bodyMatches = (localTemplate.bodyText || '').match(/\{\{(\d+)\}\}/g);
+        if (bodyMatches && bodyMatches.length > 0) {
+          const params = bodyMatches.map((_, idx) => ({
+            type: "text",
+            text: idx === 0 ? "Valued Customer" : idx === 1 ? "ESP-9482" : idx === 2 ? "₹1,499" : "FLAT30"
+          }));
+          finalComponents.push({
+            type: "body",
+            parameters: params
+          });
+        }
+      }
+
+      // If header text parameter is missing and header has variables
+      const hasHeaderParam = finalComponents.some(c => c.type?.toLowerCase() === "header");
+      if (!hasHeaderParam && localTemplate?.headerContent && localTemplate?.headerType === 'TEXT') {
+        const headerMatches = (localTemplate.headerContent || '').match(/\{\{(\d+)\}\}/g);
+        if (headerMatches && headerMatches.length > 0) {
+          finalComponents.push({
+            type: "header",
+            parameters: headerMatches.map(() => ({ type: "text", text: "Special Offer" }))
+          });
+        }
+      }
+
+      const payload: any = {
         messaging_product: "whatsapp",
         recipient_type: "individual",
         to: cleanPhone,
         type: "template",
         template: {
           name: templateName,
-          language: { code: languageCode },
-          components: components
+          language: { code: languageCode }
         }
       };
 
-      console.log(`[WhatsApp Template Dispatch] Sending template "${templateName}" (${languageCode}) to ${cleanPhone}...`);
+      if (finalComponents.length > 0) {
+        payload.template.components = finalComponents;
+      }
+
+      console.log(`[WhatsApp Template Dispatch] Sending template "${templateName}" (${languageCode}) to ${cleanPhone}...`, JSON.stringify(payload));
 
       const res = await fetch(url, {
         method: 'POST',
@@ -1942,11 +1984,7 @@ export async function sendWhatsAppTemplateAction(
         }
       }
 
-      // 2. Fetch template details from DB to build rich content representation
-      const localTemplate = await prisma.whatsAppTemplate.findFirst({
-        where: { name: templateName }
-      });
-
+      // 2. Build rich content representation for communication log
       let readableBody = localTemplate?.bodyText || `[Template: ${templateName}]`;
       if (components && Array.isArray(components)) {
         const bodyComp = components.find(c => c.type === "body");

@@ -1322,14 +1322,30 @@ export default function WhatsAppTemplatesComponent() {
 
   const handleTest = async (t: any) => {
     if (!testPhone) {
-      showToast("Enter a test phone number first.", "error");
+      showToast("Enter a test phone number in the top bar first.", "error");
       return;
     }
+    const clean = testPhone.replace(/\D/g, "");
+    const formattedPhone = clean.length === 10 ? `91${clean}` : clean;
+
     setTestingTemplate(t.name);
-    const res = await sendWhatsAppTemplateAction(testPhone, t.name, t.language || "en_US", []);
+    // Auto-construct body parameters if template has variables
+    const bodyMatches = (t.bodyText || "").match(/\{\{(\d+)\}\}/g);
+    const testComponents: any[] = [];
+    if (bodyMatches && bodyMatches.length > 0) {
+      testComponents.push({
+        type: "body",
+        parameters: bodyMatches.map((_, idx) => ({
+          type: "text",
+          text: idx === 0 ? "Valued Customer" : idx === 1 ? "ESP-9482" : idx === 2 ? "₹1,499" : "FLAT30"
+        }))
+      });
+    }
+
+    const res = await sendWhatsAppTemplateAction(formattedPhone, t.name, t.language || "en_US", testComponents);
     setTestingTemplate(null);
     if (res.success) {
-      showToast("Test template sent successfully!");
+      showToast(`🎉 Test message sent to +${formattedPhone}!`, "success");
       fetchTemplates();
     } else {
       showToast(res.error || "Send failed.", "error");
