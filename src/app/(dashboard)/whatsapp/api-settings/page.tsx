@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Key, ShieldCheck, RefreshCw, CheckCircle2, AlertTriangle, Eye, EyeOff, Send, Save, ArrowRight, Store, MessageSquare, Users, Bot, Layers, BookOpen, Edit3, X, Plus, Trash2, UserCheck, UserX, Shield, Activity } from "lucide-react";
+import { 
+  Building2, Globe, Mail, Phone, Sparkles, MapPin, FileText, Lock, Hash,
+  Key, ShieldCheck, RefreshCw, CheckCircle2, AlertTriangle, Eye, EyeOff, 
+  Send, Save, ArrowRight, Store, MessageSquare, Users, Bot, Layers, 
+  BookOpen, Edit3, X, Plus, Trash2, UserCheck, UserX, Shield, Activity 
+} from "lucide-react";
 import WebhookCapiHealthDashboard from "@/components/whatsapp/WebhookCapiHealthDashboard";
 import { 
   getWhatsAppApiCredentialsAction, 
@@ -12,6 +17,8 @@ import {
   registerWhatsAppPhoneNumberAction,
   getWhatsAppSettingsAction,
   saveWhatsAppSettingsAction,
+  getWhatsAppBrandDetailsAction,
+  saveWhatsAppBrandDetailsAction,
   getTeamMembersAction,
   getTeamsWithMembersAction,
   createTeamAction,
@@ -25,7 +32,25 @@ import { getPaymentGatewaySettings, savePaymentGatewaySettings } from "@/app/act
 import { changeUserPasswordAction } from "@/app/actions/ownerPortalActions";
 
 export default function WhatsAppAPISettingsPage() {
-  const [activeTab, setActiveTab] = useState("team-sla");
+  const [activeTab, setActiveTab] = useState("brand-profile");
+
+  // Dynamic Brand Profile & AI Intelligence State
+  const [brandName, setBrandName] = useState("Espon Clothing Private Limited");
+  const [brandDomain, setBrandDomain] = useState("www.espon.in");
+  const [brandPhone, setBrandPhone] = useState("+91 7206066678");
+  const [brandEmail, setBrandEmail] = useState("clothingespon@gmail.com");
+  const [brandAddress, setBrandAddress] = useState("Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road");
+  const [city, setCity] = useState("Rohtak");
+  const [state, setState] = useState("Haryana");
+  const [pincode, setPincode] = useState("124001");
+  const [country, setCountry] = useState("India");
+  const [gstin, setGstin] = useState("06AAHCE7721Q1Z4");
+  const [pan, setPan] = useState("AAHCE7721Q");
+  const [aiKnowledgeBase, setAiKnowledgeBase] = useState("");
+  const [aiSystemPrompt, setAiSystemPrompt] = useState("");
+  const [welcomeMessage, setWelcomeMessage] = useState("Welcome! How can we help you today?");
+  const [savingBrand, setSavingBrand] = useState(false);
+  const [brandResultMsg, setBrandResultMsg] = useState<{ success: boolean; text: string } | null>(null);
 
   // Admin Password Change State
   const [adminNewPassword, setAdminNewPassword] = useState("");
@@ -125,9 +150,10 @@ export default function WhatsAppAPISettingsPage() {
       getWhatsAppApiCredentialsAction(),
       getShopifyCredentialsAction(),
       getWhatsAppSettingsAction(),
+      getWhatsAppBrandDetailsAction(),
       getTeamsWithMembersAction(),
       getAllAgentsAction()
-    ]).then(([resWA, resShopify, resSettings, resTeams, resAgents]) => {
+    ]).then(([resWA, resShopify, resSettings, resBrand, resTeams, resAgents]) => {
       if (resWA.success && resWA.credentials) {
         setWabaId(resWA.credentials.businessAccountId || "");
         setPhoneId(resWA.credentials.phoneId || "");
@@ -146,6 +172,22 @@ export default function WhatsAppAPISettingsPage() {
         setWelcomeMsg(resSettings.settings.welcomeMessage || "Welcome! How can we help you today?");
         setActiveModel(resSettings.settings.aiModel || "gemini-2.5-flash");
         setSystemPrompt(resSettings.settings.aiSystemPrompt || "");
+      }
+      if (resBrand && resBrand.success) {
+        if (resBrand.brandName) setBrandName(resBrand.brandName);
+        if (resBrand.brandDomain) setBrandDomain(resBrand.brandDomain);
+        if (resBrand.brandPhone || resBrand.phoneNumber) setBrandPhone(resBrand.brandPhone || resBrand.phoneNumber);
+        if (resBrand.brandEmail) setBrandEmail(resBrand.brandEmail);
+        if (resBrand.address) setBrandAddress(resBrand.address);
+        if (resBrand.city) setCity(resBrand.city);
+        if (resBrand.state) setState(resBrand.state);
+        if (resBrand.pincode) setPincode(resBrand.pincode);
+        if (resBrand.country) setCountry(resBrand.country);
+        if (resBrand.gstin) setGstin(resBrand.gstin);
+        if (resBrand.pan) setPan(resBrand.pan);
+        if (resBrand.aiKnowledgeBase) setAiKnowledgeBase(resBrand.aiKnowledgeBase);
+        if (resBrand.aiSystemPrompt) setAiSystemPrompt(resBrand.aiSystemPrompt);
+        if (resBrand.welcomeMessage) setWelcomeMessage(resBrand.welcomeMessage);
       }
       if (resTeams.success && resTeams.teams) setTeams(resTeams.teams);
       if (resAgents.success && resAgents.employees) setAllAgents(resAgents.employees);
@@ -210,6 +252,35 @@ export default function WhatsAppAPISettingsPage() {
   const handleToggleChatAvailable = async (employeeId: string, current: boolean) => {
     await toggleAgentChatAvailabilityAction(employeeId, !current);
     await reloadTeams();
+  };
+
+  const handleSaveBrandProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingBrand(true);
+    setBrandResultMsg(null);
+    const res = await saveWhatsAppBrandDetailsAction({
+      brandName,
+      brandDomain,
+      brandPhone,
+      brandEmail,
+      brandAddress,
+      city,
+      state,
+      pincode,
+      country,
+      gstin,
+      pan,
+      aiKnowledgeBase,
+      aiSystemPrompt,
+      welcomeMessage
+    });
+    setSavingBrand(false);
+    if (res.success) {
+      setBrandResultMsg({ success: true, text: res.message || "✓ Brand details & AI knowledge successfully saved!" });
+    } else {
+      setBrandResultMsg({ success: false, text: res.error || "Failed to save brand details." });
+    }
+    setTimeout(() => setBrandResultMsg(null), 5000);
   };
 
 
@@ -439,10 +510,22 @@ export default function WhatsAppAPISettingsPage() {
       </div>
 
       {/* Tabs list bar */}
-      <div className="flex border-b border-gray-200 dark:border-slate-800 gap-1">
+      <div className="flex border-b border-gray-200 dark:border-slate-800 gap-1 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab("brand-profile")}
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
+            activeTab === "brand-profile" 
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
+          }`}
+        >
+          <Building2 size={16} />
+          <span>Brand Profile & AI</span>
+        </button>
+
         <button
           onClick={() => setActiveTab("webhook-health")}
-          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === "webhook-health" 
               ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
               : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
@@ -454,7 +537,7 @@ export default function WhatsAppAPISettingsPage() {
 
         <button
           onClick={() => setActiveTab("team-sla")}
-          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === "team-sla" 
               ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
               : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
@@ -466,7 +549,7 @@ export default function WhatsAppAPISettingsPage() {
 
         <button
           onClick={() => setActiveTab("agents")}
-          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === "agents" 
               ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
               : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
@@ -477,8 +560,20 @@ export default function WhatsAppAPISettingsPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab("api-credentials")}
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
+            activeTab === "api-credentials" 
+              ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
+              : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
+          }`}
+        >
+          <Key size={16} />
+          <span>Meta & Shopify APIs</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("security")}
-          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+          className={`px-5 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 cursor-pointer shrink-0 ${
             activeTab === "security" 
               ? "border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400" 
               : "border-transparent text-gray-500 hover:text-gray-800 dark:text-slate-400 dark:hover:text-slate-200 hover:border-gray-300 dark:hover:border-slate-700"
@@ -488,6 +583,476 @@ export default function WhatsAppAPISettingsPage() {
           <span>Change Password</span>
         </button>
       </div>
+
+      {/* 1. Brand Profile & AI Identity Tab */}
+      {activeTab === "brand-profile" && (
+        <div className="flex flex-col gap-6 w-full max-w-5xl">
+          {/* Live Brand Guidance Preview Banner (Same dynamic bar as in Template Studio & Chatbots) */}
+          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 shadow-lg text-white">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">Live AI & Simulator Brand Context</h3>
+                  <p className="text-xs text-slate-300">These brand parameters are automatically fed into the AI Template Architect, live phone simulator, and automated chatbot prompts in real-time.</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Auto-Served to AI Engine
+              </span>
+            </div>
+
+            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/80 flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-black text-indigo-400">🧠 Dynamic Brand Guidance:</span>
+              <span className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg font-bold text-slate-100 flex items-center gap-1.5">
+                🏢 {brandName || "Brand Name Not Set"}
+              </span>
+              <span className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg font-bold text-slate-100 flex items-center gap-1.5">
+                🌐 {brandDomain || "domain.com"}
+              </span>
+              <span className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg font-bold text-slate-100 flex items-center gap-1.5">
+                📞 {brandPhone || "Contact Phone"}
+              </span>
+              <span className="bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-lg font-bold text-slate-100 flex items-center gap-1.5">
+                ✉️ {brandEmail || "Email Not Set"}
+              </span>
+              <span className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 border ${aiKnowledgeBase.trim() ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" : "bg-amber-500/15 border-amber-500/30 text-amber-300"}`}>
+                {aiKnowledgeBase.trim() ? "✓ AI Knowledge Base Connected" : "⚠️ Standard Rules Active"}
+              </span>
+            </div>
+          </div>
+
+          {/* Brand Profile Edit Form */}
+          <form onSubmit={handleSaveBrandProfile} className="flex flex-col gap-6">
+            {brandResultMsg && (
+              <div className={`p-4 rounded-xl text-sm font-semibold flex items-center gap-2 ${
+                brandResultMsg.success 
+                  ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' 
+                  : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+              }`}>
+                {brandResultMsg.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{brandResultMsg.text}</span>
+              </div>
+            )}
+
+            {/* 1. Core Brand & Online Identity */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 flex flex-col gap-5">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Building2 size={18} className="text-indigo-600 dark:text-indigo-400" />
+                  <span>1. Core Brand & Online Identity</span>
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  This brand name, storefront domain, and contact phone are dynamically rendered across templates, live phone simulator header, and AI message generation.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    Brand / Business Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    placeholder="e.g. Espon Clothing Private Limited"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    Online Store / Website Domain <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={brandDomain}
+                    onChange={(e) => setBrandDomain(e.target.value)}
+                    placeholder="e.g. www.espon.in or esponsports.com"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                  <span className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 block">
+                    Used to auto-generate product links in Carousel cards and interactive CTA buttons.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    Support & Sales WhatsApp / Phone <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={brandPhone}
+                    onChange={(e) => setBrandPhone(e.target.value)}
+                    placeholder="e.g. +91 7206066678"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    Official Business Email <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={brandEmail}
+                    onChange={(e) => setBrandEmail(e.target.value)}
+                    placeholder="e.g. clothingespon@gmail.com"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Registered Business Address & Tax Identity */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 flex flex-col gap-5">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <MapPin size={18} className="text-indigo-600 dark:text-indigo-400" />
+                  <span>2. Registered Business Address & Tax Identity</span>
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Official legal address and tax identifiers used for GST invoicing, compliance, and AI business verification.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    Street / Building Address
+                  </label>
+                  <input
+                    type="text"
+                    value={brandAddress}
+                    onChange={(e) => setBrandAddress(e.target.value)}
+                    placeholder="e.g. Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="e.g. Rohtak"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    placeholder="e.g. Haryana"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    Pincode / Postal Code
+                  </label>
+                  <input
+                    type="text"
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value)}
+                    placeholder="e.g. 124001"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    Country
+                  </label>
+                  <input
+                    type="text"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    placeholder="e.g. India"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    GSTIN (GST Number)
+                  </label>
+                  <input
+                    type="text"
+                    value={gstin}
+                    onChange={(e) => setGstin(e.target.value)}
+                    placeholder="e.g. 06AAHCE7721Q1Z4"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                    PAN Number
+                  </label>
+                  <input
+                    type="text"
+                    value={pan}
+                    onChange={(e) => setPan(e.target.value)}
+                    placeholder="e.g. AAHCE7721Q"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none uppercase"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. AI Template Architect & Chatbot Knowledge Base */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 flex flex-col gap-5">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Sparkles size={18} className="text-indigo-600 dark:text-indigo-400" />
+                  <span>3. AI Knowledge Base & Brand Intelligence (Auto-Fed to AI)</span>
+                </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Specify return policies, sizing guidelines, fabric technology, shipping SLAs, wholesale MOQs, and brand tone. The AI Template Architect and 24/7 Chatbots will accurately quote these rules.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Brand Knowledge Base & Policies
+                    </label>
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                      {aiKnowledgeBase.length} characters
+                    </span>
+                  </div>
+                  <textarea
+                    rows={6}
+                    value={aiKnowledgeBase}
+                    onChange={(e) => setAiKnowledgeBase(e.target.value)}
+                    placeholder={`Example Knowledge Base:\n• Brand Overview: India's premier sportswear & activewear brand engineered for performance and comfort.\n• Return & Exchange Policy: 7 days hassle-free return and exchange on all unworn items.\n• Shipping: Free nationwide delivery on orders above ₹999. Standard delivery time 3-5 business days.\n• Fabric & Quality: 4-way stretch moisture-wicking polyester-spandex blend with anti-odor tech.\n• Wholesale Terms: Minimum wholesale order ₹15,000 with tiered distributor pricing.`}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-xs focus:ring-2 focus:ring-indigo-500 outline-none leading-relaxed font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                      AI Persona & Tone Instructions
+                    </label>
+                    <input
+                      type="text"
+                      value={aiSystemPrompt}
+                      onChange={(e) => setAiSystemPrompt(e.target.value)}
+                      placeholder="e.g. Professional, high-converting, polite, concise, and Meta compliant."
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
+                      Default Greeting / Welcome Message
+                    </label>
+                    <input
+                      type="text"
+                      value={welcomeMessage}
+                      onChange={(e) => setWelcomeMessage(e.target.value)}
+                      placeholder="e.g. Welcome to Espon Clothing! How can we assist you today?"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button Bar */}
+            <div className="flex justify-end items-center gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={savingBrand}
+                className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white rounded-xl text-sm font-black shadow-lg shadow-indigo-500/25 transition-all cursor-pointer"
+              >
+                {savingBrand ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
+                <span>{savingBrand ? "Saving Brand & AI Details..." : "Save Brand Profile & AI Details"}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 5. Meta & Shopify API Credentials Tab */}
+      {activeTab === "api-credentials" && (
+        <div className="flex flex-col gap-6 w-full max-w-4xl">
+          {/* WhatsApp API Credentials */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 flex items-center justify-center text-green-600 dark:text-green-400 font-bold">
+                  WA
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    Meta WhatsApp Business Cloud API
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Configure your official Meta Cloud API credentials.</p>
+                </div>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                isConnected 
+                  ? "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-400 border border-green-200 dark:border-green-800" 
+                  : "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400 border border-red-200 dark:border-red-800"
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+                {isConnected ? "Connected" : "Disconnected"}
+              </span>
+            </div>
+
+            {resultMsg && (
+              <div className={`p-4 rounded-xl text-sm font-semibold flex items-center gap-2 mb-4 ${
+                resultMsg.success 
+                  ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' 
+                  : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+              }`}>
+                {resultMsg.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{resultMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveCredentials} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">WhatsApp Business Account ID (WABA)</label>
+                <input type="text" value={wabaId} onChange={e => setWabaId(e.target.value)} placeholder="e.g. 1029384756..." className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">Phone Number ID</label>
+                <input type="text" value={phoneId} onChange={e => setPhoneId(e.target.value)} placeholder="e.g. 1098765432..." className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">Display Phone Number</label>
+                <input type="text" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="e.g. +91 7206066678" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">Business Manager ID</label>
+                <input type="text" value={managerId} onChange={e => setManagerId(e.target.value)} placeholder="e.g. 1234567890..." className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              </div>
+
+              <div className="md:col-span-2">
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Permanent Access Token</label>
+                  <button type="button" onClick={() => setShowToken(!showToken)} className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-1 cursor-pointer">
+                    {showToken ? <EyeOff size={13} /> : <Eye size={13} />} {showToken ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <input type={showToken ? "text" : "password"} value={token} onChange={e => setToken(e.target.value)} placeholder="EAAB..." className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" />
+              </div>
+
+              <div className="md:col-span-2 flex justify-between items-center pt-2">
+                <button type="button" onClick={handleFacebookLogin} disabled={registering} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5">
+                  <ShieldCheck size={14} /> Register Phone with PIN
+                </button>
+                <button type="submit" disabled={saving} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center gap-2 cursor-pointer">
+                  {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />} Save Meta Credentials
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Shopify Credentials Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold">
+                <Store size={20} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">Shopify Store Connection</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Sync live products, abandoned checkouts, and customer orders.</p>
+              </div>
+            </div>
+
+            {shopifyResultMsg && (
+              <div className={`p-4 rounded-xl text-sm font-semibold flex items-center gap-2 mb-4 ${
+                shopifyResultMsg.success 
+                  ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' 
+                  : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+              }`}>
+                {shopifyResultMsg.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{shopifyResultMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveShopifyCredentials} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">Shopify Domain</label>
+                <input type="text" value={shopifyDomain} onChange={e => setShopifyDomain(e.target.value)} placeholder="e.g. your-store.myshopify.com" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Admin Access Token</label>
+                  <button type="button" onClick={() => setShowShopifyToken(!showShopifyToken)} className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 flex items-center gap-1 cursor-pointer">
+                    {showShopifyToken ? <EyeOff size={13} /> : <Eye size={13} />} {showShopifyToken ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <input type={showShopifyToken ? "text" : "password"} value={shopifyToken} onChange={e => setShopifyToken(e.target.value)} placeholder="shpat_..." className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono" />
+              </div>
+
+              <div className="md:col-span-2 flex justify-end pt-2">
+                <button type="submit" disabled={savingShopify} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center gap-2 cursor-pointer">
+                  {savingShopify ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />} Save Shopify Settings
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Test Message Tool */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
+                <Send size={18} />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">Send WhatsApp Test Ping</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Send an instant hello_world test template to verify your Meta API connection.</p>
+              </div>
+            </div>
+
+            {testResultMsg && (
+              <div className={`p-4 rounded-xl text-sm font-semibold flex items-center gap-2 mb-4 ${
+                testResultMsg.success 
+                  ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800' 
+                  : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+              }`}>
+                {testResultMsg.success ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+                <span>{testResultMsg.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSendTestMessage} className="flex gap-3 flex-wrap">
+              <input type="text" value={testPhone} onChange={e => setTestPhone(e.target.value)} placeholder="e.g. +91 9876543210" className="flex-1 min-w-[220px] px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              <button type="submit" disabled={sendingTest || !testPhone} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center gap-2 cursor-pointer">
+                {sendingTest ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />} Send Test Message
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Webhook & CAPI Health Tab */}
       {activeTab === "webhook-health" && (
