@@ -1826,6 +1826,102 @@ export async function getWhatsAppTemplates() {
   }
 }
 
+// In-memory cache for uploaded Meta media IDs (valid for 24 hours)
+const metaMediaIdCache = new Map<string, { id: string; expiresAt: number }>();
+
+const FALLBACK_CAROUSEL_JPEGS = [
+  'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&fit=crop&q=80&fm=jpg',
+  'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&fit=crop&q=80&fm=jpg',
+  'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&fit=crop&q=80&fm=jpg',
+  'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800&fit=crop&q=80&fm=jpg',
+  'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&fit=crop&q=80&fm=jpg'
+];
+
+export async function getMetaMediaIdForUrl(
+  phoneId: string,
+  accessToken: string,
+  rawUrl?: string,
+  fallbackIndex = 0
+): Promise<{ id?: string; link?: string }> {
+  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl.trim() === '') {
+    return { link: FALLBACK_CAROUSEL_JPEGS[fallbackIndex % FALLBACK_CAROUSEL_JPEGS.length] };
+  }
+
+  const trimmed = rawUrl.trim();
+
+  // If already a numeric Meta media ID (e.g. "1423223403097404")
+  if (/^\d{10,25}$/.test(trimmed)) {
+    return { id: trimmed };
+  }
+
+  // Check in-memory cache
+  const cached = metaMediaIdCache.get(trimmed);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { id: cached.id };
+  }
+
+  try {
+    let fetchUrl = trimmed;
+    if (fetchUrl.includes('images.unsplash.com')) {
+      fetchUrl = fetchUrl.replace(/auto=format/g, 'fm=jpg');
+      if (!fetchUrl.includes('fm=jpg')) fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'fm=jpg';
+    }
+
+    let imgRes = await fetch(fetchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'image/jpeg,image/png,image/*;q=0.8'
+      }
+    });
+
+    // If fetch failed (e.g. 403 Forbidden from expired scontent.whatsapp.net), use verified public fallback JPEG
+    if (!imgRes.ok) {
+      console.warn(`[getMetaMediaIdForUrl] Fetch status ${imgRes.status} for ${trimmed}. Using verified fallback JPEG.`);
+      const fallbackUrl = FALLBACK_CAROUSEL_JPEGS[fallbackIndex % FALLBACK_CAROUSEL_JPEGS.length];
+      imgRes = await fetch(fallbackUrl);
+    }
+
+    if (imgRes.ok) {
+      const arrayBuf = await imgRes.arrayBuffer();
+      const buffer = Buffer.from(arrayBuf);
+
+      const formData = new FormData();
+      const blob = new Blob([buffer], { type: 'image/jpeg' });
+      formData.append('file', blob, `product_${Date.now()}_${fallbackIndex}.jpg`);
+      formData.append('type', 'image/jpeg');
+      formData.append('messaging_product', 'whatsapp');
+
+      const uploadRes = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/media`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData
+      });
+
+      const uploadJson = await uploadRes.json();
+      if (uploadJson?.id) {
+        metaMediaIdCache.set(trimmed, {
+          id: uploadJson.id,
+          expiresAt: Date.now() + 24 * 60 * 60 * 1000
+        });
+        return { id: uploadJson.id };
+      } else {
+        console.warn(`[getMetaMediaIdForUrl] Meta media upload error:`, uploadJson);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[getMetaMediaIdForUrl] Exception during media upload:`, err?.message);
+  }
+
+  // Fallback to safe JPEG link
+  const safeLink = trimmed.includes('images.unsplash.com')
+    ? trimmed.replace(/auto=format/g, 'fm=jpg')
+    : trimmed.startsWith('http') && !trimmed.includes('scontent.whatsapp.net')
+    ? trimmed
+    : FALLBACK_CAROUSEL_JPEGS[fallbackIndex % FALLBACK_CAROUSEL_JPEGS.length];
+
+  return { link: safeLink };
+}
+
 export async function sendWhatsAppTemplateAction(
   toPhone: string, 
   templateName: string, 
@@ -1883,17 +1979,30 @@ export async function sendWhatsAppTemplateAction(
       // Handle Standard Media Headers (IMAGE / VIDEO / DOCUMENT)
       if (!hasHeaderParam && localTemplate?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(localTemplate.headerType)) {
         const hType = localTemplate.headerType.toLowerCase();
-        const mediaUrl = localTemplate.headerContent || (hType === 'image' ? 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80' : '');
+        const mediaUrl = localTemplate.headerContent || (hType === 'image' ? FALLBACK_CAROUSEL_JPEGS[0] : '');
         if (mediaUrl) {
-          finalComponents.push({
-            type: "header",
-            parameters: [
-              {
-                type: hType,
-                [hType]: { link: mediaUrl }
-              }
-            ]
-          });
+          if (hType === 'image') {
+            const mediaRef = await getMetaMediaIdForUrl(creds.phoneId, creds.accessToken, mediaUrl, 0);
+            finalComponents.push({
+              type: "header",
+              parameters: [
+                {
+                  type: "image",
+                  image: mediaRef.id ? { id: mediaRef.id } : { link: mediaRef.link }
+                }
+              ]
+            });
+          } else {
+            finalComponents.push({
+              type: "header",
+              parameters: [
+                {
+                  type: hType,
+                  [hType]: { link: mediaUrl }
+                }
+              ]
+            });
+          }
         }
       }
 
@@ -1918,10 +2027,10 @@ export async function sendWhatsAppTemplateAction(
             const metaTData = await metaTRes.json();
             const metaCarouselComp = metaTData?.data?.[0]?.components?.find((c: any) => c.type === 'CAROUSEL');
             if (metaCarouselComp?.cards) {
-              rawCards = metaCarouselComp.cards.map((mc: any) => {
+              rawCards = metaCarouselComp.cards.map((mc: any, idx: number) => {
                 const h = mc.components?.find((c: any) => c.type === 'HEADER');
                 return {
-                  mediaUrl: h?.example?.header_handle?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80'
+                  mediaUrl: h?.example?.header_handle?.[0] || FALLBACK_CAROUSEL_JPEGS[idx % FALLBACK_CAROUSEL_JPEGS.length]
                 };
               });
             }
@@ -1929,28 +2038,81 @@ export async function sendWhatsAppTemplateAction(
         }
 
         if (Array.isArray(rawCards) && rawCards.length > 0) {
-          const cardsPayload = rawCards.map((card: any, idx: number) => {
-            const mediaUrl = card.mediaUrl || card.primaryImage || card.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80';
-            const isVideo = card.headerType === 'VIDEO';
-            return {
-              card_index: idx,
-              components: [
-                {
-                  type: "header",
-                  parameters: [
-                    isVideo 
-                      ? { type: "video", video: { link: mediaUrl } }
-                      : { type: "image", image: { link: mediaUrl } }
+          const cardsPayload = await Promise.all(
+            rawCards.map(async (card: any, idx: number) => {
+              const rawMediaUrl = card.mediaUrl || card.primaryImage || card.images?.[0] || FALLBACK_CAROUSEL_JPEGS[idx % FALLBACK_CAROUSEL_JPEGS.length];
+              const isVideo = card.headerType === 'VIDEO';
+
+              if (isVideo) {
+                return {
+                  card_index: idx,
+                  components: [
+                    {
+                      type: "header",
+                      parameters: [
+                        { type: "video", video: { link: rawMediaUrl } }
+                      ]
+                    }
                   ]
-                }
-              ]
-            };
-          });
+                };
+              }
+
+              const mediaRef = await getMetaMediaIdForUrl(creds.phoneId, creds.accessToken, rawMediaUrl, idx);
+              return {
+                card_index: idx,
+                components: [
+                  {
+                    type: "header",
+                    parameters: [
+                      mediaRef.id 
+                        ? { type: "image", image: { id: mediaRef.id } }
+                        : { type: "image", image: { link: mediaRef.link } }
+                    ]
+                  }
+                ]
+              };
+            })
+          );
 
           finalComponents.push({
             type: "carousel",
             cards: cardsPayload
           });
+        }
+      }
+
+      // Sanitize any existing components to convert image links (especially scontent or unsplash webp) to Meta media IDs
+      for (const comp of finalComponents) {
+        if (comp.type === 'header' && Array.isArray(comp.parameters)) {
+          for (const param of comp.parameters) {
+            if (param.type === 'image' && param.image?.link && !param.image.id) {
+              const mediaRef = await getMetaMediaIdForUrl(creds.phoneId, creds.accessToken, param.image.link, 0);
+              if (mediaRef.id) {
+                param.image = { id: mediaRef.id };
+              } else if (mediaRef.link) {
+                param.image = { link: mediaRef.link };
+              }
+            }
+          }
+        } else if (comp.type === 'carousel' && Array.isArray(comp.cards)) {
+          for (const card of comp.cards) {
+            if (Array.isArray(card.components)) {
+              for (const cComp of card.components) {
+                if (cComp.type === 'header' && Array.isArray(cComp.parameters)) {
+                  for (const cParam of cComp.parameters) {
+                    if (cParam.type === 'image' && cParam.image?.link && !cParam.image.id) {
+                      const mediaRef = await getMetaMediaIdForUrl(creds.phoneId, creds.accessToken, cParam.image.link, card.card_index || 0);
+                      if (mediaRef.id) {
+                        cParam.image = { id: mediaRef.id };
+                      } else if (mediaRef.link) {
+                        cParam.image = { link: mediaRef.link };
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
 
@@ -7063,17 +7225,67 @@ export async function processCampaignQueueAction(campaignId: string) {
         // Media Header parameter support (Image/Video/Document)
         if (activeTemplate?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(activeTemplate.headerType.toUpperCase())) {
           const mediaUrl = (activeTemplate as any)?.headerMediaUrl || activeTemplate.headerContent;
-          if (mediaUrl && mediaUrl.startsWith('http')) {
+          if (mediaUrl) {
             const hType = activeTemplate.headerType.toLowerCase();
-            components.push({
-              type: "header",
-              parameters: [
-                {
-                  type: hType,
-                  [hType]: { link: mediaUrl }
+            if (hType === 'image') {
+              const mediaRef = await getMetaMediaIdForUrl(creds.phoneId, creds.accessToken, mediaUrl, 0);
+              components.push({
+                type: "header",
+                parameters: [
+                  {
+                    type: "image",
+                    image: mediaRef.id ? { id: mediaRef.id } : { link: mediaRef.link }
+                  }
+                ]
+              });
+            } else {
+              components.push({
+                type: "header",
+                parameters: [
+                  {
+                    type: hType,
+                    [hType]: { link: mediaUrl }
+                  }
+                ]
+              });
+            }
+          }
+        }
+
+        // Carousel Template Support for Broadcasts
+        if (activeTemplate?.templateType === 'CAROUSEL' || activeTemplate?.carouselCards) {
+          let bCards: any[] = [];
+          if (activeTemplate?.carouselCards) {
+            try {
+              bCards = typeof activeTemplate.carouselCards === 'string' ? JSON.parse(activeTemplate.carouselCards) : activeTemplate.carouselCards;
+            } catch {
+              bCards = [];
+            }
+          }
+          if (Array.isArray(bCards) && bCards.length > 0) {
+            const cardsPayload = await Promise.all(
+              bCards.map(async (card: any, idx: number) => {
+                const rawMediaUrl = card.mediaUrl || card.primaryImage || card.images?.[0] || FALLBACK_CAROUSEL_JPEGS[idx % FALLBACK_CAROUSEL_JPEGS.length];
+                const isVideo = card.headerType === 'VIDEO';
+                if (isVideo) {
+                  return {
+                    card_index: idx,
+                    components: [{ type: "header", parameters: [{ type: "video", video: { link: rawMediaUrl } }] }]
+                  };
                 }
-              ]
-            });
+                const mediaRef = await getMetaMediaIdForUrl(creds.phoneId, creds.accessToken, rawMediaUrl, idx);
+                return {
+                  card_index: idx,
+                  components: [{
+                    type: "header",
+                    parameters: [
+                      mediaRef.id ? { type: "image", image: { id: mediaRef.id } } : { type: "image", image: { link: mediaRef.link } }
+                    ]
+                  }]
+                };
+              })
+            );
+            components.push({ type: "carousel", cards: cardsPayload });
           }
         }
 

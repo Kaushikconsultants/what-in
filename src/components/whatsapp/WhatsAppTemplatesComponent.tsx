@@ -1451,11 +1451,17 @@ export default function WhatsAppTemplatesComponent() {
     );
   };
 
-  const formatBadge = (tType?: string) => {
+  const formatBadge = (tType?: string, tmpl?: any) => {
     if (tType === "CAROUSEL" || tType === "IMAGE_CAROUSEL") {
+      const isProductCarousel = tmpl?.carouselCards && (
+        tmpl.carouselCards.includes("₹") || 
+        tmpl.carouselCards.includes("products") || 
+        tmpl.carouselCards.includes("Product") ||
+        tmpl.name?.toLowerCase().includes("product")
+      );
       return (
         <span className="px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 text-[10px] font-black uppercase flex items-center gap-1">
-          <Layers size={11} /> Image Carousel
+          {isProductCarousel ? <ShoppingBag size={11} /> : <Layers size={11} />} {isProductCarousel ? "Product Carousel" : "Image Carousel"}
         </span>
       );
     }
@@ -4887,7 +4893,7 @@ export default function WhatsAppTemplatesComponent() {
                       </div>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         {statusBadge(t.status)}
-                        {formatBadge(t.templateType)}
+                        {formatBadge(t.templateType, t)}
                         <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                           {t.category}
                         </span>
