@@ -8721,6 +8721,23 @@ export async function getWhatsAppBrandDetailsAction() {
     ]);
 
     const brandName = company?.companyName || client?.businessName || org?.name || account?.name || "Espon Clothing Private Limited";
+    let whatsAppDisplayName = account?.name || client?.businessName || "Espon";
+
+    try {
+      const creds = await getMetaApiCredentials();
+      if (creds && creds.isConnected && creds.phoneId && creds.accessToken) {
+        const phoneRes = await fetch(
+          `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=verified_name,display_phone_number,is_official_business_account`,
+          {
+            headers: { Authorization: `Bearer ${creds.accessToken}` }
+          }
+        );
+        if (phoneRes.ok) {
+          const pData = await phoneRes.json();
+          if (pData.verified_name) whatsAppDisplayName = pData.verified_name;
+        }
+      }
+    } catch {}
     
     // Resolve public storefront domain (prioritize direct website over internal myshopify domain)
     let brandDomain = "www.espon.in";
@@ -8755,6 +8772,8 @@ export async function getWhatsAppBrandDetailsAction() {
     return {
       success: true,
       brandName,
+      verifiedName: whatsAppDisplayName,
+      whatsAppDisplayName,
       brandDomain,
       phoneNumber,
       brandPhone: phoneNumber,

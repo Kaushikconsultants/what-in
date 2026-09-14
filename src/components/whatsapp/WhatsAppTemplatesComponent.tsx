@@ -16,6 +16,7 @@ import {
   deleteWhatsAppTemplateAction,
   sendWhatsAppTemplateAction,
   getWhatsAppBrandDetailsAction,
+  getMetaPhoneHealthAndLimitsAction,
   generateAITemplateAction,
   getWhatsAppInventoryCatalogAction,
   refreshTemplateStatusAction,
@@ -126,7 +127,8 @@ export default function WhatsAppTemplatesComponent() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "most_used" | "highest_read" | "alphabetical">("newest");
   
   // Dynamic Brand Details & Intelligence from Database
-  const [brandName, setBrandName] = useState("Espon Clothing");
+  const [brandName, setBrandName] = useState("Espon Clothing Private Limited");
+  const [whatsAppDisplayName, setWhatsAppDisplayName] = useState("Espon");
   const [brandDomain, setBrandDomain] = useState("www.espon.in");
   const [brandPhone, setBrandPhone] = useState("+91 7206066678");
   const [brandEmail, setBrandEmail] = useState("clothingespon@gmail.com");
@@ -155,11 +157,22 @@ export default function WhatsAppTemplatesComponent() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch brand details & AI intelligence on component mount
+  // Fetch brand details, verified WhatsApp name & AI intelligence on component mount
   useEffect(() => {
+    getMetaPhoneHealthAndLimitsAction().then((healthRes) => {
+      if (healthRes && healthRes.verifiedName && healthRes.verifiedName !== "WhatsApp Account") {
+        setWhatsAppDisplayName(healthRes.verifiedName);
+      }
+    }).catch(() => {});
+
     getWhatsAppBrandDetailsAction().then((res) => {
-      if (res && res.brandName) {
-        setBrandName(res.brandName);
+      if (res) {
+        if (res.verifiedName || res.whatsAppDisplayName) {
+          setWhatsAppDisplayName(res.verifiedName || res.whatsAppDisplayName);
+        }
+        if (res.brandName) {
+          setBrandName(res.brandName);
+        }
         if (res.brandDomain) setBrandDomain(res.brandDomain);
         if (res.phoneNumber || res.brandPhone) setBrandPhone(res.phoneNumber || res.brandPhone);
         if (res.brandEmail) setBrandEmail(res.brandEmail);
@@ -4104,12 +4117,12 @@ export default function WhatsAppTemplatesComponent() {
                   <div className="flex items-center gap-2 min-w-0">
                     <ArrowLeft size={16} className="text-white flex-shrink-0 cursor-pointer hover:opacity-80" />
                     <div className="w-8 h-8 rounded-full bg-emerald-800 text-white font-black text-xs flex items-center justify-center uppercase border border-white/20 flex-shrink-0">
-                      {brandName.slice(0, 2).toUpperCase()}
+                      {(whatsAppDisplayName || brandName || "Espon").slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-bold flex items-center gap-1 text-white truncate">
-                        <span className="truncate">{brandName}</span>
-                        <CheckCircle2 size={12} className="text-white fill-[#25d366] flex-shrink-0" />
+                      <div className="text-xs font-bold flex items-center gap-1.5 text-white truncate">
+                        <span className="truncate">{whatsAppDisplayName || "Espon"}</span>
+                        <CheckCircle2 size={13} className="text-emerald-400 fill-emerald-400 text-white flex-shrink-0" />
                       </div>
                       <div className="text-[10px] text-emerald-100/90 dark:text-emerald-300/80 truncate">Verified Business Account</div>
                     </div>
@@ -4483,12 +4496,12 @@ export default function WhatsAppTemplatesComponent() {
                       <div className="p-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between bg-gray-50 dark:bg-slate-800/80 rounded-t-3xl">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
-                            {brandName[0] || 'E'}
+                            {(whatsAppDisplayName || brandName)[0] || 'E'}
                           </div>
                           <div>
                             <div className="font-black text-xs text-gray-900 dark:text-white flex items-center gap-1">
-                              <span>{brandName} Store</span>
-                              <CheckCircle2 size={12} className="text-sky-500 fill-sky-500 text-white" />
+                              <span>{whatsAppDisplayName || "Espon"} Store</span>
+                              <CheckCircle2 size={12} className="text-emerald-500 fill-emerald-500 text-white" />
                             </div>
                             <div className="text-[10px] text-gray-400">
                               {selectedCatalogProducts.length > 0 ? `${selectedCatalogProducts.length} items` : "All catalog items"}
