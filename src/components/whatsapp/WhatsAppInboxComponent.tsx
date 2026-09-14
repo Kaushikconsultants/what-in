@@ -1594,12 +1594,26 @@ export default function WhatsAppInboxComponent() {
                 <RefreshCw size={16} />
               </button>
               <button
-                className="panel-toggle-btn"
+                className={`panel-toggle-btn ${showFilters ? "active" : ""}`}
                 onClick={() => setShowFilters(!showFilters)}
-                title="Toggle Filters"
-                style={{ color: showFilters ? "#6d28d9" : "#64748b" }}
+                title={showFilters ? "Hide Filters" : "Toggle Filters"}
+                style={{
+                  color: showFilters || (unreadOnly || leadStatusFilter || filterEmployeeId) ? "#6d28d9" : "#64748b",
+                  position: "relative"
+                }}
               >
-                <Filter size={16} />
+                <Filter size={15} />
+                {(unreadOnly || leadStatusFilter || filterEmployeeId) && (
+                  <span style={{
+                    position: "absolute",
+                    top: "3px",
+                    right: "3px",
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    background: "#8b5cf6"
+                  }} />
+                )}
               </button>
 
 
@@ -1609,7 +1623,7 @@ export default function WhatsAppInboxComponent() {
           {!isLeftCollapsed && (
             <>
               {/* Search Bar & Folder Tabs */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: showFilters ? '8px' : '0px' }}>
                 {/* Search Bar */}
                 <div className="inbox-search-box" style={{ margin: 0 }}>
                   <Search size={16} className="search-icon" />
