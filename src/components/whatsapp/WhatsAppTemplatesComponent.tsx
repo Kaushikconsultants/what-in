@@ -4042,11 +4042,11 @@ export default function WhatsAppTemplatesComponent() {
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
           >
-            <option value="ALL">All Categories</option>
+            <option value="ALL" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">All Categories</option>
             {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
+              <option key={c.value} value={c.value} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">
                 {c.label}
               </option>
             ))}
@@ -4056,43 +4056,43 @@ export default function WhatsAppTemplatesComponent() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer text-indigo-600 dark:text-indigo-400"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer text-indigo-600 dark:text-indigo-400"
           >
-            <option value="ALL">All Message Types</option>
-            <option value="STANDARD">Default (Text/Media)</option>
-            <option value="CAROUSEL">Image Carousel</option>
-            <option value="CATALOGUE">Product Catalogue</option>
-            <option value="FLOWS">Interactive Flows</option>
-            <option value="ORDER_DETAILS">Order Details</option>
-            <option value="ORDER_STATUS">Order Status</option>
-            <option value="CALL_PERMISSIONS">Call Permissions</option>
-            <option value="LTO_COUPON">Limited-Time Coupon</option>
-            <option value="AUTHENTICATION">Authentication (OTP)</option>
+            <option value="ALL" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">All Message Types</option>
+            <option value="STANDARD" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Default (Text/Media)</option>
+            <option value="CAROUSEL" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Image Carousel</option>
+            <option value="CATALOGUE" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Product Catalogue</option>
+            <option value="FLOWS" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Interactive Flows</option>
+            <option value="ORDER_DETAILS" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Order Details</option>
+            <option value="ORDER_STATUS" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Order Status</option>
+            <option value="CALL_PERMISSIONS" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Call Permissions</option>
+            <option value="LTO_COUPON" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Limited-Time Coupon</option>
+            <option value="AUTHENTICATION" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Authentication (OTP)</option>
           </select>
 
           {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
           >
-            <option value="ALL">All Statuses</option>
-            <option value="APPROVED">Approved</option>
-            <option value="PENDING">Pending / In Review</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="PAUSED">Paused</option>
+            <option value="ALL" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">All Statuses</option>
+            <option value="APPROVED" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Approved</option>
+            <option value="PENDING" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Pending / In Review</option>
+            <option value="REJECTED" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Rejected</option>
+            <option value="PAUSED" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Paused</option>
           </select>
 
           {/* Time Range Filter */}
           <select
             value={timeRangeFilter}
             onChange={(e) => setTimeRangeFilter(e.target.value as any)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer text-slate-700 dark:text-slate-200"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none cursor-pointer text-slate-700 dark:text-slate-200"
           >
-            <option value="ALL">All Time</option>
-            <option value="TODAY">Created Today</option>
-            <option value="7D">Last 7 Days</option>
-            <option value="30D">Last 30 Days</option>
+            <option value="ALL" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">All Time</option>
+            <option value="TODAY" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Created Today</option>
+            <option value="7D" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Last 7 Days</option>
+            <option value="30D" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Last 30 Days</option>
           </select>
         </div>
 
@@ -4104,13 +4104,13 @@ export default function WhatsAppTemplatesComponent() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
+            className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 outline-none cursor-pointer"
           >
-            <option value="newest">Newest Created</option>
-            <option value="oldest">Oldest First</option>
-            <option value="most_used">Most Sent / Dispatched</option>
-            <option value="highest_read">Highest Read Rate</option>
-            <option value="alphabetical">Name (A-Z)</option>
+            <option value="newest" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Newest Created</option>
+            <option value="oldest" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Oldest First</option>
+            <option value="most_used" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Most Sent / Dispatched</option>
+            <option value="highest_read" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Highest Read Rate</option>
+            <option value="alphabetical" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100">Name (A-Z)</option>
           </select>
         </div>
       </div>
@@ -4179,22 +4179,22 @@ export default function WhatsAppTemplatesComponent() {
             return (
               <div
                 key={t.id || t.name}
-                className="bg-white dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 rounded-3xl p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between gap-3.5"
+                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between gap-3.5"
               >
                 {/* Header */}
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div>
-                      <div className="font-black text-sm text-gray-900 dark:text-white tracking-tight break-all">
+                      <div className="font-black text-sm text-slate-900 dark:text-white tracking-tight break-all">
                         {t.name}
                       </div>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         {statusBadge(t.status)}
                         {formatBadge(t.templateType)}
-                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300">
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                           {t.category}
                         </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-700 text-gray-500">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                           {t.language || "en_US"}
                         </span>
                       </div>
@@ -4203,7 +4203,7 @@ export default function WhatsAppTemplatesComponent() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleCloneTemplate(t)}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-xl transition cursor-pointer"
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-xl transition cursor-pointer"
                         title="Clone / Duplicate this template"
                       >
                         <Copy size={14} />
@@ -4211,7 +4211,7 @@ export default function WhatsAppTemplatesComponent() {
                       <button
                         onClick={() => handleDelete(t.name)}
                         disabled={deleting === t.name}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition cursor-pointer"
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition cursor-pointer"
                         title="Delete Template from Meta"
                       >
                         {deleting === t.name ? <RefreshCw size={14} className="animate-spin text-red-500" /> : <Trash2 size={15} />}
@@ -4220,24 +4220,24 @@ export default function WhatsAppTemplatesComponent() {
                   </div>
 
                   {/* Creation Timestamp Badge */}
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500 font-medium flex items-center gap-1 mb-2.5">
-                    <Calendar size={11} className="text-gray-400" />
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium flex items-center gap-1 mb-2.5">
+                    <Calendar size={11} className="text-slate-400 dark:text-slate-500" />
                     <span>Created: {createdFormatted}</span>
                   </div>
 
                   {/* WhatsApp Chat Preview Bubble */}
-                  <div className="bg-[#e2ffc7] dark:bg-emerald-950/40 border border-[#c6f0a4] dark:border-emerald-800/50 rounded-2xl rounded-tr-xs p-3.5 text-xs text-gray-900 dark:text-gray-100 shadow-2xs">
+                  <div className="bg-[#e2ffc7] dark:bg-[#005c4b]/35 border border-[#c6f0a4] dark:border-[#00a884]/30 rounded-2xl rounded-tr-xs p-3.5 text-xs text-slate-900 dark:text-slate-100 shadow-2xs">
                     {t.headerContent && (
-                      <div className="font-black text-xs text-gray-900 dark:text-white mb-1.5 pb-1 border-b border-emerald-300/40 dark:border-emerald-700/40">
+                      <div className="font-black text-xs text-slate-900 dark:text-emerald-300 mb-1.5 pb-1 border-b border-emerald-300/40 dark:border-emerald-700/40">
                         {t.headerContent}
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap leading-relaxed font-sans text-xs">
+                    <div className="whitespace-pre-wrap leading-relaxed font-sans text-xs text-slate-800 dark:text-slate-200">
                       {t.bodyText?.slice(0, 200)}
                       {t.bodyText?.length > 200 ? "..." : ""}
                     </div>
                     {t.footerText && (
-                      <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-2 italic">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 italic">
                         {t.footerText}
                       </div>
                     )}
@@ -4254,7 +4254,7 @@ export default function WhatsAppTemplatesComponent() {
                     )}
 
                     {/* Dynamic Message Time with Blue Double Ticks */}
-                    <div className="flex items-center justify-end gap-1 text-[10px] text-gray-500 dark:text-gray-400 font-medium mt-1">
+                    <div className="flex items-center justify-end gap-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-1">
                       <span>{previewTime}</span>
                       <CheckCheck size={13} className="text-sky-500 inline stroke-[2.5]" />
                     </div>
@@ -4284,23 +4284,23 @@ export default function WhatsAppTemplatesComponent() {
                 </div>
 
                 {/* Bottom Analytics & Actions */}
-                <div className="pt-3 border-t border-gray-100 dark:border-slate-700 flex flex-col gap-2.5">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
                   {/* Performance stats mini-strip */}
-                  <div className="grid grid-cols-4 gap-1.5 p-2 bg-gray-50/80 dark:bg-slate-900/60 rounded-xl text-center border border-gray-100 dark:border-slate-800">
+                  <div className="grid grid-cols-4 gap-1.5 p-2 bg-slate-50 dark:bg-slate-950/60 rounded-xl text-center border border-slate-100 dark:border-slate-800/80">
                     <div>
-                      <div className="text-[9px] font-bold text-gray-400 uppercase">Broadcasts</div>
-                      <div className="text-xs font-black text-gray-800 dark:text-white mt-0.5">{t.campaignsCount || 0}</div>
+                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">Broadcasts</div>
+                      <div className="text-xs font-black text-slate-800 dark:text-slate-200 mt-0.5">{t.campaignsCount || 0}</div>
                     </div>
                     <div>
-                      <div className="text-[9px] font-bold text-gray-400 uppercase">Sent</div>
+                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">Sent</div>
                       <div className="text-xs font-black text-indigo-600 dark:text-indigo-400 mt-0.5">{t.totalSent || 0}</div>
                     </div>
                     <div>
-                      <div className="text-[9px] font-bold text-gray-400 uppercase">Read Rate</div>
+                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">Read Rate</div>
                       <div className="text-xs font-black text-cyan-600 dark:text-cyan-400 mt-0.5">{t.readRate || 0}%</div>
                     </div>
                     <div>
-                      <div className="text-[9px] font-bold text-gray-400 uppercase">CTR</div>
+                      <div className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase">CTR</div>
                       <div className="text-xs font-black text-purple-600 dark:text-purple-400 mt-0.5">{t.clickRate || 0}%</div>
                     </div>
                   </div>
@@ -4311,7 +4311,7 @@ export default function WhatsAppTemplatesComponent() {
                       <button
                         onClick={() => handleTest(t)}
                         disabled={testingTemplate === t.name}
-                        className="w-full py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                        className="w-full py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
                       >
                         {testingTemplate === t.name ? (
                           <RefreshCw size={13} className="animate-spin" />
@@ -4322,7 +4322,7 @@ export default function WhatsAppTemplatesComponent() {
                       </button>
                       <a
                         href={`/whatsapp/broadcasts?template=${t.name}`}
-                        className="w-full py-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                        className="w-full py-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                       >
                         <BellRing size={13} />
                         <span>📣 Launch Broadcast</span>

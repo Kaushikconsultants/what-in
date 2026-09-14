@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -11,10 +13,10 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0f172a;
+    --background: #090d16;
     --foreground: #f8fafc;
-    --sidebar: #1e293b;
-    --border: #334155;
+    --sidebar: #0f172a;
+    --border: #1e293b;
   }
 }
 
@@ -45,8 +47,16 @@ body {
   background: #cbd5e1;
   border-radius: 10px;
 }
+html.dark ::-webkit-scrollbar-thumb,
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+html.dark ::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 /* Global Dark Mode Skeleton Fallbacks */
