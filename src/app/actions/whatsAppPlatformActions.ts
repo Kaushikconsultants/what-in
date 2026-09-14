@@ -1880,6 +1880,80 @@ export async function sendWhatsAppTemplateAction(
         }
       }
 
+      // Handle Standard Media Headers (IMAGE / VIDEO / DOCUMENT)
+      if (!hasHeaderParam && localTemplate?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(localTemplate.headerType)) {
+        const hType = localTemplate.headerType.toLowerCase();
+        const mediaUrl = localTemplate.headerContent || (hType === 'image' ? 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80' : '');
+        if (mediaUrl) {
+          finalComponents.push({
+            type: "header",
+            parameters: [
+              {
+                type: hType,
+                [hType]: { link: mediaUrl }
+              }
+            ]
+          });
+        }
+      }
+
+      // Handle Carousel Cards if template is a CAROUSEL template
+      const hasCarouselParam = finalComponents.some(c => c.type?.toLowerCase() === "carousel");
+      if (!hasCarouselParam && (localTemplate?.templateType === 'CAROUSEL' || localTemplate?.carouselCards)) {
+        let rawCards: any[] = [];
+        if (localTemplate?.carouselCards) {
+          try {
+            rawCards = typeof localTemplate.carouselCards === 'string' ? JSON.parse(localTemplate.carouselCards) : localTemplate.carouselCards;
+          } catch {
+            rawCards = [];
+          }
+        }
+
+        // If localTemplate didn't have cards, query Meta directly for the template components
+        if (!Array.isArray(rawCards) || rawCards.length === 0) {
+          try {
+            const metaTRes = await fetch(`https://graph.facebook.com/v21.0/${creds.wabaId}/message_templates?name=${templateName}&fields=components`, {
+              headers: { Authorization: `Bearer ${creds.accessToken}` }
+            });
+            const metaTData = await metaTRes.json();
+            const metaCarouselComp = metaTData?.data?.[0]?.components?.find((c: any) => c.type === 'CAROUSEL');
+            if (metaCarouselComp?.cards) {
+              rawCards = metaCarouselComp.cards.map((mc: any) => {
+                const h = mc.components?.find((c: any) => c.type === 'HEADER');
+                return {
+                  mediaUrl: h?.example?.header_handle?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80'
+                };
+              });
+            }
+          } catch {}
+        }
+
+        if (Array.isArray(rawCards) && rawCards.length > 0) {
+          const cardsPayload = rawCards.map((card: any, idx: number) => {
+            const mediaUrl = card.mediaUrl || card.primaryImage || card.images?.[0] || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80';
+            const isVideo = card.headerType === 'VIDEO';
+            return {
+              card_index: idx,
+              components: [
+                {
+                  type: "header",
+                  parameters: [
+                    isVideo 
+                      ? { type: "video", video: { link: mediaUrl } }
+                      : { type: "image", image: { link: mediaUrl } }
+                  ]
+                }
+              ]
+            };
+          });
+
+          finalComponents.push({
+            type: "carousel",
+            cards: cardsPayload
+          });
+        }
+      }
+
       const payload: any = {
         messaging_product: "whatsapp",
         recipient_type: "individual",
