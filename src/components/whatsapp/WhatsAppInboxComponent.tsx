@@ -168,11 +168,15 @@ export default function WhatsAppInboxComponent() {
 
   // Attachment File Upload Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cannedPopupRef = useRef<HTMLDivElement>(null);
+  const cannedPopupSearchRef = useRef<HTMLInputElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [aiToggleLoading, setAiToggleLoading] = useState<boolean>(false);
   const [cannedResponses, setCannedResponses] = useState<any[]>([]);
   const [showCannedResponses, setShowCannedResponses] = useState<boolean>(false);
+  const [cannedPopupSearch, setCannedPopupSearch] = useState<string>("");
+  const [cannedPopupHighlight, setCannedPopupHighlight] = useState<number>(0);
   const [showTemplatePicker, setShowTemplatePicker] = useState<boolean>(false);
   const [showProductPanel, setShowProductPanel] = useState<boolean>(false);
   const [showFlowPicker, setShowFlowPicker] = useState<boolean>(false);
@@ -235,6 +239,29 @@ export default function WhatsAppInboxComponent() {
   const [newReplyShortcut, setNewReplyShortcut] = useState("");
   const [newReplyContent, setNewReplyContent] = useState("");
   const [savingCanned, setSavingCanned] = useState(false);
+
+  // Close canned popup when clicking outside
+  useEffect(() => {
+    if (!showCannedResponses) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (cannedPopupRef.current && !cannedPopupRef.current.contains(e.target as Node)) {
+        setShowCannedResponses(false);
+        setCannedPopupSearch("");
+        setCannedPopupHighlight(0);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [showCannedResponses]);
+
+  // Auto-focus search when popup opens
+  useEffect(() => {
+    if (showCannedResponses) {
+      setCannedPopupSearch("");
+      setCannedPopupHighlight(0);
+      setTimeout(() => cannedPopupSearchRef.current?.focus(), 60);
+    }
+  }, [showCannedResponses]);
   
   // Mentions Autocomplete State
   const [showMentionsMenu, setShowMentionsMenu] = useState<boolean>(false);
@@ -3241,45 +3268,103 @@ export default function WhatsAppInboxComponent() {
                       <Zap size={18} />
                     </button>
 
-                    <div style={{ position: "relative" }}>
+                    <div style={{ position: "relative" }} ref={cannedPopupRef}>
                       <button
                         type="button"
                         className={`input-attachment-btn ${showCannedResponses ? "btn-active-quick" : ""}`}
-                        title="Quick Replies / Canned Responses"
+                        title="Quick Replies / Canned Responses (⚡)"
                         onClick={() => setShowCannedResponses(!showCannedResponses)}
                       >
                         <MessageSquare size={18} />
                       </button>
 
                       {/* Canned Responses Popup Menu */}
-                      {showCannedResponses && (
-                        <div className="canned-responses-popup">
-                          <div className="canned-responses-header">
-                            <span>Quick Replies</span>
-                            <button type="button" onClick={() => setShowCannedResponses(false)} className="popup-close-btn"><X size={14} /></button>
-                          </div>
-                          <div className="canned-responses-list">
-                            {cannedResponses.length > 0 ? (
-                              cannedResponses.map(cr => (
-                                <button
-                                  key={cr.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setMessageInput(prev => prev ? `${prev} ${cr.content}` : cr.content);
+                      {showCannedResponses && (() => {
+                        const filtered = cannedResponses.filter(cr =>
+                          !cannedPopupSearch ||
+                          cr.title?.toLowerCase().includes(cannedPopupSearch.toLowerCase()) ||
+                          (cr.shortcut || "").toLowerCase().includes(cannedPopupSearch.toLowerCase()) ||
+                          cr.content?.toLowerCase().includes(cannedPopupSearch.toLowerCase())
+                        );
+                        const safeHighlight = Math.min(cannedPopupHighlight, Math.max(0, filtered.length - 1));
+                        return (
+                          <div className="canned-responses-popup">
+                            <div className="canned-responses-header">
+                              <span>⚡ Quick Replies</span>
+                              <button type="button" onClick={() => { setShowCannedResponses(false); setCannedPopupSearch(""); }} className="popup-close-btn"><X size={14} /></button>
+                            </div>
+                            {/* Search filter */}
+                            <div className="canned-popup-search-wrap">
+                              <input
+                                ref={cannedPopupSearchRef}
+                                type="text"
+                                className="canned-popup-search"
+                                placeholder="Search replies or type /shortcut..."
+                                value={cannedPopupSearch}
+                                onChange={e => { setCannedPopupSearch(e.target.value); setCannedPopupHighlight(0); }}
+                                onKeyDown={e => {
+                                  if (e.key === "ArrowDown") { e.preventDefault(); setCannedPopupHighlight(h => Math.min(h + 1, filtered.length - 1)); }
+                                  else if (e.key === "ArrowUp") { e.preventDefault(); setCannedPopupHighlight(h => Math.max(h - 1, 0)); }
+                                  else if (e.key === "Enter" && filtered.length > 0) {
+                                    e.preventDefault();
+                                    applyQuickShortcut(filtered[safeHighlight]);
                                     setShowCannedResponses(false);
-                                  }}
-                                  className="canned-response-item"
-                                >
-                                  <strong className="canned-response-title">{cr.title} <span className="canned-response-shortcut">{cr.shortcut}</span></strong>
-                                  <span className="canned-response-snippet">{cr.content}</span>
-                                </button>
-                              ))
-                            ) : (
-                              <div className="canned-response-empty">No quick replies found.</div>
-                            )}
+                                    setCannedPopupSearch("");
+                                  } else if (e.key === "Escape") {
+                                    setShowCannedResponses(false);
+                                    setCannedPopupSearch("");
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="canned-responses-list">
+                              {filtered.length > 0 ? (
+                                filtered.map((cr, idx) => {
+                                  const isRich = !!(cr.buttons || cr.mediaUrl || cr.headerText || cr.footerText);
+                                  return (
+                                    <button
+                                      key={cr.id}
+                                      type="button"
+                                      onClick={() => {
+                                        applyQuickShortcut(cr);
+                                        setShowCannedResponses(false);
+                                        setCannedPopupSearch("");
+                                      }}
+                                      className={`canned-response-item${idx === safeHighlight ? " canned-response-item--active" : ""}`}
+                                      onMouseEnter={() => setCannedPopupHighlight(idx)}
+                                    >
+                                      <span className="canned-response-item-row">
+                                        <strong className="canned-response-title">{cr.title}</strong>
+                                        <span className="canned-response-meta">
+                                          {isRich && <span className="canned-rich-badge">⚡ Rich</span>}
+                                          <span className="canned-response-shortcut">{cr.shortcut}</span>
+                                        </span>
+                                      </span>
+                                      <span className="canned-response-snippet">{cr.content}</span>
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <div className="canned-response-empty">
+                                  {cannedPopupSearch ? `No replies match "${cannedPopupSearch}"` : "No quick replies yet. Create one in the Reply Library."}
+                                </div>
+                              )}
+                            </div>
+                            <div className="canned-popup-footer">
+                              <button
+                                type="button"
+                                className="canned-popup-manage-btn"
+                                onClick={() => { setShowCannedResponses(false); setShowReplyLibraryModal(true); setIsManagingReplies(true); }}
+                              >
+                                ＋ Manage Reply Library
+                              </button>
+                              {filtered.length > 0 && (
+                                <span className="canned-popup-hint">↑↓ navigate · Enter to send</span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
 
                     <button
@@ -3357,10 +3442,14 @@ export default function WhatsAppInboxComponent() {
                       setShowMentionsMenu(false);
                     }
 
-                    // Check if they typed a shortcut exactly
-                    const match = cannedResponses.find(cr => val.endsWith(cr.shortcut + " "));
+                    // Check if they typed a shortcut exactly (replace only first/last occurrence)
+                    const match = cannedResponses.find(cr => cr.shortcut && val.endsWith(cr.shortcut + " "));
                     if (match) {
-                      setMessageInput(val.replace(match.shortcut + " ", match.content + " "));
+                      const idx = val.lastIndexOf(match.shortcut + " ");
+                      if (idx !== -1) {
+                        const replaced = val.slice(0, idx) + match.content + " ";
+                        setMessageInput(replaced);
+                      }
                     }
                   }}
                   onKeyDown={(e) => {
