@@ -753,6 +753,50 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
       to: targetPhone
     };
 
+    if (existing.messageType === 'TEMPLATE') {
+      let tName = '';
+      let lang = 'en_US';
+      let comps: any[] = [];
+      try {
+        if (existing.metadata) {
+          const meta = typeof existing.metadata === 'string' ? JSON.parse(existing.metadata) : existing.metadata;
+          tName = meta.templateName;
+          lang = meta.languageCode || 'en_US';
+          comps = meta.components || [];
+        }
+      } catch {}
+
+      if (!tName && existing.content) {
+        const match = existing.content.match(/\[Template:\s*([^\]]+)\]/);
+        if (match) tName = match[1].trim();
+      }
+
+      if (!tName) {
+        const latestT = await prisma.whatsAppTemplate.findFirst({
+          where: { status: 'APPROVED' },
+          orderBy: { updatedAt: 'desc' }
+        });
+        if (latestT) tName = latestT.name;
+      }
+
+      if (tName) {
+        const sendRes = await sendWhatsAppTemplateAction(targetPhone, tName, lang, comps, conversation.id, existing.senderName || undefined);
+        if (sendRes.success) {
+          await prisma.whatsAppMessage.update({
+            where: { id: messageId },
+            data: {
+              status: 'SENT',
+              sentAt: new Date()
+            }
+          }).catch(() => {});
+          revalidatePath('/whatsapp/inbox');
+          return { success: true, message: sendRes };
+        } else {
+          return { success: false, error: sendRes.error };
+        }
+      }
+    }
+
     if (existing.messageType === 'BUTTONS' || existing.messageType === 'LIST') {
       let options: string[] = [];
       try {
@@ -7533,7 +7577,10 @@ export async function getMetaPhoneHealthAndLimitsAction() {
         if (pData.status) status = pData.status;
         if (pData.verified_name) verifiedName = pData.verified_name;
         if (pData.display_phone_number) displayPhoneNumber = pData.display_phone_number;
-        if (pData.throughput?.level) throughput = pData.throughput.level;
+        if (pData.throughput?.level) {
+          const lvl = String(pData.throughput.level).toUpperCase();
+          throughput = lvl === 'STANDARD' ? 80 : lvl === 'HIGH' ? 250 : lvl === 'VERY_HIGH' ? 1000 : (Number(pData.throughput.level) || 80);
+        }
       }
     } catch (e) {
       console.warn("Could not fetch phone health from Meta:", e);

@@ -168,7 +168,9 @@ function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
             <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Throughput:</span>
             <span className="px-2.5 py-1 rounded-lg font-bold text-xs bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 flex items-center gap-1.5">
               <Activity size={12} className="text-sky-500" />
-              {metaHealth.throughput} msgs/sec
+              {String(metaHealth.throughput).toUpperCase() === "STANDARD" || metaHealth.throughput === 80
+                ? "80 msgs/sec (Standard)"
+                : `${metaHealth.throughput} msgs/sec`}
             </span>
           </div>
         </div>
