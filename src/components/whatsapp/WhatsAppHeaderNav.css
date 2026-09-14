@@ -1,57 +1,64 @@
 .whatmore-header {
-  background: var(--sidebar);
-  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #eaecf0;
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .whatmore-header-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 12px 24px;
 }
 
 .whatmore-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .brand-logo {
-  background: var(--primary);
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
   color: white;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 3px 10px rgba(79, 70, 229, 0.25);
 }
 
 .brand-text h1 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   margin: 0;
   letter-spacing: -0.02em;
-  color: var(--foreground);
+  color: #0f172a;
 }
 
 .brand-text p {
-  font-size: 12px;
+  font-size: 11px;
   color: #64748b;
   margin: 0;
   font-weight: 500;
 }
 
+/* Status Beacon */
 .status-badge {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   text-decoration: none;
   border: 1px solid transparent;
@@ -70,54 +77,266 @@
   color: #991b1b;
 }
 
+.beacon-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+}
+
 .pulse-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
+  position: relative;
+  z-index: 2;
 }
 
 .status-badge.active .pulse-dot {
-  background: #22c55e;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+  background: #16a34a;
 }
 
 .status-badge.inactive .pulse-dot {
   background: #ef4444;
 }
 
-.whatmore-nav {
-  display: flex;
-  gap: 8px;
-  padding: 0 24px;
-  overflow-x: auto;
+.beacon-ping {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #22c55e;
+  opacity: 0.4;
+  animation: beaconPing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
-.nav-item {
+@keyframes beaconPing {
+  0% { transform: scale(0.5); opacity: 0.8; }
+  80%, 100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Header Action Tools */
+.whatmore-header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+}
+
+.theme-toggle-btn,
+.notif-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-toggle-btn:hover,
+.notif-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+/* User Profile Chip */
+.user-profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  transition: all 0.15s ease;
+}
+
+.user-avatar-initials {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-info-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-display-name {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.user-role-badge {
+  font-size: 9px;
   color: #64748b;
-  font-size: 14px;
   font-weight: 600;
+  line-height: 1.1;
+}
+
+.user-signout-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.user-signout-btn:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
+/* Segmented Navigation Track */
+.whatmore-nav-container {
+  padding: 0 24px 8px;
+  display: flex;
+}
+
+.whatmore-nav-track {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 9px;
+  overflow-x: auto;
+}
+
+.nav-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
   text-decoration: none;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  border-radius: 7px;
+  transition: all 0.15s ease;
   white-space: nowrap;
 }
 
-.nav-item:hover {
-  color: var(--foreground);
+.nav-pill:hover {
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.6);
 }
 
-.nav-item.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
+.nav-pill.active {
+  background: #ffffff;
+  color: #4338ca;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-.nav-item.highlight {
-  color: #8b5cf6;
+.nav-pill-icon {
+  flex-shrink: 0;
 }
-.nav-item.highlight.active {
-  border-bottom-color: #8b5cf6;
+
+/* ----------------------------------------------------------------- */
+/* DARK THEME SUPPORT */
+/* ----------------------------------------------------------------- */
+html.dark .whatmore-header,
+[data-theme="dark"] .whatmore-header {
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom-color: #1e293b;
+}
+
+html.dark .brand-text h1,
+[data-theme="dark"] .brand-text h1 {
+  color: #f8fafc;
+}
+
+html.dark .brand-text p,
+[data-theme="dark"] .brand-text p {
+  color: #94a3b8;
+}
+
+html.dark .status-badge.active,
+[data-theme="dark"] .status-badge.active {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #4ade80;
+}
+
+html.dark .theme-toggle-btn,
+html.dark .notif-btn,
+[data-theme="dark"] .theme-toggle-btn,
+[data-theme="dark"] .notif-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+html.dark .theme-toggle-btn:hover,
+html.dark .notif-btn:hover,
+[data-theme="dark"] .theme-toggle-btn:hover,
+[data-theme="dark"] .notif-btn:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+html.dark .user-profile-chip,
+[data-theme="dark"] .user-profile-chip {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html.dark .user-display-name,
+[data-theme="dark"] .user-display-name {
+  color: #f8fafc;
+}
+
+html.dark .user-role-badge,
+[data-theme="dark"] .user-role-badge {
+  color: #94a3b8;
+}
+
+html.dark .user-signout-btn:hover,
+[data-theme="dark"] .user-signout-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+html.dark .whatmore-nav-track,
+[data-theme="dark"] .whatmore-nav-track {
+  background: #1e293b;
+}
+
+html.dark .nav-pill,
+[data-theme="dark"] .nav-pill {
+  color: #94a3b8;
+}
+
+html.dark .nav-pill:hover,
+[data-theme="dark"] .nav-pill:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .nav-pill.active,
+[data-theme="dark"] .nav-pill.active {
+  background: #334155;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }

@@ -122,6 +122,29 @@ const forceDownloadMedia = async (url: string, e?: React.MouseEvent) => {
 
 const EMOJI_LIST = ["👍", "🙏", "✅", "📦", "📄", "💰", "📞", "❤️", "🔥", "💯", "🏷️", "🚚"];
 
+const AVATAR_GRADIENTS = [
+  "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+  "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
+  "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+  "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+  "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+  "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
+  "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+  "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)",
+  "linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)",
+];
+
+export const getAvatarGradient = (str?: string | null): string => {
+  if (!str) return AVATAR_GRADIENTS[0];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_GRADIENTS.length;
+  return AVATAR_GRADIENTS[index];
+};
+
 export default function WhatsAppInboxComponent() {
   const { conversations, setConversations, activeConvDetail, setActiveConvDetail } = useWhatsAppStore();
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
@@ -408,6 +431,27 @@ export default function WhatsAppInboxComponent() {
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [currentUserName, setCurrentUserName] = useState<string>("Agent");
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string>("");
+  const [rawAllChats, setRawAllChats] = useState<any[]>([]);
+
+  // Real-time folder counts for All, Assigned, Unassigned, Closed
+  const folderCounts = useMemo(() => {
+    const list = rawAllChats.length > 0 ? rawAllChats : conversations;
+    const isAgent = currentUserRole === 'AGENT' || currentUserRole === 'SALES';
+    const all = list.filter((c: any) => c.status === 'OPEN').length;
+    const assigned = list.filter((c: any) => {
+      const empId = c._raw?.assignedEmployeeId;
+      if (isAgent && currentEmployeeId) {
+        return empId === currentEmployeeId && c.status === 'OPEN';
+      }
+      return Boolean(empId) && c.status === 'OPEN';
+    }).length;
+    const unassigned = list.filter((c: any) => {
+      const empId = c._raw?.assignedEmployeeId;
+      return (!empId || empId === "") && c.status === 'OPEN';
+    }).length;
+    const closed = list.filter((c: any) => c.status === 'CLOSED').length;
+    return { all, assigned, unassigned, closed };
+  }, [rawAllChats, conversations, currentUserRole, currentEmployeeId]);
 
   useEffect(() => {
     try {
@@ -598,6 +642,8 @@ export default function WhatsAppInboxComponent() {
           },
           _raw: c
         }));
+
+        setRawAllChats(mapped);
 
         // Read user details from cookie for filtering to avoid stale state in closures
         let activeRole = currentUserRole;
@@ -1589,12 +1635,14 @@ export default function WhatsAppInboxComponent() {
                     }}
                   >
                     <span>All</span>
+                    <span className="folder-count-badge">{folderCounts.all}</span>
                   </button>
                   <button
                     className={`folder-tab ${activeNavTab === "assigned_to_me" ? "active" : ""}`}
                     onClick={() => setActiveNavTab("assigned_to_me")}
                   >
                     <span>Assigned</span>
+                    <span className="folder-count-badge">{folderCounts.assigned}</span>
                   </button>
                   <button
                     className={`folder-tab ${activeNavTab === "unassigned" ? "active" : ""}`}
@@ -1604,6 +1652,7 @@ export default function WhatsAppInboxComponent() {
                     }}
                   >
                     <span>Unassigned</span>
+                    <span className="folder-count-badge">{folderCounts.unassigned}</span>
                   </button>
                   <button
                     className={`folder-tab ${activeNavTab === "closed" ? "active" : ""}`}
@@ -1613,6 +1662,7 @@ export default function WhatsAppInboxComponent() {
                     }}
                   >
                     <span>Closed</span>
+                    <span className="folder-count-badge">{folderCounts.closed}</span>
                   </button>
                 </div>
                 )}
@@ -1703,8 +1753,8 @@ export default function WhatsAppInboxComponent() {
                   className={`conversation-card ${isSelected ? "selected" : ""} ${isUnread ? "unread" : ""}`}
                   onClick={() => { if(selectedConvId !== conv.id) { setActiveConvDetail(null); setSelectedConvId(conv.id); } }}
                 >
-                  <div className="conv-avatar">
-                    <span>{(cust?.contactPerson || cust?.businessName || "C").slice(0, 2).toUpperCase()}</span>
+                  <div className="conv-avatar" style={{ background: getAvatarGradient(cust?.contactPerson || cust?.businessName || cust?.whatsappNumber) }}>
+                    <span style={{ color: "#ffffff", fontWeight: 700 }}>{(cust?.contactPerson || cust?.businessName || "C").slice(0, 2).toUpperCase()}</span>
                     <span className="conv-wa-badge">
                       <MessageSquare size={10} color="#fff" />
                     </span>
@@ -1826,8 +1876,8 @@ export default function WhatsAppInboxComponent() {
             {/* Chat Header */}
             <div className="chat-header">
               <div className="chat-header-user-info">
-                <div className="chat-avatar-large">
-                  <span>{(activeConvDetail.customer?.contactPerson || "C").slice(0, 2).toUpperCase()}</span>
+                <div className="chat-avatar-large" style={{ background: getAvatarGradient(activeConvDetail.customer?.contactPerson || activeConvDetail.customer?.businessName || activeConvDetail.customer?.whatsappNumber) }}>
+                  <span style={{ color: "#ffffff", fontWeight: 700 }}>{(activeConvDetail.customer?.contactPerson || "C").slice(0, 2).toUpperCase()}</span>
                 </div>
                 <div>
                   <div className="chat-title-line" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -1908,7 +1958,6 @@ export default function WhatsAppInboxComponent() {
                         </button>
                       </>
                     )}
-                    <span className="chat-wa-connected-badge">Connected</span>
                     {!sessionStatus.neverMessaged && (
                       <span 
                         style={{
@@ -2323,13 +2372,22 @@ export default function WhatsAppInboxComponent() {
                     {dateDividerNode}
                     <div className={`message-row ${isAgent ? "outgoing" : "incoming"} ${msg.isInternalNote ? "internal-note-row" : ""}`}>
                       <div className="message-bubble" style={msg.isInternalNote ? { background: '#fef9c3', color: '#854d0e', border: '1px solid #fde047' } : {}}>
-                        <div className="message-sender-name" style={msg.isInternalNote ? { color: '#a16207' } : {}}>
+                        <div className="message-sender-name">
                           {msg.isInternalNote ? (
-                            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><LockIcon size={12} /> Internal Note</span>
+                            <span className="sender-badge internal-note"><Lock size={11} /> Internal Note</span>
+                          ) : (msg.senderType === "BOT" || msg.senderType === "AI" || msg.senderName === "AI Assistant") ? (
+                            <span className="sender-badge ai-badge"><Bot size={11} /> AI Assistant</span>
+                          ) : isAgent ? (
+                            <span className="sender-badge agent-badge">
+                              <UserCheck size={11} />
+                              <span>
+                                {(msg.senderName === "Sales Rep" || msg.senderName === "Agent") && activeConvDetail.assignedEmployee?.user?.name 
+                                  ? `Sales Agent · ${activeConvDetail.assignedEmployee.user.name}` 
+                                  : (msg.senderName || "Sales Agent")}
+                              </span>
+                            </span>
                           ) : (
-                            (msg.senderName === "Sales Rep" || msg.senderName === "Agent") && activeConvDetail.assignedEmployee?.user?.name 
-                              ? activeConvDetail.assignedEmployee.user.name 
-                              : msg.senderName
+                            <span className="sender-badge customer-badge">{msg.senderName || activeConvDetail.customer?.contactPerson || "Customer"}</span>
                           )}
                         </div>
 

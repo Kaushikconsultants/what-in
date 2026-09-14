@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  MessageSquare, LayoutDashboard, Bot, ShoppingBag, Key, Activity, Box, GitBranch, FileCode, Zap, Bell
+  MessageSquare, LayoutDashboard, Bot, ShoppingBag, Key, Activity, Box, GitBranch, FileCode, Zap, Bell, Sun, Moon, LogOut
 } from "lucide-react";
 import "./WhatsAppHeaderNav.css";
 import { getWhatsAppDashboardMetrics, syncSessionRoleAction } from "@/app/actions/whatsAppPlatformActions";
@@ -170,6 +170,39 @@ export default function WhatsAppHeaderNav() {
     }
   };
 
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
+
+  React.useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem("wm_theme");
+      if (savedTheme === "dark" || (!savedTheme && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        setIsDarkMode(true);
+        document.documentElement.classList.add("dark");
+        document.documentElement.setAttribute("data-theme", "dark");
+      } else {
+        setIsDarkMode(false);
+        document.documentElement.classList.remove("dark");
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    } catch (_) {}
+  }, []);
+
+  const toggleDarkMode = () => {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    try {
+      if (nextMode) {
+        document.documentElement.classList.add("dark");
+        document.documentElement.setAttribute("data-theme", "dark");
+        localStorage.setItem("wm_theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.setAttribute("data-theme", "light");
+        localStorage.setItem("wm_theme", "light");
+      }
+    } catch (_) {}
+  };
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -180,7 +213,7 @@ export default function WhatsAppHeaderNav() {
       <div className="whatmore-header-top">
         <div className="whatmore-brand">
           <div className="brand-logo">
-            <ShoppingBag size={24} strokeWidth={2.5} />
+            <ShoppingBag size={20} strokeWidth={2.5} />
           </div>
           <div className="brand-text">
             <h1 suppressHydrationWarning>{brandTitle}</h1>
@@ -192,35 +225,68 @@ export default function WhatsAppHeaderNav() {
           href="/whatsapp/integrations"
           className={`status-badge ${accountInfo.isConnected ? "active" : "inactive"}`}
         >
-          <span className="pulse-dot"></span>
-          <span>WhatsApp API: {accountInfo.status}</span>
+          <span className="beacon-container">
+            <span className="pulse-dot"></span>
+            {accountInfo.isConnected && <span className="beacon-ping"></span>}
+          </span>
+          <span className="status-text">WhatsApp API: {accountInfo.status}</span>
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginLeft: "12px" }}>
-          <button onClick={handleTestNotification} title="Test Notifications" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", borderRadius: "50%", background: "rgba(99, 102, 241, 0.1)", color: "#6366f1", border: "none", cursor: "pointer" }}>
-            <Bell size={16} />
+
+        <div className="whatmore-header-actions">
+          {/* Theme Toggle Button */}
+          <button 
+            type="button" 
+            onClick={toggleDarkMode} 
+            className="theme-toggle-btn"
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
           </button>
-          {userName && <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 500 }}>{userName}</span>}
-          <button onClick={handleLogout} style={{ padding: "5px 12px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "8px", color: "#f87171", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>Sign Out</button>
+
+          <button onClick={handleTestNotification} title="Test Notifications" className="notif-btn">
+            <Bell size={15} />
+          </button>
+
+          {/* User Profile Chip */}
+          <div className="user-profile-chip">
+            <div className="user-avatar-initials">
+              {(userName || "Admin").slice(0, 2).toUpperCase()}
+            </div>
+            <div className="user-info-text">
+              <span className="user-display-name">{userName || "Espon Admin"}</span>
+              <span className="user-role-badge">{userRole === "AGENT" ? "Agent" : userRole === "SALES" ? "Sales" : "Admin"}</span>
+            </div>
+            <button 
+              type="button" 
+              onClick={handleLogout} 
+              className="user-signout-btn" 
+              title="Sign Out"
+            >
+              <LogOut size={13} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <nav className="whatmore-nav">
-        {subNavItems.map((item) => {
-          if (userRole === "AGENT" && item.name !== "Inbox" && item.name !== "Settings") return null;
-          const Icon = item.icon;
-          const active = isItemActive(item.path);
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={`nav-item ${active ? "active" : ""} ${(item as any).highlight ? "highlight" : ""}`}
-            >
-              <Icon size={16} />
-              <span>{userRole === "AGENT" && item.name === "Settings" ? "My Profile" : item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="whatmore-nav-container">
+        <nav className="whatmore-nav-track">
+          {subNavItems.map((item) => {
+            if (userRole === "AGENT" && item.name !== "Inbox" && item.name !== "Settings") return null;
+            const Icon = item.icon;
+            const active = isItemActive(item.path);
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`nav-pill ${active ? "active" : ""}`}
+              >
+                <Icon size={14} className="nav-pill-icon" />
+                <span>{userRole === "AGENT" && item.name === "Settings" ? "My Profile" : item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </header>
   );
 }
