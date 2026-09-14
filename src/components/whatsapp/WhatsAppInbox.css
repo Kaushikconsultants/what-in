@@ -1795,7 +1795,7 @@
 }
 
 .skeleton-line {
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background: var(--skel-gradient, linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%));
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 6px;
@@ -1810,11 +1810,11 @@
 .skeleton-conv-card {
   display: flex; align-items: flex-start; gap: 10px;
   padding: 12px; border-radius: 10px;
-  background: #fff; border: 1px solid #f1f5f9;
+  background: var(--skel-bg, #fff); border: 1px solid var(--skel-border, #f1f5f9);
 }
 .skeleton-avatar {
   width: 40px; height: 40px; border-radius: 50%;
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background: var(--skel-gradient, linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%));
   background-size: 200% 100%; animation: shimmer 1.5s infinite; flex-shrink: 0;
 }
 .skeleton-avatar.large {
@@ -1825,16 +1825,16 @@
 /* Chat window skeleton */
 .chat-skeleton-loader {
   flex: 1; display: flex; flex-direction: column; overflow: hidden;
-  background: #fff;
+  background: var(--chat-skel-bg, #fff);
 }
 .chat-skeleton-header {
   display: flex; align-items: center; gap: 12px;
-  padding: 16px 20px; border-bottom: 1px solid #f1f5f9;
-  background: #fff;
+  padding: 16px 20px; border-bottom: 1px solid var(--chat-skel-border, #f1f5f9);
+  background: var(--chat-skel-header, #fff);
 }
 .chat-skeleton-messages {
   flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px;
-  background: #f8fafc;
+  background: var(--chat-skel-msgs, #f8fafc);
 }
 .skeleton-bubble {
   display: flex;
@@ -2243,6 +2243,7 @@
   width: 100px;
   height: 100px;
   background: #ffffff;
+  color: #6d28d9;
   border-radius: 28px;
   display: flex;
   align-items: center;
@@ -3197,3 +3198,255 @@ html.dark .dropdown-menu-item:hover,
   background: #334155;
   color: #f8fafc;
 }
+
+/* ----------------------------------------------------------------- */
+/* DARK MODE: SKELETON LOADERS & LOADING SCREEN */
+/* ----------------------------------------------------------------- */
+html.dark,
+[data-theme="dark"] {
+  --skel-bg: #111827;
+  --skel-border: rgba(255, 255, 255, 0.07);
+  --skel-gradient: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  --chat-skel-bg: #090d16;
+  --chat-skel-header: #0f172a;
+  --chat-skel-border: rgba(255, 255, 255, 0.08);
+  --chat-skel-msgs: #090d16;
+}
+
+/* Left panel skeleton list */
+html.dark .inbox-loading-skeleton,
+[data-theme="dark"] .inbox-loading-skeleton {
+  background: transparent;
+}
+
+html.dark .skeleton-conv-card,
+[data-theme="dark"] .skeleton-conv-card {
+  background: #111827 !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+html.dark .skeleton-avatar,
+[data-theme="dark"] .skeleton-avatar {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%) !important;
+  background-size: 200% 100% !important;
+}
+
+html.dark .skeleton-line,
+[data-theme="dark"] .skeleton-line {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%) !important;
+  background-size: 200% 100% !important;
+}
+
+/* Center panel chat skeleton loader */
+html.dark .chat-skeleton-loader,
+[data-theme="dark"] .chat-skeleton-loader {
+  background: #090d16 !important;
+}
+
+html.dark .chat-skeleton-header,
+[data-theme="dark"] .chat-skeleton-header {
+  background: #0f172a !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .chat-skeleton-messages,
+[data-theme="dark"] .chat-skeleton-messages {
+  background: #090d16 !important;
+}
+
+html.dark .skeleton-bubble.left .skeleton-line,
+[data-theme="dark"] .skeleton-bubble.left .skeleton-line {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%) !important;
+}
+
+html.dark .skeleton-bubble.right .skeleton-line,
+[data-theme="dark"] .skeleton-bubble.right .skeleton-line {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.25) 25%, rgba(99, 102, 241, 0.45) 50%, rgba(99, 102, 241, 0.25) 75%) !important;
+}
+
+/* Center Panel Empty Selection ("Select a Conversation") */
+html.dark .chat-empty-selection.premium-empty,
+html.dark .premium-empty,
+[data-theme="dark"] .chat-empty-selection.premium-empty,
+[data-theme="dark"] .premium-empty {
+  background: radial-gradient(ellipse at 50% 40%, #131b2e 0%, #090d16 75%) !important;
+}
+
+html.dark .main-empty-icon,
+[data-theme="dark"] .main-empty-icon {
+  background: #1e293b !important;
+  color: #a78bfa !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 0 30px rgba(124, 58, 237, 0.25) !important;
+}
+
+html.dark .main-empty-icon svg,
+[data-theme="dark"] .main-empty-icon svg {
+  color: #a78bfa !important;
+  stroke: #a78bfa !important;
+}
+
+html.dark .premium-empty-title,
+[data-theme="dark"] .premium-empty-title {
+  color: #f1f5f9 !important;
+}
+
+html.dark .premium-empty-desc,
+[data-theme="dark"] .premium-empty-desc {
+  color: #94a3b8 !important;
+}
+
+/* Left Panel Empty State ("No conversations found") */
+.inbox-empty-state.modern-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.modern-empty-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: #ede9fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.modern-empty-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 6px 0;
+}
+
+.modern-empty-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+  max-width: 240px;
+}
+
+.modern-empty-btn {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.modern-empty-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+html.dark .inbox-empty-state.modern-empty,
+[data-theme="dark"] .inbox-empty-state.modern-empty {
+  background: transparent;
+}
+
+html.dark .modern-empty-icon-wrapper,
+[data-theme="dark"] .modern-empty-icon-wrapper {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+html.dark .modern-empty-title,
+[data-theme="dark"] .modern-empty-title {
+  color: #f1f5f9;
+}
+
+html.dark .modern-empty-subtitle,
+[data-theme="dark"] .modern-empty-subtitle {
+  color: #94a3b8;
+}
+
+html.dark .modern-empty-btn,
+[data-theme="dark"] .modern-empty-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+html.dark .modern-empty-btn:hover,
+[data-theme="dark"] .modern-empty-btn:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+/* Logs Panel Dark Mode */
+html.dark .logs-panel,
+[data-theme="dark"] .logs-panel {
+  background: #090d16;
+}
+
+html.dark .logs-panel-header,
+[data-theme="dark"] .logs-panel-header {
+  background: #0f172a;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+html.dark .logs-title,
+[data-theme="dark"] .logs-title {
+  color: #f8fafc;
+}
+
+html.dark .logs-number-badge,
+[data-theme="dark"] .logs-number-badge {
+  background: rgba(139, 92, 246, 0.18);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+html.dark .logs-subtab-pills,
+[data-theme="dark"] .logs-subtab-pills {
+  background: #1e293b;
+}
+
+html.dark .logs-subtab-btn,
+[data-theme="dark"] .logs-subtab-btn {
+  color: #94a3b8;
+}
+
+html.dark .logs-subtab-btn.active-ai,
+[data-theme="dark"] .logs-subtab-btn.active-ai {
+  background: #0f172a;
+  color: #a78bfa;
+}
+
+html.dark .logs-subtab-btn.active-webhook,
+[data-theme="dark"] .logs-subtab-btn.active-webhook {
+  background: #0f172a;
+  color: #38bdf8;
+}
+
+html.dark .logs-refresh-btn,
+[data-theme="dark"] .logs-refresh-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+html.dark .logs-refresh-btn:hover,
+[data-theme="dark"] .logs-refresh-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+html.dark .logs-stat-card,
+[data-theme="dark"] .logs-stat-card {
+  background: #111827;
+  border-color: rgba(255, 255, 255, 0.07);
+  box-shadow: none;
+}
+

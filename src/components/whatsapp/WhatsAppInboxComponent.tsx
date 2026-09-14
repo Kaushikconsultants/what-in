@@ -1865,7 +1865,7 @@ export default function WhatsAppInboxComponent() {
               <div className="floating-bubble bubble-2"><Sparkles size={20} color="#fff" /></div>
               <div className="floating-bubble bubble-3"><CheckCircle size={20} color="#fff" /></div>
               <div className="main-empty-icon">
-                <MessageSquare size={54} color="#6d28d9" strokeWidth={1.5} />
+                <MessageSquare size={54} strokeWidth={1.5} />
               </div>
             </div>
             <h3 className="premium-empty-title">Select a Conversation</h3>

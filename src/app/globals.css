@@ -49,3 +49,13 @@ body {
   background: #94a3b8;
 }
 
+/* Global Dark Mode Skeleton Fallbacks */
+html.dark .skeleton-line,
+[data-theme="dark"] .skeleton-line,
+html.dark .skeleton-box,
+[data-theme="dark"] .skeleton-box,
+html.dark .skeleton-card,
+[data-theme="dark"] .skeleton-card {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%) !important;
+  background-size: 200% 100% !important;
+}
