@@ -88,14 +88,14 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
   // Auto-fill variables helper
   const handleAutoFill = () => {
     const newVars: Record<string, string> = { ...variables };
-    if (bodyVars[0] && !newVars[bodyVars[0]]) {
+    if (bodyVars[0]) {
       newVars[bodyVars[0]] = customerName || "Customer";
     }
-    if (bodyVars[1] && !newVars[bodyVars[1]]) {
-      newVars[bodyVars[1]] = agentName || brandName;
+    if (bodyVars[1]) {
+      newVars[bodyVars[1]] = agentName || brandName || "Whatmore";
     }
-    if (bodyVars[2] && !newVars[bodyVars[2]]) {
-      newVars[bodyVars[2]] = brandName;
+    if (bodyVars[2]) {
+      newVars[bodyVars[2]] = brandName || "Whatmore";
     }
     setVariables(newVars);
 
@@ -113,8 +113,14 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
     setSelected(t);
     const vars = extractVariables(t.bodyText);
     const initialVars: Record<string, string> = {};
-    if (vars[0] && customerName) {
-      initialVars[vars[0]] = customerName;
+    if (vars[0]) {
+      initialVars[vars[0]] = customerName || "Customer";
+    }
+    if (vars[1]) {
+      initialVars[vars[1]] = agentName || brandName || "Whatmore";
+    }
+    if (vars[2]) {
+      initialVars[vars[2]] = brandName || "Whatmore";
     }
     setVariables(initialVars);
 
@@ -145,14 +151,20 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
     if (bodyVars.length > 0) {
       components.push({
         type: "body",
-        parameters: bodyVars.map(v => ({ type: "text", text: variables[v] || v }))
+        parameters: bodyVars.map((v, idx) => {
+          let textVal = (variables[v] || "").trim();
+          if (!textVal || textVal === v) {
+            textVal = idx === 0 ? (customerName || "Customer") : idx === 1 ? (agentName || brandName || "Whatmore") : (brandName || "Whatmore");
+          }
+          return { type: "text", text: textVal };
+        })
       });
     }
 
     // Dynamic Button components
     dynamicButtons.forEach(btn => {
       const key = `btn_${btn.originalIndex}`;
-      const val = buttonVariables[key] || btn.urlExample || "ESP-10029";
+      const val = (buttonVariables[key] || "").trim() || btn.urlExample || (phone ? phone.slice(-6) : "ESP-10029");
       if (btn.type === "URL") {
         components.push({
           type: "button",
@@ -170,7 +182,24 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
       }
     });
 
-    await onSendTemplate(selected.name, selected.language || "en", components);
+    // Catalog button
+    const hasCatalog = templateButtons.some((b: any) => b.type?.toUpperCase() === "CATALOG");
+    if (hasCatalog) {
+      components.push({
+        type: "button",
+        sub_type: "CATALOG",
+        index: "0",
+        parameters: [
+          {
+            type: "action",
+            action: {}
+          }
+        ]
+      });
+    }
+
+    const effectiveLang = selected.language || "en_US";
+    await onSendTemplate(selected.name, effectiveLang, components);
     setSending(false);
     onClose();
   };

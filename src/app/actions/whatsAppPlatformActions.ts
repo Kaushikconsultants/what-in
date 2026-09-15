@@ -2035,28 +2035,104 @@ export async function sendWhatsAppTemplateAction(
       
       let finalComponents = Array.isArray(components) ? [...components] : [];
 
-      // Auto-detect template variable requirements from database to prevent Meta #132000 errors
-      const localTemplate = await prisma.whatsAppTemplate.findFirst({
+      // Auto-detect template variable requirements from database to prevent Meta #132000 / #131008 errors
+      let localTemplate = await prisma.whatsAppTemplate.findFirst({
         where: { name: templateName }
       });
 
-      // If body parameters are missing, inspect bodyText and auto-generate required parameter placeholders!
-      const hasBodyParam = finalComponents.some(c => c.type?.toLowerCase() === "body");
-      if (!hasBodyParam && localTemplate?.bodyText) {
-        const bodyMatches = (localTemplate.bodyText || '').match(/\{\{(\d+)\}\}/g);
-        if (bodyMatches && bodyMatches.length > 0) {
-          const params = bodyMatches.map((_, idx) => ({
-            type: "text",
-            text: idx === 0 ? "Valued Customer" : idx === 1 ? "ESP-9482" : idx === 2 ? "₹1,499" : "FLAT30"
-          }));
-          finalComponents.push({
-            type: "body",
-            parameters: params
+      // If local template not in DB, attempt to fetch its definition directly from Meta
+      if (!localTemplate && creds.wabaId) {
+        try {
+          const metaTRes = await fetch(`https://graph.facebook.com/v21.0/${creds.wabaId}/message_templates?name=${encodeURIComponent(templateName)}&fields=id,name,status,category,language,components,quality_score,rejected_reason`, {
+            headers: { Authorization: `Bearer ${creds.accessToken}` }
           });
+          const metaTData = await metaTRes.json();
+          const found = metaTData?.data?.[0];
+          if (found) {
+            const bodyC = found.components?.find((c: any) => c.type === 'BODY');
+            const headerC = found.components?.find((c: any) => c.type === 'HEADER');
+            const footerC = found.components?.find((c: any) => c.type === 'FOOTER');
+            const buttonsC = found.components?.find((c: any) => c.type === 'BUTTONS');
+            const carouselC = found.components?.find((c: any) => c.type === 'CAROUSEL');
+
+            localTemplate = await prisma.whatsAppTemplate.upsert({
+              where: { id: found.id },
+              update: {
+                name: found.name,
+                status: (found.status || 'APPROVED').toUpperCase(),
+                language: found.language || 'en_US',
+                category: found.category || 'MARKETING',
+                bodyText: bodyC?.text || '',
+                headerType: headerC?.format || 'NONE',
+                headerContent: headerC?.text || '',
+                footerText: footerC?.text || '',
+                buttons: buttonsC ? JSON.stringify(buttonsC.buttons) : '[]',
+                templateType: carouselC ? 'CAROUSEL' : 'STANDARD'
+              },
+              create: {
+                id: found.id,
+                name: found.name,
+                status: (found.status || 'APPROVED').toUpperCase(),
+                language: found.language || 'en_US',
+                category: found.category || 'MARKETING',
+                bodyText: bodyC?.text || '',
+                headerType: headerC?.format || 'NONE',
+                headerContent: headerC?.text || '',
+                footerText: footerC?.text || '',
+                buttons: buttonsC ? JSON.stringify(buttonsC.buttons) : '[]',
+                templateType: carouselC ? 'CAROUSEL' : 'STANDARD'
+              }
+            }).catch(() => null);
+          }
+        } catch {}
+      }
+
+      // 1. Normalize Language
+      let effectiveLanguage = languageCode || 'en_US';
+      if (localTemplate?.language) {
+        if (effectiveLanguage === 'en' && localTemplate.language.startsWith('en_')) {
+          effectiveLanguage = localTemplate.language;
+        } else if (!languageCode || languageCode === 'en') {
+          effectiveLanguage = localTemplate.language;
         }
       }
 
-      // If header text parameter is missing and header has variables
+      // 2. Body Parameter Validation & Auto-Padding
+      const bodyMatches = (localTemplate?.bodyText || '').match(/\{\{(\d+)\}\}/g) || [];
+      const bodyCompIdx = finalComponents.findIndex(c => c.type?.toLowerCase() === "body");
+
+      if (bodyCompIdx === -1) {
+        if (bodyMatches.length > 0) {
+          finalComponents.push({
+            type: "body",
+            parameters: bodyMatches.map((_, idx) => ({
+              type: "text",
+              text: idx === 0 ? (senderName || "Valued Customer") : idx === 1 ? "ESP-9482" : idx === 2 ? "Whatmore" : "FLAT30"
+            }))
+          });
+        }
+      } else {
+        const existingParams = finalComponents[bodyCompIdx].parameters || [];
+        const sanitizedParams = existingParams.map((p: any, idx: number) => {
+          let t = typeof p?.text === "string" ? p.text.trim() : "";
+          if (!t || t.match(/^\{\{\d+\}\}$/)) {
+            t = idx === 0 ? (senderName || "Valued Customer") : idx === 1 ? "ESP-9482" : idx === 2 ? "Whatmore" : "FLAT30";
+          }
+          return { ...p, type: p.type || "text", text: t };
+        });
+
+        // Pad any missing parameters if user supplied fewer than required
+        while (sanitizedParams.length < bodyMatches.length) {
+          const idx = sanitizedParams.length;
+          sanitizedParams.push({
+            type: "text",
+            text: idx === 0 ? (senderName || "Valued Customer") : idx === 1 ? "ESP-9482" : idx === 2 ? "Whatmore" : "FLAT30"
+          });
+        }
+        finalComponents[bodyCompIdx].parameters = sanitizedParams;
+      }
+
+      // 3. Header Parameters Validation
       const hasHeaderParam = finalComponents.some(c => c.type?.toLowerCase() === "header");
       if (!hasHeaderParam && localTemplate?.headerContent && localTemplate?.headerType === 'TEXT') {
         const headerMatches = (localTemplate.headerContent || '').match(/\{\{(\d+)\}\}/g);
@@ -2068,7 +2144,7 @@ export async function sendWhatsAppTemplateAction(
         }
       }
 
-      // Handle Standard Media Headers (IMAGE / VIDEO / DOCUMENT)
+      // 4. Handle Standard Media Headers (IMAGE / VIDEO / DOCUMENT)
       if (!hasHeaderParam && localTemplate?.headerType && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(localTemplate.headerType)) {
         const hType = localTemplate.headerType.toLowerCase();
         const mediaUrl = localTemplate.headerContent || (hType === 'image' ? FALLBACK_CAROUSEL_JPEGS[0] : '');
@@ -2098,7 +2174,59 @@ export async function sendWhatsAppTemplateAction(
         }
       }
 
-      // Handle Carousel Cards if template is a CAROUSEL template
+      // 5. Handle Buttons (CATALOG, DYNAMIC URL, COPY_CODE)
+      let parsedButtons: any[] = [];
+      if (localTemplate?.buttons) {
+        try {
+          parsedButtons = typeof localTemplate.buttons === 'string' ? JSON.parse(localTemplate.buttons) : localTemplate.buttons;
+        } catch {}
+      }
+
+      // Auto-attach CATALOG button component if template has CATALOG button
+      const hasCatalogButtonInParams = finalComponents.some(c => c.type?.toLowerCase() === "button" && (c.sub_type?.toUpperCase() === "CATALOG"));
+      const templateHasCatalogButton = parsedButtons.some((b: any) => b.type?.toUpperCase() === "CATALOG");
+
+      if (!hasCatalogButtonInParams && templateHasCatalogButton) {
+        finalComponents.push({
+          type: "button",
+          sub_type: "CATALOG",
+          index: "0",
+          parameters: [
+            {
+              type: "action",
+              action: {}
+            }
+          ]
+        });
+      }
+
+      // Auto-attach Dynamic URL and COPY_CODE buttons if missing
+      parsedButtons.forEach((b: any, idx: number) => {
+        const bType = (b.type || "").toUpperCase();
+        if (bType === "URL" && (b.urlType === "DYNAMIC" || b.url?.includes("{{1}}"))) {
+          const hasBtn = finalComponents.some(c => c.type?.toLowerCase() === "button" && String(c.index) === String(idx));
+          if (!hasBtn) {
+            finalComponents.push({
+              type: "button",
+              sub_type: "url",
+              index: String(idx),
+              parameters: [{ type: "text", text: b.example?.[0] || b.urlExample || (cleanPhone ? cleanPhone.slice(-6) : "ESP-10029") }]
+            });
+          }
+        } else if (bType === "COPY_CODE" && (b.code === "{{1}}" || b.isDynamicCode)) {
+          const hasBtn = finalComponents.some(c => c.type?.toLowerCase() === "button" && String(c.index) === String(idx));
+          if (!hasBtn) {
+            finalComponents.push({
+              type: "button",
+              sub_type: "copy_code",
+              index: String(idx),
+              parameters: [{ type: "coupon_code", coupon_code: b.code || "ESPON5" }]
+            });
+          }
+        }
+      });
+
+      // 6. Handle Carousel Cards if template is a CAROUSEL template
       const hasCarouselParam = finalComponents.some(c => c.type?.toLowerCase() === "carousel");
       if (!hasCarouselParam && (localTemplate?.templateType === 'CAROUSEL' || localTemplate?.carouselCards)) {
         let rawCards: any[] = [];
@@ -2215,7 +2343,7 @@ export async function sendWhatsAppTemplateAction(
         type: "template",
         template: {
           name: templateName,
-          language: { code: languageCode }
+          language: { code: effectiveLanguage }
         }
       };
 
@@ -2330,35 +2458,71 @@ export async function sendWhatsAppTemplateAction(
         ? `${localTemplate.headerContent}\n\n${readableBody}`
         : readableBody;
 
-      // 3. Create WhatsAppMessage record in DB if conversation exists
+      // 3. Create or update WhatsAppMessage record in DB if conversation exists
       if (targetConvId) {
-        await prisma.whatsAppMessage.create({
-          data: {
-            conversationId: targetConvId,
-            senderType: 'AGENT',
-            senderName: senderName || 'Sales Agent',
-            messageType: 'TEMPLATE',
-            content: displayContent,
-            metadata: JSON.stringify({
-              templateName,
-              languageCode,
-              components,
-              templateId: localTemplate?.id,
-              metaMessageId
-            }),
-            status: 'SENT',
-            metaMessageId: metaMessageId,
-            sentAt: new Date()
+        try {
+          if (metaMessageId) {
+            await prisma.whatsAppMessage.upsert({
+              where: { metaMessageId },
+              update: {
+                status: 'SENT',
+                content: displayContent,
+                metadata: JSON.stringify({
+                  templateName,
+                  languageCode: effectiveLanguage,
+                  components: finalComponents,
+                  templateId: localTemplate?.id,
+                  metaMessageId
+                })
+              },
+              create: {
+                conversationId: targetConvId,
+                senderType: 'AGENT',
+                senderName: senderName || 'Sales Agent',
+                messageType: 'TEMPLATE',
+                content: displayContent,
+                metadata: JSON.stringify({
+                  templateName,
+                  languageCode: effectiveLanguage,
+                  components: finalComponents,
+                  templateId: localTemplate?.id,
+                  metaMessageId
+                }),
+                status: 'SENT',
+                metaMessageId: metaMessageId,
+                sentAt: new Date()
+              }
+            });
+          } else {
+            await prisma.whatsAppMessage.create({
+              data: {
+                conversationId: targetConvId,
+                senderType: 'AGENT',
+                senderName: senderName || 'Sales Agent',
+                messageType: 'TEMPLATE',
+                content: displayContent,
+                metadata: JSON.stringify({
+                  templateName,
+                  languageCode: effectiveLanguage,
+                  components: finalComponents,
+                  templateId: localTemplate?.id
+                }),
+                status: 'SENT',
+                sentAt: new Date()
+              }
+            });
           }
-        });
 
-        await prisma.whatsAppConversation.update({
-          where: { id: targetConvId },
-          data: {
-            lastMessageText: `[Template] ${templateName}`,
-            lastMessageAt: new Date()
-          }
-        });
+          await prisma.whatsAppConversation.update({
+            where: { id: targetConvId },
+            data: {
+              lastMessageText: `[Template] ${templateName}`,
+              lastMessageAt: new Date()
+            }
+          });
+        } catch (msgErr) {
+          console.warn("[sendWhatsAppTemplateAction] Non-fatal message save note:", msgErr);
+        }
       }
 
       // 4. Create CommunicationLog entry
