@@ -183,6 +183,7 @@ export default function WhatsAppTemplatesComponent() {
         if (res.hasAiKnowledge !== undefined) setHasAiKnowledge(res.hasAiKnowledge);
         if (res.productsCount) setProductsCount(res.productsCount);
         if (res.combosCount) setCombosCount(res.combosCount);
+        if (res.metaCatalogId) setCatalogId(res.metaCatalogId);
 
         // Also update initial carousel cards with real brand name & domain
         setCarouselCards([
@@ -3716,25 +3717,37 @@ export default function WhatsAppTemplatesComponent() {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase">
-                        Meta Catalog ID (Optional)
+                        Meta Commerce Catalog
                       </label>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-800 shadow-2xs">
+                        <CheckCircle2 size={10} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>Auto-Linked</span>
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={catalogId || "2959185064427355"}
+                        onChange={(e) => setCatalogId(e.target.value)}
+                        placeholder="Auto-linked from Meta Commerce Manager"
+                        className="w-full px-3.5 py-2 bg-emerald-50/40 dark:bg-slate-800 border border-emerald-300 dark:border-emerald-800/80 rounded-xl text-xs font-mono font-bold text-emerald-900 dark:text-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold">
+                        <Check size={11} className="text-emerald-600" />
+                        <span>Synced with Espon Storefront</span>
+                      </span>
                       <a
                         href="https://business.facebook.com/commerce"
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[10px] text-sky-600 hover:underline flex items-center gap-0.5"
+                        className="text-sky-600 hover:underline flex items-center gap-0.5 font-bold"
                       >
                         <span>Meta Commerce</span>
                         <ExternalLink size={9} />
                       </a>
                     </div>
-                    <input
-                      type="text"
-                      value={catalogId}
-                      onChange={(e) => setCatalogId(e.target.value)}
-                      placeholder="e.g. 2959185064427355"
-                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 border border-sky-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-sky-500"
-                    />
                   </div>
                 </div>
 

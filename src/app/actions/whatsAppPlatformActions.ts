@@ -9722,18 +9722,41 @@ export async function getWhatsAppBrandDetailsAction() {
     const brandName = company?.companyName || client?.businessName || org?.name || account?.name || "Espon Clothing Private Limited";
     let whatsAppDisplayName = account?.name || client?.businessName || "Espon";
 
+    let metaCatalogId: string | null = null;
+    let isCartEnabled = true;
+    let isCatalogVisible = true;
+
     try {
       const creds = await getMetaApiCredentials();
       if (creds && creds.isConnected && creds.phoneId && creds.accessToken) {
-        const phoneRes = await fetch(
-          `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=verified_name,display_phone_number,is_official_business_account`,
-          {
-            headers: { Authorization: `Bearer ${creds.accessToken}` }
-          }
-        );
-        if (phoneRes.ok) {
+        const [phoneRes, commerceRes] = await Promise.all([
+          fetch(
+            `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=verified_name,display_phone_number,is_official_business_account`,
+            {
+              headers: { Authorization: `Bearer ${creds.accessToken}` }
+            }
+          ).catch(() => null),
+          fetch(
+            `https://graph.facebook.com/v21.0/${creds.phoneId}/whatsapp_commerce_settings`,
+            {
+              headers: { Authorization: `Bearer ${creds.accessToken}` }
+            }
+          ).catch(() => null)
+        ]);
+
+        if (phoneRes && phoneRes.ok) {
           const pData = await phoneRes.json();
           if (pData.verified_name) whatsAppDisplayName = pData.verified_name;
+        }
+
+        if (commerceRes && commerceRes.ok) {
+          const cData = await commerceRes.json();
+          const setting = cData?.data?.[0];
+          if (setting?.id) {
+            metaCatalogId = setting.id;
+            isCartEnabled = setting.is_cart_enabled ?? true;
+            isCatalogVisible = setting.is_catalog_visible ?? true;
+          }
         }
       }
     } catch {}
@@ -9774,6 +9797,9 @@ export async function getWhatsAppBrandDetailsAction() {
       verifiedName: whatsAppDisplayName,
       whatsAppDisplayName,
       brandDomain,
+      metaCatalogId: metaCatalogId || "2959185064427355",
+      isCartEnabled,
+      isCatalogVisible,
       phoneNumber,
       brandPhone: phoneNumber,
       brandEmail,
