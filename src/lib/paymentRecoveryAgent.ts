@@ -46,8 +46,9 @@ export async function saveRecoveryAgentSettings(settings: Partial<RecoveryAgentS
   const updated: RecoveryAgentSettings = {
     ...current,
     ...settings,
-    // Strict safety check: If allowDiscount is toggled off, discountPercent cannot be leveraged
-    allowDiscount: Boolean(settings.allowDiscount)
+    allowDiscount: settings.allowDiscount !== undefined ? Boolean(settings.allowDiscount) : current.allowDiscount,
+    autoCatalogPaymentEnabled: settings.autoCatalogPaymentEnabled !== undefined ? Boolean(settings.autoCatalogPaymentEnabled) : current.autoCatalogPaymentEnabled,
+    autoCatalogDeliveryMethod: settings.autoCatalogDeliveryMethod || current.autoCatalogDeliveryMethod || 'both'
   };
 
   globalThis.__recoverySettings = updated;

@@ -393,6 +393,31 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Quick Toggle for Catalog Order Payment Link & QR */}
+          <button
+            type="button"
+            onClick={async () => {
+              const newVal = !recoverySettings.autoCatalogPaymentEnabled;
+              const updated = { ...recoverySettings, autoCatalogPaymentEnabled: newVal };
+              setRecoverySettings(updated);
+              await savePaymentRecoverySettingsAction(updated);
+              showToast(
+                newVal ? "Catalog Auto-Payment Links & QR: ENABLED" : "Catalog Auto-Payment Links: DISABLED",
+                "success"
+              );
+            }}
+            className={`px-3.5 py-2 border rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer shadow-xs ${
+              recoverySettings.autoCatalogPaymentEnabled
+                ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900"
+                : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+            }`}
+            title="Toggle automatic payment link & QR code sending when customer submits a WhatsApp catalog order"
+          >
+            <QrCode size={15} className={recoverySettings.autoCatalogPaymentEnabled ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"} />
+            <span>Catalog Auto-Pay: {recoverySettings.autoCatalogPaymentEnabled ? "ON" : "OFF"}</span>
+            <span className={`w-2 h-2 rounded-full ${recoverySettings.autoCatalogPaymentEnabled ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`}></span>
+          </button>
+
           <button 
             onClick={() => setShowRecordModal(true)}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
@@ -1035,6 +1060,76 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                 {savingPg ? <RefreshCw size={13} className="animate-spin"/> : <Save size={13}/>}
                 <span>Save UPI Details</span>
               </button>
+            </div>
+          </div>
+
+          {/* Catalog Order Auto-Payment Link & QR Automation Banner */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 rounded-xl text-emerald-600 dark:text-emerald-400 shrink-0">
+                <QrCode size={22} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">
+                    Auto-Send Payment Links & QR on Catalog Orders
+                  </h4>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    recoverySettings.autoCatalogPaymentEnabled
+                      ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                  }`}>
+                    {recoverySettings.autoCatalogPaymentEnabled ? "ACTIVE" : "PAUSED"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1 max-w-xl">
+                  When enabled, any customer submitting an order from your WhatsApp Product Catalog automatically receives an instant payment link + scannable UPI QR code to pay immediately.
+                </p>
+                {recoverySettings.autoCatalogPaymentEnabled && (
+                  <div className="flex items-center gap-2 mt-2.5">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400">Delivery Format:</span>
+                    <select
+                      value={recoverySettings.autoCatalogDeliveryMethod || "both"}
+                      onChange={async (e) => {
+                        const newFormat = e.target.value as any;
+                        const updated = { ...recoverySettings, autoCatalogDeliveryMethod: newFormat };
+                        setRecoverySettings(updated);
+                        await savePaymentRecoverySettingsAction(updated);
+                        showToast(`Catalog Delivery Format updated to ${newFormat.toUpperCase()}`, "success");
+                      }}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                    >
+                      <option value="both">Both (Interactive Pay Now Button + Scannable QR)</option>
+                      <option value="qr">QR Code Image Only</option>
+                      <option value="link">Interactive Pay Now Button Only</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={recoverySettings.autoCatalogPaymentEnabled}
+                  onChange={async (e) => {
+                    const newVal = e.target.checked;
+                    const updated = { ...recoverySettings, autoCatalogPaymentEnabled: newVal };
+                    setRecoverySettings(updated);
+                    await savePaymentRecoverySettingsAction(updated);
+                    showToast(
+                      newVal ? "Catalog Auto-Payment Links & QR: ENABLED" : "Catalog Auto-Payment Links: DISABLED",
+                      "success"
+                    );
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-600"></div>
+              </label>
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                {recoverySettings.autoCatalogPaymentEnabled ? "Enabled" : "Disabled"}
+              </span>
             </div>
           </div>
 
