@@ -371,7 +371,7 @@ export default function WhatsAppTemplatesComponent() {
 
   const handleClearCatalogSelection = () => {
     setSelectedCatalogProducts([]);
-    showToast("Cleared catalog product selection.", "info");
+    showToast("Cleared catalog product selection.", "success");
   };
 
   const handleGenerateAICatalogCopy = () => {
@@ -1343,7 +1343,7 @@ export default function WhatsAppTemplatesComponent() {
     if (bodyMatches && bodyMatches.length > 0) {
       testComponents.push({
         type: "body",
-        parameters: bodyMatches.map((_, idx) => ({
+        parameters: bodyMatches.map((_: string, idx: number) => ({
           type: "text",
           text: idx === 0 ? "Valued Customer" : idx === 1 ? "ESP-9482" : idx === 2 ? "₹1,499" : "FLAT30"
         }))

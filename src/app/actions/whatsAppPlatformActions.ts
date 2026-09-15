@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey, resolveWhatsAppDispatchPhone } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
+import { emitInboxEvent } from "@/lib/inboxEvents";
 
 export async function getWhatsAppChatbotLogsAction(phone: string) {
   try {
@@ -597,6 +598,20 @@ export async function sendWhatsAppMessageAction(data: {
         lastMessageText: data.isInternalNote ? conversation.lastMessageText : data.content,
         lastMessageAt: new Date()
       }
+    });
+
+    // Real-time SSE dispatch for all active agent inboxes
+    emitInboxEvent({
+      type: "NEW_MESSAGE",
+      conversationId: data.conversationId,
+      clientId: conversation.clientId || null,
+      messageId: message.id,
+      data: message
+    });
+    emitInboxEvent({
+      type: "CONVERSATION_UPDATE",
+      conversationId: data.conversationId,
+      clientId: conversation.clientId || null
     });
 
     // Log to CommunicationLog for system audit
@@ -2971,7 +2986,6 @@ export async function saveWhatsAppTemplateAction(data: any) {
         bodyText: data.bodyText || '',
         footerText: data.footerText || null,
         buttons: JSON.stringify(data.buttons || []),
-        variables: JSON.stringify(data.variables || []),
         templateType,
         carouselCards: data.carouselCards 
           ? (typeof data.carouselCards === 'string' ? data.carouselCards : JSON.stringify(data.carouselCards)) 
@@ -7220,8 +7234,27 @@ export async function processCampaignQueueAction(campaignId: string) {
        return { success: false, error: "Meta API credentials not connected" };
     }
 
+    // 🛡️ Pre-flight Phone Health & Quality Circuit Breaker
+    const initialHealth = await getMetaPhoneHealthAndLimitsAction();
+    if (initialHealth.isConnected) {
+      const qRating = (initialHealth.qualityRating || "").toUpperCase();
+      const pStatus = (initialHealth.status || "").toUpperCase();
+      if (qRating === "YELLOW" || qRating === "RED" || pStatus === "FLAGGED" || pStatus === "RESTRICTED") {
+        console.warn(`[Circuit Breaker] Pre-flight aborted: Phone quality is ${qRating}, status is ${pStatus}`);
+        await prisma.whatsAppCampaign.update({
+          where: { id: campaignId },
+          data: { status: "PAUSED_QUALITY_GUARD" }
+        });
+        return {
+          success: false,
+          error: `Circuit Breaker: Meta phone quality is ${qRating} (Status: ${pStatus}). Campaign paused to protect your number from bans.`
+        };
+      }
+    }
+
     let sentCount = 0;
     let failedCount = 0;
+    let circuitBreakerTripped = false;
     
     let mappings: any[] = [];
     try {
@@ -7529,6 +7562,22 @@ export async function processCampaignQueueAction(campaignId: string) {
         if (i % 25 === 0 && i > 0) {
           await new Promise((resolve) => setTimeout(resolve, 80));
         }
+
+        // 🛡️ Mid-flight Circuit Breaker: Inspect Meta phone quality every 50 messages
+        if (i > 0 && i % 50 === 0) {
+          try {
+            const midHealth = await getMetaPhoneHealthAndLimitsAction();
+            if (midHealth.isConnected) {
+              const qRating = (midHealth.qualityRating || "").toUpperCase();
+              const pStatus = (midHealth.status || "").toUpperCase();
+              if (qRating === "YELLOW" || qRating === "RED" || pStatus === "FLAGGED" || pStatus === "RESTRICTED") {
+                console.warn(`[Circuit Breaker] Tripped mid-broadcast at item ${i}: Quality dropped to ${qRating}, Status: ${pStatus}`);
+                circuitBreakerTripped = true;
+                break;
+              }
+            }
+          } catch (_) {}
+        }
       } catch (err: any) {
         failedCount++;
         await prisma.whatsAppCampaignQueue.update({
@@ -7544,11 +7593,16 @@ export async function processCampaignQueueAction(campaignId: string) {
     const finalFailed = await prisma.whatsAppCampaignQueue.count({
       where: { campaignId, status: 'FAILED' }
     });
+    const remainingPending = await prisma.whatsAppCampaignQueue.count({
+      where: { campaignId, status: 'PENDING' }
+    });
+
+    const finalStatus = (circuitBreakerTripped || remainingPending > 0) ? 'PAUSED_QUALITY_GUARD' : 'COMPLETED';
 
     await prisma.whatsAppCampaign.update({
       where: { id: campaignId },
       data: {
-        status: 'COMPLETED',
+        status: finalStatus,
         sentCount: finalSent,
         failedCount: finalFailed
       }

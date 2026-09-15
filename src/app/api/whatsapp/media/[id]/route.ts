@@ -15,10 +15,46 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Invalid or missing numeric media ID" }, { status: 400 });
     }
 
-    const account = await prisma.whatsAppAccount.findFirst();
-    const token = account?.accessToken;
+    // Dynamic Multi-Tenant Meta Access Token Resolution:
+    // 1. Check if media belongs to a specific message and client tenant
+    let token: string | null = null;
+    try {
+      const msg = await prisma.whatsAppMessage.findFirst({
+        where: {
+          OR: [
+            { mediaUrl: { contains: mediaId } },
+            { metaMessageId: mediaId }
+          ]
+        },
+        include: {
+          conversation: {
+            include: { client: true }
+          }
+        }
+      });
 
-    if (!token) return NextResponse.json({ error: "Missing WhatsApp credentials" }, { status: 500 });
+      if (msg?.conversation?.client?.metaAccessToken) {
+        token = msg.conversation.client.metaAccessToken;
+      }
+    } catch (_) {}
+
+    // 2. Check active user session's client tenant
+    if (!token && user?.clientId) {
+      const client = await prisma.whatsAppClient.findUnique({
+        where: { id: user.clientId }
+      }).catch(() => null);
+      if (client?.metaAccessToken) {
+        token = client.metaAccessToken;
+      }
+    }
+
+    // 3. Fallback: Main account or environment token
+    if (!token) {
+      const account = await prisma.whatsAppAccount.findFirst();
+      token = account?.accessToken || process.env.WHATSAPP_ACCESS_TOKEN || null;
+    }
+
+    if (!token) return NextResponse.json({ error: "Missing WhatsApp credentials for media tenant" }, { status: 500 });
 
     // Step 1: Get media URL from Meta using Media ID
     const metaUrlRes = await fetch(`https://graph.facebook.com/v20.0/${mediaId}`, {

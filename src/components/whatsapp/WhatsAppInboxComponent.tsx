@@ -909,14 +909,55 @@ export default function WhatsAppInboxComponent() {
     }
   }, [selectedConvId]);
 
-  // Real-time Auto Polling (Every 3 seconds) — Silent & Smooth Background Sync
+  // ⚡ Real-time SSE Stream Listener (Instant < 100ms Inbound & Outbound Delivery)
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource("/api/whatsapp/inbox/stream");
+
+        eventSource.onmessage = (event) => {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed.type === "CONNECTED") return;
+
+            // Trigger instant silent refresh on real-time event
+            fetchConversationsList(true);
+            if (selectedConvIdRef.current) {
+              fetchConversationDetail(selectedConvIdRef.current, true);
+            }
+          } catch (_) {}
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          // Graceful exponential reconnect fallback
+          reconnectTimeout = setTimeout(connectSSE, 5000);
+        };
+      } catch (_) {}
+    };
+
+    connectSSE();
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, []);
+
+  // Background Safety Net Polling (Relaxed to 30s as silent fallback if SSE is interrupted)
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchConversationsList(true);
       if (selectedConvIdRef.current) {
         fetchConversationDetail(selectedConvIdRef.current, true);
       }
-    }, 3000);
+    }, 30000);
     return () => clearInterval(intervalId);
   }, [searchQuery, activeNavTab, unreadOnly, leadStatusFilter, filterEmployeeId, selectedConvId]);
 

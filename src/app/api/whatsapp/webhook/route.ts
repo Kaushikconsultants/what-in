@@ -5,6 +5,7 @@ import { executeFlowEngine } from "@/lib/whatsappFlowEngine";
 import { assignWhatsAppLeadAction } from "@/app/actions/whatsAppPlatformActions";
 import { formatWhatsAppPhone } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
+import { emitInboxEvent } from "@/lib/inboxEvents";
 
 const MAX_DEDUP_SIZE = 2000;
 const dedupQueue: string[] = [];
@@ -285,6 +286,13 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
                   readAt: targetStatus === 'READ' ? (existingMsg.readAt || now) : undefined
                 }
               });
+              emitInboxEvent({
+                type: "MESSAGE_STATUS",
+                conversationId: existingMsg.conversationId,
+                clientId,
+                messageId: existingMsg.id,
+                status: targetStatus
+              });
               console.log(`[Status Webhook] Updated message ${existingMsg.id} (${wamid}) to ${targetStatus}`);
             }
           } else if (last10) {
@@ -315,6 +323,13 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
                   deliveredAt: (targetStatus === 'DELIVERED' || targetStatus === 'READ') ? (fallbackMsg.deliveredAt || now) : undefined,
                   readAt: targetStatus === 'READ' ? (fallbackMsg.readAt || now) : undefined
                 }
+              });
+              emitInboxEvent({
+                type: "MESSAGE_STATUS",
+                conversationId: fallbackMsg.conversationId,
+                clientId,
+                messageId: fallbackMsg.id,
+                status: targetStatus
               });
               console.log(`[Status Webhook] Fallback matched message ${fallbackMsg.id} to ${wamid} -> ${targetStatus}`);
             }
@@ -650,7 +665,7 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
     }
 
     // Step D: Store Incoming Message
-    await prisma.whatsAppMessage.create({
+    const createdInboundMsg = await prisma.whatsAppMessage.create({
       data: {
         conversationId: conversation.id,
         senderType: "CUSTOMER",
@@ -664,6 +679,31 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         metadata: ctwaMetadata ? JSON.stringify(ctwaMetadata) : null,
         sentAt: messageTimestamp
       }
+    });
+
+    // Real-time SSE dispatch for connected agent inboxes
+    emitInboxEvent({
+      type: "NEW_MESSAGE",
+      conversationId: conversation.id,
+      clientId,
+      messageId: createdInboundMsg.id,
+      data: {
+        id: createdInboundMsg.id,
+        conversationId: conversation.id,
+        senderType: "CUSTOMER",
+        senderName: customer.contactPerson,
+        messageType: msg.type ? msg.type.toUpperCase() : "TEXT",
+        content: textContent,
+        mediaUrl: proxyMediaUrl,
+        mediaType: mediaMimeType,
+        status: "RECEIVED",
+        sentAt: messageTimestamp
+      }
+    });
+    emitInboxEvent({
+      type: "CONVERSATION_UPDATE",
+      conversationId: conversation.id,
+      clientId
     });
 
     if (ctwaMetadata) {
