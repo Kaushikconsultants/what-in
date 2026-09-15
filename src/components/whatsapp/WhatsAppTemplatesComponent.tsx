@@ -263,6 +263,7 @@ export default function WhatsAppTemplatesComponent() {
   const [catalogInStockOnly, setCatalogInStockOnly] = useState(false);
   const [simulatorCatalogDrawerOpen, setSimulatorCatalogDrawerOpen] = useState(false);
   const [simulatorCartCount, setSimulatorCartCount] = useState(0);
+  const [catalogId, setCatalogId] = useState("");
 
   // Meta Interactive Flows State
   const [metaFlows, setMetaFlows] = useState<any[]>([]);
@@ -1316,7 +1317,8 @@ export default function WhatsAppTemplatesComponent() {
         ? [{ type: "COPY_CODE", text: "Copy code", code: "{{1}}" }]
         : buttons,
       carouselCards: templateType === "CAROUSEL" ? carouselCards : templateType === "CATALOGUE" ? selectedCatalogProducts : null,
-      variables: templateType === "CATALOGUE" && selectedCatalogProducts.length > 0 ? selectedCatalogProducts : undefined
+      variables: templateType === "CATALOGUE" && selectedCatalogProducts.length > 0 ? selectedCatalogProducts : undefined,
+      catalogId: catalogId.trim() || undefined
     };
 
     const res = await saveWhatsAppTemplateAction(payload);
@@ -3684,8 +3686,8 @@ export default function WhatsAppTemplatesComponent() {
                   </button>
                 </div>
 
-                {/* Section Title & Button Label Inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-sky-50/40 dark:bg-sky-950/20 rounded-2xl border border-sky-100 dark:border-sky-900/40">
+                {/* Section Title, Button Label & Meta Catalog ID Inputs */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-sky-50/40 dark:bg-sky-950/20 rounded-2xl border border-sky-100 dark:border-sky-900/40">
                   <div>
                     <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
                       Section / Collection Header
@@ -3709,6 +3711,29 @@ export default function WhatsAppTemplatesComponent() {
                       placeholder="e.g. View catalog, Shop Now"
                       maxLength={META_LIMITS.BUTTON_TEXT_MAX}
                       className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 border border-sky-200 dark:border-slate-700 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase">
+                        Meta Catalog ID (Optional)
+                      </label>
+                      <a
+                        href="https://business.facebook.com/commerce"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-sky-600 hover:underline flex items-center gap-0.5"
+                      >
+                        <span>Meta Commerce</span>
+                        <ExternalLink size={9} />
+                      </a>
+                    </div>
+                    <input
+                      type="text"
+                      value={catalogId}
+                      onChange={(e) => setCatalogId(e.target.value)}
+                      placeholder="e.g. 2959185064427355"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 border border-sky-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
                 </div>
