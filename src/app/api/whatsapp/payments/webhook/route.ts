@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessageAction } from "@/app/actions/whatsAppPlatformActions";
 import { emitInboxEvent } from "@/lib/inboxEvents";
+import { logPaymentWebhookEvent } from "@/lib/paymentWebhookLogger";
 
 export const dynamic = "force-dynamic";
 
@@ -54,12 +55,23 @@ export async function GET() {
 
 // POST Endpoint - Universal Ingestion for Razorpay & Cashfree Events
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  let body: any = {};
+
   try {
     const rawBody = await req.text();
-    let body: any = {};
     try {
       body = JSON.parse(rawBody);
     } catch {
+      await logPaymentWebhookEvent({
+        provider: "UNKNOWN",
+        eventType: "PARSE_ERROR",
+        status: "FAILED",
+        httpStatus: 400,
+        latencyMs: Date.now() - startTime,
+        payload: { raw: rawBody },
+        error: "Invalid JSON body"
+      });
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
@@ -78,6 +90,15 @@ export async function POST(req: NextRequest) {
         const isValid = verifyRazorpaySignature(rawBody, razorpaySig, webhookSecret);
         if (!isValid) {
           console.warn("[Payment Webhook] Razorpay signature verification failed");
+          await logPaymentWebhookEvent({
+            provider: "RAZORPAY",
+            eventType: body.event || "UNKNOWN",
+            status: "FAILED",
+            httpStatus: 401,
+            latencyMs: Date.now() - startTime,
+            payload: body,
+            error: "Unauthorized: Invalid Razorpay signature"
+          });
           return NextResponse.json({ error: "Unauthorized: Invalid Razorpay signature" }, { status: 401 });
         }
       }
@@ -126,7 +147,7 @@ export async function POST(req: NextRequest) {
             const customerName = paymentLink.conversation?.customer?.contactPerson || "Valued Customer";
             const amountFormatted = (amount || paymentLink.amount || 0).toLocaleString("en-IN");
             
-            const receiptMsg = `✅ *Payment Received & Verified!*\n\nHi ${customerName}, your payment of *₹${amountFormatted}* for ${description} has been confirmed.\n\n💳 *Payment Reference:* ${txnId}\n📅 *Date:* ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for doing business with us! 🚀`;
+            const receiptMsg = `Payment Received & Verified\n\nHi ${customerName}, your payment of *₹${amountFormatted}* for ${description} has been confirmed.\n\nPayment Reference: ${txnId}\nDate: ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for doing business with us.`;
 
             await sendWhatsAppMessageAction({
               conversationId: paymentLink.conversationId,
@@ -143,9 +164,29 @@ export async function POST(req: NextRequest) {
             });
           }
 
+          await logPaymentWebhookEvent({
+            provider: "RAZORPAY",
+            eventType,
+            status: "SUCCESS",
+            httpStatus: 200,
+            latencyMs: Date.now() - startTime,
+            payload: body,
+            paymentLinkId: paymentLink.id,
+            clientId: paymentLink.clientId || undefined
+          });
+
           return NextResponse.json({ success: true, processed: true, gateway: "RAZORPAY", paymentLinkId: paymentLink.id });
         } else {
           console.warn(`[Payment Webhook] Razorpay payment received (${txnId}) but no matching payment link found in DB`);
+          await logPaymentWebhookEvent({
+            provider: "RAZORPAY",
+            eventType,
+            status: "IGNORED",
+            httpStatus: 200,
+            latencyMs: Date.now() - startTime,
+            payload: body,
+            error: "No matching payment link record in database"
+          });
           return NextResponse.json({ success: true, processed: false, reason: "No matching payment link record" });
         }
       }
@@ -160,6 +201,15 @@ export async function POST(req: NextRequest) {
         const isValid = verifyCashfreeSignature(rawBody, cashfreeSig, cashfreeTimestamp, webhookSecret);
         if (!isValid) {
           console.warn("[Payment Webhook] Cashfree signature verification failed");
+          await logPaymentWebhookEvent({
+            provider: "CASHFREE",
+            eventType: body.type || "UNKNOWN",
+            status: "FAILED",
+            httpStatus: 401,
+            latencyMs: Date.now() - startTime,
+            payload: body,
+            error: "Unauthorized: Invalid Cashfree signature"
+          });
           return NextResponse.json({ error: "Unauthorized: Invalid Cashfree signature" }, { status: 401 });
         }
       }
@@ -202,7 +252,7 @@ export async function POST(req: NextRequest) {
           const customerName = paymentLink.conversation?.customer?.contactPerson || "Valued Customer";
           const amountFormatted = Number(amount).toLocaleString("en-IN");
           
-          const receiptMsg = `✅ *Payment Received & Verified!*\n\nHi ${customerName}, your payment of *₹${amountFormatted}* has been confirmed.\n\n💳 *Payment Reference:* ${txnId}\n📅 *Date:* ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for shopping with us! 🚀`;
+          const receiptMsg = `Payment Received & Verified\n\nHi ${customerName}, your payment of *₹${amountFormatted}* has been confirmed.\n\nPayment Reference: ${txnId}\nDate: ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for shopping with us.`;
 
           await sendWhatsAppMessageAction({
             conversationId: paymentLink.conversationId,
@@ -219,15 +269,54 @@ export async function POST(req: NextRequest) {
           });
         }
 
+        await logPaymentWebhookEvent({
+          provider: "CASHFREE",
+          eventType,
+          status: "SUCCESS",
+          httpStatus: 200,
+          latencyMs: Date.now() - startTime,
+          payload: body,
+          paymentLinkId: paymentLink.id,
+          clientId: paymentLink.clientId || undefined
+        });
+
         return NextResponse.json({ success: true, processed: true, gateway: "CASHFREE", paymentLinkId: paymentLink.id });
       } else {
+        await logPaymentWebhookEvent({
+          provider: "CASHFREE",
+          eventType,
+          status: "IGNORED",
+          httpStatus: 200,
+          latencyMs: Date.now() - startTime,
+          payload: body,
+          error: "No matching payment link record in database"
+        });
         return NextResponse.json({ success: true, processed: false, reason: "No matching payment link record" });
       }
     }
 
+    await logPaymentWebhookEvent({
+      provider: "UNKNOWN",
+      eventType: body.event || body.type || "UNKNOWN",
+      status: "IGNORED",
+      httpStatus: 200,
+      latencyMs: Date.now() - startTime,
+      payload: body,
+      error: "Unrecognized event type"
+    });
+
     return NextResponse.json({ success: true, message: "Ignored unrecognized event" });
   } catch (error: any) {
     console.error("[Payment Webhook Fatal Error]:", error);
+    await logPaymentWebhookEvent({
+      provider: "UNKNOWN",
+      eventType: "ERROR",
+      status: "FAILED",
+      httpStatus: 500,
+      latencyMs: Date.now() - startTime,
+      payload: body,
+      error: error.message
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

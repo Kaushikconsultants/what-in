@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessageAction } from "@/app/actions/whatsAppPlatformActions";
 import { emitInboxEvent } from "@/lib/inboxEvents";
+import { logPaymentWebhookEvent } from "@/lib/paymentWebhookLogger";
 
 export const dynamic = "force-dynamic";
 
@@ -78,11 +79,22 @@ export async function GET(req: NextRequest, { params }: { params: any }) {
 
 // POST Endpoint - Tenant-Specific Ingestion for Razorpay & Cashfree Events
 export async function POST(req: NextRequest, { params }: { params: any }) {
+  const startTime = Date.now();
   const resolvedParams = await Promise.resolve(params);
   const clientId = resolvedParams?.clientId?.trim();
+  let body: any = {};
 
   try {
     if (!clientId) {
+      await logPaymentWebhookEvent({
+        provider: "UNKNOWN",
+        eventType: "MISSING_CLIENT_ID",
+        status: "FAILED",
+        httpStatus: 400,
+        latencyMs: Date.now() - startTime,
+        payload: {},
+        error: "Missing clientId parameter"
+      });
       return NextResponse.json({ error: "Missing clientId parameter" }, { status: 400 });
     }
 
@@ -96,18 +108,46 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
     });
 
     if (!client) {
+      await logPaymentWebhookEvent({
+        provider: "UNKNOWN",
+        eventType: "CLIENT_NOT_FOUND",
+        status: "FAILED",
+        httpStatus: 404,
+        latencyMs: Date.now() - startTime,
+        payload: { clientId },
+        error: "Client tenant not found"
+      });
       return NextResponse.json({ error: "Client tenant not found" }, { status: 404 });
     }
 
     if (client.subscriptionStatus === "BLOCKED" || client.isActive === false) {
+      await logPaymentWebhookEvent({
+        provider: "UNKNOWN",
+        eventType: "CLIENT_BLOCKED",
+        status: "IGNORED",
+        httpStatus: 200,
+        latencyMs: Date.now() - startTime,
+        payload: { clientId: client.id },
+        clientId: client.id,
+        error: "Client subscription is blocked or inactive"
+      });
       return NextResponse.json({ status: "ignored", reason: "client_blocked" });
     }
 
     const rawBody = await req.text();
-    let body: any = {};
     try {
       body = JSON.parse(rawBody);
     } catch {
+      await logPaymentWebhookEvent({
+        provider: "UNKNOWN",
+        eventType: "PARSE_ERROR",
+        status: "FAILED",
+        httpStatus: 400,
+        latencyMs: Date.now() - startTime,
+        payload: { raw: rawBody },
+        clientId: client.id,
+        error: "Invalid JSON body"
+      });
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
@@ -124,6 +164,16 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
         const isValid = verifyRazorpaySignature(rawBody, razorpaySig, webhookSecret);
         if (!isValid) {
           console.warn(`[Tenant Payment Webhook] Razorpay signature verification failed for client "${client.businessName}"`);
+          await logPaymentWebhookEvent({
+            provider: "RAZORPAY",
+            eventType: body.event || "UNKNOWN",
+            status: "FAILED",
+            httpStatus: 401,
+            latencyMs: Date.now() - startTime,
+            payload: body,
+            clientId: client.id,
+            error: "Unauthorized: Invalid Razorpay signature"
+          });
           return NextResponse.json({ error: "Unauthorized: Invalid Razorpay signature" }, { status: 401 });
         }
       }
@@ -150,7 +200,7 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
               ...(plinkId ? [{ orderId: plinkId }] : []),
               { transactionId: txnId }
             ],
-            ...(client ? { clientId: client.id } : {})
+            clientId: client.id
           },
           include: {
             conversation: { include: { customer: true } }
@@ -173,7 +223,7 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
             const customerName = paymentLink.conversation?.customer?.contactPerson || "Valued Customer";
             const amountFormatted = (amount || paymentLink.amount || 0).toLocaleString("en-IN");
             
-            const receiptMsg = `✅ *Payment Received & Verified!*\n\nHi ${customerName}, your payment of *₹${amountFormatted}* for ${description} has been confirmed.\n\n💳 *Payment Reference:* ${txnId}\n📅 *Date:* ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for doing business with ${client.businessName}! 🚀`;
+            const receiptMsg = `Payment Received & Verified\n\nHi ${customerName}, your payment of *₹${amountFormatted}* for ${description} has been confirmed.\n\nPayment Reference: ${txnId}\nDate: ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for doing business with ${client.businessName}.`;
 
             await sendWhatsAppMessageAction({
               conversationId: paymentLink.conversationId,
@@ -190,6 +240,17 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
             });
           }
 
+          await logPaymentWebhookEvent({
+            provider: "RAZORPAY",
+            eventType,
+            status: "SUCCESS",
+            httpStatus: 200,
+            latencyMs: Date.now() - startTime,
+            payload: body,
+            paymentLinkId: paymentLink.id,
+            clientId: client.id
+          });
+
           return NextResponse.json({ 
             success: true, 
             processed: true, 
@@ -199,6 +260,16 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
           });
         } else {
           console.warn(`[Tenant Payment Webhook] Razorpay payment received (${txnId}) for "${client.businessName}" but no matching record found`);
+          await logPaymentWebhookEvent({
+            provider: "RAZORPAY",
+            eventType,
+            status: "IGNORED",
+            httpStatus: 200,
+            latencyMs: Date.now() - startTime,
+            payload: body,
+            clientId: client.id,
+            error: "No matching payment link record in database"
+          });
           return NextResponse.json({ success: true, processed: false, reason: "No matching payment link record" });
         }
       }
@@ -213,6 +284,16 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
         const isValid = verifyCashfreeSignature(rawBody, cashfreeSig, cashfreeTimestamp, webhookSecret);
         if (!isValid) {
           console.warn(`[Tenant Payment Webhook] Cashfree signature verification failed for client "${client.businessName}"`);
+          await logPaymentWebhookEvent({
+            provider: "CASHFREE",
+            eventType: body.type || "UNKNOWN",
+            status: "FAILED",
+            httpStatus: 401,
+            latencyMs: Date.now() - startTime,
+            payload: body,
+            clientId: client.id,
+            error: "Unauthorized: Invalid Cashfree signature"
+          });
           return NextResponse.json({ error: "Unauthorized: Invalid Cashfree signature" }, { status: 401 });
         }
       }
@@ -234,7 +315,7 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
             ...(orderId ? [{ paymentUrl: { contains: orderId } }] : []),
             { transactionId: txnId }
           ],
-          ...(client ? { clientId: client.id } : {})
+          clientId: client.id
         },
         include: {
           conversation: { include: { customer: true } }
@@ -256,7 +337,7 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
           const customerName = paymentLink.conversation?.customer?.contactPerson || "Valued Customer";
           const amountFormatted = Number(amount).toLocaleString("en-IN");
           
-          const receiptMsg = `✅ *Payment Received & Verified!*\n\nHi ${customerName}, your payment of *₹${amountFormatted}* has been confirmed.\n\n💳 *Payment Reference:* ${txnId}\n📅 *Date:* ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for shopping with ${client.businessName}! 🚀`;
+          const receiptMsg = `Payment Received & Verified\n\nHi ${customerName}, your payment of *₹${amountFormatted}* has been confirmed.\n\nPayment Reference: ${txnId}\nDate: ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for shopping with ${client.businessName}.`;
 
           await sendWhatsAppMessageAction({
             conversationId: paymentLink.conversationId,
@@ -273,6 +354,17 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
           });
         }
 
+        await logPaymentWebhookEvent({
+          provider: "CASHFREE",
+          eventType,
+          status: "SUCCESS",
+          httpStatus: 200,
+          latencyMs: Date.now() - startTime,
+          payload: body,
+          paymentLinkId: paymentLink.id,
+          clientId: client.id
+        });
+
         return NextResponse.json({ 
           success: true, 
           processed: true, 
@@ -281,13 +373,44 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
           paymentLinkId: paymentLink.id 
         });
       } else {
+        await logPaymentWebhookEvent({
+          provider: "CASHFREE",
+          eventType,
+          status: "IGNORED",
+          httpStatus: 200,
+          latencyMs: Date.now() - startTime,
+          payload: body,
+          clientId: client.id,
+          error: "No matching payment link record in database"
+        });
         return NextResponse.json({ success: true, processed: false, reason: "No matching payment link record" });
       }
     }
 
+    await logPaymentWebhookEvent({
+      provider: "UNKNOWN",
+      eventType: body.event || body.type || "UNKNOWN",
+      status: "IGNORED",
+      httpStatus: 200,
+      latencyMs: Date.now() - startTime,
+      payload: body,
+      clientId: client.id,
+      error: "Unrecognized event type"
+    });
+
     return NextResponse.json({ success: true, message: "Ignored unrecognized event" });
   } catch (error: any) {
     console.error("[Tenant Payment Webhook Fatal Error]:", error);
+    await logPaymentWebhookEvent({
+      provider: "UNKNOWN",
+      eventType: "ERROR",
+      status: "FAILED",
+      httpStatus: 500,
+      latencyMs: Date.now() - startTime,
+      payload: body,
+      clientId: clientId || undefined,
+      error: error.message
+    });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

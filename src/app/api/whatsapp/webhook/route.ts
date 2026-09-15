@@ -6,6 +6,7 @@ import { assignWhatsAppLeadAction } from "@/app/actions/whatsAppPlatformActions"
 import { formatWhatsAppPhone } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 import { emitInboxEvent } from "@/lib/inboxEvents";
+import { processUpiScreenshotAction } from "@/app/actions/upiScreenshotActions";
 
 const MAX_DEDUP_SIZE = 2000;
 const dedupQueue: string[] = [];
@@ -805,6 +806,36 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       conversation.assignedEmployeeId,
       clientId
     ).catch((e) => console.error("[Push] Failed:", e.message));
+
+    // AI Vision Auto-Verification of UPI Payment Screenshots
+    if (msg.type === "image" && mediaId) {
+      (async () => {
+        try {
+          const result = await processUpiScreenshotAction({
+            conversationId: conversation.id,
+            mediaId: mediaId,
+            mimeType: mediaMimeType || "image/jpeg",
+            caption: msg[msg.type]?.caption || ""
+          });
+
+          if (result.success && result.isPaymentScreenshot && result.analysis) {
+            const { utrNumber, amount, paymentApp, isAuthentic } = result.analysis;
+            const notifTitle = "UPI Screenshot Detected";
+            const notifBody = `Customer sent ${paymentApp || "UPI"} screenshot: ₹${amount || "?"} | UTR: ${utrNumber || "Detected"}${!isAuthentic ? " (Review Authenticity)" : ""}`;
+            
+            await sendPushNotificationToAgents(
+              notifTitle,
+              notifBody,
+              "/whatsapp/inbox",
+              conversation.assignedEmployeeId,
+              clientId
+            );
+          }
+        } catch (visionErr) {
+          console.error("[Webhook UPI Vision Error]:", visionErr);
+        }
+      })();
+    }
 
     // Chatbot Flow Engine Execution (Client Scoped)
     const isTextMessage = msg.type === "text" || msg.type === "interactive";
