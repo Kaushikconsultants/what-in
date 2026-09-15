@@ -357,7 +357,6 @@ export function normalizePhoneKey(input: string | null | undefined): string {
 /**
  * Returns all possible lookup keys for a phone number across various international & local formats.
  * E.g. "+91 98765 43210", "919876543210", "09876543210", "9876543210"
- * All map to overlapping keys: ["9876543210", "919876543210", "+919876543210"]
  */
 export function getPhoneLookupKeys(input: string | null | undefined): string[] {
   if (!input) return [];
@@ -371,31 +370,177 @@ export function getPhoneLookupKeys(input: string | null | undefined): string[] {
   keys.add(digits);
   keys.add(`+${digits}`);
 
-  // Last 10 digits
-  if (digits.length >= 10) {
-    const last10 = digits.slice(-10);
-    keys.add(last10);
-    keys.add(`+91${last10}`);
-    keys.add(`91${last10}`);
-  }
-
-  // If starts with 91 (India) and length 12
-  if (digits.startsWith("91") && digits.length === 12) {
-    keys.add(digits.slice(2));
-  }
-
-  // If starts with 0 (trunk prefix) and length 11
-  if (digits.startsWith("0") && digits.length === 11) {
-    keys.add(digits.slice(1));
-  }
-
-  // If 10 digits (Standard Indian national mobile)
+  // Only add Indian (+91) variations if the digits explicitly start with 91 or are 10 digits
   if (digits.length === 10) {
     keys.add(`91${digits}`);
     keys.add(`+91${digits}`);
     keys.add(`0${digits}`);
+  } else if (digits.length === 12 && digits.startsWith("91")) {
+    const last10 = digits.slice(-10);
+    keys.add(last10);
+    keys.add(`+91${last10}`);
+  } else if (digits.length === 11 && digits.startsWith("0")) {
+    // Domestic UK / India leading zero
+    keys.add(digits.slice(1));
   }
 
   return Array.from(keys);
+}
+
+export interface CountryInfo {
+  code: string;
+  name: string;
+  flag: string;
+  iso: string;
+}
+
+const COUNTRY_METADATA: Record<string, { name: string; flag: string; iso: string }> = {
+  "91": { name: "India", flag: "🇮🇳", iso: "IN" },
+  "44": { name: "United Kingdom", flag: "🇬🇧", iso: "UK" },
+  "1": { name: "United States / Canada", flag: "🇺🇸", iso: "US" },
+  "971": { name: "United Arab Emirates", flag: "🇦🇪", iso: "AE" },
+  "966": { name: "Saudi Arabia", flag: "🇸🇦", iso: "SA" },
+  "61": { name: "Australia", flag: "🇦🇺", iso: "AU" },
+  "49": { name: "Germany", flag: "🇩🇪", iso: "DE" },
+  "33": { name: "France", flag: "🇫🇷", iso: "FR" },
+  "39": { name: "Italy", flag: "🇮🇹", iso: "IT" },
+  "34": { name: "Spain", flag: "🇪🇸", iso: "ES" },
+  "31": { name: "Netherlands", flag: "🇳🇱", iso: "NL" },
+  "65": { name: "Singapore", flag: "🇸🇬", iso: "SG" },
+  "60": { name: "Malaysia", flag: "🇲🇾", iso: "MY" },
+  "965": { name: "Kuwait", flag: "🇰🇼", iso: "KW" },
+  "974": { name: "Qatar", flag: "🇶🇦", iso: "QA" },
+  "968": { name: "Oman", flag: "🇴🇲", iso: "OM" },
+  "880": { name: "Bangladesh", flag: "🇧🇩", iso: "BD" },
+  "977": { name: "Nepal", flag: "🇳🇵", iso: "NP" },
+  "234": { name: "Nigeria", flag: "🇳🇬", iso: "NG" },
+  "254": { name: "Kenya", flag: "🇰🇪", iso: "KE" },
+  "27": { name: "South Africa", flag: "🇿🇦", iso: "ZA" },
+};
+
+/**
+ * Returns country info (flag, name, iso code) for any phone number.
+ */
+export function getCountryInfo(input: string | null | undefined): CountryInfo {
+  if (!input) return { code: "+91", name: "India", flag: "🇮🇳", iso: "IN" };
+  const digits = String(input).replace(/\D/g, "");
+
+  // Check 3-digit codes
+  for (const [code, data] of Object.entries(COUNTRY_METADATA)) {
+    if (code.length === 3 && digits.startsWith(code)) {
+      return { code: `+${code}`, ...data };
+    }
+  }
+
+  // Check 2-digit codes
+  for (const [code, data] of Object.entries(COUNTRY_METADATA)) {
+    if (code.length === 2 && digits.startsWith(code)) {
+      return { code: `+${code}`, ...data };
+    }
+  }
+
+  // Check 1-digit code (NANP)
+  if (digits.startsWith("1")) {
+    return { code: "+1", name: "United States / Canada", flag: "🇺🇸", iso: "US" };
+  }
+
+  // 10 digits default
+  if (digits.length === 10) {
+    return { code: "+91", name: "India", flag: "🇮🇳", iso: "IN" };
+  }
+
+  return { code: "+", name: "International", flag: "🌐", iso: "WA" };
+}
+
+/**
+ * Resolves the display name for a customer without conflicting country codes.
+ * If contactPerson is just phone digits or has a mismatched +91 prefix for a UK/foreign number,
+ * it dynamically formats and returns the true canonical whatsappNumber.
+ */
+export function getCustomerDisplayName(customer?: {
+  contactPerson?: string | null;
+  businessName?: string | null;
+  whatsappNumber?: string | null;
+  mobile?: string | null;
+} | null): string {
+  if (!customer) return "Customer";
+
+  const phone = customer.whatsappNumber || customer.mobile || "";
+  const rawName = (customer.contactPerson || customer.businessName || "").trim();
+
+  // If no name or placeholder, return formatted canonical phone
+  if (!rawName || rawName === "Unknown Lead" || rawName === "No name" || rawName === "Customer") {
+    return phone ? formatWhatsAppPhone(phone) : "Customer";
+  }
+
+  // Check if rawName is just phone digits or formatted phone string (e.g. "+91 7700144963")
+  const isPhoneLike =
+    rawName.startsWith("+") ||
+    rawName.startsWith("Contact ") ||
+    rawName.startsWith("Contact +") ||
+    /^\+?[\d\s\-()]+$/.test(rawName);
+
+  if (isPhoneLike) {
+    // Always defer to the verified whatsappNumber to avoid conflicting country codes
+    return phone ? formatWhatsAppPhone(phone) : formatWhatsAppPhone(rawName);
+  }
+
+  return rawName;
+}
+
+/**
+ * Resolves 2-letter avatar initials for a customer.
+ * If customer has a name, returns initials (e.g. "Alka" -> "AL").
+ * If customer is only a phone number, returns the 2-letter country ISO code (e.g. "UK", "IN", "US")
+ * instead of displaying an awkward "+9" or "+4".
+ */
+export function getCustomerAvatarInitials(customer?: {
+  contactPerson?: string | null;
+  businessName?: string | null;
+  whatsappNumber?: string | null;
+  mobile?: string | null;
+} | null): string {
+  if (!customer) return "C";
+  const name = (customer.contactPerson || customer.businessName || "").trim();
+  const isPhoneLike =
+    !name ||
+    name === "Unknown Lead" ||
+    name === "No name" ||
+    name.startsWith("+") ||
+    name.startsWith("Contact") ||
+    /^\+?[\d\s\-()]+$/.test(name);
+
+  if (isPhoneLike) {
+    const phone = customer.whatsappNumber || customer.mobile || name;
+    const info = getCountryInfo(phone);
+    return info.iso || "WA";
+  }
+
+  return name.slice(0, 2).toUpperCase();
+}
+
+/**
+ * Returns the subtitle to render below the title in the conversation list.
+ * If customer has a real name ("Alka PFC"), returns their formatted phone "+91 90344 18954".
+ * If the title is already the formatted phone ("+44 7700 144963"), returns the country flag and name
+ * (e.g. "🇬🇧 United Kingdom") so there are no duplicate or conflicting phone numbers.
+ */
+export function getCustomerSubtitle(customer?: {
+  contactPerson?: string | null;
+  businessName?: string | null;
+  whatsappNumber?: string | null;
+  mobile?: string | null;
+} | null): { text: string; isCountry: boolean } {
+  if (!customer) return { text: "", isCountry: false };
+  const phone = customer.whatsappNumber || customer.mobile || "";
+  const displayName = getCustomerDisplayName(customer);
+  const formattedPhone = formatWhatsAppPhone(phone);
+
+  if (displayName === formattedPhone || !phone) {
+    const info = getCountryInfo(phone);
+    return { text: `${info.flag} ${info.name}`, isCountry: true };
+  }
+
+  return { text: formattedPhone, isCountry: false };
 }
 

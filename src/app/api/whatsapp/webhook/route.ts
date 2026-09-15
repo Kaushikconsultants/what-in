@@ -394,6 +394,40 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       textContent = summary.trim();
     }
 
+    // WhatsApp Catalog Order Parsing
+    let orderMetadata: any = null;
+    if (msg.type === "order" && msg.order) {
+      const items = (msg.order.product_items || []).map((it: any) => ({
+        name: it.product_retailer_id || "Catalog Item",
+        retailer_id: it.product_retailer_id,
+        quantity: Number(it.quantity) || 1,
+        price: Number(it.item_price) || 0,
+        currency: it.currency || "INR"
+      }));
+      const totalAmount = items.reduce((sum: number, it: any) => sum + (it.price * it.quantity), 0);
+      const totalQuantity = items.reduce((sum: number, it: any) => sum + it.quantity, 0);
+
+      orderMetadata = {
+        order: {
+          catalogId: msg.order.catalog_id,
+          customerNote: msg.order.text || "",
+          items,
+          totalAmount,
+          totalQuantity,
+          currency: items[0]?.currency || "INR"
+        }
+      };
+
+      let summary = `🛍️ Catalog Order (${totalQuantity} items - ₹${totalAmount.toLocaleString('en-IN')}):\n`;
+      items.forEach((it: any) => {
+        summary += `• ${it.quantity}x ${it.name} (₹${it.price})\n`;
+      });
+      if (msg.order.text) {
+        summary += `Note: ${msg.order.text}`;
+      }
+      textContent = summary.trim();
+    }
+
     // Detect Button Clicks
     const isButtonClick = Boolean(
       msg.type === "button" ||
@@ -521,21 +555,44 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         }
       });
     } else {
-      if (cleanPhone.length > (customer.whatsappNumber?.length || 0)) {
-        await prisma.customer.update({
-          where: { id: customer.id },
-          data: { whatsappNumber: cleanPhone, mobile: cleanPhone }
-        }).catch(() => {});
-        customer = { ...customer, whatsappNumber: cleanPhone, mobile: cleanPhone };
+      const updateData: any = {};
+      if (cleanPhone !== customer.whatsappNumber) {
+        updateData.whatsappNumber = cleanPhone;
+        updateData.mobile = cleanPhone;
       }
 
-      if (whatsappProfileName && (customer.contactPerson?.startsWith("Contact +") || customer.contactPerson?.startsWith("Contact 91") || customer.contactPerson?.startsWith("+") || customer.contactPerson === "Unknown Lead" || !customer.contactPerson)) {
+      const isCurrentContactPhoneLike = !customer.contactPerson || 
+        customer.contactPerson === "Unknown Lead" ||
+        customer.contactPerson.startsWith("+") || 
+        customer.contactPerson.startsWith("Contact ") || 
+        /^\+?[\d\s\-()]+$/.test(customer.contactPerson);
+
+      const isCurrentBusinessPhoneLike = !customer.businessName || 
+        customer.businessName.startsWith("+") || 
+        customer.businessName.startsWith("Contact ") || 
+        /^\+?[\d\s\-()]+$/.test(customer.businessName);
+
+      if (whatsappProfileName) {
+        if (isCurrentContactPhoneLike) updateData.contactPerson = whatsappProfileName;
+        if (isCurrentBusinessPhoneLike) updateData.businessName = whatsappProfileName;
+      } else if (cleanPhone !== customer.whatsappNumber && isCurrentContactPhoneLike) {
+        const formattedDisplayPhone = formatWhatsAppPhone(cleanPhone);
+        updateData.contactPerson = formattedDisplayPhone;
+        if (isCurrentBusinessPhoneLike) updateData.businessName = formattedDisplayPhone;
+      }
+
+      if (Object.keys(updateData).length > 0) {
         await prisma.customer.update({
           where: { id: customer.id },
-          data: { contactPerson: whatsappProfileName }
-        });
-        customer = { ...customer, contactPerson: whatsappProfileName };
+          data: updateData
+        }).catch(() => {});
+        customer = { ...customer, ...updateData };
       }
+    }
+
+    if (!customer) {
+      console.error("[WhatsApp Inbound] Failed to find or create customer record");
+      return { status: "ignored - customer record missing" };
     }
 
     // Step C: Link/Find Conversation (Client Scoped with adoption fallback)
@@ -665,18 +722,26 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
     }
 
     // Step D: Store Incoming Message
+    const effectiveMetadata = orderMetadata
+      ? JSON.stringify(orderMetadata)
+      : ctwaMetadata
+      ? JSON.stringify(ctwaMetadata)
+      : null;
+
+    const effectiveMessageType = msg.type === "order" ? "ORDER" : msg.type ? msg.type.toUpperCase() : "TEXT";
+
     const createdInboundMsg = await prisma.whatsAppMessage.create({
       data: {
         conversationId: conversation.id,
         senderType: "CUSTOMER",
         senderName: customer.contactPerson,
-        messageType: msg.type ? msg.type.toUpperCase() : "TEXT",
+        messageType: effectiveMessageType,
         content: textContent,
         mediaUrl: proxyMediaUrl,
         mediaType: mediaMimeType,
         status: "RECEIVED",
         metaMessageId: msg.id,
-        metadata: ctwaMetadata ? JSON.stringify(ctwaMetadata) : null,
+        metadata: effectiveMetadata,
         sentAt: messageTimestamp
       }
     });
@@ -692,11 +757,12 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         conversationId: conversation.id,
         senderType: "CUSTOMER",
         senderName: customer.contactPerson,
-        messageType: msg.type ? msg.type.toUpperCase() : "TEXT",
+        messageType: effectiveMessageType,
         content: textContent,
         mediaUrl: proxyMediaUrl,
         mediaType: mediaMimeType,
         status: "RECEIVED",
+        metadata: effectiveMetadata,
         sentAt: messageTimestamp
       }
     });

@@ -4480,3 +4480,114 @@ html.dark .logs-stat-card,
   box-shadow: none;
 }
 
+/* Logs Table Card & Controls Dark Theme */
+html.dark .logs-table-card,
+[data-theme="dark"] .logs-table-card {
+  background: #111827 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+html.dark .logs-table-header,
+[data-theme="dark"] .logs-table-header {
+  background: #161f30 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .logs-table-count,
+[data-theme="dark"] .logs-table-count {
+  color: #94a3b8 !important;
+}
+
+html.dark .logs-table thead tr,
+[data-theme="dark"] .logs-table thead tr {
+  background: #1e293b !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .logs-table thead th,
+[data-theme="dark"] .logs-table thead th {
+  color: #94a3b8 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .logs-table tbody tr,
+[data-theme="dark"] .logs-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark .logs-table tbody tr:hover,
+[data-theme="dark"] .logs-table tbody tr:hover {
+  background: rgba(30, 41, 59, 0.6) !important;
+}
+
+html.dark .logs-table tbody td,
+[data-theme="dark"] .logs-table tbody td {
+  color: #e2e8f0 !important;
+}
+
+html.dark .log-phone,
+[data-theme="dark"] .log-phone {
+  color: #f8fafc !important;
+}
+
+html.dark .log-truncate,
+[data-theme="dark"] .log-truncate {
+  color: #cbd5e1 !important;
+}
+
+html.dark .log-code,
+[data-theme="dark"] .log-code {
+  background: #1e293b !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #93c5fd !important;
+}
+
+html.dark .log-time,
+[data-theme="dark"] .log-time {
+  color: #94a3b8 !important;
+}
+
+html.dark .log-muted,
+[data-theme="dark"] .log-muted {
+  color: #64748b !important;
+}
+
+html.dark .logs-empty-cell,
+[data-theme="dark"] .logs-empty-cell {
+  background: transparent !important;
+  color: #94a3b8 !important;
+}
+
+html.dark .logs-empty-title,
+[data-theme="dark"] .logs-empty-title {
+  color: #f1f5f9 !important;
+}
+
+html.dark .logs-empty-sub,
+[data-theme="dark"] .logs-empty-sub {
+  color: #64748b !important;
+}
+
+html.dark .logs-search input,
+[data-theme="dark"] .logs-search input {
+  background: #111827 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+html.dark .logs-toolbar .filter-select,
+[data-theme="dark"] .logs-toolbar .filter-select {
+  background: #111827 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+html.dark .audit-details-card,
+[data-theme="dark"] .audit-details-card {
+  background: #111827 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+

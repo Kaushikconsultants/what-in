@@ -76,6 +76,9 @@ export default function IntegrationsHubPage() {
   const [pgMsg, setPgMsg] = useState<string | null>(null);
   const [showRzpSecret, setShowRzpSecret] = useState(false);
   const [showCfSecret, setShowCfSecret] = useState(false);
+  const [copiedPgWebhook, setCopiedPgWebhook] = useState(false);
+  const [copiedRzpWebhook, setCopiedRzpWebhook] = useState(false);
+  const [copiedCfWebhook, setCopiedCfWebhook] = useState(false);
 
   // Integrations states
   const [wabaId, setWabaId] = useState("");
@@ -893,169 +896,341 @@ const reloadTeams = async () => {
           </div>
         </div>
       )}
-      {activeTab === "payment" && (
-        <div className="flex flex-col gap-8 w-full max-w-7xl">
-          {/* Payment Gateway Integration */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-2 bg-violet-100 dark:bg-violet-500/20 rounded-xl">
-                <span className="text-2xl">💳</span>
+      {activeTab === "payment" && (() => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://whatsapp.esponsports.com';
+        const globalWebhookUrl = `${origin}/api/whatsapp/payments/webhook`;
+        const tenantWebhookUrl = clientInfo?.clientId || clientInfo?.id
+          ? `${origin}/api/whatsapp/payments/webhook/${clientInfo.clientId || clientInfo.id}`
+          : globalWebhookUrl;
+
+        return (
+          <div className="flex flex-col gap-8 w-full max-w-7xl">
+            {/* Quick link to Payments Management & Manual UPI Verification */}
+            <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-lg">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-2xl border border-indigo-500/30">
+                  💳
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white m-0">Payments Hub & Manual UPI Verification</h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Live</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-300 m-0 mt-1 max-w-xl">
+                    Track all automated customer payments, verify direct UPI screenshot receipts, and automatically dispatch WhatsApp payment receipts in real-time.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Payment Gateway Integration</h2>
-                <p className="text-sm text-gray-500">Connect Razorpay or Cashfree. Only 1 gateway can be active at a time — it auto-syncs to all Payment blocks in the Chatbot Builder.</p>
-              </div>
+              <Link
+                href="/whatsapp/payments"
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2 shrink-0"
+              >
+                <span>Open Payments Tab</span>
+                <ArrowRight size={16} />
+              </Link>
             </div>
 
-            {pgMsg && (
-              <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 ${
-                pgMsg.includes('✅') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-              }`}>{pgMsg}</div>
-            )}
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              {/* Razorpay Card */}
-              <div className={`rounded-2xl border-2 p-5 transition-all ${
-                pgActiveGateway === 'RAZORPAY' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-500/5' : 'border-gray-100 dark:border-slate-700'
-              }`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xs">RZP</div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white">Razorpay</h3>
-                      <p className="text-xs text-gray-500">India's most popular gateway</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      const next = pgActiveGateway === 'RAZORPAY' ? null : 'RAZORPAY';
-                      setPgActiveGateway(next);
-                      await savePaymentGatewaySettings({ activeGateway: next, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey });
-                      setPgMsg(next ? '✅ Razorpay set as active gateway' : '✅ Gateway deactivated');
-                      setTimeout(() => setPgMsg(null), 3000);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      pgActiveGateway === 'RAZORPAY' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600'
-                    }`}
-                  >
-                    {pgActiveGateway === 'RAZORPAY' ? '✅ Active' : 'Set Active'}
-                  </button>
+            {/* Payment Gateway Integration */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="p-2 bg-violet-100 dark:bg-violet-500/20 rounded-xl">
+                  <span className="text-2xl">💳</span>
                 </div>
-                <div className="flex flex-col gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">Payment Gateway Integration</h2>
+                  <p className="text-sm text-gray-500">Connect Razorpay or Cashfree. Only 1 gateway can be active at a time — it auto-syncs to all Payment blocks in the Chatbot Builder.</p>
+                </div>
+              </div>
+
+              {pgMsg && (
+                <div className={`mb-4 px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 ${
+                  pgMsg.includes('✅') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>{pgMsg}</div>
+              )}
+
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                {/* Razorpay Card */}
+                <div className={`rounded-2xl border-2 p-5 transition-all flex flex-col justify-between ${
+                  pgActiveGateway === 'RAZORPAY' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-500/5' : 'border-gray-100 dark:border-slate-700'
+                }`}>
                   <div>
-                    <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">Key ID</label>
-                    <input type="text" value={razorpayKeyId} onChange={(e) => setRazorpayKeyId(e.target.value)} placeholder="rzp_live_..." className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">Key Secret</label>
-                    <div className="relative">
-                      <input type={showRzpSecret ? "text" : "password"} value={razorpayKeySecret} onChange={(e) => setRazorpayKeySecret(e.target.value)} placeholder="••••••••••••••••" className="w-full pl-3 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                      <button type="button" onClick={() => setShowRzpSecret(!showRzpSecret)} className="absolute right-3 top-2.5 text-gray-400">{showRzpSecret ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xs">RZP</div>
+                        <div>
+                          <h3 className="font-bold text-gray-900 dark:text-white">Razorpay</h3>
+                          <p className="text-xs text-gray-500">India's most popular gateway</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const next = pgActiveGateway === 'RAZORPAY' ? null : 'RAZORPAY';
+                          setPgActiveGateway(next);
+                          await savePaymentGatewaySettings({ activeGateway: next, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey });
+                          setPgMsg(next ? '✅ Razorpay set as active gateway' : '✅ Gateway deactivated');
+                          setTimeout(() => setPgMsg(null), 3000);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          pgActiveGateway === 'RAZORPAY' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-blue-50 hover:text-blue-600'
+                        }`}
+                      >
+                        {pgActiveGateway === 'RAZORPAY' ? '✅ Active' : 'Set Active'}
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">Key ID</label>
+                        <input type="text" value={razorpayKeyId} onChange={(e) => setRazorpayKeyId(e.target.value)} placeholder="rzp_live_..." className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">Key Secret</label>
+                        <div className="relative">
+                          <input type={showRzpSecret ? "text" : "password"} value={razorpayKeySecret} onChange={(e) => setRazorpayKeySecret(e.target.value)} placeholder="••••••••••••••••" className="w-full pl-3 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                          <button type="button" onClick={() => setShowRzpSecret(!showRzpSecret)} className="absolute right-3 top-2.5 text-gray-400">{showRzpSecret ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+                        </div>
+                      </div>
+
+                      {/* Razorpay Webhook URL */}
+                      <div className="p-3 bg-blue-50/70 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800/40 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-blue-900 dark:text-blue-300">Razorpay Webhook URL</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(tenantWebhookUrl);
+                              setCopiedRzpWebhook(true);
+                              setTimeout(() => setCopiedRzpWebhook(false), 2000);
+                            }}
+                            className="text-blue-600 dark:text-blue-400 font-bold hover:underline flex items-center gap-1"
+                          >
+                            {copiedRzpWebhook ? <Check size={11} /> : <Copy size={11} />}
+                            {copiedRzpWebhook ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                        <code className="block truncate text-[11px] text-blue-800 dark:text-blue-200 font-mono select-all bg-white/70 dark:bg-slate-900/70 p-1.5 rounded border border-blue-200/50 dark:border-blue-700/50">
+                          {tenantWebhookUrl}
+                        </code>
+                        <span className="block mt-1 text-[10.5px] text-blue-700 dark:text-blue-300 font-medium">
+                          Events: <strong>payment_link.paid</strong>, <strong>payment.captured</strong>
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <button onClick={async () => { setSavingPg(true); await savePaymentGatewaySettings({ activeGateway: pgActiveGateway, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey }); setSavingPg(false); setPgMsg('✅ Razorpay credentials saved'); setTimeout(() => setPgMsg(null), 3000); }} disabled={savingPg} className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all flex items-center justify-center gap-2">
+                  <button onClick={async () => { setSavingPg(true); await savePaymentGatewaySettings({ activeGateway: pgActiveGateway, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey }); setSavingPg(false); setPgMsg('✅ Razorpay credentials saved'); setTimeout(() => setPgMsg(null), 3000); }} disabled={savingPg} className="w-full mt-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition-all flex items-center justify-center gap-2">
                     {savingPg ? <RefreshCw size={14} className="animate-spin"/> : <Save size={14}/>} Save Razorpay Keys
                   </button>
                 </div>
-              </div>
 
-              {/* Cashfree Card */}
-              <div className={`rounded-2xl border-2 p-5 transition-all ${
-                pgActiveGateway === 'CASHFREE' ? 'border-green-500 bg-green-50/50 dark:bg-green-500/5' : 'border-gray-100 dark:border-slate-700'
-              }`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-green-600 flex items-center justify-center text-white font-bold text-xs">CF</div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white">Cashfree</h3>
-                      <p className="text-xs text-gray-500">Fast settlements & lower MDR</p>
+                {/* Cashfree Card */}
+                <div className={`rounded-2xl border-2 p-5 transition-all flex flex-col justify-between ${
+                  pgActiveGateway === 'CASHFREE' ? 'border-green-500 bg-green-50/50 dark:bg-green-500/5' : 'border-gray-100 dark:border-slate-700'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-green-600 flex items-center justify-center text-white font-bold text-xs">CF</div>
+                        <div>
+                          <h3 className="font-bold text-gray-900 dark:text-white">Cashfree</h3>
+                          <p className="text-xs text-gray-500">Fast settlements & lower MDR</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const next = pgActiveGateway === 'CASHFREE' ? null : 'CASHFREE';
+                          setPgActiveGateway(next);
+                          await savePaymentGatewaySettings({ activeGateway: next, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey });
+                          setPgMsg(next ? '✅ Cashfree set as active gateway' : '✅ Gateway deactivated');
+                          setTimeout(() => setPgMsg(null), 3000);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          pgActiveGateway === 'CASHFREE' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-green-50 hover:text-green-600'
+                        }`}
+                      >
+                        {pgActiveGateway === 'CASHFREE' ? '✅ Active' : 'Set Active'}
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">App ID</label>
+                        <input type="text" value={cashfreeAppId} onChange={(e) => setCashfreeAppId(e.target.value)} placeholder="CF App ID" className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">Secret Key</label>
+                        <div className="relative">
+                          <input type={showCfSecret ? "text" : "password"} value={cashfreeSecretKey} onChange={(e) => setCashfreeSecretKey(e.target.value)} placeholder="••••••••••••••••" className="w-full pl-3 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
+                          <button type="button" onClick={() => setShowCfSecret(!showCfSecret)} className="absolute right-3 top-2.5 text-gray-400">{showCfSecret ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+                        </div>
+                      </div>
+
+                      {/* Cashfree Webhook URL */}
+                      <div className="p-3 bg-emerald-50/70 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800/40 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-bold text-emerald-900 dark:text-emerald-300">Cashfree Webhook URL</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(tenantWebhookUrl);
+                              setCopiedCfWebhook(true);
+                              setTimeout(() => setCopiedCfWebhook(false), 2000);
+                            }}
+                            className="text-emerald-600 dark:text-emerald-400 font-bold hover:underline flex items-center gap-1"
+                          >
+                            {copiedCfWebhook ? <Check size={11} /> : <Copy size={11} />}
+                            {copiedCfWebhook ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                        <code className="block truncate text-[11px] text-emerald-800 dark:text-emerald-200 font-mono select-all bg-white/70 dark:bg-slate-900/70 p-1.5 rounded border border-emerald-200/50 dark:border-emerald-700/50">
+                          {tenantWebhookUrl}
+                        </code>
+                        <span className="block mt-1 text-[10.5px] text-emerald-700 dark:text-emerald-300 font-medium">
+                          Events: <strong>PAYMENT_SUCCESS</strong>, <strong>ORDER_PAID</strong>
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={async () => {
-                      const next = pgActiveGateway === 'CASHFREE' ? null : 'CASHFREE';
-                      setPgActiveGateway(next);
-                      await savePaymentGatewaySettings({ activeGateway: next, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey });
-                      setPgMsg(next ? '✅ Cashfree set as active gateway' : '✅ Gateway deactivated');
-                      setTimeout(() => setPgMsg(null), 3000);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      pgActiveGateway === 'CASHFREE' ? 'bg-green-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-green-50 hover:text-green-600'
-                    }`}
-                  >
-                    {pgActiveGateway === 'CASHFREE' ? '✅ Active' : 'Set Active'}
-                  </button>
-                </div>
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">App ID</label>
-                    <input type="text" value={cashfreeAppId} onChange={(e) => setCashfreeAppId(e.target.value)} placeholder="CF App ID" className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">Secret Key</label>
-                    <div className="relative">
-                      <input type={showCfSecret ? "text" : "password"} value={cashfreeSecretKey} onChange={(e) => setCashfreeSecretKey(e.target.value)} placeholder="••••••••••••••••" className="w-full pl-3 pr-10 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-green-500 outline-none" />
-                      <button type="button" onClick={() => setShowCfSecret(!showCfSecret)} className="absolute right-3 top-2.5 text-gray-400">{showCfSecret ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
-                    </div>
-                  </div>
-                  <button onClick={async () => { setSavingPg(true); await savePaymentGatewaySettings({ activeGateway: pgActiveGateway, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey, merchantUpiId, merchantUpiName }); setSavingPg(false); setPgMsg('✅ Cashfree credentials saved'); setTimeout(() => setPgMsg(null), 3000); }} disabled={savingPg} className="w-full py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition-all flex items-center justify-center gap-2">
+                  <button onClick={async () => { setSavingPg(true); await savePaymentGatewaySettings({ activeGateway: pgActiveGateway, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey, merchantUpiId, merchantUpiName }); setSavingPg(false); setPgMsg('✅ Cashfree credentials saved'); setTimeout(() => setPgMsg(null), 3000); }} disabled={savingPg} className="w-full mt-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition-all flex items-center justify-center gap-2">
                     {savingPg ? <RefreshCw size={14} className="animate-spin"/> : <Save size={14}/>} Save Cashfree Keys
                   </button>
                 </div>
-              </div>
 
-              {/* Direct UPI Card */}
-              <div className={`rounded-2xl border-2 p-5 transition-all ${
-                pgActiveGateway === 'UPI' ? 'border-orange-500 bg-orange-50/50 dark:bg-orange-500/5' : 'border-gray-100 dark:border-slate-700'
-              }`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-orange-600 flex items-center justify-center text-white font-bold text-xs">UPI</div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 dark:text-white">Direct UPI</h3>
-                      <p className="text-xs text-gray-500">Zero fees via direct QR/Link</p>
+                {/* Direct UPI Card */}
+                <div className={`rounded-2xl border-2 p-5 transition-all flex flex-col justify-between ${
+                  pgActiveGateway === 'UPI' ? 'border-orange-500 bg-orange-50/50 dark:bg-orange-500/5' : 'border-gray-100 dark:border-slate-700'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-orange-600 flex items-center justify-center text-white font-bold text-xs">UPI</div>
+                        <div>
+                          <h3 className="font-bold text-gray-900 dark:text-white">Direct UPI</h3>
+                          <p className="text-xs text-gray-500">Zero fees via direct QR/Link</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const next = pgActiveGateway === 'UPI' ? null : 'UPI';
+                          setPgActiveGateway(next);
+                          await savePaymentGatewaySettings({ activeGateway: next, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey, merchantUpiId, merchantUpiName });
+                          setPgMsg(next ? '✅ Direct UPI set as active gateway' : '✅ Gateway deactivated');
+                          setTimeout(() => setPgMsg(null), 3000);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          pgActiveGateway === 'UPI' ? 'bg-orange-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-orange-50 hover:text-orange-600'
+                        }`}
+                      >
+                        {pgActiveGateway === 'UPI' ? '✅ Active' : 'Set Active'}
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">UPI ID (VPA)</label>
+                        <input type="text" value={merchantUpiId} onChange={(e) => setMerchantUpiId(e.target.value)} placeholder="e.g. yourname@okicici" className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">Payee Name</label>
+                        <input type="text" value={merchantUpiName} onChange={(e) => setMerchantUpiName(e.target.value)} placeholder="e.g. Your Business Name" className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
+                      </div>
+                      <div className="p-3 bg-orange-50/70 dark:bg-orange-900/20 rounded-xl border border-orange-100 dark:border-orange-800/40 text-xs text-orange-800 dark:text-orange-300 leading-relaxed">
+                        Customers pay directly to your UPI ID without gateway MDR deductions. Agents manually verify UTRs or screenshot receipts in the <strong>Payments Tab</strong>.
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={async () => {
-                      const next = pgActiveGateway === 'UPI' ? null : 'UPI';
-                      setPgActiveGateway(next);
-                      await savePaymentGatewaySettings({ activeGateway: next, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey, merchantUpiId, merchantUpiName });
-                      setPgMsg(next ? '✅ Direct UPI set as active gateway' : '✅ Gateway deactivated');
-                      setTimeout(() => setPgMsg(null), 3000);
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      pgActiveGateway === 'UPI' ? 'bg-orange-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-orange-50 hover:text-orange-600'
-                    }`}
-                  >
-                    {pgActiveGateway === 'UPI' ? '✅ Active' : 'Set Active'}
-                  </button>
-                </div>
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">UPI ID (VPA)</label>
-                    <input type="text" value={merchantUpiId} onChange={(e) => setMerchantUpiId(e.target.value)} placeholder="e.g. yourname@okicici" className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 dark:text-gray-400 block mb-1">Payee Name</label>
-                    <input type="text" value={merchantUpiName} onChange={(e) => setMerchantUpiName(e.target.value)} placeholder="e.g. Your Business Name" className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-900/50 text-sm focus:ring-2 focus:ring-orange-500 outline-none" />
-                  </div>
-                  <button onClick={async () => { setSavingPg(true); await savePaymentGatewaySettings({ activeGateway: pgActiveGateway, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey, merchantUpiId, merchantUpiName }); setSavingPg(false); setPgMsg('✅ Direct UPI details saved'); setTimeout(() => setPgMsg(null), 3000); }} disabled={savingPg} className="w-full py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-all flex items-center justify-center gap-2">
+                  <button onClick={async () => { setSavingPg(true); await savePaymentGatewaySettings({ activeGateway: pgActiveGateway, razorpayKeyId, razorpayKeySecret, cashfreeAppId, cashfreeSecretKey, merchantUpiId, merchantUpiName }); setSavingPg(false); setPgMsg('✅ Direct UPI details saved'); setTimeout(() => setPgMsg(null), 3000); }} disabled={savingPg} className="w-full mt-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold transition-all flex items-center justify-center gap-2">
                     {savingPg ? <RefreshCw size={14} className="animate-spin"/> : <Save size={14}/>} Save UPI Details
                   </button>
                 </div>
               </div>
+
+              {pgActiveGateway && (
+                <div className="mt-4 px-4 py-3 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-xl text-sm text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
+                  <CheckCircle2 size={16}/>
+                  <span><strong>{pgActiveGateway === 'RAZORPAY' ? 'Razorpay' : pgActiveGateway === 'CASHFREE' ? 'Cashfree' : 'Direct UPI'}</strong> is the active gateway — auto-synced to all Payment blocks in the Chatbot Builder.</span>
+                </div>
+              )}
             </div>
 
-            {pgActiveGateway && (
-              <div className="mt-4 px-4 py-3 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-xl text-sm text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
-                <CheckCircle2 size={16}/>
-                <span><strong>{pgActiveGateway === 'RAZORPAY' ? 'Razorpay' : pgActiveGateway === 'CASHFREE' ? 'Cashfree' : 'Direct UPI'}</strong> is the active gateway — auto-synced to all Payment blocks in the Chatbot Builder.</span>
+            {/* Complete Payment Gateway Webhook Registration Guide */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-700 pb-4 mb-5">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white m-0 flex items-center gap-2">
+                    <Zap size={18} className="text-amber-500" />
+                    How to Register Webhooks in Payment Gateway Dashboards
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">
+                    When a customer completes payment via WhatsApp payment link, their gateway sends a webhook to automatically mark the order PAID and dispatch an instant WhatsApp receipt.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(tenantWebhookUrl);
+                    setCopiedPgWebhook(true);
+                    setTimeout(() => setCopiedPgWebhook(false), 2000);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 transition-all cursor-pointer shadow-sm"
+                >
+                  {copiedPgWebhook ? <Check size={14} /> : <Copy size={14} />}
+                  {copiedPgWebhook ? "Copied Webhook URL!" : "Copy Webhook URL"}
+                </button>
               </div>
-            )}
+
+              <div className="mb-5 p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="truncate">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-1">Your Live Payment Webhook Endpoint:</span>
+                  <code className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 select-all">{tenantWebhookUrl}</code>
+                </div>
+                <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg border border-emerald-200 dark:border-emerald-800/60 shrink-0 self-start md:self-auto flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Listening for Events
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Razorpay Guide */}
+                <div className="p-5 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-6 h-6 rounded-md bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                    <h4 className="text-sm font-bold text-blue-950 dark:text-blue-300 m-0">Razorpay Dashboard Setup</h4>
+                  </div>
+                  <ol className="text-xs text-slate-600 dark:text-slate-300 space-y-2 list-decimal list-inside leading-relaxed m-0 p-0">
+                    <li>Log into your <strong>Razorpay Dashboard</strong> &rarr; <strong>Account & Settings</strong>.</li>
+                    <li>Click <strong>Webhooks</strong> &rarr; <strong>Add New Webhook</strong>.</li>
+                    <li>Paste the <strong>Webhook URL</strong> copied above into the URL box.</li>
+                    <li>Under <strong>Active Events</strong>, select:
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800/60 text-blue-800 dark:text-blue-200 rounded font-mono text-[11px] font-bold">payment_link.paid</span>
+                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800/60 text-blue-800 dark:text-blue-200 rounded font-mono text-[11px] font-bold">payment.captured</span>
+                      </div>
+                    </li>
+                    <li>Click <strong>Create Webhook</strong>. Done!</li>
+                  </ol>
+                </div>
+
+                {/* Cashfree Guide */}
+                <div className="p-5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-6 h-6 rounded-md bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                    <h4 className="text-sm font-bold text-emerald-950 dark:text-emerald-300 m-0">Cashfree Dashboard Setup</h4>
+                  </div>
+                  <ol className="text-xs text-slate-600 dark:text-slate-300 space-y-2 list-decimal list-inside leading-relaxed m-0 p-0">
+                    <li>Log into your <strong>Cashfree Merchant Dashboard</strong>.</li>
+                    <li>Go to <strong>Payment Gateway</strong> &rarr; <strong>Developers</strong> &rarr; <strong>Webhooks</strong>.</li>
+                    <li>Click <strong>Add Webhook</strong> and paste the <strong>Webhook URL</strong> copied above.</li>
+                    <li>Enable the following event triggers:
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200 rounded font-mono text-[11px] font-bold">PAYMENT_SUCCESS</span>
+                        <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200 rounded font-mono text-[11px] font-bold">ORDER_PAID</span>
+                      </div>
+                    </li>
+                    <li>Click <strong>Save & Test</strong>. Real-time receipts are now active!</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {activeTab === "webhooks" && (
         <div className="flex flex-col gap-8 w-full max-w-7xl">

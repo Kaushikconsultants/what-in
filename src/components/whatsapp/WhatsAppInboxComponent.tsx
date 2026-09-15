@@ -93,7 +93,7 @@ import {
 import { getWhatsAppIntegrationsAction, pushLeadToIntegrationAction } from "@/app/actions/whatsAppIntegrationActions";
 import { getPaymentGatewaySettings } from "@/app/actions/paymentGatewayActions";
 import { useWhatsAppStore } from "@/store/whatsappStore";
-import { formatWhatsAppPhone } from "@/lib/phoneUtils";
+import { formatWhatsAppPhone, getCustomerDisplayName, getCustomerAvatarInitials, getCustomerSubtitle, getCountryInfo } from "@/lib/phoneUtils";
 import "./WhatsAppInbox.css";
 
 // Helper to force download media instead of opening in a new tab
@@ -1866,7 +1866,7 @@ export default function WhatsAppInboxComponent() {
                   onClick={() => { if(selectedConvId !== conv.id) { setActiveConvDetail(null); setSelectedConvId(conv.id); } }}
                 >
                   <div className="conv-avatar" style={{ background: getAvatarGradient(cust?.contactPerson || cust?.businessName || cust?.whatsappNumber) }}>
-                    <span style={{ color: "#ffffff", fontWeight: 700 }}>{(cust?.contactPerson || cust?.businessName || "C").slice(0, 2).toUpperCase()}</span>
+                    <span style={{ color: "#ffffff", fontWeight: 700 }}>{getCustomerAvatarInitials(cust)}</span>
                     <span className="conv-wa-badge">
                       <MessageSquare size={10} color="#fff" />
                     </span>
@@ -1875,14 +1875,14 @@ export default function WhatsAppInboxComponent() {
                   {!isLeftCollapsed && (
                     <div className="conv-content-box">
                       <div className="conv-top-line">
-                        <span className="conv-name">{cust?.contactPerson || cust?.businessName || cust?.whatsappNumber}</span>
+                        <span className="conv-name">{getCustomerDisplayName(cust)}</span>
                         <span className="conv-time" title={new Date(conv.lastMessageAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}>
                           {formatConversationTime(conv.lastMessageAt)}
                         </span>
                       </div>
 
                       <div className="conv-contact-sub">
-                        <span>{formatWhatsAppPhone(cust?.whatsappNumber || cust?.mobile)}</span>
+                        <span>{getCustomerSubtitle(cust).text}</span>
                       </div>
 
                       <div className="conv-snippet-line">
@@ -1989,7 +1989,7 @@ export default function WhatsAppInboxComponent() {
             <div className="chat-header">
               <div className="chat-header-user-info">
                 <div className="chat-avatar-large" style={{ background: getAvatarGradient(activeConvDetail.customer?.contactPerson || activeConvDetail.customer?.businessName || activeConvDetail.customer?.whatsappNumber) }}>
-                  <span style={{ color: "#ffffff", fontWeight: 700 }}>{(activeConvDetail.customer?.contactPerson || "C").slice(0, 2).toUpperCase()}</span>
+                  <span style={{ color: "#ffffff", fontWeight: 700 }}>{getCustomerAvatarInitials(activeConvDetail.customer)}</span>
                 </div>
                 <div>
                   <div className="chat-title-line" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
@@ -2049,7 +2049,7 @@ export default function WhatsAppInboxComponent() {
                     ) : (
                       <>
                         <h2 className="chat-customer-name" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                          {activeConvDetail.customer?.contactPerson || activeConvDetail.customer?.businessName || activeConvDetail.customer?.whatsappNumber}
+                          {getCustomerDisplayName(activeConvDetail.customer)}
                         </h2>
                         <button
                           onClick={() => {
@@ -2093,7 +2093,16 @@ export default function WhatsAppInboxComponent() {
                         }
                       }}
                     >
-                      {formatWhatsAppPhone(activeConvDetail.customer?.whatsappNumber || activeConvDetail.customer?.mobile)}
+                      {(() => {
+                        const p = activeConvDetail.customer?.whatsappNumber || activeConvDetail.customer?.mobile;
+                        const country = getCountryInfo(p);
+                        return (
+                          <>
+                            <span style={{ fontSize: "13px" }}>{country.flag}</span>
+                            <span>{formatWhatsAppPhone(p)}</span>
+                          </>
+                        );
+                      })()}
                       <Copy size={11} color="#6366f1" />
                     </span>
                   </div>
@@ -2454,7 +2463,7 @@ export default function WhatsAppInboxComponent() {
                               </span>
                             </span>
                           ) : (
-                            <span className="sender-badge customer-badge">{msg.senderName || activeConvDetail.customer?.contactPerson || "Customer"}</span>
+                            <span className="sender-badge customer-badge">{getCustomerDisplayName(activeConvDetail.customer)}</span>
                           )}
                         </div>
 
@@ -2878,10 +2887,14 @@ export default function WhatsAppInboxComponent() {
                         {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && msg.messageType !== "ORDER" && (
                           <p className="message-text-content">
                             {msg.messageType === "UNSUPPORTED" ? (
-                              <span style={{ fontStyle: "italic", color: "#64748b", display: "inline-flex", alignItems: "center", gap: "5px" }}>
-                                <Paperclip size={12} />
-                                <span>[Unsupported message format (e.g. Sticker, Location, or Poll)]</span>
-                              </span>
+                              msg.content && msg.content !== "[Message]" ? (
+                                <span>{msg.content}</span>
+                              ) : (
+                                <span style={{ color: "#38bdf8", display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600 }}>
+                                  <ShoppingBag size={14} />
+                                  <span>WhatsApp Catalog Order Received</span>
+                                </span>
+                              )
                             ) : (
                               msg.content
                             )}
