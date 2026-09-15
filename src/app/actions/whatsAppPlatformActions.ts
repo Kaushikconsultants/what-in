@@ -1025,8 +1025,15 @@ export async function generateWhatsAppPaymentLinkAction(data: {
   deliveryMethod?: 'link' | 'qr' | 'both';
 }) {
   try {
-    const creds = await prisma.whatsAppSettings.findFirst();
-    const gw = creds?.activeGateway;
+    const conv = await prisma.whatsAppConversation.findUnique({
+      where: { id: data.conversationId },
+      include: { client: true }
+    });
+    const client = conv?.client;
+    const globalCreds = await prisma.whatsAppSettings.findFirst();
+    const creds: any = client?.activeGateway ? client : (globalCreds || client);
+    const gw = client?.activeGateway || globalCreds?.activeGateway || 'UPI';
+
     const domain = process.env.NEXTAUTH_URL || 'https://whatsapp.esponsports.com';
     let paymentUrl = `${domain}/pay`;
 
@@ -1069,15 +1076,18 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       if (cfData.link_url) paymentUrl = cfData.link_url;
     } else {
       // Default to UPI Gateway
-      upiId = creds?.merchantUpiId || '9306817689@kotak811';
-      paymentUrl = `${domain}/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(creds?.merchantUpiName || 'Espon')}&am=${data.amount}&tn=${encodeURIComponent(data.description)}`;
+      const resolvedUpiId = creds?.merchantUpiId || '9306817689@kotak811';
+      upiId = resolvedUpiId;
+      const payeeName = creds?.merchantUpiName || client?.businessName || 'Merchant';
+      paymentUrl = `${domain}/pay?pa=${encodeURIComponent(resolvedUpiId)}&pn=${encodeURIComponent(payeeName)}&am=${data.amount}&tn=${encodeURIComponent(data.description)}`;
 
-      const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(creds?.merchantUpiName || 'Espon')}&am=${data.amount}&cu=INR&tn=${encodeURIComponent(data.description)}`;
+      const upiLink = `upi://pay?pa=${encodeURIComponent(resolvedUpiId)}&pn=${encodeURIComponent(payeeName)}&am=${data.amount}&cu=INR&tn=${encodeURIComponent(data.description)}`;
       qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
     }
     
     const paymentLink = await prisma.whatsAppPaymentLink.create({
       data: {
+        clientId: conv?.clientId || client?.id || null,
         conversationId: data.conversationId,
         customerId: data.customerId,
         amount: data.amount,
@@ -1094,44 +1104,56 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       upiId
     });
 
-    // Send SINGLE unified message based on delivery method
+    const senderName = creds?.merchantUpiName || client?.businessName || 'Billing System';
+
+    // Send unified message based on delivery method
     if (data.deliveryMethod === 'qr' && qrApiUrl) {
-      // Send single QR image message
       await sendWhatsAppMessageAction({
         conversationId: data.conversationId,
-        senderType: 'AGENT',
-        senderName: 'Billing System',
+        senderType: 'SYSTEM',
+        senderName,
         messageType: 'IMAGE',
-        content: `💳 *Payment Request: ₹${data.amount.toLocaleString('en-IN')}*\n\n${data.description}\n\n🏦 UPI ID: *${upiId}*\n\nScan this QR code with any UPI app (GPay, PhonePe, Paytm) to complete payment.`,
+        content: `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}\n\nUPI ID: *${upiId}*\n\nScan this QR code with any UPI app (GPay, PhonePe, Paytm, BHIM) to complete payment.`,
         mediaUrl: qrApiUrl,
         metadata: metadataPayload
       });
     } else if (data.deliveryMethod === 'link') {
-      // Send single CTA link button message without image header
       await sendWhatsAppMessageAction({
         conversationId: data.conversationId,
-        senderType: 'AGENT',
-        senderName: 'Billing System',
+        senderType: 'SYSTEM',
+        senderName,
         messageType: 'PAYMENT_LINK',
-        content: `💳 *Payment Request: ₹${data.amount.toLocaleString('en-IN')}*\n\n${data.description}\n\nClick the button below to pay securely:`,
+        content: `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}\n\nTap below to pay securely:`,
         mediaUrl: paymentUrl,
         metadata: JSON.stringify({ paymentLinkId: paymentLink.id, amount: data.amount, paymentUrl, upiId })
       });
     } else {
-      // Both (Default): Send ONE single interactive message with QR image header AND Pay Now button!
+      // Both (Default): Send QR code image message with direct payment URL in the caption!
       const bodyContent = qrApiUrl 
-        ? `💳 *Payment Request: ₹${data.amount.toLocaleString('en-IN')}*\n\n${data.description}${upiId ? `\n\n🏦 UPI ID: *${upiId}*` : ''}\n\nScan this QR code or tap 'Pay Now' below to complete payment:`
-        : `💳 *Payment Request: ₹${data.amount.toLocaleString('en-IN')}*\n\n${data.description}\n\nClick below to pay securely:`;
+        ? `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}${upiId ? `\n\nUPI ID: *${upiId}*` : ''}\n\nPay via Link: ${paymentUrl}\n\nOr scan the QR code above using any UPI app (PhonePe, GPay, Paytm) to complete payment.`
+        : `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}\n\nClick below to pay securely:`;
 
-      await sendWhatsAppMessageAction({
-        conversationId: data.conversationId,
-        senderType: 'AGENT',
-        senderName: 'Billing System',
-        messageType: 'PAYMENT_LINK',
-        content: bodyContent,
-        mediaUrl: paymentUrl,
-        metadata: metadataPayload
-      });
+      if (qrApiUrl) {
+        await sendWhatsAppMessageAction({
+          conversationId: data.conversationId,
+          senderType: 'SYSTEM',
+          senderName,
+          messageType: 'IMAGE',
+          content: bodyContent,
+          mediaUrl: qrApiUrl,
+          metadata: metadataPayload
+        });
+      } else {
+        await sendWhatsAppMessageAction({
+          conversationId: data.conversationId,
+          senderType: 'SYSTEM',
+          senderName,
+          messageType: 'PAYMENT_LINK',
+          content: bodyContent,
+          mediaUrl: paymentUrl,
+          metadata: metadataPayload
+        });
+      }
     }
 
     await prisma.whatsAppConversation.update({

@@ -71,13 +71,24 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
   const [inspectingPayload, setInspectingPayload] = useState<any | null>(null);
 
   // Recovery Agent Settings state
-  const [recoverySettings, setRecoverySettings] = useState({
+  const [recoverySettings, setRecoverySettings] = useState<{
+    enabled: boolean;
+    delayHours: number;
+    allowDiscount: boolean;
+    discountPercent: number;
+    discountCode: string;
+    productValuePitch: string;
+    autoCatalogPaymentEnabled: boolean;
+    autoCatalogDeliveryMethod: 'both' | 'qr' | 'link';
+  }>({
     enabled: false,
     delayHours: 2,
     allowDiscount: false,
     discountPercent: 5,
     discountCode: "SPECIAL5",
-    productValuePitch: "Each piece is crafted from 100% premium combed cotton with heavy GSM durability, reinforced stitching, and a 7-day hassle-free exchange promise."
+    productValuePitch: "Each piece is crafted from 100% premium combed cotton with heavy GSM durability, reinforced stitching, and a 7-day hassle-free exchange promise.",
+    autoCatalogPaymentEnabled: true,
+    autoCatalogDeliveryMethod: "both"
   });
   const [savingRecovery, setSavingRecovery] = useState(false);
   const [sendingRecoveryForId, setSendingRecoveryForId] = useState<string | null>(null);
@@ -1407,6 +1418,50 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold uppercase text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Auto-Send Payment Link with QR on Catalog Orders */}
+                <div className={`p-4 rounded-xl border transition-all ${
+                  recoverySettings.autoCatalogPaymentEnabled
+                    ? "bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60"
+                    : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <QrCode size={14} className="text-emerald-600 dark:text-emerald-400" />
+                        Auto-Send Payment Links & QR on Catalog Orders
+                      </span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        {recoverySettings.autoCatalogPaymentEnabled
+                          ? "Active: When a customer submits a WhatsApp Catalog order, system immediately sends a dynamic payment link & UPI QR code."
+                          : "Disabled: Catalog orders are received in inbox for manual salesperson response."}
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={recoverySettings.autoCatalogPaymentEnabled}
+                      onChange={(e) => setRecoverySettings({ ...recoverySettings, autoCatalogPaymentEnabled: e.target.checked })}
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                    />
+                  </div>
+
+                  {recoverySettings.autoCatalogPaymentEnabled && (
+                    <div className="mt-3 pt-3 border-t border-emerald-200/60 dark:border-emerald-800/40">
+                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                        Catalog Payment Delivery Format
+                      </label>
+                      <select
+                        value={recoverySettings.autoCatalogDeliveryMethod || "both"}
+                        onChange={(e) => setRecoverySettings({ ...recoverySettings, autoCatalogDeliveryMethod: e.target.value as any })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="both">Dynamic UPI QR Code + Payment Link in Caption (Recommended)</option>
+                        <option value="qr">UPI QR Code Image Only</option>
+                        <option value="link">Payment Link CTA Button Only</option>
+                      </select>
                     </div>
                   )}
                 </div>

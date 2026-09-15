@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleIncomingAILogic } from "@/lib/whatsappAI";
 import { executeFlowEngine } from "@/lib/whatsappFlowEngine";
-import { assignWhatsAppLeadAction } from "@/app/actions/whatsAppPlatformActions";
+import { assignWhatsAppLeadAction, generateWhatsAppPaymentLinkAction } from "@/app/actions/whatsAppPlatformActions";
 import { formatWhatsAppPhone } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 import { emitInboxEvent } from "@/lib/inboxEvents";
 import { processUpiScreenshotAction } from "@/app/actions/upiScreenshotActions";
+import { getRecoveryAgentSettings } from "@/lib/paymentRecoveryAgent";
 
 const MAX_DEDUP_SIZE = 2000;
 const dedupQueue: string[] = [];
@@ -833,6 +834,36 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
           }
         } catch (visionErr) {
           console.error("[Webhook UPI Vision Error]:", visionErr);
+        }
+      })();
+    }
+
+    // ══════════════════════════════════════════════════════
+    // AUTO-SEND PAYMENT LINK WITH QR ON CATALOG ORDERS
+    // ══════════════════════════════════════════════════════
+    if (msg.type === "order" && orderMetadata?.order && orderMetadata.order.totalAmount > 0) {
+      (async () => {
+        try {
+          const recSettings = await getRecoveryAgentSettings();
+          if (recSettings.autoCatalogPaymentEnabled !== false) {
+            const orderInfo = orderMetadata.order;
+            const itemSummary = (orderInfo.items || []).map((it: any) => `${it.quantity}x ${it.name}`).join(", ");
+            const desc = `Catalog Order (${orderInfo.totalQuantity} items: ${itemSummary})`.slice(0, 150);
+
+            await generateWhatsAppPaymentLinkAction({
+              conversationId: conversation.id,
+              customerId: customer.id,
+              amount: orderInfo.totalAmount,
+              description: desc,
+              deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both"
+            });
+
+            console.log(`[WhatsApp Webhook] Auto-sent payment link + QR for catalog order to ${customer.contactPerson} (Amount: ₹${orderInfo.totalAmount})`);
+          } else {
+            console.log(`[WhatsApp Webhook] Auto-send catalog payment link skipped (disabled by admin setting)`);
+          }
+        } catch (catOrderErr) {
+          console.error("[WhatsApp Webhook] Error auto-sending payment link on catalog order:", catOrderErr);
         }
       })();
     }

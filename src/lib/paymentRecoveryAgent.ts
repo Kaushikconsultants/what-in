@@ -7,6 +7,8 @@ export interface RecoveryAgentSettings {
   discountPercent: number; // e.g. 5
   discountCode: string; // e.g. "SPECIAL5"
   productValuePitch: string;
+  autoCatalogPaymentEnabled: boolean; // Auto-send payment link + QR on catalog orders
+  autoCatalogDeliveryMethod: 'both' | 'qr' | 'link'; // Delivery format: both, qr, or link
 }
 
 // In-memory fallback / cache with sensible defaults
@@ -20,7 +22,9 @@ const DEFAULT_SETTINGS: RecoveryAgentSettings = {
   allowDiscount: false, // OFF by default
   discountPercent: 5,
   discountCode: "SPECIAL5",
-  productValuePitch: "Each piece is crafted from 100% premium combed cotton with heavy GSM durability, reinforced stitching, and a 7-day hassle-free exchange promise. Our limited-edition batches sell out quickly, ensuring exclusivity."
+  productValuePitch: "Each piece is crafted from 100% premium combed cotton with heavy GSM durability, reinforced stitching, and a 7-day hassle-free exchange promise. Our limited-edition batches sell out quickly, ensuring exclusivity.",
+  autoCatalogPaymentEnabled: true, // Enabled by default
+  autoCatalogDeliveryMethod: "both"
 };
 
 export async function getRecoveryAgentSettings(): Promise<RecoveryAgentSettings> {
