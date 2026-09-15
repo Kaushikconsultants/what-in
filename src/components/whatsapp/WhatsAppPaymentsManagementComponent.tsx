@@ -22,7 +22,7 @@ import {
   savePaymentRecoverySettingsAction, 
   sendConversationalPaymentRecoveryAction 
 } from "@/app/actions/paymentRecoveryActions";
-import { formatWhatsAppPhone } from "@/lib/phoneUtils";
+import { formatWhatsAppPhone, getCustomerDisplayName } from "@/lib/phoneUtils";
 
 interface WhatsAppPaymentsManagementComponentProps {
   embedded?: boolean;
@@ -609,7 +609,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                         <tr key={link.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                           <td className="py-3 px-4">
                             <div className="font-bold text-slate-900 dark:text-white">
-                              {cust?.businessName || cust?.contactPerson || "Customer"}
+                              {getCustomerDisplayName(cust)}
                             </div>
                             <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">
                               {formatWhatsAppPhone(cust?.whatsappNumber || cust?.mobile) || "-"}
@@ -1575,7 +1575,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
               <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3.5">
                 <div className="text-[11px] font-bold text-slate-500 uppercase">Customer</div>
                 <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-                  {verifyingLink.conversation?.customer?.contactPerson || verifyingLink.customer?.contactPerson || "Customer"}
+                  {getCustomerDisplayName(verifyingLink.conversation?.customer || verifyingLink.customer)}
                 </div>
                 <div className="flex justify-between items-center mt-2 text-xs">
                   <span className="text-slate-500">Amount:</span>

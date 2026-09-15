@@ -263,7 +263,7 @@ export async function getWhatsAppConversationById(id: string) {
         },
         assignedEmployee: { include: { user: true } },
         messages: { orderBy: { sentAt: 'asc' } },
-        paymentLinks: { orderBy: { createdAt: 'desc' }, take: 3 }
+        paymentLinks: { orderBy: { createdAt: 'desc' }, take: 25 }
       }
     });
 

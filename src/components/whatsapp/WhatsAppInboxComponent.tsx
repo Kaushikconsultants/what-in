@@ -2565,6 +2565,19 @@ export default function WhatsAppInboxComponent() {
                           const payUrl = payMeta.paymentUrl || (msg.mediaUrl?.startsWith("http") && !msg.mediaUrl.includes("create-qr-code") ? msg.mediaUrl : null);
                           const payAmt = payMeta.amount || (msg.content?.match(/₹\s*([0-9,]+)/)?.[1]);
 
+                          // Look up real-time payment link status from conversation data
+                          const matchingLink = payMeta.paymentLinkId 
+                            ? activeConvDetail?.paymentLinks?.find((l: any) => l.id === payMeta.paymentLinkId)
+                            : (payUrl 
+                                ? activeConvDetail?.paymentLinks?.find((l: any) => l.paymentUrl === payUrl || (l.orderId && payUrl.includes(l.orderId)))
+                                : (payAmt 
+                                    ? activeConvDetail?.paymentLinks?.find((l: any) => Math.abs(Number(l.amount) - Number(String(payAmt).replace(/,/g, ""))) <= 1)
+                                    : activeConvDetail?.paymentLinks?.[0]));
+
+                          const isPaid = matchingLink?.status === "PAID";
+                          const isExpired = matchingLink?.status === "EXPIRED";
+                          const txnRef = matchingLink?.transactionId;
+
                           return (
                             <div className="msg-payment-card">
                               {/* Header */}
@@ -2584,13 +2597,13 @@ export default function WhatsAppInboxComponent() {
                                     )}
                                   </div>
                                 </div>
-                                <span className="msg-payment-status-badge">
-                                  PENDING
+                                <span className={`msg-payment-status-badge ${isPaid ? "paid" : isExpired ? "expired" : "pending"}`}>
+                                  {isPaid ? "✓ PAID" : isExpired ? "EXPIRED" : "PENDING"}
                                 </span>
                               </div>
 
                               {/* Scannable QR Code Image */}
-                              {qrImg && (
+                              {qrImg && !isPaid && (
                                 <div className="msg-payment-qr-wrap">
                                   <div className="msg-payment-qr-box">
                                     <img
@@ -2611,18 +2624,44 @@ export default function WhatsAppInboxComponent() {
                                 {msg.content}
                               </div>
 
-                              {/* Pay Now Button Link */}
-                              {payUrl && (
-                                <div className="msg-payment-btn-wrap">
-                                  <a
-                                    href={payUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="msg-payment-btn"
-                                  >
-                                    <CreditCard size={13} /> Pay Now <ExternalLink size={12} />
-                                  </a>
+                              {/* Verified Banner (if paid) */}
+                              {isPaid ? (
+                                <div style={{ padding: "0 12px 12px" }}>
+                                  <div style={{
+                                    background: "#f0fdf4",
+                                    border: "1px solid #86efac",
+                                    borderRadius: "10px",
+                                    padding: "10px 12px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: "8px"
+                                  }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                      <CheckCircle2 size={16} color="#16a34a" />
+                                      <span style={{ fontSize: "12px", fontWeight: 700, color: "#15803d" }}>Payment Verified & Received</span>
+                                    </div>
+                                    {txnRef && (
+                                      <span style={{ fontSize: "10px", fontFamily: "monospace", color: "#166534", background: "#dcfce7", padding: "2px 6px", borderRadius: "4px" }}>
+                                        {txnRef}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
+                              ) : (
+                                /* Pay Now Button Link (if pending) */
+                                payUrl && (
+                                  <div className="msg-payment-btn-wrap">
+                                    <a
+                                      href={payUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="msg-payment-btn"
+                                    >
+                                      <CreditCard size={13} /> Pay Now <ExternalLink size={12} />
+                                    </a>
+                                  </div>
+                                )
                               )}
                             </div>
                           );
