@@ -32,7 +32,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
   const [links, setLinks] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSubTab, setActiveSubTab] = useState<"TRANSACTIONS" | "GATEWAYS">("TRANSACTIONS");
+  const [activeSubTab, setActiveSubTab] = useState<"TRANSACTIONS" | "GATEWAYS" | "RECOVERY">("TRANSACTIONS");
   const [activeFilter, setActiveFilter] = useState<"ALL" | "PENDING" | "PAID" | "MANUAL_UPI" | "GATEWAY">("ALL");
   const [copiedRzp, setCopiedRzp] = useState(false);
   const [copiedCf, setCopiedCf] = useState(false);
@@ -496,6 +496,21 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
         >
           <Zap size={15} />
           <span>Gateway Credentials & Webhooks</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab("RECOVERY")}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeSubTab === "RECOVERY"
+              ? "bg-slate-900 dark:bg-indigo-600 text-white shadow-xs"
+              : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          }`}
+        >
+          <Sliders size={15} />
+          <span>AI Recovery & Discounts</span>
+          {recoverySettings.enabled && (
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          )}
         </button>
       </div>
 
@@ -1287,6 +1302,186 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                 {savingRecovery ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
                 <span>Save Recovery Agent Policy</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subtab 3: AI Recovery & Discounts */}
+      {activeSubTab === "RECOVERY" && (
+        <div className="flex flex-col gap-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900 dark:text-white m-0 flex items-center gap-2">
+                  <Sliders size={20} className="text-indigo-600 dark:text-indigo-400" />
+                  <span>Conversational Payment Recovery Agent</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">
+                  Automated AI follow-up for pending payment links. Strictly respects your discount policy.
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer bg-slate-50 dark:bg-slate-800 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                <input
+                  type="checkbox"
+                  checked={recoverySettings.enabled}
+                  onChange={(e) => setRecoverySettings({ ...recoverySettings, enabled: e.target.checked })}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${recoverySettings.enabled ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`}></span>
+                  {recoverySettings.enabled ? "Agent Active" : "Agent Disabled"}
+                </span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Form Controls */}
+              <div className="lg:col-span-7 flex flex-col gap-5">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    Follow-Up Delay
+                  </label>
+                  <select
+                    value={recoverySettings.delayHours}
+                    onChange={(e) => setRecoverySettings({ ...recoverySettings, delayHours: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value={1}>After 1 Hour of pending link</option>
+                    <option value={2}>After 2 Hours of pending link (Recommended)</option>
+                    <option value={4}>After 4 Hours of pending link</option>
+                    <option value={24}>After 24 Hours of pending link</option>
+                  </select>
+                </div>
+
+                {/* Admin Discount Control Card */}
+                <div className={`p-4 rounded-xl border transition-all ${
+                  recoverySettings.allowDiscount
+                    ? "bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/60"
+                    : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                        Authorize Dynamic Courtesy Discount
+                      </span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        {recoverySettings.allowDiscount 
+                          ? "AI is permitted to offer discounts up to your configured limit."
+                          : "AI is strictly FORBIDDEN from offering discounts. It will pitch craftsmanship and quality instead."}
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={recoverySettings.allowDiscount}
+                      onChange={(e) => setRecoverySettings({ ...recoverySettings, allowDiscount: e.target.checked })}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                  </div>
+
+                  {recoverySettings.allowDiscount && (
+                    <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-indigo-200/60 dark:border-indigo-800/40">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          Max Discount %
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="25"
+                          value={recoverySettings.discountPercent}
+                          onChange={(e) => setRecoverySettings({ ...recoverySettings, discountPercent: Number(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          Discount Coupon Code
+                        </label>
+                        <input
+                          type="text"
+                          value={recoverySettings.discountCode}
+                          onChange={(e) => setRecoverySettings({ ...recoverySettings, discountCode: e.target.value })}
+                          placeholder="e.g. SPECIAL5"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold uppercase text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Product Value Proposition Text Area */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    Product Value Pitch & Craftsmanship Details
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={recoverySettings.productValuePitch}
+                    onChange={(e) => setRecoverySettings({ ...recoverySettings, productValuePitch: e.target.value })}
+                    placeholder="Describe your premium fabric, heavy GSM, durability, fast delivery, or guarantee..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 resize-none leading-relaxed"
+                  />
+                  <span className="text-[10.5px] text-slate-500 dark:text-slate-400 block mt-1">
+                    When discounts are disabled, the AI uses these key points to motivate the customer to complete payment without price cuts.
+                  </span>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveRecoverySettings}
+                    disabled={savingRecovery}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
+                  >
+                    {savingRecovery ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                    <span>Save Recovery Agent Policy</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column: Live WhatsApp Simulation Preview */}
+              <div className="lg:col-span-5 flex flex-col gap-3">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Smartphone size={14} className="text-emerald-500" />
+                  <span>Live WhatsApp Message Preview</span>
+                </span>
+
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-[#EFEAE2] dark:bg-slate-950 p-4 flex flex-col gap-3 shadow-inner min-h-[300px]">
+                  <div className="text-[10px] text-center font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Customer Chat Preview
+                  </div>
+
+                  <div className="max-w-[90%] self-start bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-2xl rounded-tl-none p-3.5 shadow-xs text-xs flex flex-col gap-2 border border-slate-200/50 dark:border-slate-700/50 leading-relaxed font-sans">
+                    <span className="font-semibold">Hi Priya!</span>
+                    <p className="m-0 text-[11.5px]">
+                      We noticed your payment link for *Order #1042* (₹1,999) is pending. We just wanted to check if you faced any difficulty completing the payment!
+                    </p>
+
+                    {recoverySettings.allowDiscount ? (
+                      <div className="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-[11px] text-indigo-900 dark:text-indigo-200 flex flex-col gap-1">
+                        <span className="font-bold">Privilege Courtesy Discount:</span>
+                        <span>Use code <span className="font-mono font-black uppercase text-indigo-600 dark:text-indigo-400">{recoverySettings.discountCode || "SPECIAL5"}</span> to get <span className="font-black">{recoverySettings.discountPercent}% OFF</span> on this order!</span>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 text-[11px] text-slate-700 dark:text-slate-300">
+                        <span className="font-bold block mb-0.5">Why you'll love it:</span>
+                        <span>{recoverySettings.productValuePitch || "Crafted from 100% premium combed cotton with heavy GSM durability and fast dispatch."}</span>
+                      </div>
+                    )}
+
+                    <div className="pt-1 text-[11px]">
+                      <span>Click here to complete payment: </span>
+                      <span className="text-blue-600 dark:text-blue-400 underline font-mono">https://pay.espon.in/link_1042</span>
+                    </div>
+
+                    <span className="text-[9px] text-slate-400 text-right self-end mt-1 font-mono">
+                      12:30 PM
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
