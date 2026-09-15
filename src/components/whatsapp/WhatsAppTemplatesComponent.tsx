@@ -5,10 +5,12 @@ import {
   FileCode, Plus, Search, RefreshCw, CheckCircle2, Clock, AlertCircle,
   X, Send, Trash2, Eye, Info, Calendar, Zap, TrendingUp, Filter, Sparkles,
   ArrowUpDown, CheckCheck, Radio, Check, ArrowLeft, Layers, ShoppingBag,
-  Tag, ChevronLeft, ChevronRight, ChevronDown, Image as ImageIcon, Link as LinkIcon,
+  Tag, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Image as ImageIcon, Link as LinkIcon,
   Phone, Copy, Smartphone, Upload, Clipboard, CheckSquare, PackageCheck,
   Truck, CreditCard, BellRing, FileText, Video, FileCheck, ExternalLink,
-  Smile, Paperclip, Camera, Mic, MoreVertical
+  Smile, Paperclip, Camera, Mic, MoreVertical, Megaphone, SlidersHorizontal,
+  KeyRound, ShieldCheck, Building2, Globe, Crown, Briefcase, Type, MessageSquare,
+  Receipt, Gift, ShoppingCart, Bot
 } from "lucide-react";
 import {
   getWhatsAppTemplates,
@@ -53,15 +55,15 @@ const LANGUAGES = [
 ];
 
 const CATEGORIES = [
-  { value: "MARKETING", label: "📢 Marketing", desc: "Promotions, product showcases, seasonal offers, and re-engagement" },
-  { value: "UTILITY", label: "⚙️ Utility", desc: "Order confirmation, shipping status, payment receipts, and critical account alerts" },
-  { value: "AUTHENTICATION", label: "🔐 Authentication", desc: "One-time passwords (OTP) and login account verification codes" },
+  { value: "MARKETING", label: "Marketing", desc: "Promotions, product showcases, seasonal offers, and re-engagement" },
+  { value: "UTILITY", label: "Utility", desc: "Order confirmation, shipping status, payment receipts, and critical account alerts" },
+  { value: "AUTHENTICATION", label: "Authentication", desc: "One-time passwords (OTP) and login account verification codes" },
 ];
 
 const getUtilityPresetsList = (brand: string, domain: string) => [
   {
     id: "ORDER_CONFIRMATION",
-    label: "📦 Order Confirmation",
+    label: "Order Confirmation",
     desc: "Post-purchase customer transactional receipts",
     type: "STANDARD",
     category: "UTILITY",
@@ -81,20 +83,21 @@ const getUtilityPresetsList = (brand: string, domain: string) => [
   },
   {
     id: "SHIPPING_UPDATE",
+    label: "Shipping & Payment",
     header: "Payment Received",
     body: `Hi {{1}}, we have received your payment of ₹{{2}} for invoice #{{3}}. Thank you for choosing ${brand}!`,
     footer: `${brand} Accounts`
   },
   {
     id: "ACCOUNT_ALERT",
-    label: "🔔 Account Alert",
+    label: "Account Alert",
     header: "Security Notice",
     body: `Hi {{1}}, this is an important update regarding your ${brand} account: {{2}}. If this was not you, please reply immediately.`,
     footer: `${brand} Security Desk`
   },
   {
     id: "CUSTOM_UTILITY",
-    label: "📝 Custom Utility",
+    label: "Custom Utility",
     header: "",
     body: "",
     footer: ""
@@ -299,7 +302,7 @@ export default function WhatsAppTemplatesComponent() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiDraft, setAiDraft] = useState<any | null>(null);
-  const [aiIsOpen, setAiIsOpen] = useState(true);
+  const [aiIsOpen, setAiIsOpen] = useState(false);
   const [aiRefineInput, setAiRefineInput] = useState("");
   const [aiSelectedProducts, setAiSelectedProducts] = useState<any[]>([]);
   const [aiProductDropdownOpen, setAiProductDropdownOpen] = useState(false);
@@ -348,7 +351,7 @@ export default function WhatsAppTemplatesComponent() {
     const inStock = inventoryProducts.filter((p) => p.inStock);
     const toSelect = (inStock.length > 0 ? inStock : inventoryProducts).slice(0, count);
     setSelectedCatalogProducts(toSelect);
-    showToast(`⚡ Selected top ${toSelect.length} in-stock products for catalog!`, "success");
+    showToast(`Selected top ${toSelect.length} in-stock products for catalog.`, "success");
   };
 
   const handleSelectAllInStock = () => {
@@ -366,7 +369,7 @@ export default function WhatsAppTemplatesComponent() {
       return true;
     }).slice(0, 30);
     setSelectedCatalogProducts(inStock);
-    showToast(`📦 Selected ${inStock.length} in-stock products for catalog!`, "success");
+    showToast(`Selected ${inStock.length} in-stock products for catalog.`, "success");
   };
 
   const handleClearCatalogSelection = () => {
@@ -380,16 +383,16 @@ export default function WhatsAppTemplatesComponent() {
       return;
     }
     const names = selectedCatalogProducts.map((p) => p.name).slice(0, 3).join(", ");
-    const dynamicBody = `Hi {{1}}, explore our *${catalogSectionTitle || "Featured Collection"}* at ${brandName}! 🔥\n\nFeaturing top picks like ${names}${selectedCatalogProducts.length > 3 ? ` and ${selectedCatalogProducts.length - 3} more` : ''}. Tap *${catalogButtonText || "View catalog"}* below to browse styles, check sizes, and place orders directly on WhatsApp!\n\nUse code *${couponCode || 'FLAT30'}* for special discounts.`;
+    const dynamicBody = `Hi {{1}}, explore our *${catalogSectionTitle || "Featured Collection"}* at ${brandName}!\n\nFeaturing top picks like ${names}${selectedCatalogProducts.length > 3 ? ` and ${selectedCatalogProducts.length - 3} more` : ''}. Tap *${catalogButtonText || "View catalog"}* below to browse styles, check sizes, and place orders directly on WhatsApp!\n\nUse code *${couponCode || 'FLAT30'}* for special discounts.`;
     setBodyText(dynamicBody);
     setFooterText(`${brandName} Store | Official Online Shop`);
-    showToast("✨ AI generated personalized catalog message copy!", "success");
+    showToast("AI generated personalized catalog message copy.", "success");
   };
 
   const handleInjectProductIntoCatalog = (p: any) => {
     setTemplateType("CATALOGUE");
     toggleSelectCatalogProduct(p);
-    showToast(`🛍️ Added "${p.name}" to Catalog selection!`, "success");
+    showToast(`Added "${p.name}" to Catalog selection.`, "success");
   };
 
   const handleBuildCarouselFromAiSelected = () => {
@@ -433,7 +436,7 @@ export default function WhatsAppTemplatesComponent() {
       { type: "URL", text: "Shop Full Store", url: `https://${brandDomain}`, urlType: "STATIC" },
       { type: "COPY_CODE", text: "Copy Coupon", code: couponCode || "FLAT30" }
     ]);
-    showToast(`✨ Generated ${cards.length} carousel cards from your selected products!`, "success");
+    showToast(`Generated ${cards.length} carousel cards from your selected products.`, "success");
   };
 
   const handleGenerateWithAI = async (customPrompt?: string) => {
@@ -485,7 +488,7 @@ export default function WhatsAppTemplatesComponent() {
         setAiDraft(res);
         // Auto-apply directly into the Studio Form and Live Smartphone Preview
         handleApplyAIDraft(res);
-        showToast("✨ AI generated & loaded template into studio and live simulator!", "success");
+        showToast("AI generated & loaded template into studio and live simulator.", "success");
       } else {
         showToast(res.error || "Failed to generate AI template.", "error");
       }
@@ -536,7 +539,7 @@ export default function WhatsAppTemplatesComponent() {
     }
     if (t.couponCode) setCouponCode(t.couponCode);
 
-    showToast(`🎉 AI Template ${hasCards ? `(${t.carouselCards.length}-card Carousel)` : ''} loaded into Studio & phone simulator!`, "success");
+    showToast(`AI Template ${hasCards ? `(${t.carouselCards.length}-card Carousel)` : ''} loaded into Studio & phone simulator.`, "success");
   };
 
   const handleRefineAIDraft = async () => {
@@ -556,7 +559,7 @@ export default function WhatsAppTemplatesComponent() {
       if (res.success && res.template?.bodyText) {
         setBodyText(res.template.bodyText);
         if (res.template.footerText) setFooterText(res.template.footerText);
-        showToast(`✅ Template translated to ${targetLang}!`, "success");
+        showToast(`Template translated to ${targetLang}.`, "success");
       }
     } catch (e: any) {
       showToast(e.message || "Translation failed.", "error");
@@ -594,7 +597,7 @@ export default function WhatsAppTemplatesComponent() {
       if (valid.length > 0) {
         setAiVariants(valid);
         setAiVariantIndex(0);
-        showToast(`✨ Generated ${valid.length} variants — pick your favorite!`, "success");
+        showToast(`Generated ${valid.length} variants — pick your favorite.`, "success");
       } else {
         showToast("Failed to generate variants. Try a more specific prompt.", "error");
       }
@@ -631,7 +634,7 @@ export default function WhatsAppTemplatesComponent() {
       } catch {}
     }
     setViewMode("CREATE");
-    showToast(`📋 Cloned "${t.name}" — edit and save as "${clonedName}"`, "success");
+    showToast(`Cloned "${t.name}" — edit and save as "${clonedName}".`, "success");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -670,7 +673,7 @@ export default function WhatsAppTemplatesComponent() {
       label: "Variables & Sample Values",
       pass: true,
       message: varMatches.length > 0
-        ? `✓ ${varMatches.length} variable(s) detected. Valid sample values will be auto-generated for Meta.`
+        ? `${varMatches.length} variable(s) detected. Valid sample values will be auto-generated for Meta.`
         : "No variables (static template)."
     });
 
@@ -690,7 +693,7 @@ export default function WhatsAppTemplatesComponent() {
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState("ALL");
   const [inventoryInStockOnly, setInventoryInStockOnly] = useState(false);
   const [inventoryStats, setInventoryStats] = useState({ totalProducts: 0, inStockProducts: 0, categoriesCount: 0 });
-  const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(true);
+  const [inventoryDrawerOpen, setInventoryDrawerOpen] = useState(false);
 
   const fetchInventory = async (search = inventorySearch, cat = inventoryCategoryFilter, inStock = inventoryInStockOnly) => {
     setInventoryLoading(true);
@@ -732,7 +735,7 @@ export default function WhatsAppTemplatesComponent() {
 
     if (!bodyText || bodyText.length < 10) {
       setBodyText(
-        `Hi {{1}}, check out our bestseller *${p.name}* at ${brandName}! 🔥\n\nGrab yours today for only *₹${p.sellingPrice}* (MRP ₹${p.mrp || p.sellingPrice} • ${p.discountPercent}% OFF). Crafted with ${p.fabric || 'premium fabric'} for ultimate comfort.\n\nUse code *${couponCode || 'FLAT30'}* at checkout for extra savings!`
+        `Hi {{1}}, check out our bestseller *${p.name}* at ${brandName}!\n\nGrab yours today for only *₹${p.sellingPrice}* (MRP ₹${p.mrp || p.sellingPrice} • ${p.discountPercent}% OFF). Crafted with ${p.fabric || 'premium fabric'} for ultimate comfort.\n\nUse code *${couponCode || 'FLAT30'}* at checkout for extra savings!`
       );
     }
 
@@ -759,7 +762,7 @@ export default function WhatsAppTemplatesComponent() {
       }
     ]);
 
-    showToast(`🖼️ Injected "${p.name}" photo, price & Buy Now link into Header!`, "success");
+    showToast(`Injected "${p.name}" photo, price & Buy Now link into Header.`, "success");
   };
 
   const handleInjectProductAsCarouselCard = (p: any) => {
@@ -791,7 +794,7 @@ export default function WhatsAppTemplatesComponent() {
     }
 
     setCarouselCards(prev => [...prev, newCard]);
-    showToast(`➕ Added "${p.name}" with photo & Buy Now link to Carousel Cards!`, "success");
+    showToast(`Added "${p.name}" with photo & Buy Now link to Carousel Cards.`, "success");
   };
 
   const handleAutoFillCarouselWithTopProducts = () => {
@@ -839,13 +842,13 @@ export default function WhatsAppTemplatesComponent() {
       { type: "COPY_CODE", text: "Copy Coupon", code: couponCode || "FLAT30" }
     ]);
 
-    showToast(`✨ Successfully auto-populated ${generatedCards.length} product cards with live inventory photos & links!`, "success");
+    showToast(`Successfully auto-populated ${generatedCards.length} product cards with live inventory photos & links.`, "success");
   };
 
   const handleInjectProductIntoBody = (p: any) => {
     const snippet = `\n• *${p.name}* — ₹${p.sellingPrice} (MRP ₹${p.mrp} • ${p.discountPercent}% OFF)`;
     setBodyText(prev => (prev ? `${prev}${snippet}` : `Hi {{1}}, check out *${p.name}* at ₹${p.sellingPrice}! Link: ${p.productUrl}`));
-    showToast(`📝 Injected "${p.name}" details into body message!`, "success");
+    showToast(`Injected "${p.name}" details into body message.`, "success");
   };
 
   const handlePromptAIForProduct = (p: any) => {
@@ -1270,10 +1273,10 @@ export default function WhatsAppTemplatesComponent() {
       const statusLabel = res.template?.status || (res.submitted ? "PENDING" : "PENDING");
       showToast(
         isApproved
-          ? "🎉 Template approved directly by Meta!"
+          ? "Template approved directly by Meta!"
           : res.submitted
-          ? `🎉 Template submitted to Meta Cloud API! Status: ${statusLabel} (Under Review)`
-          : `✅ Template saved locally! Status: ${statusLabel}`,
+          ? `Template submitted to Meta Cloud API! Status: ${statusLabel} (Under Review)`
+          : `Template saved locally! Status: ${statusLabel}`,
         "success"
       );
       resetForm();
@@ -1303,11 +1306,11 @@ export default function WhatsAppTemplatesComponent() {
     setRefreshingTemplate(null);
     if (res.success) {
       if (res.status === "APPROVED") {
-        showToast(`🎉 Meta Approved template "${name}"!`, "success");
+        showToast(`Meta Approved template "${name}".`, "success");
       } else if (res.status === "REJECTED") {
-        showToast(`⚠️ Meta Rejected "${name}": ${res.rejectionReason || "Policy Issue"}`, "error");
+        showToast(`Meta Rejected "${name}": ${res.rejectionReason || "Policy Issue"}`, "error");
       } else {
-        showToast(`⏳ Template "${name}" status from Meta: ${res.status}`);
+        showToast(`Template "${name}" status from Meta: ${res.status}`);
       }
       fetchTemplates();
     } else {
@@ -1320,7 +1323,7 @@ export default function WhatsAppTemplatesComponent() {
     const res = await resubmitCarouselTemplateAction(templateName);
     setResubmittingTemplate(null);
     if (res.success) {
-      showToast(res.message || `✓ 100% compliant version submitted to Meta for 1-5 minute approval!`, "success");
+      showToast(res.message || `Compliant version submitted to Meta for 1-5 minute approval.`, "success");
       setFastTrackModalTmpl(null);
       fetchTemplates();
     } else {
@@ -1353,7 +1356,7 @@ export default function WhatsAppTemplatesComponent() {
     const res = await sendWhatsAppTemplateAction(formattedPhone, t.name, t.language || "en_US", testComponents);
     setTestingTemplate(null);
     if (res.success) {
-      showToast(`🎉 Test message sent to +${formattedPhone}!`, "success");
+      showToast(`Test message sent to +${formattedPhone}.`, "success");
       fetchTemplates();
     } else {
       showToast(res.error || "Send failed.", "error");
@@ -1692,7 +1695,7 @@ export default function WhatsAppTemplatesComponent() {
                 </div>
 
                 <div className={`p-3 rounded-xl border text-[11px] font-semibold text-center ${allPass ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300" : "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300"}`}>
-                  {allPass ? "✅ All compliance checks passed! Your template is ready to submit to Meta." : "⚠️ Fix the issues above before submitting to improve approval chances."}
+                  {allPass ? "All compliance checks passed! Your template is ready to submit to Meta." : "Please fix the issues above before submitting to improve approval chances."}
                 </div>
 
                 <div className="flex gap-2">
@@ -1721,15 +1724,15 @@ export default function WhatsAppTemplatesComponent() {
             {/* ========================================================= */}
             {/* EMBEDDED AI TEMPLATE STUDIO CO-PILOT (Prompt-to-Template) */}
             {/* ========================================================= */}
-            <div className="bg-white dark:bg-slate-800 border-2 border-indigo-200/80 dark:border-indigo-900/60 rounded-3xl p-5 shadow-xs relative overflow-hidden bg-gradient-to-br from-indigo-50/30 via-white to-purple-50/20 dark:from-slate-800 dark:via-slate-800 dark:to-indigo-950/20">
+            <div className="bg-white dark:bg-slate-800/95 border border-indigo-200/80 dark:border-indigo-900/60 rounded-3xl p-5 shadow-xs relative overflow-hidden bg-gradient-to-br from-indigo-50/30 via-white to-purple-50/20 dark:from-slate-800 dark:via-slate-800 dark:to-indigo-950/20">
               {/* Header Badge & Brand Guide Notice */}
-              <div className="flex items-center justify-between gap-4 mb-3 relative z-10">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/25 text-white">
+              <div className="flex items-center justify-between gap-4 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 text-white flex-shrink-0">
                     <Sparkles size={18} />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-black tracking-tight text-gray-900 dark:text-white flex items-center gap-1.5">
                         AI Template Architect & Co-Pilot
                       </h3>
@@ -1746,38 +1749,50 @@ export default function WhatsAppTemplatesComponent() {
                 <button
                   type="button"
                   onClick={() => setAiIsOpen(!aiIsOpen)}
-                  className="px-3 py-1.5 bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 transition flex items-center gap-1 cursor-pointer"
+                  className="px-3.5 py-1.5 bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 transition flex items-center gap-1.5 cursor-pointer flex-shrink-0"
                 >
-                  {aiIsOpen ? "Hide Co-Pilot" : "Open Co-Pilot"}
+                  {aiIsOpen ? (
+                    <>
+                      <span>Hide Co-Pilot</span>
+                      <ChevronUp size={13} />
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={13} className="text-indigo-600" />
+                      <span>Open Co-Pilot</span>
+                      <ChevronDown size={13} />
+                    </>
+                  )}
                 </button>
               </div>
 
-              {/* Dynamic Brand Intelligence Badge */}
-              <div className="mb-4 px-3.5 py-2.5 bg-indigo-50/70 dark:bg-slate-900/60 border border-indigo-100 dark:border-slate-700/80 rounded-2xl flex flex-wrap items-center gap-2 text-[11px] text-gray-700 dark:text-gray-300 relative z-10">
-                <span className="flex items-center gap-1 font-black text-indigo-700 dark:text-indigo-300">
-                  🧠 Dynamic Brand Guidance:
-                </span>
-                <span className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2.5 py-0.5 rounded-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1 shadow-2xs">
-                  🏢 {brandName}
-                </span>
-                <span className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2.5 py-0.5 rounded-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1 shadow-2xs">
-                  🌐 {brandDomain}
-                </span>
-                <span className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2.5 py-0.5 rounded-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1 shadow-2xs">
-                  📞 {brandPhone}
-                </span>
-                {inventoryStats.totalProducts > 0 && (
-                  <span className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 px-2.5 py-0.5 rounded-lg font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1">
-                    🛍️ {inventoryStats.inStockProducts || inventoryProducts.length} In-Stock Products Connected
-                  </span>
-                )}
-                <span className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
-                  ✓ {hasAiKnowledge ? "AI Knowledge Base Connected" : "Standard Rules Active"}
-                </span>
-              </div>
-
               {aiIsOpen && (
-                <div className="flex flex-col gap-3.5 relative z-10 animate-in fade-in duration-150">
+                <div className="mt-4 flex flex-col gap-3.5 relative z-10 animate-in fade-in duration-150">
+                  {/* Dynamic Brand Intelligence Badge */}
+                  <div className="px-3.5 py-2.5 bg-indigo-50/70 dark:bg-slate-900/60 border border-indigo-100 dark:border-slate-700/80 rounded-2xl flex flex-wrap items-center gap-2 text-[11px] text-gray-700 dark:text-gray-300">
+                    <span className="flex items-center gap-1 font-black text-indigo-700 dark:text-indigo-300">
+                      <Sparkles size={12} className="text-indigo-600" />
+                      Dynamic Brand Guidance:
+                    </span>
+                    <span className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2.5 py-0.5 rounded-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1 shadow-2xs">
+                      <Building2 size={11} className="text-gray-400" /> {brandName}
+                    </span>
+                    <span className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2.5 py-0.5 rounded-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1 shadow-2xs">
+                      <Globe size={11} className="text-gray-400" /> {brandDomain}
+                    </span>
+                    <span className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 px-2.5 py-0.5 rounded-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1 shadow-2xs">
+                      <Phone size={11} className="text-gray-400" /> {brandPhone}
+                    </span>
+                    {inventoryStats.totalProducts > 0 && (
+                      <span className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 px-2.5 py-0.5 rounded-lg font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                        <ShoppingBag size={11} className="text-purple-600" /> {inventoryStats.inStockProducts || inventoryProducts.length} In-Stock Products Connected
+                      </span>
+                    )}
+                    <span className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                      <CheckCircle2 size={11} className="text-emerald-600" /> {hasAiKnowledge ? "AI Knowledge Base Connected" : "Standard Rules Active"}
+                    </span>
+                  </div>
+
                   {/* Quick Starter Inspiration Chips */}
                   <div>
                     <div className="text-[11px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -1786,11 +1801,11 @@ export default function WhatsAppTemplatesComponent() {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        { label: "🎁 Festive 30% OFF Flash Sale", prompt: `Create a festive mega flash sale template for ${brandName} with a 30% coupon code FLAT30, image header, limited-time urgency, shop now dynamic button, and call support button.` },
-                        { label: "📦 Order Dispatched & Tracking", prompt: `Create a transactional order dispatched utility template for ${brandName} with order number, tracking ID, and dynamic track order button.` },
-                        { label: "🛒 Abandoned Cart Recovery", prompt: `Create an abandoned cart recovery template for ${brandName} with a 15% discount coupon SAVE15, urgency reminder, and 1-click checkout button.` },
-                        { label: "🛍️ Bestsellers Product Carousel", prompt: `Create a 3-card product carousel template showcasing top trending apparel styles at ${brandName} with Buy Now buttons.` },
-                        { label: "⭐️ VIP Review & Feedback", prompt: `Create a customer review & feedback template for ${brandName} thanking the customer and providing a quick link to rate their order.` }
+                        { label: "Festive 30% OFF Flash Sale", icon: Tag, prompt: `Create a festive mega flash sale template for ${brandName} with a 30% coupon code FLAT30, image header, limited-time urgency, shop now dynamic button, and call support button.` },
+                        { label: "Order Dispatched & Tracking", icon: Truck, prompt: `Create a transactional order dispatched utility template for ${brandName} with order number, tracking ID, and dynamic track order button.` },
+                        { label: "Abandoned Cart Recovery", icon: ShoppingCart, prompt: `Create an abandoned cart recovery template for ${brandName} with a 15% discount coupon SAVE15, urgency reminder, and 1-click checkout button.` },
+                        { label: "Bestsellers Product Carousel", icon: Layers, prompt: `Create a 3-card product carousel template showcasing top trending apparel styles at ${brandName} with Buy Now buttons.` },
+                        { label: "VIP Review & Feedback", icon: Sparkles, prompt: `Create a customer review & feedback template for ${brandName} thanking the customer and providing a quick link to rate their order.` }
                       ].map((chip, idx) => (
                         <button
                           key={idx}
@@ -1799,9 +1814,10 @@ export default function WhatsAppTemplatesComponent() {
                             setAiPrompt(chip.prompt);
                             handleGenerateWithAI(chip.prompt);
                           }}
-                          className="px-2.5 py-1 bg-white dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 hover:border-indigo-300 rounded-lg text-[11px] text-gray-700 dark:text-gray-200 hover:text-indigo-600 font-semibold transition active:scale-95 cursor-pointer text-left shadow-2xs"
+                          className="px-2.5 py-1 bg-white dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 hover:border-indigo-300 rounded-lg text-[11px] text-gray-700 dark:text-gray-200 hover:text-indigo-600 font-semibold transition active:scale-95 cursor-pointer flex items-center gap-1.5 text-left shadow-2xs"
                         >
-                          {chip.label}
+                          <chip.icon size={11} className="text-indigo-500" />
+                          <span>{chip.label}</span>
                         </button>
                       ))}
                     </div>
@@ -1831,7 +1847,7 @@ export default function WhatsAppTemplatesComponent() {
                               className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold shadow-2xs transition active:scale-95 flex items-center gap-1 cursor-pointer"
                             >
                               <Layers size={11} />
-                              <span>⚡ 1-Click Build Carousel</span>
+                              <span>Build Carousel</span>
                             </button>
                             <button
                               type="button"
@@ -1848,7 +1864,6 @@ export default function WhatsAppTemplatesComponent() {
                           onClick={() => {
                             const opening = !aiProductDropdownOpen;
                             setAiProductDropdownOpen(opening);
-                            // Auto-fetch inventory if not yet loaded when dropdown opens
                             if (opening && inventoryProducts.length === 0 && !inventoryLoading) {
                               fetchInventory("", "ALL", false);
                             }
@@ -1908,7 +1923,6 @@ export default function WhatsAppTemplatesComponent() {
                           )}
                         </div>
 
-                        {/* Loading state */}
                         {inventoryLoading && (
                           <div className="flex items-center justify-center gap-2 py-6 text-indigo-500 text-xs font-semibold">
                             <RefreshCw size={14} className="animate-spin" />
@@ -1916,7 +1930,6 @@ export default function WhatsAppTemplatesComponent() {
                           </div>
                         )}
 
-                        {/* Empty state */}
                         {!inventoryLoading && inventoryProducts.length === 0 && (
                           <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
                             <ShoppingBag size={28} className="text-gray-300" />
@@ -1925,7 +1938,6 @@ export default function WhatsAppTemplatesComponent() {
                           </div>
                         )}
 
-                        {/* Products grid */}
                         {!inventoryLoading && inventoryProducts.length > 0 && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {inventoryProducts
@@ -1967,7 +1979,7 @@ export default function WhatsAppTemplatesComponent() {
                                         {p.mrp > p.sellingPrice && <span className="line-through text-gray-400">₹{p.mrp}</span>}
                                         {p.discountPercent > 0 && <span className="text-rose-500 font-bold">{p.discountPercent}% OFF</span>}
                                         {p.stockQuantity > 0 ? (
-                                          <span className="text-emerald-600 font-bold">🟢 {p.stockQuantity}</span>
+                                          <span className="text-emerald-600 font-bold">{p.stockQuantity} in stock</span>
                                         ) : (
                                           <span className="text-amber-500 font-medium">Ready</span>
                                         )}
@@ -1993,15 +2005,21 @@ export default function WhatsAppTemplatesComponent() {
                     {/* Tone Selector */}
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                        🎨 Tone / Style:
+                        <SlidersHorizontal size={11} /> Tone / Style:
                       </span>
                       <div className="flex gap-1.5 flex-wrap">
-                        {(["Professional", "Casual", "Festive", "Urgent", "Luxury"] as const).map(tone => (
+                        {([
+                          { tone: "Professional", icon: Briefcase },
+                          { tone: "Casual", icon: Smile },
+                          { tone: "Festive", icon: Sparkles },
+                          { tone: "Urgent", icon: Zap },
+                          { tone: "Luxury", icon: Crown }
+                        ] as const).map(({ tone, icon: ToneIcon }) => (
                           <button
                             key={tone}
                             type="button"
-                            onClick={() => setAiTone(tone)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border ${
+                            onClick={() => setAiTone(tone as any)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer border flex items-center gap-1.5 ${
                               aiTone === tone
                                 ? tone === "Professional" ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
                                 : tone === "Casual" ? "bg-sky-500 text-white border-sky-500 shadow-sm"
@@ -2011,7 +2029,8 @@ export default function WhatsAppTemplatesComponent() {
                                 : "bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-indigo-300"
                             }`}
                           >
-                            {tone === "Professional" ? "💼" : tone === "Casual" ? "😊" : tone === "Festive" ? "🎉" : tone === "Urgent" ? "⚡" : "✨"} {tone}
+                            <ToneIcon size={12} />
+                            <span>{tone}</span>
                           </button>
                         ))}
                       </div>
@@ -2041,7 +2060,7 @@ export default function WhatsAppTemplatesComponent() {
                             disabled={aiTranslating}
                             className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-sky-50 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
                           >
-                            {aiTranslating ? <RefreshCw size={12} className="animate-spin" /> : <span>🌐</span>}
+                            {aiTranslating ? <RefreshCw size={12} className="animate-spin" /> : <Globe size={12} className="text-gray-500" />}
                             <span>{aiTranslating ? "Translating..." : "Translate"}</span>
                             <ChevronDown size={11} />
                           </button>
@@ -2053,7 +2072,7 @@ export default function WhatsAppTemplatesComponent() {
                                 onClick={() => handleTranslateTemplate(lang)}
                                 className="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-slate-700 transition cursor-pointer"
                               >
-                                {lang === "Hindi" ? "🇮🇳" : lang === "Hinglish" ? "🤝" : lang === "Gujarati" ? "🌾" : lang === "Marathi" ? "🏔️" : lang === "Tamil" ? "🌺" : "📚"} {lang}
+                                {lang}
                               </button>
                             ))}
                           </div>
@@ -2066,7 +2085,7 @@ export default function WhatsAppTemplatesComponent() {
                           disabled={aiVariantsLoading || aiGenerating}
                           className="px-3 py-2 bg-white dark:bg-slate-800 hover:bg-purple-50 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-purple-600 dark:text-purple-300 transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
                         >
-                          {aiVariantsLoading ? <RefreshCw size={12} className="animate-spin" /> : <span>⚡</span>}
+                          {aiVariantsLoading ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
                           <span>{aiVariantsLoading ? "Generating..." : "3 Variants"}</span>
                         </button>
                       </div>
@@ -2079,7 +2098,7 @@ export default function WhatsAppTemplatesComponent() {
                               AI is drafting your template...
                             </span>
                           ) : (
-                            <span className="hidden sm:block">💡 Be specific for best results.</span>
+                            <span className="hidden sm:block">Be specific for best results.</span>
                           )}
                         </div>
 
@@ -2090,7 +2109,7 @@ export default function WhatsAppTemplatesComponent() {
                           className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition flex items-center gap-2 shadow-md shadow-indigo-500/25 active:scale-95 disabled:opacity-50 cursor-pointer"
                         >
                           {aiGenerating ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                          <span>{aiGenerating ? "Generating..." : "Generate with AI ✨"}</span>
+                          <span>{aiGenerating ? "Generating..." : "Generate with AI"}</span>
                         </button>
                       </div>
                     </div>
@@ -2173,7 +2192,7 @@ export default function WhatsAppTemplatesComponent() {
                                   onError={(e: any) => { e.target.style.display = 'none'; }}
                                 />
                               )}
-                              <span className="text-gray-600 dark:text-gray-300 font-semibold">Image Header Attached ✓</span>
+                              <span className="text-gray-600 dark:text-gray-300 font-semibold">Image Header Attached</span>
                             </div>
                           )}
                         </div>
@@ -2201,7 +2220,7 @@ export default function WhatsAppTemplatesComponent() {
                               Swipeable Carousel Cards ({aiDraft.template.carouselCards.length} products attached):
                             </span>
                             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
-                              ✓ Live in Phone Simulator
+                              Live in Phone Simulator
                             </span>
                           </div>
 
@@ -2275,7 +2294,7 @@ export default function WhatsAppTemplatesComponent() {
                       {/* AI Explanation */}
                       {aiDraft.explanation && (
                         <div className="text-[11px] text-gray-600 dark:text-gray-300 bg-indigo-50/50 dark:bg-indigo-950/30 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
-                          💡 <strong>AI Architect Rationale:</strong> {aiDraft.explanation}
+                          <strong>AI Architect Rationale:</strong> {aiDraft.explanation}
                         </div>
                       )}
 
@@ -2306,7 +2325,7 @@ export default function WhatsAppTemplatesComponent() {
                           className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 active:scale-95 cursor-pointer whitespace-nowrap"
                         >
                           <CheckCircle2 size={15} />
-                          <span>Approve & Load into Studio Form ✨</span>
+                          <span>Approve & Load into Studio Form</span>
                         </button>
                       </div>
                     </div>
@@ -2325,7 +2344,7 @@ export default function WhatsAppTemplatesComponent() {
                     <ShoppingBag size={18} />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">
                         Store Inventory & Product Injector
                       </h3>
@@ -2346,15 +2365,25 @@ export default function WhatsAppTemplatesComponent() {
                     className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-md shadow-purple-500/20 active:scale-95 cursor-pointer"
                   >
                     <Layers size={13} />
-                    <span>Auto-Fill Carousel (Top 3 Items) ✨</span>
+                    <span>Auto-Fill Carousel (Top 3 Items)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setInventoryDrawerOpen(!inventoryDrawerOpen)}
-                    className="p-1.5 bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 transition cursor-pointer"
+                    className="px-3 py-1.5 bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 transition flex items-center gap-1 cursor-pointer"
                   >
-                    {inventoryDrawerOpen ? <X size={14} /> : <Plus size={14} />}
+                    {inventoryDrawerOpen ? (
+                      <>
+                        <span>Hide Inventory</span>
+                        <ChevronUp size={13} />
+                      </>
+                    ) : (
+                      <>
+                        <span>Open Inventory</span>
+                        <ChevronDown size={13} />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -2522,7 +2551,16 @@ export default function WhatsAppTemplatesComponent() {
                         : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:border-indigo-300"
                     }`}
                   >
-                    <div className="font-black text-sm">{c.label}</div>
+                    <div className="flex items-center gap-2">
+                      {c.value === "MARKETING" ? (
+                        <Megaphone size={18} className={category === c.value ? "text-indigo-600" : "text-gray-400"} />
+                      ) : c.value === "UTILITY" ? (
+                        <SlidersHorizontal size={18} className={category === c.value ? "text-indigo-600" : "text-gray-400"} />
+                      ) : (
+                        <ShieldCheck size={18} className={category === c.value ? "text-indigo-600" : "text-gray-400"} />
+                      )}
+                      <div className="font-black text-sm">{c.label}</div>
+                    </div>
                     <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-tight">
                       {c.desc}
                     </div>
@@ -2790,8 +2828,9 @@ export default function WhatsAppTemplatesComponent() {
                   {/* Pre-approved Library when Default is selected */}
                   {templateType === "STANDARD" && (
                     <div className="p-3.5 bg-gray-50 dark:bg-slate-750 rounded-2xl border border-gray-200 dark:border-slate-700 flex flex-col gap-2">
-                      <div className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                        ⚡ Apply Instant Pre-approved Notification Template:
+                      <div className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                        <Zap size={13} className="text-amber-500" />
+                        <span>Apply Instant Pre-approved Notification Template:</span>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {utilityPresets.map((p) => (
@@ -3003,11 +3042,11 @@ export default function WhatsAppTemplatesComponent() {
                   {/* Header Type Selector Buttons */}
                   <div className="flex gap-2 flex-wrap">
                     {[
-                      { type: "NONE", label: "None" },
-                      { type: "TEXT", label: "📝 Text" },
-                      { type: "IMAGE", label: "🖼️ Image (Upload / Paste)" },
-                      { type: "VIDEO", label: "🎥 Video" },
-                      { type: "DOCUMENT", label: "📄 Document / PDF" }
+                      { type: "NONE", label: "None", icon: null },
+                      { type: "TEXT", label: "Text", icon: Type },
+                      { type: "IMAGE", label: "Image (Upload / Paste)", icon: ImageIcon },
+                      { type: "VIDEO", label: "Video", icon: Video },
+                      { type: "DOCUMENT", label: "Document / PDF", icon: FileText }
                     ].map((ht) => (
                       <button
                         key={ht.type}
@@ -3019,13 +3058,14 @@ export default function WhatsAppTemplatesComponent() {
                             setHeaderMediaPreview(null);
                           }
                         }}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-black transition border cursor-pointer ${
+                        className={`px-3.5 py-2 rounded-xl text-xs font-black transition border cursor-pointer flex items-center gap-1.5 ${
                           headerType === ht.type
                             ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
                             : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-indigo-300"
                         }`}
                       >
-                        {ht.label}
+                        {ht.icon && <ht.icon size={13} />}
+                        <span>{ht.label}</span>
                       </button>
                     ))}
                   </div>
@@ -3417,9 +3457,9 @@ export default function WhatsAppTemplatesComponent() {
                                   }}
                                   className="px-2 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-bold cursor-pointer"
                                 >
-                                  <option value="URL">🔗 URL (Website Link)</option>
-                                  <option value="PHONE_NUMBER">📞 Phone (Call Us)</option>
-                                  <option value="QUICK_REPLY">↩️ Quick Reply</option>
+                                  <option value="URL">URL (Website Link)</option>
+                                  <option value="PHONE_NUMBER">Phone (Call Us)</option>
+                                  <option value="QUICK_REPLY">Quick Reply</option>
                                 </select>
                                 <span className="text-[10px] font-bold text-gray-400">Button #{bIdx + 1}</span>
                               </div>
@@ -3542,8 +3582,8 @@ export default function WhatsAppTemplatesComponent() {
                       <CheckCircle2 size={11} />
                       {inventoryStats.inStockProducts || inventoryProducts.length} In-Stock in Store
                     </span>
-                    <span className="px-2.5 py-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 rounded-xl text-[10px] font-black">
-                      🛍️ {selectedCatalogProducts.length} Selected
+                    <span className="px-2.5 py-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 rounded-xl text-[10px] font-black flex items-center gap-1">
+                      <ShoppingBag size={11} /> {selectedCatalogProducts.length} Selected
                     </span>
                   </div>
                 </div>
@@ -3601,7 +3641,7 @@ export default function WhatsAppTemplatesComponent() {
                       type="text"
                       value={catalogSectionTitle}
                       onChange={(e) => setCatalogSectionTitle(e.target.value)}
-                      placeholder="e.g. 🔥 Featured Collection, ⚡ Today's Deals"
+                      placeholder="e.g. Featured Collection, Today's Deals"
                       className="w-full px-3.5 py-2 bg-white dark:bg-slate-800 border border-sky-200 dark:border-slate-700 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-sky-500"
                     />
                   </div>
@@ -3630,7 +3670,7 @@ export default function WhatsAppTemplatesComponent() {
                       className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800/60 rounded-xl text-[11px] font-black transition cursor-pointer flex items-center gap-1 shadow-2xs"
                     >
                       <Zap size={11} className="text-amber-600 fill-amber-500" />
-                      <span>⚡ Top 5 Bestsellers</span>
+                      <span>Top 5 Bestsellers</span>
                     </button>
                     <button
                       type="button"
@@ -3638,7 +3678,7 @@ export default function WhatsAppTemplatesComponent() {
                       className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-[11px] font-black transition cursor-pointer flex items-center gap-1 shadow-2xs"
                     >
                       <CheckSquare size={11} className="text-emerald-600" />
-                      <span>📦 Select In-Stock</span>
+                      <span>Select In-Stock</span>
                     </button>
                     {selectedCatalogProducts.length > 0 && (
                       <button
@@ -3659,7 +3699,7 @@ export default function WhatsAppTemplatesComponent() {
                     className="px-3 py-1.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                   >
                     <Sparkles size={12} />
-                    <span>✨ Write AI Catalog Copy</span>
+                    <span>Write AI Catalog Copy</span>
                   </button>
                 </div>
 
@@ -3910,7 +3950,27 @@ export default function WhatsAppTemplatesComponent() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-200 flex items-center gap-1.5 shadow-2xs">
-                              {btn.type === "QUICK_REPLY" ? "↩️ Quick Reply" : btn.type === "URL" ? "🔗 Website CTA" : btn.type === "COPY_CODE" ? "🏷️ Coupon Code" : "📞 Phone Call"}
+                              {btn.type === "QUICK_REPLY" ? (
+                                <>
+                                  <MessageSquare size={13} className="text-indigo-500" />
+                                  <span>Quick Reply</span>
+                                </>
+                              ) : btn.type === "URL" ? (
+                                <>
+                                  <ExternalLink size={13} className="text-purple-500" />
+                                  <span>Website CTA</span>
+                                </>
+                              ) : btn.type === "COPY_CODE" ? (
+                                <>
+                                  <Tag size={13} className="text-emerald-500" />
+                                  <span>Coupon Code</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Phone size={13} className="text-blue-500" />
+                                  <span>Phone Call</span>
+                                </>
+                              )}
                             </span>
                             <span className="text-[11px] font-bold text-gray-400">Button #{idx + 1}</span>
                           </div>
@@ -3955,13 +4015,14 @@ export default function WhatsAppTemplatesComponent() {
                                       updateButton(idx, "url", btn.url.replace("/{{1}}", "").replace("{{1}}", ""));
                                     }
                                   }}
-                                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
                                     btn.urlType !== "DYNAMIC"
                                       ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs font-black"
                                       : "text-gray-600 dark:text-gray-400 hover:text-gray-900"
                                   }`}
                                 >
-                                  🌐 Static URL
+                                  <Globe size={11} />
+                                  <span>Static URL</span>
                                 </button>
                                 <button
                                   type="button"
@@ -4060,9 +4121,10 @@ export default function WhatsAppTemplatesComponent() {
                                         updateButton(idx, "url", `https://${brandDomain}/track/{{1}}`);
                                         updateButton(idx, "urlExample", "ESP-88294");
                                       }}
-                                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:border-indigo-400 cursor-pointer shadow-2xs"
+                                      className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:border-indigo-400 cursor-pointer shadow-2xs flex items-center gap-1.5"
                                     >
-                                      📦 Track Order
+                                      <Truck size={11} className="text-indigo-500" />
+                                      <span>Track Order</span>
                                     </button>
                                     <button
                                       type="button"
@@ -4071,9 +4133,10 @@ export default function WhatsAppTemplatesComponent() {
                                         updateButton(idx, "url", `https://${brandDomain}/checkout?token={{1}}`);
                                         updateButton(idx, "urlExample", "cart_tok_9912");
                                       }}
-                                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:border-indigo-400 cursor-pointer shadow-2xs"
+                                      className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:border-indigo-400 cursor-pointer shadow-2xs flex items-center gap-1.5"
                                     >
-                                      🛒 Shopify Checkout
+                                      <ShoppingCart size={11} className="text-purple-500" />
+                                      <span>Shopify Checkout</span>
                                     </button>
                                     <button
                                       type="button"
@@ -4082,9 +4145,10 @@ export default function WhatsAppTemplatesComponent() {
                                         updateButton(idx, "url", `https://${brandDomain}/invoices/{{1}}`);
                                         updateButton(idx, "urlExample", "INV-2026-091");
                                       }}
-                                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:border-indigo-400 cursor-pointer shadow-2xs"
+                                      className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:border-indigo-400 cursor-pointer shadow-2xs flex items-center gap-1.5"
                                     >
-                                      🧾 View Invoice
+                                      <Receipt size={11} className="text-emerald-500" />
+                                      <span>View Invoice</span>
                                     </button>
                                     <button
                                       type="button"
@@ -4093,9 +4157,10 @@ export default function WhatsAppTemplatesComponent() {
                                         updateButton(idx, "url", `https://${brandDomain}/deals?promo={{1}}`);
                                         updateButton(idx, "urlExample", "SAVE30");
                                       }}
-                                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:border-indigo-400 cursor-pointer shadow-2xs"
+                                      className="px-2.5 py-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[10px] font-bold text-gray-700 dark:text-gray-300 hover:border-indigo-400 cursor-pointer shadow-2xs flex items-center gap-1.5"
                                     >
-                                      🎁 Promo Link
+                                      <Gift size={11} className="text-pink-500" />
+                                      <span>Promo Link</span>
                                     </button>
                                   </div>
                                 </div>
@@ -4141,13 +4206,14 @@ export default function WhatsAppTemplatesComponent() {
                                     updateButton(idx, "isDynamicCode", false);
                                     updateButton(idx, "code", couponCode || "FLAT30");
                                   }}
-                                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
                                     !btn.isDynamicCode && btn.code !== "{{1}}"
                                       ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs font-black"
                                       : "text-gray-600 dark:text-gray-400 hover:text-gray-900"
                                   }`}
                                 >
-                                  🏷️ Static Code
+                                  <Tag size={11} />
+                                  <span>Static Code</span>
                                 </button>
                                 <button
                                   type="button"
@@ -4448,8 +4514,9 @@ export default function WhatsAppTemplatesComponent() {
                             583 920
                           </div>
                           {authExpiryTime && (
-                            <div className="text-[9px] text-orange-700 dark:text-orange-400">
-                              ⏱️ Code expires in {authExpiryMinutes} minutes
+                            <div className="text-[9px] text-orange-700 dark:text-orange-400 flex items-center justify-center gap-1">
+                              <Clock size={10} />
+                              <span>Code expires in {authExpiryMinutes} minutes</span>
                             </div>
                           )}
                         </div>
@@ -4482,7 +4549,7 @@ export default function WhatsAppTemplatesComponent() {
                               ) : b.type === "COPY_CODE" ? (
                                 <Copy size={12} />
                               ) : (
-                                <span>↩️</span>
+                                <MessageSquare size={12} />
                               )}
                               <span>{b.text || "Action"}</span>
                               {isDynamicUrl && (
@@ -4691,7 +4758,7 @@ export default function WhatsAppTemplatesComponent() {
                               type="button"
                               onClick={() => {
                                 setSimulatorCartCount(prev => prev + 1);
-                                showToast(`🛒 Added "${p.name}" to simulated cart!`, "success");
+                                showToast(`Added "${p.name}" to simulated cart.`, "success");
                               }}
                               className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-black cursor-pointer shadow-2xs active:scale-95 transition"
                             >
@@ -4706,7 +4773,7 @@ export default function WhatsAppTemplatesComponent() {
                         <button
                           type="button"
                           onClick={() => {
-                            showToast("🎉 WhatsApp Catalog Order simulated successfully!", "success");
+                            showToast("WhatsApp Catalog Order simulated successfully.", "success");
                             setSimulatorCatalogDrawerOpen(false);
                           }}
                           className="w-full py-2 bg-[#00a884] hover:bg-[#008f6f] text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
@@ -5070,9 +5137,18 @@ export default function WhatsAppTemplatesComponent() {
                             {btns.map((b: any, i: number) => (
                               <span
                                 key={i}
-                                className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 rounded-xl text-[10px] font-bold flex items-center gap-1"
+                                className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 rounded-xl text-[10px] font-bold flex items-center gap-1.5"
                               >
-                                {b.type === "URL" ? "🔗" : b.type === "PHONE_NUMBER" ? "📞" : b.type === "COPY_CODE" ? "🏷️" : "↩️"} {b.text}
+                                {b.type === "URL" ? (
+                                  <ExternalLink size={10} className="text-indigo-500" />
+                                ) : b.type === "PHONE_NUMBER" ? (
+                                  <Phone size={10} className="text-blue-500" />
+                                ) : b.type === "COPY_CODE" ? (
+                                  <Tag size={10} className="text-emerald-500" />
+                                ) : (
+                                  <MessageSquare size={10} className="text-purple-500" />
+                                )}
+                                <span>{b.text}</span>
                               </span>
                             ))}
                           </div>
@@ -5124,8 +5200,8 @@ export default function WhatsAppTemplatesComponent() {
                         href={`/whatsapp/broadcasts?template=${t.name}`}
                         className="w-full py-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                       >
-                        <BellRing size={13} />
-                        <span>📣 Launch Broadcast</span>
+                        <Send size={13} />
+                        <span>Launch Broadcast</span>
                       </a>
                     </div>
                   ) : (
@@ -5155,7 +5231,7 @@ export default function WhatsAppTemplatesComponent() {
                           title="Fix compliance issues and submit for guaranteed 1-5 minute automated approval"
                         >
                           <Zap size={12} className="fill-white" />
-                          <span>⚡ Fast-Track (5 Min)</span>
+                          <span>Fast-Track (5 Min)</span>
                         </button>
                       </div>
 
@@ -5260,8 +5336,8 @@ export default function WhatsAppTemplatesComponent() {
                   </>
                 ) : (
                   <>
-                    <Zap size={13} className="fill-white" />
-                    <span>🚀 Submit Clean Version (1-5 Min Approval)</span>
+                    <CheckCircle2 size={13} />
+                    <span>Submit Clean Version (1-5 Min Approval)</span>
                   </>
                 )}
               </button>
