@@ -1043,6 +1043,7 @@ export async function generateWhatsAppPaymentLinkAction(data: {
 
     let qrApiUrl: string | null = null;
     let upiId: string | null = null;
+    let generatedOrderId: string | null = null;
 
     if (gw === 'RAZORPAY' && creds?.razorpayKeyId && creds?.razorpayKeySecret) {
       const auth = Buffer.from(`${creds.razorpayKeyId}:${creds.razorpayKeySecret}`).toString('base64');
@@ -1060,12 +1061,17 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       });
       const rzpData = await rzpRes.json();
       if (rzpData.short_url) paymentUrl = rzpData.short_url;
+      generatedOrderId = rzpData.id || `rzp_${Date.now()}`;
+      // Dynamic QR Code for Razorpay Payment Link
+      qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(paymentUrl)}`;
     } else if (gw === 'CASHFREE' && creds?.cashfreeAppId && creds?.cashfreeSecretKey) {
+      const cfLinkId = `wm_${Date.now()}`;
+      generatedOrderId = cfLinkId;
       const cfRes = await fetch('https://api.cashfree.com/pg/links', {
         method: 'POST',
         headers: { 'x-api-version': '2023-08-01', 'x-client-id': creds.cashfreeAppId, 'x-client-secret': creds.cashfreeSecretKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          link_id: `wm_${Date.now()}`,
+          link_id: cfLinkId,
           link_amount: data.amount,
           link_currency: 'INR',
           link_purpose: data.description,
@@ -1074,6 +1080,8 @@ export async function generateWhatsAppPaymentLinkAction(data: {
       });
       const cfData = await cfRes.json();
       if (cfData.link_url) paymentUrl = cfData.link_url;
+      // Dynamic QR Code for Cashfree Checkout Link
+      qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(paymentUrl)}`;
     } else {
       // Default to UPI Gateway
       const resolvedUpiId = creds?.merchantUpiId || '9306817689@kotak811';
@@ -1090,6 +1098,7 @@ export async function generateWhatsAppPaymentLinkAction(data: {
         clientId: conv?.clientId || client?.id || null,
         conversationId: data.conversationId,
         customerId: data.customerId,
+        orderId: generatedOrderId,
         amount: data.amount,
         paymentUrl,
         status: 'PENDING'
