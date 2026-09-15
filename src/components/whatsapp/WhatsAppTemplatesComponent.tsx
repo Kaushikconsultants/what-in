@@ -22,7 +22,8 @@ import {
   generateAITemplateAction,
   getWhatsAppInventoryCatalogAction,
   refreshTemplateStatusAction,
-  resubmitCarouselTemplateAction
+  resubmitCarouselTemplateAction,
+  getWhatsAppMetaFlows
 } from "@/app/actions/whatsAppPlatformActions";
 
 // Meta API Constraints
@@ -210,6 +211,16 @@ export default function WhatsAppTemplatesComponent() {
         ]);
       }
     });
+
+    getWhatsAppMetaFlows().then((res) => {
+      if (res && res.success && res.flows && res.flows.length > 0) {
+        setMetaFlows(res.flows);
+        setSelectedMetaFlow(res.flows[0]);
+        setSelectedMetaFlowId(res.flows[0].flowId || res.flows[0].id);
+        if (res.flows[0].ctaText) setFlowButtonText(res.flows[0].ctaText);
+        if (res.flows[0].screenName) setFlowScreen(res.flows[0].screenName);
+      }
+    }).catch(() => {});
   }, []);
 
   // -------------------------------------------------------------
@@ -253,7 +264,21 @@ export default function WhatsAppTemplatesComponent() {
   const [simulatorCatalogDrawerOpen, setSimulatorCatalogDrawerOpen] = useState(false);
   const [simulatorCartCount, setSimulatorCartCount] = useState(0);
 
+  // Meta Interactive Flows State
+  const [metaFlows, setMetaFlows] = useState<any[]>([]);
+  const [metaFlowsLoading, setMetaFlowsLoading] = useState(false);
+  const [selectedMetaFlowId, setSelectedMetaFlowId] = useState<string>("");
+  const [selectedMetaFlow, setSelectedMetaFlow] = useState<any | null>(null);
   const [flowButtonText, setFlowButtonText] = useState("View Flow");
+  const [flowAction, setFlowAction] = useState<"navigate" | "data_exchange">("navigate");
+  const [flowScreen, setFlowScreen] = useState<string>("START_SCREEN");
+  const [flowToken, setFlowToken] = useState<string>("");
+  const [flowSearch, setFlowSearch] = useState("");
+  const [flowCustomId, setFlowCustomId] = useState("");
+  const [simulatorFlowDrawerOpen, setSimulatorFlowDrawerOpen] = useState(false);
+  const [simulatorFlowSubmitted, setSimulatorFlowSubmitted] = useState(false);
+  const [simulatorFlowFormData, setSimulatorFlowFormData] = useState<Record<string, any>>({});
+
   const [authCodeDelivery, setAuthCodeDelivery] = useState<"COPY_CODE" | "ONE_TAP" | "ZERO_TAP">("COPY_CODE");
   const [authSecurityRecommendation, setAuthSecurityRecommendation] = useState(true);
   const [authExpiryTime, setAuthExpiryTime] = useState(false);
@@ -959,6 +984,22 @@ export default function WhatsAppTemplatesComponent() {
         setSelectedCatalogProducts(topProds);
       }
     } else if (type === "FLOWS") {
+      if (metaFlows.length === 0) {
+        getWhatsAppMetaFlows().then((res) => {
+          if (res && res.success && res.flows && res.flows.length > 0) {
+            setMetaFlows(res.flows);
+            setSelectedMetaFlow(res.flows[0]);
+            setSelectedMetaFlowId(res.flows[0].flowId || res.flows[0].id);
+            if (res.flows[0].ctaText) setFlowButtonText(res.flows[0].ctaText);
+            if (res.flows[0].screenName) setFlowScreen(res.flows[0].screenName);
+          }
+        }).catch(() => {});
+      } else if (!selectedMetaFlow && metaFlows.length > 0) {
+        setSelectedMetaFlow(metaFlows[0]);
+        setSelectedMetaFlowId(metaFlows[0].flowId || metaFlows[0].id);
+        if (metaFlows[0].ctaText) setFlowButtonText(metaFlows[0].ctaText);
+        if (metaFlows[0].screenName) setFlowScreen(metaFlows[0].screenName);
+      }
       setBodyText(`Hello {{1}}, please fill out this quick form so our ${brandName} team can assist you:`);
       setFooterText(`${brandName} Support`);
       setButtons([{ type: "FLOW", text: flowButtonText || "View Flow" }]);
@@ -1244,6 +1285,11 @@ export default function WhatsAppTemplatesComponent() {
       bodyText,
       bodyVariableSamples,
       footerText,
+      flowId: templateType === "FLOWS" ? (selectedMetaFlow?.flowId || flowCustomId || selectedMetaFlowId || "flow_lead_qualification_v1") : undefined,
+      flowButtonText: templateType === "FLOWS" ? (flowButtonText || "View Flow") : undefined,
+      flowAction: templateType === "FLOWS" ? flowAction : undefined,
+      flowScreen: templateType === "FLOWS" ? flowScreen : undefined,
+      flowToken: templateType === "FLOWS" ? (flowToken || undefined) : undefined,
       catalogSectionTitle: templateType === "CATALOGUE" ? catalogSectionTitle : undefined,
       catalogButtonText: templateType === "CATALOGUE" ? (catalogButtonText || "View catalog") : undefined,
       selectedProducts: templateType === "CATALOGUE" ? selectedCatalogProducts : undefined,
@@ -1252,7 +1298,14 @@ export default function WhatsAppTemplatesComponent() {
         : templateType === "CATALOGUE"
         ? [{ type: "CATALOG", text: catalogButtonText || "View catalog" }]
         : templateType === "FLOWS"
-        ? [{ type: "FLOW", text: flowButtonText || "View Flow" }]
+        ? [{ 
+            type: "FLOW", 
+            text: flowButtonText || "View Flow",
+            flow_id: selectedMetaFlow?.flowId || flowCustomId || selectedMetaFlowId || "flow_lead_qualification_v1",
+            flow_action: flowAction || "navigate",
+            navigate_screen: flowScreen || "START_SCREEN",
+            flow_token: flowToken || undefined
+          }]
         : templateType === "ORDER_DETAILS"
         ? [{ type: "ORDER_DETAILS", text: "Review and Pay" }]
         : templateType === "ORDER_STATUS"
@@ -3873,6 +3926,285 @@ export default function WhatsAppTemplatesComponent() {
               </div>
             )}
 
+            {/* STEP 6C: INTERACTIVE META FLOW SELECTOR & CONFIGURATION (Only when Flows is selected) */}
+            {templateType === "FLOWS" && (
+              <div className="bg-white dark:bg-slate-800/90 border border-emerald-200 dark:border-emerald-800/60 rounded-3xl p-6 shadow-2xs flex flex-col gap-5">
+                {/* Header with Badges */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <label className="block text-xs font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider flex items-center gap-1.5">
+                      <CheckSquare size={14} />
+                      6. Interactive WhatsApp Flow & Form Setup
+                    </label>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Select a Meta WhatsApp Flow (lead forms, surveys, appointment booking, fitment guides) to embed into this message template.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-[10px] font-black flex items-center gap-1">
+                      <CheckCircle2 size={11} />
+                      {metaFlows.length} Available Meta Flows
+                    </span>
+                    <a
+                      href="/whatsapp/flows"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-xl text-[10px] font-bold flex items-center gap-1 transition"
+                    >
+                      <ExternalLink size={11} />
+                      <span>Flow Builder</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Search & Refresh Bar */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 relative">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={flowSearch}
+                      onChange={(e) => setFlowSearch(e.target.value)}
+                      placeholder="Search Meta flows by name or keywords (e.g. Inquiry, Survey, Booking)..."
+                      className="w-full pl-8 pr-3 py-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setMetaFlowsLoading(true);
+                      const res = await getWhatsAppMetaFlows();
+                      if (res.success) {
+                        setMetaFlows(res.flows || []);
+                        showToast("Meta Flows refreshed.", "success");
+                      }
+                      setMetaFlowsLoading(false);
+                    }}
+                    className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-xl transition cursor-pointer"
+                    title="Refresh Flows from Database & Meta Graph API"
+                  >
+                    <RefreshCw size={14} className={metaFlowsLoading ? "animate-spin text-emerald-600" : ""} />
+                  </button>
+                </div>
+
+                {/* Flow Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {metaFlows
+                    .filter((f) => {
+                      if (!flowSearch) return true;
+                      const s = flowSearch.toLowerCase();
+                      return (
+                        (f.name || "").toLowerCase().includes(s) ||
+                        (f.description || "").toLowerCase().includes(s) ||
+                        (f.flowId || "").toLowerCase().includes(s)
+                      );
+                    })
+                    .map((f, idx) => {
+                      const isSelected = selectedMetaFlowId === f.flowId || selectedMetaFlowId === f.id || selectedMetaFlow?.id === f.id;
+                      let schemaFields: any[] = [];
+                      try {
+                        if (typeof f.formSchema === "string") schemaFields = JSON.parse(f.formSchema);
+                        else if (Array.isArray(f.formSchema)) schemaFields = f.formSchema;
+                      } catch (e) {}
+
+                      return (
+                        <div
+                          key={f.id || idx}
+                          onClick={() => {
+                            setSelectedMetaFlowId(f.flowId || f.id);
+                            setSelectedMetaFlow(f);
+                            if (f.ctaText) setFlowButtonText(f.ctaText);
+                            if (f.screenName) setFlowScreen(f.screenName);
+                            if (!bodyText || bodyText.startsWith("Hello {{1}}, please fill out") || bodyText.startsWith("Hello {{1}}, schedule") || bodyText.startsWith("Hello {{1}}, thank you") || bodyText.startsWith("Hello {{1}}, please share")) {
+                              if (f.name.toLowerCase().includes("survey") || f.name.toLowerCase().includes("nps")) {
+                                setBodyText(`Hello {{1}}, thank you for shopping with ${brandName}! We'd love your quick feedback to ensure top-notch quality:`);
+                              } else if (f.name.toLowerCase().includes("appointment") || f.name.toLowerCase().includes("booking")) {
+                                setBodyText(`Hello {{1}}, schedule your 1-on-1 consultation or video showcase with ${brandName} below:`);
+                              } else if (f.name.toLowerCase().includes("size") || f.name.toLowerCase().includes("fit")) {
+                                setBodyText(`Hello {{1}}, please share your custom measurements below so our ${brandName} masters can tailor your gear:`);
+                              } else {
+                                setBodyText(`Hello {{1}}, please fill out this quick form so our ${brandName} team can assist you with your inquiry:`);
+                              }
+                            }
+                          }}
+                          className={`p-4 rounded-2xl border text-left transition flex flex-col justify-between gap-2.5 cursor-pointer relative ${
+                            isSelected
+                              ? "border-emerald-600 bg-emerald-50/70 dark:bg-emerald-950/50 text-emerald-950 dark:text-emerald-200 ring-2 ring-emerald-500/30 shadow-2xs"
+                              : "border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:border-emerald-300"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className={`p-2 rounded-xl ${isSelected ? "bg-emerald-600 text-white" : "bg-gray-100 dark:bg-slate-700 text-gray-500"}`}>
+                                <CheckSquare size={16} />
+                              </div>
+                              <div>
+                                <div className="font-black text-xs">{f.name}</div>
+                                <div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mt-0.5">
+                                  ID: {f.flowId || "Custom"}
+                                </div>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                <Check size={12} strokeWidth={3} />
+                              </span>
+                            )}
+                          </div>
+
+                          {f.description && (
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                              {f.description}
+                            </div>
+                          )}
+
+                          {/* Chips row */}
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100 dark:border-slate-700/60 text-[9.5px]">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100/70 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-bold">
+                              CTA: {f.ctaText || "View Flow"}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 font-mono">
+                              Screen: {f.screenName || "START"}
+                            </span>
+                            {schemaFields.length > 0 && (
+                              <span className="px-2 py-0.5 rounded-md bg-sky-100/70 dark:bg-sky-900/60 text-sky-800 dark:text-sky-200 font-bold">
+                                {schemaFields.length} Form Fields
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Custom Configuration Box for Selected Flow */}
+                <div className="p-4 bg-emerald-50/40 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black uppercase tracking-wider text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                      <Zap size={13} className="text-emerald-600 dark:text-emerald-400" />
+                      Flow Parameters & CTA Button Settings
+                    </label>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold">
+                      Meta Official Flow Specification
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Button Label */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold text-gray-700 dark:text-gray-300 uppercase">
+                          Flow CTA Button Label
+                        </label>
+                        <span className="text-[9px] text-gray-400">{flowButtonText.length}/25</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={flowButtonText}
+                        onChange={(e) => setFlowButtonText(e.target.value)}
+                        placeholder="e.g. Start Inquiry, Book Now, Rate Order"
+                        maxLength={25}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    {/* Initial Screen Name */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                        Initial Screen Name (navigate_screen)
+                      </label>
+                      <input
+                        type="text"
+                        value={flowScreen}
+                        onChange={(e) => setFlowScreen(e.target.value)}
+                        placeholder="e.g. START_SCREEN, LEAD_INQUIRY_SCREEN"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    {/* Meta Flow ID */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                        Meta Flow ID (flow_id)
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedMetaFlow?.flowId || flowCustomId || selectedMetaFlowId}
+                        onChange={(e) => {
+                          setFlowCustomId(e.target.value);
+                          setSelectedMetaFlowId(e.target.value);
+                        }}
+                        placeholder="e.g. flow_lead_qualification_v1 or numeric ID"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-slate-700 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    {/* Flow Action Selector */}
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                        Flow Action Mode (flow_action)
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-gray-200/80 dark:bg-slate-800 rounded-xl border border-gray-300/60 dark:border-slate-700 text-[11px] font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setFlowAction("navigate")}
+                          className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                            flowAction === "navigate"
+                              ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-300 shadow-2xs font-black"
+                              : "text-gray-600 dark:text-gray-400 hover:text-gray-900"
+                          }`}
+                        >
+                          Navigate (Screen)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFlowAction("data_exchange")}
+                          className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer text-center ${
+                            flowAction === "data_exchange"
+                              ? "bg-emerald-600 text-white shadow-2xs font-black"
+                              : "text-gray-600 dark:text-gray-400 hover:text-gray-900"
+                          }`}
+                        >
+                          Data Exchange (API)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Form Schema Field Preview */}
+                  {selectedMetaFlow && (
+                    <div className="pt-2 border-t border-emerald-100 dark:border-emerald-900/60 flex flex-col gap-1.5">
+                      <div className="text-[10px] font-bold text-gray-600 dark:text-gray-300">
+                        Form Fields Embedded in this WhatsApp Flow:
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(() => {
+                          try {
+                            const schema = typeof selectedMetaFlow.formSchema === "string"
+                              ? JSON.parse(selectedMetaFlow.formSchema)
+                              : selectedMetaFlow.formSchema || [];
+                            return schema.map((f: any, i: number) => (
+                              <span
+                                key={i}
+                                className="px-2 py-0.5 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800/80 rounded-lg text-[10px] font-semibold text-emerald-800 dark:text-emerald-200 flex items-center gap-1 shadow-2xs"
+                              >
+                                <span>{f.label || f.name}</span>
+                                <span className="text-[8.5px] uppercase font-mono px-1 py-0.2 bg-emerald-100 dark:bg-emerald-950 rounded text-emerald-700 dark:text-emerald-300">
+                                  {f.type}
+                                </span>
+                              </span>
+                            ));
+                          } catch (e) {
+                            return null;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* STEP 7: PROMINENT FOOTER SECTION (AVAILABLE ACROSS ALL TEMPLATE TYPES!) */}
             <div className="bg-white dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xs flex flex-col gap-3">
               <div className="flex items-center justify-between">
@@ -3893,7 +4225,7 @@ export default function WhatsAppTemplatesComponent() {
             </div>
 
             {/* STEP 8: INTERACTIVE BUTTONS (FOR STANDARD & UTILITY TEMPLATES) */}
-            {templateType !== "CAROUSEL" && (
+            {templateType !== "CAROUSEL" && templateType !== "CATALOGUE" && templateType !== "FLOWS" && templateType !== "ORDER_DETAILS" && templateType !== "ORDER_STATUS" && templateType !== "CALL_PERMISSIONS" && templateType !== "AUTHENTICATION" && (
               <div className="bg-white dark:bg-slate-800/90 border border-gray-200 dark:border-slate-700 rounded-3xl p-6 shadow-2xs flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -4440,14 +4772,28 @@ export default function WhatsAppTemplatesComponent() {
                     {/* Flows Action Preview */}
                     {templateType === "FLOWS" && (
                       <div className="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 flex flex-col gap-2">
-                        <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-[10px] text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
-                          <CheckSquare size={13} className="text-emerald-600 flex-shrink-0" />
-                          <span className="font-bold">Interactive Meta Flow Form</span>
+                        <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 text-[10px] text-emerald-900 dark:text-emerald-200 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <CheckSquare size={13} className="text-emerald-600 flex-shrink-0" />
+                            <span className="font-bold truncate">
+                              {selectedMetaFlow?.name || "Interactive Meta Flow"}
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-emerald-700 dark:text-emerald-300 font-black uppercase flex-shrink-0">
+                            Screen: {flowScreen || "START"}
+                          </span>
                         </div>
-                        <div className="bg-emerald-600 text-white rounded-xl py-2 px-3 text-center text-xs font-black flex items-center justify-center gap-1.5 shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSimulatorFlowDrawerOpen(true);
+                            setSimulatorFlowSubmitted(false);
+                          }}
+                          className="w-full bg-[#00a884] hover:bg-[#008f6f] active:scale-95 text-white rounded-xl py-2 px-3 text-center text-xs font-black flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all"
+                        >
                           <FileCode size={13} />
                           <span>{flowButtonText || "View Flow"}</span>
-                        </div>
+                        </button>
                       </div>
                     )}
 
@@ -4782,6 +5128,146 @@ export default function WhatsAppTemplatesComponent() {
                           <span>View Cart ({simulatorCartCount}) • Place Order</span>
                         </button>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* IN-PHONE INTERACTIVE META FLOW FORM SIMULATOR DRAWER */}
+                {templateType === "FLOWS" && simulatorFlowDrawerOpen && (
+                  <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-2xs flex flex-col justify-end animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-[#1f2c34] rounded-t-3xl border-t border-gray-200 dark:border-slate-700 max-h-[85%] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-250">
+                      {/* Drawer Header */}
+                      <div className="p-3 bg-gray-50 dark:bg-[#111b21] border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2 truncate">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                            <CheckSquare size={15} />
+                          </div>
+                          <div className="truncate">
+                            <div className="text-xs font-black text-gray-900 dark:text-white truncate">
+                              {selectedMetaFlow?.name || "Interactive WhatsApp Flow"}
+                            </div>
+                            <div className="text-[9px] text-gray-400 font-mono">
+                              Screen: {flowScreen || "START_SCREEN"}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSimulatorFlowDrawerOpen(false);
+                            setSimulatorFlowSubmitted(false);
+                          }}
+                          className="w-6 h-6 rounded-full bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-300 cursor-pointer flex-shrink-0"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+
+                      {/* Form Content */}
+                      <div className="p-3.5 overflow-y-auto flex flex-col gap-3 max-h-72 scrollbar-thin text-left">
+                        {simulatorFlowSubmitted ? (
+                          <div className="py-6 px-4 flex flex-col items-center justify-center text-center gap-2 animate-in zoom-in-95">
+                            <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
+                              <CheckCircle2 size={24} />
+                            </div>
+                            <div className="text-xs font-black text-gray-900 dark:text-white">Form Submitted Successfully!</div>
+                            <div className="text-[10px] text-gray-500 max-w-[220px]">
+                              Your response has been sent to {brandName}. Our team will follow up shortly.
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="text-[11px] text-gray-600 dark:text-gray-300 font-medium">
+                              {selectedMetaFlow?.description || "Please fill in the details below:"}
+                            </div>
+
+                            {/* Dynamic fields from formSchema */}
+                            {(() => {
+                              let schemaFields: any[] = [];
+                              try {
+                                if (typeof selectedMetaFlow?.formSchema === "string") schemaFields = JSON.parse(selectedMetaFlow.formSchema);
+                                else if (Array.isArray(selectedMetaFlow?.formSchema)) schemaFields = selectedMetaFlow.formSchema;
+                              } catch (e) {}
+
+                              if (schemaFields.length === 0) {
+                                schemaFields = [
+                                  { id: "full_name", type: "text", label: "Full Name", required: true },
+                                  { id: "email", type: "email", label: "Email Address", required: true },
+                                  { id: "comments", type: "textarea", label: "Comments", required: false }
+                                ];
+                              }
+
+                              return schemaFields.map((f: any, idx: number) => (
+                                <div key={idx} className="flex flex-col gap-1">
+                                  <label className="text-[10px] font-bold text-gray-700 dark:text-gray-300">
+                                    {f.label || f.name || `Field ${idx + 1}`} {f.required && <span className="text-rose-500">*</span>}
+                                  </label>
+                                  {f.type === "dropdown" || f.type === "select" ? (
+                                    <select
+                                      value={simulatorFlowFormData[f.id || idx] || ""}
+                                      onChange={(e) => setSimulatorFlowFormData({ ...simulatorFlowFormData, [f.id || idx]: e.target.value })}
+                                      className="px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[11px] text-gray-800 dark:text-gray-200 outline-none"
+                                    >
+                                      <option value="">Select option...</option>
+                                      {(f.options || []).map((opt: string, optIdx: number) => (
+                                        <option key={optIdx} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  ) : f.type === "radio" ? (
+                                    <div className="flex flex-col gap-1">
+                                      {(f.options || []).map((opt: string, optIdx: number) => (
+                                        <label key={optIdx} className="flex items-center gap-2 text-[10px] text-gray-700 dark:text-gray-300 cursor-pointer">
+                                          <input
+                                            type="radio"
+                                            name={`flow_radio_${idx}`}
+                                            checked={simulatorFlowFormData[f.id || idx] === opt}
+                                            onChange={() => setSimulatorFlowFormData({ ...simulatorFlowFormData, [f.id || idx]: opt })}
+                                            className="accent-emerald-600"
+                                          />
+                                          <span>{opt}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  ) : f.type === "textarea" ? (
+                                    <textarea
+                                      rows={2}
+                                      value={simulatorFlowFormData[f.id || idx] || ""}
+                                      onChange={(e) => setSimulatorFlowFormData({ ...simulatorFlowFormData, [f.id || idx]: e.target.value })}
+                                      placeholder="Type details here..."
+                                      className="px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[11px] text-gray-800 dark:text-gray-200 outline-none resize-none"
+                                    />
+                                  ) : (
+                                    <input
+                                      type={f.type === "email" ? "email" : f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+                                      value={simulatorFlowFormData[f.id || idx] || ""}
+                                      onChange={(e) => setSimulatorFlowFormData({ ...simulatorFlowFormData, [f.id || idx]: e.target.value })}
+                                      placeholder={f.placeholder || `Enter ${f.label || "value"}...`}
+                                      className="px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-[11px] text-gray-800 dark:text-gray-200 outline-none"
+                                    />
+                                  )}
+                                </div>
+                              ));
+                            })()}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Drawer Bottom Action */}
+                      {!simulatorFlowSubmitted && (
+                        <div className="p-3 bg-white dark:bg-[#1f2c34] border-t border-gray-100 dark:border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSimulatorFlowSubmitted(true);
+                              showToast("WhatsApp Flow Form response simulated successfully.", "success");
+                            }}
+                            className="w-full py-2 bg-[#00a884] hover:bg-[#008f6f] text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <Send size={12} />
+                            <span>Submit Form</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -2906,11 +2906,25 @@ export async function saveWhatsAppTemplateAction(data: any) {
           text: data.footerText.slice(0, 60)
         });
       }
+      const flowBtn: any = {
+        type: 'FLOW',
+        text: (data.flowButtonText || 'View Flow').slice(0, 25)
+      };
+      if (data.flowId) {
+        flowBtn.flow_id = data.flowId;
+      }
+      if (data.flowAction) {
+        flowBtn.flow_action = data.flowAction;
+      }
+      if (data.flowScreen) {
+        flowBtn.navigate_screen = data.flowScreen;
+      }
+      if (data.flowToken) {
+        flowBtn.flow_token = data.flowToken;
+      }
       components.push({
         type: 'BUTTONS',
-        buttons: [
-          { type: 'FLOW', text: (data.flowButtonText || 'View Flow').slice(0, 25) }
-        ]
+        buttons: [flowBtn]
       });
     } else if (templateType === 'ORDER_DETAILS') {
       // Meta Native Order Details Template
@@ -7371,7 +7385,71 @@ export async function sendProductCardAction(
 
 export async function getWhatsAppMetaFlows() {
   try {
-    const flows = await prisma.whatsAppMetaFlow.findMany({ orderBy: { createdAt: 'desc' } });
+    let flows = await prisma.whatsAppMetaFlow.findMany({ orderBy: { createdAt: 'desc' } });
+    if (!flows || flows.length === 0) {
+      const defaultFlows = [
+        {
+          name: "Customer Lead & Inquiry Form",
+          flowId: "flow_lead_qualification_v1",
+          description: "Collect customer requirement, budget range, and preferred contact method.",
+          screenName: "LEAD_INQUIRY_SCREEN",
+          ctaText: "Start Inquiry",
+          formSchema: JSON.stringify([
+            { id: "full_name", type: "text", label: "Full Name", required: true },
+            { id: "email", type: "email", label: "Email Address", required: true },
+            { id: "service_type", type: "dropdown", label: "Service / Product Interest", options: ["Custom Apparel & Bulk Order", "Wholesale Distributorship", "Product Sizing Query", "General Assistance"], required: true },
+            { id: "budget", type: "dropdown", label: "Estimated Budget", options: ["Under ₹10,000", "₹10,000 - ₹50,000", "₹50,000 - ₹2,00,000", "₹2,00,000+"], required: false },
+            { id: "notes", type: "textarea", label: "Additional Requirements", required: false }
+          ])
+        },
+        {
+          name: "Customer Satisfaction & NPS Survey",
+          flowId: "flow_feedback_csat_v1",
+          description: "Interactive post-purchase satisfaction rating and product review.",
+          screenName: "CSAT_SURVEY_SCREEN",
+          ctaText: "Rate Your Order",
+          formSchema: JSON.stringify([
+            { id: "rating", type: "radio", label: "Overall Experience", options: ["(5/5) Excellent", "(4/5) Good", "(3/5) Average", "(2/5) Needs Improvement"], required: true },
+            { id: "quality", type: "dropdown", label: "Product Fabric & Quality", options: ["Exceeded Expectations", "As Described", "Satisfactory", "Below Expectations"], required: true },
+            { id: "feedback", type: "textarea", label: "What can we do better?", required: false }
+          ])
+        },
+        {
+          name: "Appointment & Video Demo Booking",
+          flowId: "flow_appointment_booking_v1",
+          description: "Schedule 1-on-1 virtual styling or product consultation.",
+          screenName: "BOOKING_SLOT_SCREEN",
+          ctaText: "Book Appointment",
+          formSchema: JSON.stringify([
+            { id: "consultation_type", type: "dropdown", label: "Consultation Type", options: ["Virtual Video Showcase", "Wholesale Catalog Walkthrough", "Custom Design Consultation"], required: true },
+            { id: "preferred_date", type: "date", label: "Preferred Date", required: true },
+            { id: "time_slot", type: "dropdown", label: "Preferred Time Slot", options: ["Morning (10:00 AM - 1:00 PM)", "Afternoon (2:00 PM - 5:00 PM)", "Evening (6:00 PM - 8:30 PM)"], required: true },
+            { id: "phone_confirm", type: "text", label: "Contact Phone Number", required: true }
+          ])
+        },
+        {
+          name: "Custom Size & Fitment Measurement",
+          flowId: "flow_custom_order_fit_v1",
+          description: "Submit custom sizing measurements and garment specifications.",
+          screenName: "FITMENT_SCREEN",
+          ctaText: "Submit Sizing",
+          formSchema: JSON.stringify([
+            { id: "apparel_category", type: "dropdown", label: "Apparel Category", options: ["Polo & T-Shirts", "Jerseys & Sports Uniforms", "Hoodies & Jackets", "Trackpants & Shorts"], required: true },
+            { id: "standard_size", type: "dropdown", label: "Standard Size Reference", options: ["S (38)", "M (40)", "L (42)", "XL (44)", "XXL (46)", "Custom Fit"], required: true },
+            { id: "chest_size", type: "text", label: "Chest (inches)", required: false },
+            { id: "waist_size", type: "text", label: "Waist (inches)", required: false },
+            { id: "quantity", type: "number", label: "Quantity", required: true }
+          ])
+        }
+      ];
+
+      for (const df of defaultFlows) {
+        try {
+          await prisma.whatsAppMetaFlow.create({ data: df });
+        } catch (e) {}
+      }
+      flows = await prisma.whatsAppMetaFlow.findMany({ orderBy: { createdAt: 'desc' } });
+    }
     return { success: true, flows };
   } catch (e: any) {
     return { success: false, error: e.message, flows: [] };
