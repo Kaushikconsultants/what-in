@@ -396,32 +396,68 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       textContent = summary.trim();
     }
 
-    // WhatsApp Catalog Order Parsing
+    // WhatsApp Catalog Order Parsing with Intelligent Product Resolution
     let orderMetadata: any = null;
     if (msg.type === "order" && msg.order) {
-      const items = (msg.order.product_items || []).map((it: any) => ({
-        name: it.product_retailer_id || "Catalog Item",
-        retailer_id: it.product_retailer_id,
-        quantity: Number(it.quantity) || 1,
-        price: Number(it.item_price) || 0,
-        currency: it.currency || "INR"
-      }));
-      const totalAmount = items.reduce((sum: number, it: any) => sum + (it.price * it.quantity), 0);
-      const totalQuantity = items.reduce((sum: number, it: any) => sum + it.quantity, 0);
+      const rawItems = msg.order.product_items || [];
+      const resolvedItems: any[] = [];
+
+      for (const it of rawItems) {
+        const retId = it.product_retailer_id ? String(it.product_retailer_id).trim() : "";
+        let prodName = retId || "Catalog Item";
+        let prodImage: string | null = null;
+        let prodSku = retId;
+        let prodArticle = null;
+
+        if (retId) {
+          try {
+            const matchedProd = await prisma.product.findFirst({
+              where: {
+                OR: [
+                  { sku: retId },
+                  { sku: { contains: retId } },
+                  { articleNumber: retId },
+                  { id: retId }
+                ]
+              }
+            });
+            if (matchedProd) {
+              prodName = matchedProd.name;
+              prodImage = matchedProd.images?.[0] || null;
+              prodSku = matchedProd.sku || retId;
+              prodArticle = matchedProd.articleNumber || null;
+            }
+          } catch (_) {}
+        }
+
+        resolvedItems.push({
+          name: prodName,
+          retailer_id: retId,
+          sku: prodSku,
+          articleNumber: prodArticle,
+          image: prodImage,
+          quantity: Number(it.quantity) || 1,
+          price: Number(it.item_price) || 0,
+          currency: it.currency || "INR"
+        });
+      }
+
+      const totalAmount = resolvedItems.reduce((sum: number, it: any) => sum + (it.price * it.quantity), 0);
+      const totalQuantity = resolvedItems.reduce((sum: number, it: any) => sum + it.quantity, 0);
 
       orderMetadata = {
         order: {
           catalogId: msg.order.catalog_id,
           customerNote: msg.order.text || "",
-          items,
+          items: resolvedItems,
           totalAmount,
           totalQuantity,
-          currency: items[0]?.currency || "INR"
+          currency: resolvedItems[0]?.currency || "INR"
         }
       };
 
       let summary = `🛍️ Catalog Order (${totalQuantity} items - ₹${totalAmount.toLocaleString('en-IN')}):\n`;
-      items.forEach((it: any) => {
+      resolvedItems.forEach((it: any) => {
         summary += `• ${it.quantity}x ${it.name} (₹${it.price})\n`;
       });
       if (msg.order.text) {

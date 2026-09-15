@@ -82,7 +82,7 @@ export async function createWhatsAppIntegrationAction(data: { name: string, url:
       return { success: false, error: "Name and URL are required" };
     }
 
-    if (!isValidPublicWebhookUrl(data.url) && data.type !== 'META_CAPI' && data.type !== 'PIXEL') {
+    if (!isValidPublicWebhookUrl(data.url) && data.type !== 'META_CAPI' && data.type !== 'PIXEL' && data.type !== 'META_CATALOG') {
       return { success: false, error: "Invalid webhook URL: Private network/loopback IP addresses are not permitted." };
     }
 
@@ -95,6 +95,16 @@ export async function createWhatsAppIntegrationAction(data: { name: string, url:
         type: data.type || "CRM_LEAD"
       }
     });
+
+    if (data.type === 'META_CATALOG' && data.url) {
+      try {
+        const { linkMetaCatalogToWhatsAppAction } = await import("./whatsAppPlatformActions");
+        await linkMetaCatalogToWhatsAppAction(data.url.trim());
+      } catch (catLinkErr) {
+        console.warn("[createWhatsAppIntegrationAction] Auto-linking catalog warning:", catLinkErr);
+      }
+    }
+
     return { success: true, integration };
   } catch (e: any) {
     return { success: false, error: e.message };
@@ -109,7 +119,7 @@ export async function updateWhatsAppIntegrationAction(id: string, data: { name: 
       return { success: false, error: "Unauthorized access: Admin privileges required" };
     }
 
-    if (data.url && !isValidPublicWebhookUrl(data.url) && data.type !== 'META_CAPI' && data.type !== 'PIXEL') {
+    if (data.url && !isValidPublicWebhookUrl(data.url) && data.type !== 'META_CAPI' && data.type !== 'PIXEL' && data.type !== 'META_CATALOG') {
       return { success: false, error: "Invalid webhook URL: Private network/loopback IP addresses are not permitted." };
     }
 
@@ -122,6 +132,16 @@ export async function updateWhatsAppIntegrationAction(id: string, data: { name: 
         type: data.type || "CRM_LEAD"
       }
     });
+
+    if (data.type === 'META_CATALOG' && data.url) {
+      try {
+        const { linkMetaCatalogToWhatsAppAction } = await import("./whatsAppPlatformActions");
+        await linkMetaCatalogToWhatsAppAction(data.url.trim());
+      } catch (catLinkErr) {
+        console.warn("[updateWhatsAppIntegrationAction] Auto-linking catalog warning:", catLinkErr);
+      }
+    }
+
     return { success: true, integration };
   } catch (e: any) {
     return { success: false, error: e.message };

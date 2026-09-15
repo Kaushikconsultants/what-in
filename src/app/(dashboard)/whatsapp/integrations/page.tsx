@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Key, ShieldCheck, RefreshCw, CheckCircle2, AlertTriangle, Eye, EyeOff, Send, Save, ArrowRight, Store, MessageSquare, Users, Bot, Layers, BookOpen, Edit3, X, Plus, Trash2, UserCheck, UserX, Shield, ExternalLink, Sparkles, HelpCircle, Target, Edit, Zap, ShoppingBag, Copy, Check, CreditCard } from "lucide-react";
+import { Key, ShieldCheck, RefreshCw, CheckCircle2, AlertTriangle, Eye, EyeOff, Send, Save, ArrowRight, Store, MessageSquare, Users, Bot, Layers, BookOpen, Edit3, X, Plus, Trash2, UserCheck, UserX, Shield, ExternalLink, Sparkles, HelpCircle, Target, Edit, Zap, ShoppingBag, Copy, Check, CreditCard, Link2 } from "lucide-react";
 import { 
   getWhatsAppApiCredentialsAction, 
   saveWhatsAppApiCredentialsAction, 
@@ -19,7 +19,8 @@ import {
   addAgentToTeamAction,
   removeAgentFromTeamAction,
   toggleAgentChatAvailabilityAction,
-  getAllAgentsAction
+  getAllAgentsAction,
+  linkMetaCatalogToWhatsAppAction
 } from "@/app/actions/whatsAppPlatformActions";
 import { getPaymentGatewaySettings, savePaymentGatewaySettings } from "@/app/actions/paymentGatewayActions";
 import { 
@@ -53,6 +54,7 @@ export default function IntegrationsHubPage() {
   const [savingCapi, setSavingCapi] = useState(false);
   const [capiResultMsg, setCapiResultMsg] = useState<{ success: boolean; text: string } | null>(null);
   const [testingCatalogId, setTestingCatalogId] = useState<string | null>(null);
+  const [linkingCatalogId, setLinkingCatalogId] = useState<string | null>(null);
   const [catalogTestStatus, setCatalogTestStatus] = useState<{ id: string; success: boolean; text: string } | null>(null);
   const [fetchingCatalogs, setFetchingCatalogs] = useState(false);
   const [fetchedCatalogs, setFetchedCatalogs] = useState<any[]>([]);
@@ -1216,15 +1218,53 @@ const reloadTeams = async () => {
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end items-center gap-2">
                               {wh.type === 'META_CATALOG' && (
-                                <button
-                                  onClick={() => handleTestCatalogConnection(wh)}
-                                  disabled={testingCatalogId === wh.id}
-                                  className="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-800/60 flex items-center gap-1 transition-all cursor-pointer"
-                                  title="Verify Meta Catalog Connectivity"
-                                >
-                                  {testingCatalogId === wh.id ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                                  {testingCatalogId === wh.id ? "Testing..." : "Test Catalog"}
-                                </button>
+                                <>
+                                  <button
+                                    onClick={async () => {
+                                      setLinkingCatalogId(wh.id);
+                                      try {
+                                        const res = await linkMetaCatalogToWhatsAppAction(wh.url);
+                                        if (res.success) {
+                                          setCatalogTestStatus({
+                                            id: wh.id,
+                                            success: true,
+                                            text: `✨ Linked Catalog ID ${res.catalogId} to WhatsApp Number (${res.phoneNumber || res.phoneId}) successfully!`
+                                          });
+                                        } else {
+                                          setCatalogTestStatus({
+                                            id: wh.id,
+                                            success: false,
+                                            text: `Link Error: ${res.error || "Failed to link catalog"}`
+                                          });
+                                        }
+                                      } catch (err: any) {
+                                        setCatalogTestStatus({
+                                          id: wh.id,
+                                          success: false,
+                                          text: `Link Error: ${err.message}`
+                                        });
+                                      } finally {
+                                        setLinkingCatalogId(null);
+                                      }
+                                    }}
+                                    disabled={linkingCatalogId === wh.id}
+                                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1 transition-all cursor-pointer"
+                                    title="Link this Meta Catalog to active WhatsApp Business Phone Number"
+                                  >
+                                    {linkingCatalogId === wh.id ? <RefreshCw size={12} className="animate-spin" /> : <Link2 size={12} />}
+                                    {linkingCatalogId === wh.id ? "Linking..." : "Link to WhatsApp"}
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleTestCatalogConnection(wh)}
+                                    disabled={testingCatalogId === wh.id}
+                                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-800/60 flex items-center gap-1 transition-all cursor-pointer"
+                                    title="Verify Meta Catalog Connectivity"
+                                  >
+                                    {testingCatalogId === wh.id ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                                    {testingCatalogId === wh.id ? "Testing..." : "Test Catalog"}
+                                  </button>
+                                </>
                               )}
                               {wh.type === 'META_CAPI' && (
                                 <button

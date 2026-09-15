@@ -88,13 +88,74 @@ import {
   sendProductCardAction,
   sendWhatsAppFlowMessageAction,
   getWhatsAppSettingsAction,
-  retryFailedWhatsAppMessageAction
+  retryFailedWhatsAppMessageAction,
+  getWhatsAppTemplates,
+  getProductsAction
 } from "@/app/actions/whatsAppPlatformActions";
 import { getWhatsAppIntegrationsAction, pushLeadToIntegrationAction } from "@/app/actions/whatsAppIntegrationActions";
 import { getPaymentGatewaySettings } from "@/app/actions/paymentGatewayActions";
 import { useWhatsAppStore } from "@/store/whatsappStore";
 import { formatWhatsAppPhone, getCustomerDisplayName, getCustomerAvatarInitials, getCustomerSubtitle, getCountryInfo } from "@/lib/phoneUtils";
 import "./WhatsAppInbox.css";
+
+// WhatsApp Text Formatter Helper (Handles *bold*, _italic_, ~strike~, `code`, newlines and links)
+const parseInlineWhatsAppTokens = (line: string): React.ReactNode[] => {
+  if (!line) return [];
+  const tokens: React.ReactNode[] = [];
+  const regex = /(\*[^*]+\*|_[^_]+_|~[^~]+~|`[^`]+`|https?:\/\/[^\s]+)/g;
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(line)) !== null) {
+    if (match.index > lastIdx) {
+      tokens.push(line.substring(lastIdx, match.index));
+    }
+    const token = match[0];
+    const key = `${match.index}-${token}`;
+    if (token.startsWith('*') && token.endsWith('*') && token.length >= 2) {
+      tokens.push(<strong key={key} style={{ fontWeight: 700 }}>{token.slice(1, -1)}</strong>);
+    } else if (token.startsWith('_') && token.endsWith('_') && token.length >= 2) {
+      tokens.push(<em key={key} style={{ fontStyle: 'italic' }}>{token.slice(1, -1)}</em>);
+    } else if (token.startsWith('~') && token.endsWith('~') && token.length >= 2) {
+      tokens.push(<del key={key} style={{ textDecoration: 'line-through' }}>{token.slice(1, -1)}</del>);
+    } else if (token.startsWith('`') && token.endsWith('`') && token.length >= 2) {
+      tokens.push(<code key={key} style={{ background: 'rgba(0,0,0,0.15)', padding: '1px 4px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.9em' }}>{token.slice(1, -1)}</code>);
+    } else if (token.startsWith('http://') || token.startsWith('https://')) {
+      tokens.push(
+        <a 
+          key={key} 
+          href={token} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          style={{ color: '#38bdf8', textDecoration: 'underline', wordBreak: 'break-all' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {token}
+        </a>
+      );
+    } else {
+      tokens.push(token);
+    }
+    lastIdx = match.index + token.length;
+  }
+
+  if (lastIdx < line.length) {
+    tokens.push(line.substring(lastIdx));
+  }
+
+  return tokens.length > 0 ? tokens : [line];
+};
+
+export const renderWhatsAppFormattedText = (text: string) => {
+  if (!text) return null;
+  const lines = String(text).split('\n');
+  return lines.map((line, lIdx) => (
+    <React.Fragment key={lIdx}>
+      {lIdx > 0 && <br />}
+      {parseInlineWhatsAppTokens(line)}
+    </React.Fragment>
+  ));
+};
 
 // Helper to force download media instead of opening in a new tab
 const forceDownloadMedia = async (url: string, e?: React.MouseEvent) => {
@@ -184,6 +245,23 @@ export default function WhatsAppInboxComponent() {
   const [showProductPanel, setShowProductPanel] = useState<boolean>(false);
   const [showFlowPicker, setShowFlowPicker] = useState<boolean>(false);
   const [retryingMsgId, setRetryingMsgId] = useState<string | null>(null);
+  const [approvedTemplates, setApprovedTemplates] = useState<any[]>([]);
+  const [productsList, setProductsList] = useState<any[]>([]);
+
+  // Preload approved templates & product catalog for accurate chat previews & product resolution
+  useEffect(() => {
+    getWhatsAppTemplates()
+      .then(res => {
+        if (res?.templates) setApprovedTemplates(res.templates);
+      })
+      .catch(() => {});
+
+    getProductsAction()
+      .then(res => {
+        if (res?.products) setProductsList(res.products);
+      })
+      .catch(() => {});
+  }, []);
   
   // Check 24-hour window status
   const checkSessionExpired = () => {
@@ -2720,12 +2798,181 @@ export default function WhatsAppInboxComponent() {
                           </div>
                         )}
 
-                        {/* Meta Template Badge */}
-                        {msg.messageType === "TEMPLATE" && (
-                          <div className="msg-type-badge msg-badge-template">
-                            <ShieldCheck size={11} /> Meta Approved Template
-                          </div>
-                        )}
+                        {/* Meta Template Complete Card Renderer */}
+                        {msg.messageType === "TEMPLATE" && (() => {
+                          let parsedMeta: any = null;
+                          try {
+                            if (msg.metadata) {
+                              parsedMeta = typeof msg.metadata === "string" ? JSON.parse(msg.metadata) : msg.metadata;
+                            }
+                          } catch (_) {}
+
+                          const tName = parsedMeta?.templateName || parsedMeta?.name || msg.templateId || "";
+                          const matchedTemplate = approvedTemplates.find((t: any) => 
+                            (tName && (t.name?.toLowerCase() === tName.toLowerCase() || t.id === tName)) ||
+                            (parsedMeta?.templateId && t.id === parsedMeta.templateId)
+                          ) || null;
+
+                          // Extract body parameters
+                          const bodyParams: any[] = parsedMeta?.components?.find((c: any) => c.type === 'body')?.parameters || [];
+                          
+                          // Hydrate body text:
+                          let bodyText = msg.content || matchedTemplate?.bodyText || "";
+                          if (bodyText.includes("{{") && matchedTemplate?.bodyText) {
+                            let hydrated = matchedTemplate.bodyText;
+                            bodyParams.forEach((param: any, pIdx: number) => {
+                              const val = param.text || param.date_time?.fallback_value || "";
+                              hydrated = hydrated.replace(new RegExp(`\\{\\{${pIdx + 1}\\}\\}`, 'g'), val);
+                            });
+                            // Fallback any remaining {{1}} with customer name
+                            const custName = activeConvDetail?.customer?.contactPerson || activeConvDetail?.contactName || "Valued Customer";
+                            hydrated = hydrated.replace(/\{\{\d+\}\}/g, custName);
+                            bodyText = hydrated;
+                          }
+
+                          // Header resolution:
+                          const headerType = matchedTemplate?.headerType || (msg.mediaUrl ? 'IMAGE' : (parsedMeta?.headerType || 'NONE'));
+                          const headerParam = parsedMeta?.components?.find((c: any) => c.type === 'header')?.parameters?.[0];
+                          const headerMediaUrl = msg.mediaUrl || headerParam?.image?.link || headerParam?.video?.link || headerParam?.document?.link || (headerType !== 'TEXT' ? matchedTemplate?.headerContent : null);
+                          const headerTitle = headerType === 'TEXT' ? (headerParam?.text || matchedTemplate?.headerContent || parsedMeta?.headerText) : null;
+
+                          // Footer resolution:
+                          const footerText = matchedTemplate?.footerText || parsedMeta?.footerText || parsedMeta?.footer || "";
+
+                          // Buttons resolution:
+                          let templateButtons: any[] = [];
+                          if (matchedTemplate?.buttons) {
+                            try {
+                              templateButtons = typeof matchedTemplate.buttons === 'string' ? JSON.parse(matchedTemplate.buttons) : matchedTemplate.buttons;
+                            } catch (_) {}
+                          }
+                          if ((!templateButtons || templateButtons.length === 0) && parsedMeta?.buttons) {
+                            templateButtons = Array.isArray(parsedMeta.buttons) ? parsedMeta.buttons : [];
+                          }
+                          if ((!templateButtons || templateButtons.length === 0) && parsedMeta?.components) {
+                            const btnComps = parsedMeta.components.filter((c: any) => c.type === 'button');
+                            if (btnComps.length > 0) {
+                              templateButtons = btnComps.map((bc: any) => ({
+                                type: bc.sub_type || 'URL',
+                                text: bc.sub_type === 'CATALOG' ? 'View catalog' : (bc.text || 'Action'),
+                                url: bc.parameters?.[0]?.text
+                              }));
+                            }
+                          }
+
+                          return (
+                            <div className="msg-template-card">
+                              {/* Template Badge Header */}
+                              <div className="msg-type-badge msg-badge-template" style={{ marginBottom: "6px" }}>
+                                <ShieldCheck size={11} /> Meta Approved Template: {matchedTemplate?.name || tName || 'Template'}
+                              </div>
+
+                              {/* Header Media / Title */}
+                              {headerType === 'IMAGE' && headerMediaUrl && (
+                                <div className="msg-template-header-media">
+                                  <img 
+                                    src={resolveSafeMediaUrl(headerMediaUrl)} 
+                                    alt="Template Header" 
+                                    referrerPolicy="no-referrer"
+                                    style={{ width: "100%", maxHeight: "200px", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }}
+                                    onClick={() => window.open(resolveSafeMediaUrl(headerMediaUrl), "_blank")}
+                                  />
+                                </div>
+                              )}
+
+                              {headerType === 'VIDEO' && headerMediaUrl && (
+                                <div className="msg-template-header-media">
+                                  <video 
+                                    src={resolveSafeMediaUrl(headerMediaUrl)} 
+                                    controls 
+                                    playsInline 
+                                    style={{ width: "100%", borderRadius: "8px", maxHeight: "240px", objectFit: "cover" }}
+                                  />
+                                </div>
+                              )}
+
+                              {headerType === 'DOCUMENT' && (
+                                <div className="msg-doc-preview" style={{ marginBottom: "8px" }} onClick={() => headerMediaUrl && window.open(resolveSafeMediaUrl(headerMediaUrl), "_blank")}>
+                                  <div className="msg-doc-icon">
+                                    <FileText size={20} color="#3b82f6" />
+                                  </div>
+                                  <div className="msg-doc-info">
+                                    <div className="msg-doc-name">{matchedTemplate?.name || 'Document'}.pdf</div>
+                                    <div className="msg-doc-meta">WhatsApp Document Attachment</div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {headerTitle && (
+                                <div className="msg-template-header-title">
+                                  {headerTitle}
+                                </div>
+                              )}
+
+                              {/* Formatted Body Text */}
+                              <div className="msg-template-body-text">
+                                {renderWhatsAppFormattedText(bodyText)}
+                              </div>
+
+                              {/* Footer Text */}
+                              {footerText && (
+                                <div className="msg-template-footer-text">
+                                  {footerText}
+                                </div>
+                              )}
+
+                              {/* Action Buttons */}
+                              {templateButtons.length > 0 && (
+                                <div className="msg-template-buttons-container">
+                                  {templateButtons.map((btn: any, bIdx: number) => {
+                                    const isCatalog = btn.type === "CATALOG" || btn.type === "CATALOGUE";
+                                    const isUrl = btn.type === "URL" || btn.type === "DYNAMIC_URL";
+                                    const isPhone = btn.type === "PHONE_NUMBER" || btn.type === "VOICE_CALL";
+                                    const isCopyCode = btn.type === "COPY_CODE" || btn.type === "OTP";
+                                    const isQuickReply = btn.type === "QUICK_REPLY";
+
+                                    return (
+                                      <button
+                                        key={bIdx}
+                                        type="button"
+                                        className={`msg-template-btn ${isCatalog ? 'msg-template-catalog-btn' : ''}`}
+                                        onClick={() => {
+                                          if (isCatalog) {
+                                            setToastMsg("🛍️ WhatsApp Commerce Catalog link active on receiver's device");
+                                            setTimeout(() => setToastMsg(null), 3000);
+                                          } else if (isUrl && btn.url) {
+                                            let targetUrl = btn.url;
+                                            const btnParam = parsedMeta?.components?.find((c: any) => c.type === 'button' && c.index === String(bIdx))?.parameters?.[0]?.text;
+                                            if (btnParam) {
+                                              targetUrl = targetUrl.replace(/\{\{\d+\}\}/g, btnParam);
+                                            }
+                                            window.open(targetUrl, "_blank");
+                                          } else if (isPhone && (btn.phoneNumber || btn.phone)) {
+                                            window.location.href = `tel:${btn.phoneNumber || btn.phone}`;
+                                          } else if (isCopyCode) {
+                                            const codeVal = btn.code || bodyParams[0]?.text || "123456";
+                                            navigator.clipboard.writeText(codeVal);
+                                            setToastMsg(`Verification code (${codeVal}) copied!`);
+                                            setTimeout(() => setToastMsg(null), 2500);
+                                          } else if (isQuickReply) {
+                                            setMessageInput(btn.text || "");
+                                          }
+                                        }}
+                                      >
+                                        {isCatalog && <ShoppingBag size={14} color="#10b981" />}
+                                        {isUrl && <ExternalLink size={14} />}
+                                        {isPhone && <Phone size={14} />}
+                                        {isCopyCode && <Copy size={14} />}
+                                        {isQuickReply && <Sparkles size={14} />}
+                                        <span>{btn.text || (isCatalog ? 'View catalog' : (isCopyCode ? 'Copy Code' : 'Action'))}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Interactive Flow Badge */}
                         {msg.messageType === "FLOW" && (
@@ -2759,8 +3006,48 @@ export default function WhatsAppInboxComponent() {
                             }
                           } catch (_) {}
 
-                          const items: any[] = Array.isArray(orderInfo?.items) ? orderInfo.items : [];
-                          const totalAmount = orderInfo?.totalAmount ?? 0;
+                          const rawItems: any[] = Array.isArray(orderInfo?.items) ? orderInfo.items : [];
+                          
+                          // Resolve product titles and images against productsList
+                          const items = rawItems.map((it: any) => {
+                            const retailerKey = String(it.retailer_id || it.product_retailer_id || it.sku || it.id || it.retailerId || "").trim();
+                            const matched = productsList.find((p: any) => {
+                              if (!p) return false;
+                              if (retailerKey) {
+                                if (String(p.sku || "").trim() === retailerKey) return true;
+                                if (String(p.id || "").trim() === retailerKey) return true;
+                                if (String(p.subCategory || "").trim() === retailerKey) return true;
+                                if (String(p.sku || "").includes(retailerKey)) return true;
+                                if (retailerKey.includes(String(p.sku || ""))) return true;
+                              }
+                              if (it.name && typeof it.name === 'string' && !/^\d+$/.test(it.name.trim())) {
+                                if (p.name && p.name.toLowerCase() === it.name.toLowerCase()) return true;
+                              }
+                              return false;
+                            });
+
+                            const isNumericTitle = !it.name || /^\d+$/.test(String(it.name).trim()) || it.name === it.retailer_id || it.name === it.sku;
+                            const finalTitle = (!isNumericTitle && it.name) 
+                              ? it.name 
+                              : (matched?.name || (it.name && !isNumericTitle ? it.name : (matched?.name || `Product SKU: ${retailerKey}`)));
+
+                            const finalImage = it.image || matched?.images?.[0] || matched?.image || null;
+                            const finalPrice = Number(it.price || it.item_price || matched?.sellingPrice || matched?.price || 0);
+                            const finalQty = Number(it.quantity || 1);
+                            const finalSubtotal = Number(it.subtotal || (finalPrice * finalQty));
+
+                            return {
+                              ...it,
+                              name: finalTitle,
+                              image: finalImage,
+                              price: finalPrice,
+                              quantity: finalQty,
+                              subtotal: finalSubtotal,
+                              sku: retailerKey
+                            };
+                          });
+
+                          const totalAmount = orderInfo?.totalAmount ?? (items.reduce((s: number, i: any) => s + (i.subtotal || 0), 0) || 0);
                           const totalQuantity = orderInfo?.totalQuantity ?? (items.reduce((s: number, i: any) => s + (i.quantity || 1), 0) || 1);
                           const currencySymbol = (orderInfo?.currency === 'INR' || !orderInfo?.currency) ? '₹' : '$';
                           const customerNote = orderInfo?.customerNote || orderInfo?.text || '';
@@ -2797,7 +3084,7 @@ export default function WhatsAppInboxComponent() {
                                       <div className="msg-order-thumb">
                                         {it.image ? (
                                           <img
-                                            src={it.image}
+                                            src={resolveSafeMediaUrl(it.image)}
                                             alt={it.name || 'Product'}
                                             referrerPolicy="no-referrer"
                                             style={{
@@ -2831,7 +3118,7 @@ export default function WhatsAppInboxComponent() {
                                       {/* Title & Qty */}
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div className="msg-order-item-title">
-                                          {it.name || `Product SKU: ${it.sku || it.retailerId}`}
+                                          {it.name}
                                         </div>
                                         <div className="msg-order-item-qty-row">
                                           <span className="msg-order-qty-chip">
@@ -2928,11 +3215,11 @@ export default function WhatsAppInboxComponent() {
                         })()}
 
                         {/* Standard Text & Unsupported Format Renderer */}
-                        {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && msg.messageType !== "ORDER" && (
-                          <p className="message-text-content">
+                        {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && msg.messageType !== "ORDER" && msg.messageType !== "TEMPLATE" && (
+                          <div className="message-text-content">
                             {msg.messageType === "UNSUPPORTED" ? (
                               msg.content && msg.content !== "[Message]" ? (
-                                <span>{msg.content}</span>
+                                <span>{renderWhatsAppFormattedText(msg.content)}</span>
                               ) : (
                                 <span style={{ color: "#38bdf8", display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600 }}>
                                   <ShoppingBag size={14} />
@@ -2940,9 +3227,9 @@ export default function WhatsAppInboxComponent() {
                                 </span>
                               )
                             ) : (
-                              msg.content
+                              renderWhatsAppFormattedText(msg.content)
                             )}
-                          </p>
+                          </div>
                         )}
 
                         {msg.status === "FAILED" && (() => {
