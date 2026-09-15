@@ -1148,37 +1148,23 @@ export async function generateWhatsAppPaymentLinkAction(data: {
         senderType: 'SYSTEM',
         senderName,
         messageType: 'PAYMENT_LINK',
-        content: `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}\n\nTap below to pay securely:`,
+        content: `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}\n\nTap "Pay Now" below to complete payment securely:`,
         mediaUrl: paymentUrl,
         metadata: JSON.stringify({ paymentLinkId: paymentLink.id, amount: data.amount, paymentUrl, upiId })
       });
     } else {
-      // Both (Default): Send QR code image message with direct payment URL in the caption!
-      const bodyContent = qrApiUrl 
-        ? `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}${upiId ? `\n\nUPI ID: *${upiId}*` : ''}\n\nPay via Link: ${paymentUrl}\n\nOr scan the QR code above using any UPI app (PhonePe, GPay, Paytm) to complete payment.`
-        : `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}\n\nClick below to pay securely:`;
+      // Both (Default): Sends interactive WhatsApp CTA Pay Now button with QR code image header!
+      const bodyContent = `Payment Request: ₹${data.amount.toLocaleString('en-IN')}\n\n${data.description}${upiId ? `\n\nUPI ID: *${upiId}*` : ''}\n\nTap "Pay Now" below or scan the QR code above to complete payment:`;
 
-      if (qrApiUrl) {
-        await sendWhatsAppMessageAction({
-          conversationId: data.conversationId,
-          senderType: 'SYSTEM',
-          senderName,
-          messageType: 'IMAGE',
-          content: bodyContent,
-          mediaUrl: qrApiUrl,
-          metadata: metadataPayload
-        });
-      } else {
-        await sendWhatsAppMessageAction({
-          conversationId: data.conversationId,
-          senderType: 'SYSTEM',
-          senderName,
-          messageType: 'PAYMENT_LINK',
-          content: bodyContent,
-          mediaUrl: paymentUrl,
-          metadata: metadataPayload
-        });
-      }
+      await sendWhatsAppMessageAction({
+        conversationId: data.conversationId,
+        senderType: 'SYSTEM',
+        senderName,
+        messageType: 'PAYMENT_LINK',
+        content: bodyContent,
+        mediaUrl: paymentUrl,
+        metadata: metadataPayload
+      });
     }
 
     await prisma.whatsAppConversation.update({
