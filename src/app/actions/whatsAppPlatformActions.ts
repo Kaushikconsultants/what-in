@@ -2040,8 +2040,8 @@ export async function sendWhatsAppTemplateAction(
         where: { name: templateName }
       });
 
-      // If local template not in DB, attempt to fetch its definition directly from Meta
-      if (!localTemplate && creds.wabaId) {
+      // Always auto-fetch template definition directly from Meta to guarantee exact language code and component schema
+      if (creds.wabaId) {
         try {
           const metaTRes = await fetch(`https://graph.facebook.com/v21.0/${creds.wabaId}/message_templates?name=${encodeURIComponent(templateName)}&fields=id,name,status,category,language,components,quality_score,rejected_reason`, {
             headers: { Authorization: `Bearer ${creds.accessToken}` }
@@ -2055,7 +2055,8 @@ export async function sendWhatsAppTemplateAction(
             const buttonsC = found.components?.find((c: any) => c.type === 'BUTTONS');
             const carouselC = found.components?.find((c: any) => c.type === 'CAROUSEL');
 
-            localTemplate = await prisma.whatsAppTemplate.upsert({
+            // Upsert / sync language and components to DB
+            const updated = await prisma.whatsAppTemplate.upsert({
               where: { id: found.id },
               update: {
                 name: found.name,
@@ -2067,7 +2068,7 @@ export async function sendWhatsAppTemplateAction(
                 headerContent: headerC?.text || '',
                 footerText: footerC?.text || '',
                 buttons: buttonsC ? JSON.stringify(buttonsC.buttons) : '[]',
-                templateType: carouselC ? 'CAROUSEL' : 'STANDARD'
+                templateType: carouselC ? 'CAROUSEL' : (localTemplate?.templateType || 'STANDARD')
               },
               create: {
                 id: found.id,
@@ -2083,18 +2084,18 @@ export async function sendWhatsAppTemplateAction(
                 templateType: carouselC ? 'CAROUSEL' : 'STANDARD'
               }
             }).catch(() => null);
+
+            if (updated) {
+              localTemplate = updated;
+            }
           }
         } catch {}
       }
 
-      // 1. Normalize Language
-      let effectiveLanguage = languageCode || 'en_US';
-      if (localTemplate?.language) {
-        if (effectiveLanguage === 'en' && localTemplate.language.startsWith('en_')) {
-          effectiveLanguage = localTemplate.language;
-        } else if (!languageCode || languageCode === 'en') {
-          effectiveLanguage = localTemplate.language;
-        }
+      // 1. Exact Meta Language Resolution (Prioritize Meta's official approved language code)
+      let effectiveLanguage = localTemplate?.language || languageCode || 'en_US';
+      if (effectiveLanguage === 'en') {
+        effectiveLanguage = localTemplate?.language && localTemplate.language.startsWith('en_') ? localTemplate.language : 'en_US';
       }
 
       // 2. Body Parameter Validation & Auto-Padding
@@ -2187,6 +2188,24 @@ export async function sendWhatsAppTemplateAction(
       const templateHasCatalogButton = parsedButtons.some((b: any) => b.type?.toUpperCase() === "CATALOG");
 
       if (!hasCatalogButtonInParams && templateHasCatalogButton) {
+        let retailerId: string | null = null;
+        if (localTemplate?.variables) {
+          try {
+            const v = typeof localTemplate.variables === 'string' ? JSON.parse(localTemplate.variables) : localTemplate.variables;
+            if (Array.isArray(v) && v.length > 0) {
+              retailerId = v[0]?.sku || v[0]?.handle || v[0]?.id || null;
+            }
+          } catch {}
+        }
+        if (!retailerId && localTemplate?.carouselCards) {
+          try {
+            const c = typeof localTemplate.carouselCards === 'string' ? JSON.parse(localTemplate.carouselCards) : localTemplate.carouselCards;
+            if (Array.isArray(c) && c.length > 0) {
+              retailerId = c[0]?.sku || c[0]?.handle || c[0]?.id || null;
+            }
+          } catch {}
+        }
+
         finalComponents.push({
           type: "button",
           sub_type: "CATALOG",
@@ -2194,7 +2213,7 @@ export async function sendWhatsAppTemplateAction(
           parameters: [
             {
               type: "action",
-              action: {}
+              action: retailerId ? { thumbnail_product_retailer_id: String(retailerId) } : {}
             }
           ]
         });
@@ -2206,21 +2225,31 @@ export async function sendWhatsAppTemplateAction(
         if (bType === "URL" && (b.urlType === "DYNAMIC" || b.url?.includes("{{1}}"))) {
           const hasBtn = finalComponents.some(c => c.type?.toLowerCase() === "button" && String(c.index) === String(idx));
           if (!hasBtn) {
+            let sampleVal = b.example?.[0] || b.urlExample || (cleanPhone ? cleanPhone.slice(-6) : "ESP102");
+            if (typeof sampleVal === "string" && sampleVal.includes("code=")) {
+              const m = sampleVal.match(/code=([^&]+)/);
+              sampleVal = m ? m[1] : sampleVal;
+            }
+            if (typeof sampleVal === "string" && sampleVal.startsWith("http")) {
+              sampleVal = cleanPhone ? cleanPhone.slice(-6) : "ESP102";
+            }
+            sampleVal = String(sampleVal).slice(0, 15);
             finalComponents.push({
               type: "button",
               sub_type: "url",
               index: String(idx),
-              parameters: [{ type: "text", text: b.example?.[0] || b.urlExample || (cleanPhone ? cleanPhone.slice(-6) : "ESP-10029") }]
+              parameters: [{ type: "text", text: sampleVal }]
             });
           }
         } else if (bType === "COPY_CODE" && (b.code === "{{1}}" || b.isDynamicCode)) {
           const hasBtn = finalComponents.some(c => c.type?.toLowerCase() === "button" && String(c.index) === String(idx));
           if (!hasBtn) {
+            const couponVal = (b.code === "{{1}}" ? (cleanPhone ? cleanPhone.slice(-6) : "ESPON5") : (b.code || "ESPON5")).slice(0, 15);
             finalComponents.push({
               type: "button",
               sub_type: "copy_code",
               index: String(idx),
-              parameters: [{ type: "coupon_code", coupon_code: b.code || "ESPON5" }]
+              parameters: [{ type: "coupon_code", coupon_code: couponVal }]
             });
           }
         }

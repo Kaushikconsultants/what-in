@@ -182,22 +182,6 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
       }
     });
 
-    // Catalog button
-    const hasCatalog = templateButtons.some((b: any) => b.type?.toUpperCase() === "CATALOG");
-    if (hasCatalog) {
-      components.push({
-        type: "button",
-        sub_type: "CATALOG",
-        index: "0",
-        parameters: [
-          {
-            type: "action",
-            action: {}
-          }
-        ]
-      });
-    }
-
     const effectiveLang = selected.language || "en_US";
     await onSendTemplate(selected.name, effectiveLang, components);
     setSending(false);
