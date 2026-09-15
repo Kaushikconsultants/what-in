@@ -27,7 +27,6 @@ const subNavItems = [
   { name: "Inbox", path: "/whatsapp/inbox", icon: MessageSquare },
   { name: "Shopify", path: "/whatsapp/shopify", icon: ShoppingBag },
   { name: "WhatsApp", path: "/whatsapp/templates", icon: Bot },
-  { name: "Payments", path: "/whatsapp/payments", icon: CreditCard },
   { name: "Integrations", path: "/whatsapp/integrations", icon: Zap },
   { name: "Products & Prices", path: "/whatsapp/commerce", icon: Box },
   { name: "Settings", path: "/whatsapp/api-settings", icon: Key },
