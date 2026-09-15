@@ -4282,14 +4282,162 @@ export async function getWhatsAppPaymentLinks() {
   try {
     const links = await prisma.whatsAppPaymentLink.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 200,
       include: {
+        customer: true,
         conversation: { include: { customer: true } }
       }
     });
     return { success: true, links };
   } catch (e: any) {
     return { success: false, error: e.message, links: [] };
+  }
+}
+
+export async function verifyManualPaymentAction(data: {
+  paymentLinkId: string;
+  transactionId?: string;
+  notes?: string;
+  sendWhatsAppReceipt?: boolean;
+}) {
+  try {
+    const payment = await prisma.whatsAppPaymentLink.findUnique({
+      where: { id: data.paymentLinkId },
+      include: {
+        conversation: { include: { customer: true, client: true } },
+        customer: true
+      }
+    });
+
+    if (!payment) return { success: false, error: "Payment record not found" };
+
+    const now = new Date();
+    const utr = data.transactionId?.trim() || `MANUAL_VERIFIED_${Date.now()}`;
+
+    // Update payment link to PAID
+    const updated = await prisma.whatsAppPaymentLink.update({
+      where: { id: payment.id },
+      data: {
+        status: "PAID",
+        transactionId: utr,
+        paidAt: now
+      }
+    });
+
+    // Send official WhatsApp Receipt to customer
+    if (data.sendWhatsAppReceipt !== false && payment.conversationId) {
+      const customerName = payment.conversation?.customer?.contactPerson || payment.customer?.contactPerson || "Valued Customer";
+      const amountStr = (payment.amount || 0).toLocaleString("en-IN");
+      const desc = payment.orderId || "Invoice / Order";
+
+      const receiptMsg = `✅ *Payment Verified & Received!*\n\nDear ${customerName}, your payment of *₹${amountStr}* for ${desc} has been confirmed.\n\n🔢 *UTR / Transaction Ref:* ${utr}\n📅 *Date:* ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for shopping with us! 🚀`;
+
+      await sendWhatsAppMessageAction({
+        conversationId: payment.conversationId,
+        senderType: "SYSTEM",
+        senderName: "Billing System",
+        messageType: "TEXT",
+        content: receiptMsg
+      }).catch(err => console.error("Receipt send error:", err));
+    }
+
+    // Emit real-time SSE event for connected agent inboxes
+    emitInboxEvent({
+      type: "CONVERSATION_UPDATE",
+      conversationId: payment.conversationId,
+      clientId: payment.clientId || null
+    });
+
+    revalidatePath("/whatsapp/payments");
+    revalidatePath("/whatsapp/inbox");
+
+    return { success: true, payment: updated };
+  } catch (e: any) {
+    console.error("Error verifying payment:", e);
+    return { success: false, error: e.message };
+  }
+}
+
+export async function recordManualUpiPaymentAction(data: {
+  customerId: string;
+  amount: number;
+  transactionId?: string;
+  description?: string;
+  sendWhatsAppReceipt?: boolean;
+}) {
+  try {
+    const customer = await prisma.customer.findUnique({
+      where: { id: data.customerId }
+    });
+    if (!customer) return { success: false, error: "Customer not found" };
+
+    // Find or create conversation for this customer
+    let conversation = await prisma.whatsAppConversation.findFirst({
+      where: { customerId: customer.id }
+    });
+
+    if (!conversation) {
+      const account = await prisma.whatsAppAccount.findFirst();
+      conversation = await prisma.whatsAppConversation.create({
+        data: {
+          customerId: customer.id,
+          accountId: account?.id || "default",
+          status: "OPEN",
+          lastMessageText: `Manual Payment Recorded: ₹${data.amount}`,
+          lastMessageAt: new Date()
+        }
+      });
+    }
+
+    const now = new Date();
+    const utr = data.transactionId?.trim() || `MANUAL_UPI_${Date.now()}`;
+    const desc = data.description?.trim() || "Manual Offline UPI / Bank Payment";
+
+    // Create payment link record directly as PAID
+    const payment = await prisma.whatsAppPaymentLink.create({
+      data: {
+        customerId: customer.id,
+        conversationId: conversation.id,
+        clientId: customer.clientId || null,
+        amount: Number(data.amount) || 0,
+        currency: "INR",
+        paymentUrl: "https://upi.manual.verified",
+        orderId: desc,
+        status: "PAID",
+        transactionId: utr,
+        paidAt: now
+      }
+    });
+
+    // Send official WhatsApp Receipt to customer
+    if (data.sendWhatsAppReceipt !== false) {
+      const customerName = customer.contactPerson || "Valued Customer";
+      const amountStr = (Number(data.amount) || 0).toLocaleString("en-IN");
+
+      const receiptMsg = `✅ *Payment Confirmation Receipt*\n\nDear ${customerName}, your payment of *₹${amountStr}* for ${desc} has been verified and recorded.\n\n🔢 *Reference / UTR:* ${utr}\n📅 *Date:* ${now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}\n\nThank you for doing business with us! 🚀`;
+
+      await sendWhatsAppMessageAction({
+        conversationId: conversation.id,
+        senderType: "SYSTEM",
+        senderName: "Billing System",
+        messageType: "TEXT",
+        content: receiptMsg
+      }).catch(err => console.error("Receipt send error:", err));
+    }
+
+    emitInboxEvent({
+      type: "CONVERSATION_UPDATE",
+      conversationId: conversation.id,
+      clientId: customer.clientId || null
+    });
+
+    revalidatePath("/whatsapp/payments");
+    revalidatePath("/whatsapp/inbox");
+
+    return { success: true, payment };
+  } catch (e: any) {
+    console.error("Error recording manual payment:", e);
+    return { success: false, error: e.message };
   }
 }
 

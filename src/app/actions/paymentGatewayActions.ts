@@ -37,10 +37,13 @@ export async function getPaymentGatewaySettings() {
       cashfreeSecretKey: isPrivileged ? (client?.cashfreeSecretKey || '') : '',
       merchantUpiId: client?.merchantUpiId || '',
       merchantUpiName: client?.merchantUpiName || '',
+      webhookClientId: client?.webhookClientId || client?.id || '',
+      clientBusinessName: client?.businessName || ''
     };
   }
 
   const settings = await prisma.whatsAppSettings.findFirst();
+  const firstClient = await prisma.whatsAppClient.findFirst();
   return {
     activeGateway: settings?.activeGateway || null,
     razorpayKeyId: settings?.razorpayKeyId || '',
@@ -49,6 +52,8 @@ export async function getPaymentGatewaySettings() {
     cashfreeSecretKey: isPrivileged ? (settings?.cashfreeSecretKey || '') : '',
     merchantUpiId: settings?.merchantUpiId || '',
     merchantUpiName: settings?.merchantUpiName || '',
+    webhookClientId: firstClient?.webhookClientId || firstClient?.id || 'default',
+    clientBusinessName: firstClient?.businessName || 'Main Business'
   };
 }
 
