@@ -2290,7 +2290,7 @@ export default function WhatsAppInboxComponent() {
             {/* Messages Scroll Area */}
             <div className="chat-messages-container" ref={chatMessagesContainerRef}>
               {sortedMessages?.map((msg: any, mIdx: number) => {
-                const isAgent = msg.senderType === "AGENT" || msg.senderType === "BOT" || msg.senderType === "AI";
+                const isAgent = msg.senderType === "AGENT" || msg.senderType === "BOT" || msg.senderType === "AI" || msg.senderType === "SYSTEM" || msg.senderType === "BUSINESS" || msg.senderType === "GATEWAY" || msg.role === "assistant" || msg.role === "system";
                 const isInternal = msg.isInternalNote;
 
                 const msgDate = new Date(msg.sentAt);
@@ -2453,6 +2453,11 @@ export default function WhatsAppInboxComponent() {
                             <span className="sender-badge internal-note"><Lock size={11} /> Internal Note</span>
                           ) : (msg.senderType === "BOT" || msg.senderType === "AI" || msg.senderName === "AI Assistant") ? (
                             <span className="sender-badge ai-badge"><Bot size={11} /> AI Assistant</span>
+                          ) : (msg.senderType === "SYSTEM" || msg.senderType === "GATEWAY" || msg.senderType === "BUSINESS") ? (
+                            <span className="sender-badge agent-badge">
+                              <ShieldCheck size={11} />
+                              <span>{msg.senderName || "System / Billing"}</span>
+                            </span>
                           ) : isAgent ? (
                             <span className="sender-badge agent-badge">
                               <UserCheck size={11} />
