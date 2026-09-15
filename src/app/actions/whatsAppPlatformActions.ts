@@ -411,6 +411,22 @@ export async function sendWhatsAppMessageAction(data: {
       let token = conversation.client?.metaAccessToken || conversation.account?.accessToken;
       let phoneId = conversation.client?.phoneId || conversation.account?.phoneId;
 
+      if ((!token || !phoneId || token.length < 20) && conversation.clientId) {
+        const client = await prisma.whatsAppClient.findUnique({ where: { id: conversation.clientId } });
+        if (client?.metaAccessToken && client?.phoneId) {
+          token = client.metaAccessToken;
+          phoneId = client.phoneId;
+        }
+      }
+
+      if (!token || !phoneId || token.length < 20) {
+        const account = await prisma.whatsAppAccount.findFirst();
+        if (account?.accessToken && account?.phoneId) {
+          token = account.accessToken;
+          phoneId = account.phoneId;
+        }
+      }
+
       if (!token || !phoneId || token.length < 20) {
         const creds = await getMetaApiCredentials();
         if (creds && creds.isConnected) {
@@ -4370,6 +4386,11 @@ export async function verifyManualPaymentAction(data: {
         messageType: "TEXT",
         content: receiptMsg
       }).catch(err => console.error("Receipt send error:", err));
+
+      await prisma.whatsAppConversation.update({
+        where: { id: payment.conversationId },
+        data: { orderStatus: "Paid" }
+      }).catch(err => console.error("Error updating conversation orderStatus:", err));
     }
 
     // Emit real-time SSE event for connected agent inboxes
