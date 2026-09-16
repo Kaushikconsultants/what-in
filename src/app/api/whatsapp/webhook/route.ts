@@ -9,6 +9,7 @@ import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 import { emitInboxEvent } from "@/lib/inboxEvents";
 import { processUpiScreenshotAction } from "@/app/actions/upiScreenshotActions";
 import { getRecoveryAgentSettings } from "@/lib/paymentRecoveryAgent";
+import { dispatchOutboundWebhook } from "@/lib/outboundWebhookDispatcher";
 
 const MAX_DEDUP_SIZE = 2000;
 const dedupQueue: string[] = [];
@@ -305,6 +306,14 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
                 messageId: existingMsg.id,
                 status: targetStatus
               });
+              if (clientId) {
+                dispatchOutboundWebhook(clientId, "message.status_update", {
+                  messageId: existingMsg.id,
+                  wamid,
+                  status: targetStatus,
+                  timestamp: now.toISOString()
+                });
+              }
               console.log(`[Status Webhook] Updated message ${existingMsg.id} (${wamid}) to ${targetStatus}`);
             }
           } else if (last10) {
@@ -343,6 +352,14 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
                 messageId: fallbackMsg.id,
                 status: targetStatus
               });
+              if (clientId) {
+                dispatchOutboundWebhook(clientId, "message.status_update", {
+                  messageId: fallbackMsg.id,
+                  wamid,
+                  status: targetStatus,
+                  timestamp: now.toISOString()
+                });
+              }
               console.log(`[Status Webhook] Fallback matched message ${fallbackMsg.id} to ${wamid} -> ${targetStatus}`);
             }
           }
@@ -819,6 +836,27 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       conversationId: conversation.id,
       clientId
     });
+
+    if (clientId) {
+      dispatchOutboundWebhook(clientId, "message.received", {
+        messageId: createdInboundMsg.id,
+        conversationId: conversation.id,
+        customer: {
+          id: customer.id,
+          name: customer.contactPerson,
+          mobile: customer.mobile,
+          whatsappNumber: customer.whatsappNumber
+        },
+        message: {
+          type: effectiveMessageType,
+          content: textContent,
+          mediaUrl: proxyMediaUrl || null,
+          mediaType: mediaMimeType || null,
+          metaMessageId: msg.id,
+          timestamp: messageTimestamp.toISOString()
+        }
+      });
+    }
 
     if (ctwaMetadata) {
       await prisma.whatsAppMessage.create({

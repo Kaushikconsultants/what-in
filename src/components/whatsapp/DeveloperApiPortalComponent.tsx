@@ -105,7 +105,84 @@ export default function DeveloperApiPortalComponent() {
     avgResponseTimeMs: 0,
   });
 
+  // Outbound Webhook State
+  const [outboundWebhooks, setOutboundWebhooks] = useState<any[]>([]);
+  const [loadingWebhooks, setLoadingWebhooks] = useState(false);
+  const [showWebhookForm, setShowWebhookForm] = useState(false);
+  const [newWebhookUrl, setNewWebhookUrl] = useState("");
+  const [newWebhookDesc, setNewWebhookDesc] = useState("");
+  const [newWebhookEvents, setNewWebhookEvents] = useState<string[]>(["message.received", "message.status_update", "lead.captured"]);
+  const [creatingWebhook, setCreatingWebhook] = useState(false);
+  const [pingingWebhookId, setPingingWebhookId] = useState<string | null>(null);
+  const [pingResults, setPingResults] = useState<Record<string, any>>({});
+
+  const ALL_EVENTS = [
+    { id: "message.received", label: "message.received", desc: "Inbound WhatsApp message from any customer" },
+    { id: "message.status_update", label: "message.status_update", desc: "Delivery status change: sent → delivered → read → failed" },
+    { id: "lead.captured", label: "lead.captured", desc: "New lead captured from widget, API, or form" },
+  ];
+
+  const fetchOutboundWebhooks = async () => {
+    setLoadingWebhooks(true);
+    try {
+      const res = await fetch("/api/v1/webhooks/outbound");
+      const data = await res.json();
+      if (data.success) setOutboundWebhooks(data.data || []);
+    } catch {}
+    finally { setLoadingWebhooks(false); }
+  };
+
+  const handleCreateWebhook = async () => {
+    if (!newWebhookUrl.startsWith("http")) return;
+    setCreatingWebhook(true);
+    try {
+      const res = await fetch("/api/v1/webhooks/outbound", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUrl: newWebhookUrl, subscribedEvents: newWebhookEvents, description: newWebhookDesc }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOutboundWebhooks([data.data, ...outboundWebhooks]);
+        setShowWebhookForm(false);
+        setNewWebhookUrl("");
+        setNewWebhookDesc("");
+        alert(`✅ Webhook created! Secret key: ${data.data.secretKey}\n\nStore this safely - it's shown once.`);
+      } else {
+        alert(data.error || "Failed to create webhook");
+      }
+    } catch (e: any) { alert(e.message); }
+    finally { setCreatingWebhook(false); }
+  };
+
+  const handlePingWebhook = async (webhookId: string) => {
+    setPingingWebhookId(webhookId);
+    try {
+      const res = await fetch("/api/v1/webhooks/outbound", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ping", webhookId }),
+      });
+      const data = await res.json();
+      setPingResults((prev) => ({ ...prev, [webhookId]: data }));
+    } catch (e: any) { setPingResults((prev) => ({ ...prev, [webhookId]: { success: false, error: e.message } })); }
+    finally { setPingingWebhookId(null); }
+  };
+
+  const handleDeleteWebhook = async (webhookId: string) => {
+    if (!confirm("Delete this webhook subscription? This cannot be undone.")) return;
+    await fetch(`/api/v1/webhooks/outbound?id=${webhookId}`, { method: "DELETE" });
+    setOutboundWebhooks(outboundWebhooks.filter((w) => w.id !== webhookId));
+  };
+
+  const handleToggleWebhookEvent = (eventId: string) => {
+    setNewWebhookEvents((prev) =>
+      prev.includes(eventId) ? prev.filter((e) => e !== eventId) : [...prev, eventId]
+    );
+  };
+
   const appBaseUrl = typeof window !== "undefined" ? window.location.origin : "https://whatsapp.esponsports.com";
+
 
   // Template Component Presets (Body variables, Documents, Images, Interactive Buttons, Shorthand)
   const TEMPLATE_PRESETS = [
@@ -598,7 +675,7 @@ echo $response;
           <Terminal size={15} /> Documentation & Playground
         </button>
         <button
-          onClick={() => setActiveSubTab("logs")}
+          onClick={() => { setActiveSubTab("logs"); }}
           className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
             activeSubTab === "logs"
               ? "bg-indigo-50 text-indigo-600 border border-indigo-200/80 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-900/60 shadow-xs"
@@ -608,14 +685,14 @@ echo $response;
           <Activity size={15} /> Request & Audit Logs
         </button>
         <button
-          onClick={() => setActiveSubTab("webhooks")}
+          onClick={() => { setActiveSubTab("webhooks"); fetchOutboundWebhooks(); }}
           className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
             activeSubTab === "webhooks"
               ? "bg-indigo-50 text-indigo-600 border border-indigo-200/80 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-900/60 shadow-xs"
               : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
-          <Zap size={15} /> Inbound Lead Webhook
+          <Zap size={15} /> Outbound Webhooks
         </button>
       </div>
 
@@ -1398,64 +1475,315 @@ echo $response;
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* TAB 4: UNIVERSAL INBOUND LEAD WEBHOOK */}
+      {/* TAB 4: OUTBOUND WEBHOOKS MANAGEMENT */}
       {/* ------------------------------------------------------------- */}
       {activeSubTab === "webhooks" && (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 shadow-xs flex flex-col gap-6">
-          <div>
-            <h3 className="text-base font-bold text-gray-900 dark:text-white m-0">Universal Inbound Lead Webhook</h3>
-            <p className="text-xs text-gray-500 m-0 mt-1">
-              Connect external ad leads or form builders directly. Any POST request creates a CRM contact, triggers a WhatsApp greeting, and logs to Google Sheets.
-            </p>
-          </div>
-
-          <div className="p-5 bg-slate-50 dark:bg-slate-900/90 rounded-2xl border border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
-            <div className="overflow-hidden flex-1">
-              <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <Terminal size={14} className="text-indigo-600 dark:text-indigo-400" /> Webhook Endpoint URL
+        <div className="flex flex-col gap-5">
+          {/* Header */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white m-0 flex items-center gap-2">
+                  <Zap size={18} className="text-indigo-500" />
+                  Outbound Webhook Subscriptions
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 m-0 mt-1 max-w-xl">
+                  Subscribe your server, Zapier, Make.com, or ERP to real-time events. Every webhook is signed with{" "}
+                  <code className="font-mono bg-gray-100 dark:bg-slate-900 px-1 py-0.5 rounded">X-Whatmore-Signature: sha256=...</code>{" "}
+                  using HMAC-SHA256 for authenticity verification.
+                </p>
               </div>
-              <div className="bg-white dark:bg-slate-950 p-3 rounded-xl border border-gray-200 dark:border-slate-800">
-                <code className="text-xs sm:text-sm font-mono text-indigo-700 dark:text-emerald-400 break-all font-bold select-all">
-                  {`${appBaseUrl}/api/v1/leads/ingest?apiKey=wapi_live_YOUR_KEY`}
-                </code>
+              <button
+                onClick={() => setShowWebhookForm(!showWebhookForm)}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-xs transition-all"
+              >
+                <Plus size={15} /> Add Endpoint
+              </button>
+            </div>
+
+            {/* HMAC Verification Guide */}
+            <div className="mt-4 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-950/30">
+              <div className="text-xs font-bold text-indigo-800 dark:text-indigo-300 mb-2 flex items-center gap-1.5">
+                <Shield size={14} /> HMAC-SHA256 Signature Verification
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <pre className="text-[10.5px] font-mono text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-950 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900/60 overflow-x-auto m-0">{`// Node.js Verification Example
+const crypto = require('crypto');
+
+app.post('/my-webhook', (req, res) => {
+  const sig = req.headers['x-whatmore-signature'];
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', WEBHOOK_SECRET_KEY)
+    .update(JSON.stringify(req.body))
+    .digest('hex');
+
+  if (sig !== expected) return res.status(401).end();
+  // Process the event...
+  res.json({ ok: true });
+});`}</pre>
+                <div className="flex flex-col gap-2">
+                  <div className="p-2.5 bg-white dark:bg-slate-950 rounded-lg border border-indigo-100 dark:border-indigo-900/60">
+                    <div className="text-[10px] font-bold text-indigo-700 dark:text-indigo-400 mb-1">Event Payload Shape</div>
+                    <pre className="text-[10px] font-mono text-gray-700 dark:text-slate-300 m-0 overflow-x-auto">{`{
+  "event": "lead.captured",
+  "timestamp": "2026-09-16T12:00:00Z",
+  "clientId": "your-client-id",
+  "data": { ...eventPayload }
+}`}</pre>
+                  </div>
+                  <div className="text-[10.5px] text-indigo-700 dark:text-indigo-400 space-y-1">
+                    <div>📦 <strong>Events:</strong> message.received, message.status_update, lead.captured</div>
+                    <div>⏱ <strong>Timeout:</strong> 8 second delivery timeout per endpoint</div>
+                    <div>📝 <strong>Retries:</strong> Last 10 delivery logs per webhook</div>
+                  </div>
+                </div>
               </div>
             </div>
-            <button
-              onClick={() => {
-                const sampleKey = keys.find((k) => k.status === "ACTIVE")?.keyPrefix || "YOUR_KEY";
-                navigator.clipboard.writeText(`${appBaseUrl}/api/v1/leads/ingest?apiKey=${revealedKey || sampleKey}`);
-                alert("Webhook URL copied to clipboard!");
-              }}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-xs transition-all"
-            >
-              <Copy size={14} /> Copy Webhook URL
-            </button>
           </div>
 
+          {/* Create Webhook Form */}
+          {showWebhookForm && (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 shadow-xs">
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Plus size={15} className="text-indigo-600" /> Add New Webhook Endpoint
+              </h4>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-slate-300 block mb-1">Target URL *</label>
+                  <input
+                    type="url"
+                    value={newWebhookUrl}
+                    onChange={(e) => setNewWebhookUrl(e.target.value)}
+                    placeholder="https://your-server.com/webhooks/whatmore"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-slate-300 block mb-1">Description (optional)</label>
+                  <input
+                    type="text"
+                    value={newWebhookDesc}
+                    onChange={(e) => setNewWebhookDesc(e.target.value)}
+                    placeholder="e.g. Zapier ERP Sync, CRM Lead Handler"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-700 dark:text-slate-300 block mb-2">Subscribe to Events</label>
+                  <div className="flex flex-col gap-2">
+                    {ALL_EVENTS.map((ev) => (
+                      <label key={ev.id} className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newWebhookEvents.includes(ev.id)}
+                          onChange={() => handleToggleWebhookEvent(ev.id)}
+                          className="mt-0.5 accent-indigo-600"
+                        />
+                        <div>
+                          <code className="text-[11px] font-mono text-indigo-700 dark:text-indigo-300">{ev.label}</code>
+                          <div className="text-[10.5px] text-gray-500 dark:text-slate-400">{ev.desc}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setShowWebhookForm(false)}
+                    className="px-4 py-2 text-xs font-bold text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-900 rounded-xl transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateWebhook}
+                    disabled={creatingWebhook || !newWebhookUrl.startsWith("http")}
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all"
+                  >
+                    {creatingWebhook ? <RefreshCw size={13} className="animate-spin" /> : <Plus size={13} />}
+                    {creatingWebhook ? "Creating..." : "Create Webhook"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Webhooks List */}
+          {loadingWebhooks ? (
+            <div className="flex items-center justify-center py-16 text-gray-400">
+              <RefreshCw size={20} className="animate-spin mr-2" /> Loading webhooks...
+            </div>
+          ) : outboundWebhooks.length === 0 ? (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-300 dark:border-slate-600 p-12 text-center">
+              <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center">
+                <Zap size={28} className="text-indigo-400" />
+              </div>
+              <div className="text-sm font-bold text-gray-700 dark:text-slate-300">No Outbound Webhooks Yet</div>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
+                Add your first endpoint to start streaming real-time events to your ERP, Zapier, or CRM.
+              </p>
+              <button
+                onClick={() => setShowWebhookForm(true)}
+                className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 mx-auto"
+              >
+                <Plus size={14} /> Add First Endpoint
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {outboundWebhooks.map((webhook) => {
+                const pingResult = pingResults[webhook.id];
+                return (
+                  <div key={webhook.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div
+                            className={`w-2 h-2 rounded-full ${webhook.isActive ? "bg-emerald-400" : "bg-gray-400"}`}
+                          />
+                          <code className="text-xs font-mono text-indigo-700 dark:text-indigo-300 truncate block">
+                            {webhook.targetUrl}
+                          </code>
+                        </div>
+                        {webhook.description && (
+                          <div className="text-[11px] text-gray-500 dark:text-slate-400 mb-2">{webhook.description}</div>
+                        )}
+                        <div className="flex flex-wrap gap-1.5">
+                          {(Array.isArray(webhook.subscribedEvents) ? webhook.subscribedEvents : []).map((ev: string) => (
+                            <span
+                              key={ev}
+                              className="px-1.5 py-0.5 text-[10px] font-mono rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/60"
+                            >
+                              {ev}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-3 mt-2 text-[10.5px] text-gray-500 dark:text-slate-500">
+                          <span>📨 {webhook.totalDispatched} dispatched</span>
+                          <span>❌ {webhook.totalFailed} failed</span>
+                          {webhook.lastStatusCode && (
+                            <span
+                              className={`font-bold ${webhook.lastStatusCode >= 200 && webhook.lastStatusCode < 300 ? "text-emerald-600" : "text-red-500"}`}
+                            >
+                              HTTP {webhook.lastStatusCode}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handlePingWebhook(webhook.id)}
+                          disabled={pingingWebhookId === webhook.id}
+                          className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all"
+                        >
+                          {pingingWebhookId === webhook.id ? (
+                            <RefreshCw size={13} className="animate-spin" />
+                          ) : (
+                            <Play size={13} />
+                          )}
+                          {pingingWebhookId === webhook.id ? "Pinging..." : "Send Test Ping"}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteWebhook(webhook.id)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-all"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Ping Result */}
+                    {pingResult && (
+                      <div
+                        className={`mt-3 p-3 rounded-xl text-[11px] font-mono border ${
+                          pingResult.success
+                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/60"
+                            : "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900/60"
+                        }`}
+                      >
+                        {pingResult.success
+                          ? `✅ Ping Successful — HTTP ${pingResult.statusCode} in ${pingResult.responseTimeMs}ms`
+                          : `❌ Ping Failed — ${pingResult.error || `HTTP ${pingResult.statusCode}`} (${pingResult.responseTimeMs}ms)`}
+                      </div>
+                    )}
+
+                    {/* Recent Logs Preview */}
+                    {webhook.logs && webhook.logs.length > 0 && (
+                      <div className="mt-3 border-t border-gray-100 dark:border-slate-700 pt-3">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Recent Deliveries</div>
+                        <div className="flex flex-col gap-1">
+                          {webhook.logs.slice(0, 3).map((log: any) => (
+                            <div key={log.id} className="flex items-center gap-2 text-[10.5px]">
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${log.success ? "bg-emerald-400" : "bg-red-400"}`}
+                              />
+                              <code className="font-mono text-indigo-600 dark:text-indigo-400">{log.event}</code>
+                              <span className="text-gray-400">→ HTTP {log.statusCode || "0"}</span>
+                              <span className="text-gray-400">{log.responseTimeMs}ms</span>
+                              {!log.success && log.errorMessage && (
+                                <span className="text-red-500 truncate">{log.errorMessage}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Batch Template & Media Upload Quick-Reference */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/40">
-              <h4 className="text-xs font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-emerald-500" /> Supported Providers
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 shadow-xs">
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <Send size={15} className="text-indigo-500" /> Batch Template Broadcast
               </h4>
-              <ul className="text-xs text-gray-600 dark:text-slate-400 space-y-1.5 pl-4 list-disc">
-                <li><strong>Meta Lead Ads:</strong> Webhook listener pushes instant WhatsApp brochure.</li>
-                <li><strong>Google Ads / Zapier:</strong> Connect Google Forms, Typeform, Calendly.</li>
-                <li><strong>WordPress / Elementor:</strong> Set webhook action in form settings.</li>
-                <li><strong>Webflow / Shopify:</strong> Send lead on form submit or checkout drop.</li>
-                <li><strong>IndiaMART / JustDial:</strong> Forward inbound B2B trade inquiries.</li>
-              </ul>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
+                Send bulk WhatsApp template messages to up to 100 recipients per call.
+                Rate limited at 60 requests/minute with RFC-standard headers.
+              </p>
+              <pre className="text-[10px] font-mono text-gray-700 dark:text-slate-300 bg-gray-50 dark:bg-slate-900 p-3 rounded-xl overflow-x-auto border border-gray-200 dark:border-slate-700 m-0">{`POST /api/v1/messages/batch-template
+Authorization: Bearer wapi_live_...
+
+{
+  "templateName": "order_confirmation",
+  "language": "en_US",
+  "recipients": [
+    {
+      "phone": "919876543210",
+      "parameters": ["Aman", "ORD-001", "₹1499"]
+    },
+    {
+      "phone": "919123456789",
+      "parameters": ["Priya", "ORD-002", "₹2999"]
+    }
+  ]
+}`}</pre>
             </div>
 
-            <div className="p-4 rounded-xl border border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/40">
-              <h4 className="text-xs font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                <Zap size={14} className="text-amber-500" /> Automated Triggers
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 shadow-xs">
+              <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <FileCode size={15} className="text-emerald-500" /> Direct Media Upload
               </h4>
-              <ul className="text-xs text-gray-600 dark:text-slate-400 space-y-1.5 pl-4 list-disc">
-                <li><strong>Instant Contact Upsert:</strong> Automatic E.164 phone normalization.</li>
-                <li><strong>Welcome Message:</strong> Dispatches pre-approved greeting template within 3 seconds.</li>
-                <li><strong>Google Sheets Sync:</strong> Automatically logs timestamp, name, and notes.</li>
-                <li><strong>Agent Notifications:</strong> Real-time inbox push to sales agents.</li>
-              </ul>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
+                Upload images, PDFs, and audio directly to WhatsApp Cloud API servers.
+                Returns a reusable <code className="font-mono">mediaId</code> for template headers.
+              </p>
+              <pre className="text-[10px] font-mono text-gray-700 dark:text-slate-300 bg-gray-50 dark:bg-slate-900 p-3 rounded-xl overflow-x-auto border border-gray-200 dark:border-slate-700 m-0">{`# Upload by URL (JSON)
+POST /api/v1/media/upload
+{ "url": "https://cdn.example.com/invoice.pdf",
+  "mimeType": "application/pdf",
+  "filename": "Invoice_ORD9824.pdf" }
+
+# Upload file (multipart)
+POST /api/v1/media/upload
+Content-Type: multipart/form-data
+file=@/path/to/image.jpg
+
+# Response
+{ "success": true, "mediaId": "9614..." }`}</pre>
             </div>
           </div>
         </div>

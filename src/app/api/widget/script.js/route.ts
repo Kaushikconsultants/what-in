@@ -4,6 +4,12 @@ import { prisma } from "@/lib/prisma";
 /**
  * GET /api/widget/script.js
  * Serves the dynamic, zero-dependency embeddable website widget JavaScript.
+ * Supports:
+ * - Multi-category client presets
+ * - Proactive timed & exit-intent speech bubble nudge
+ * - Multi-department chat routing
+ * - Shopify / WooCommerce Cart Recovery inspection
+ * - Business hours schedule & live pulsating online indicator
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -19,6 +25,17 @@ export async function GET(req: NextRequest) {
     requireLeadForm: false,
     showOnMobile: true,
     phoneNumber: "917404388242",
+    clientCategory: "GENERAL",
+    departments: [],
+    proactiveNudge: false,
+    nudgeDelaySeconds: 5,
+    nudgeText: "👋 Need quick help or custom pricing? Chat with us!",
+    enableCartRecovery: false,
+    businessHoursEnabled: false,
+    businessHoursStart: "09:00",
+    businessHoursEnd: "18:00",
+    timezone: "Asia/Kolkata",
+    offlineNotice: "We are currently offline. Leave a message and we will get back to you during business hours!",
   };
 
   if (clientId) {
@@ -29,6 +46,15 @@ export async function GET(req: NextRequest) {
     if (client) {
       if (client.phoneNumber) widgetConfig.phoneNumber = client.phoneNumber.replace(/\D/g, "");
       if (client.websiteWidget) {
+        let depts = [];
+        if (client.websiteWidget.departments) {
+          try {
+            depts = JSON.parse(client.websiteWidget.departments);
+          } catch {
+            depts = [];
+          }
+        }
+
         widgetConfig = {
           ...widgetConfig,
           themeColor: client.websiteWidget.themeColor || "#25D366",
@@ -39,6 +65,17 @@ export async function GET(req: NextRequest) {
           avatarUrl: client.websiteWidget.avatarUrl || "",
           requireLeadForm: Boolean(client.websiteWidget.requireLeadForm),
           showOnMobile: client.websiteWidget.showOnMobile !== false,
+          clientCategory: client.websiteWidget.clientCategory || "GENERAL",
+          departments: depts,
+          proactiveNudge: Boolean(client.websiteWidget.proactiveNudge),
+          nudgeDelaySeconds: client.websiteWidget.nudgeDelaySeconds || 5,
+          nudgeText: client.websiteWidget.nudgeText || widgetConfig.nudgeText,
+          enableCartRecovery: Boolean(client.websiteWidget.enableCartRecovery),
+          businessHoursEnabled: Boolean(client.websiteWidget.businessHoursEnabled),
+          businessHoursStart: client.websiteWidget.businessHoursStart || "09:00",
+          businessHoursEnd: client.websiteWidget.businessHoursEnd || "18:00",
+          timezone: client.websiteWidget.timezone || "Asia/Kolkata",
+          offlineNotice: client.websiteWidget.offlineNotice || widgetConfig.offlineNotice,
         };
       }
     }
@@ -62,6 +99,7 @@ export async function GET(req: NextRequest) {
   // Platform & Environment Auto-Detection
   var platform = 'Custom HTML';
   var detectedProduct = null;
+  var detectedCart = null;
 
   try {
     if (window.Shopify || window.ShopifyAnalytics) {
@@ -99,6 +137,42 @@ export async function GET(req: NextRequest) {
     }
   } catch (err) {}
 
+  // Business Hours Calculation
+  var isOnline = true;
+  if (config.businessHoursEnabled) {
+    try {
+      var now = new Date();
+      var nowMinutes = now.getHours() * 60 + now.getMinutes();
+      var startParts = (config.businessHoursStart || '09:00').split(':');
+      var endParts = (config.businessHoursEnd || '18:00').split(':');
+      var startMinutes = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1] || 0, 10);
+      var endMinutes = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1] || 0, 10);
+
+      isOnline = nowMinutes >= startMinutes && nowMinutes <= endMinutes;
+    } catch (e) {
+      isOnline = true;
+    }
+  }
+
+  // Create style element for animations
+  var style = document.createElement('style');
+  style.innerHTML = \`
+    @keyframes whatinFadeIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes whatinPulseDot {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+    .whatin-dept-item:hover {
+      background-color: #f1f5f9 !important;
+      transform: translateX(3px);
+    }
+  \`;
+  document.head.appendChild(style);
+
   // Create container
   var container = document.createElement('div');
   container.id = 'whatin-widget-container';
@@ -123,8 +197,110 @@ export async function GET(req: NextRequest) {
   btn.style.justifyContent = 'center';
   btn.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
   btn.style.outline = 'none';
+  btn.style.position = 'relative';
 
   btn.innerHTML = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2ZM12.04 20.15C10.56 20.15 9.11 19.76 7.85 19.01L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.3C4.24 14.99 3.8 13.47 3.8 11.91C3.8 7.37 7.5 3.67 12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15ZM16.56 14.39C16.31 14.27 15.09 13.67 14.86 13.58C14.63 13.5 14.47 13.46 14.3 13.71C14.14 13.96 13.67 14.51 13.52 14.68C13.38 14.84 13.23 14.87 12.98 14.74C12.74 14.62 11.94 14.36 11 13.52C10.26 12.87 9.76 12.06 9.62 11.81C9.47 11.57 9.6 11.43 9.73 11.31C9.84 11.2 9.97 11.02 10.1 10.87C10.22 10.73 10.27 10.62 10.35 10.46C10.43 10.29 10.39 10.15 10.33 10.02C10.27 9.9 9.79 8.71 9.58 8.22C9.39 7.74 9.18 7.81 9.03 7.8C8.89 7.79 8.72 7.79 8.56 7.79C8.39 7.79 8.12 7.85 7.89 8.1C7.66 8.35 7.02 8.95 7.02 10.18C7.02 11.4 7.91 12.58 8.04 12.74C8.16 12.91 9.8 15.44 12.3 16.52C12.89 16.78 13.36 16.93 13.71 17.04C14.31 17.23 14.85 17.2 15.28 17.14C15.76 17.07 16.76 16.53 16.97 15.95C17.18 15.38 17.18 14.89 17.12 14.79C17.06 14.69 16.89 14.51 16.56 14.39Z" fill="white"/></svg>';
+
+  // Status dot on trigger button
+  var statusBadge = document.createElement('span');
+  statusBadge.style.position = 'absolute';
+  statusBadge.style.top = '2px';
+  statusBadge.style.right = '2px';
+  statusBadge.style.width = '14px';
+  statusBadge.style.height = '14px';
+  statusBadge.style.borderRadius = '50%';
+  statusBadge.style.border = '2px solid #ffffff';
+  statusBadge.style.backgroundColor = isOnline ? '#22c55e' : '#eab308';
+  if (isOnline) {
+    statusBadge.style.animation = 'whatinPulseDot 2s infinite';
+  }
+  btn.appendChild(statusBadge);
+
+  // Proactive Nudge Speech Bubble
+  var nudge = null;
+  var nudgeDismissed = false;
+
+  function createNudgeBubble() {
+    if (nudgeDismissed || nudge || card.style.display === 'flex') return;
+
+    nudge = document.createElement('div');
+    nudge.id = 'whatin-nudge-bubble';
+    nudge.style.position = 'absolute';
+    nudge.style.bottom = '75px';
+    nudge.style[config.position.includes('right') ? 'right' : 'left'] = '0';
+    nudge.style.width = '260px';
+    nudge.style.backgroundColor = '#ffffff';
+    nudge.style.borderRadius = '14px';
+    nudge.style.boxShadow = '0 10px 30px rgba(0,0,0,0.18)';
+    nudge.style.padding = '12px 14px';
+    nudge.style.display = 'flex';
+    nudge.style.alignItems = 'flex-start';
+    nudge.style.gap = '10px';
+    nudge.style.cursor = 'pointer';
+    nudge.style.animation = 'whatinFadeIn 0.3s ease forwards';
+
+    var nAvatar = document.createElement('div');
+    nAvatar.style.fontSize = '20px';
+    nAvatar.innerText = '💬';
+
+    var nContent = document.createElement('div');
+    nContent.style.flex = '1';
+    nContent.style.fontSize = '12.5px';
+    nContent.style.color = '#0f172a';
+    nContent.style.fontWeight = '500';
+    nContent.style.lineHeight = '1.4';
+    nContent.innerText = config.nudgeText;
+
+    var nClose = document.createElement('button');
+    nClose.innerHTML = '&times;';
+    nClose.style.background = 'none';
+    nClose.style.border = 'none';
+    nClose.style.color = '#94a3b8';
+    nClose.style.fontSize = '18px';
+    nClose.style.cursor = 'pointer';
+    nClose.style.padding = '0';
+    nClose.style.lineHeight = '1';
+
+    nClose.onclick = function(e) {
+      e.stopPropagation();
+      nudgeDismissed = true;
+      if (nudge) {
+        nudge.remove();
+        nudge = null;
+      }
+    };
+
+    nudge.appendChild(nAvatar);
+    nudge.appendChild(nContent);
+    nudge.appendChild(nClose);
+
+    nudge.onclick = function() {
+      if (nudge) {
+        nudge.remove();
+        nudge = null;
+      }
+      card.style.display = 'flex';
+    };
+
+    container.appendChild(nudge);
+  }
+
+  // Trigger Proactive Nudge via timer
+  if (config.proactiveNudge) {
+    var delayMs = (config.nudgeDelaySeconds || 5) * 1000;
+    setTimeout(function() {
+      createNudgeBubble();
+    }, delayMs);
+
+    // Desktop Exit Intent trigger
+    if (!isMobile) {
+      document.addEventListener('mouseleave', function(e) {
+        if (e.clientY <= 20) {
+          createNudgeBubble();
+        }
+      });
+    }
+  }
 
   // Modal Card Popup
   var card = document.createElement('div');
@@ -132,7 +308,7 @@ export async function GET(req: NextRequest) {
   card.style.position = 'absolute';
   card.style.bottom = '75px';
   card.style[config.position.includes('right') ? 'right' : 'left'] = '0';
-  card.style.width = '320px';
+  card.style.width = '330px';
   card.style.backgroundColor = '#ffffff';
   card.style.borderRadius = '16px';
   card.style.boxShadow = '0 12px 36px rgba(0,0,0,0.18)';
@@ -156,14 +332,14 @@ export async function GET(req: NextRequest) {
   headerLeft.style.gap = '10px';
 
   var avatar = document.createElement('div');
-  avatar.style.width = '40px';
-  avatar.style.height = '40px';
+  avatar.style.width = '42px';
+  avatar.style.height = '42px';
   avatar.style.borderRadius = '50%';
   avatar.style.backgroundColor = 'rgba(255,255,255,0.25)';
   avatar.style.display = 'flex';
   avatar.style.alignItems = 'center';
   avatar.style.justifyContent = 'center';
-  avatar.style.fontSize = '18px';
+  avatar.style.fontSize = '20px';
   avatar.innerHTML = config.avatarUrl ? '<img src="' + config.avatarUrl + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />' : '💬';
 
   var headerText = document.createElement('div');
@@ -176,7 +352,22 @@ export async function GET(req: NextRequest) {
   subEl.style.fontSize = '11.5px';
   subEl.style.opacity = '0.9';
   subEl.style.marginTop = '2px';
-  subEl.innerText = config.subheading;
+  subEl.style.display = 'flex';
+  subEl.style.alignItems = 'center';
+  subEl.style.gap = '5px';
+
+  var dotSpan = document.createElement('span');
+  dotSpan.style.display = 'inline-block';
+  dotSpan.style.width = '7px';
+  dotSpan.style.height = '7px';
+  dotSpan.style.borderRadius = '50%';
+  dotSpan.style.backgroundColor = isOnline ? '#4ade80' : '#fde047';
+
+  var statusTextSpan = document.createElement('span');
+  statusTextSpan.innerText = isOnline ? (config.subheading || 'Online now') : 'Offline - Leave a message';
+
+  subEl.appendChild(dotSpan);
+  subEl.appendChild(statusTextSpan);
 
   headerText.appendChild(titleEl);
   headerText.appendChild(subEl);
@@ -203,7 +394,70 @@ export async function GET(req: NextRequest) {
   body.style.display = 'flex';
   body.style.flexDirection = 'column';
   body.style.gap = '12px';
+  body.style.maxHeight = '420px';
+  body.style.overflowY = 'auto';
 
+  // Offline Notice Banner
+  if (!isOnline && config.offlineNotice) {
+    var offlineBox = document.createElement('div');
+    offlineBox.style.backgroundColor = '#fef3c7';
+    offlineBox.style.border = '1px solid #fde68a';
+    offlineBox.style.padding = '8px 10px';
+    offlineBox.style.borderRadius = '8px';
+    offlineBox.style.fontSize = '11.5px';
+    offlineBox.style.color = '#92400e';
+    offlineBox.style.lineHeight = '1.3';
+    offlineBox.innerText = '🌙 ' + config.offlineNotice;
+    body.appendChild(offlineBox);
+  }
+
+  // Cart Recovery Inspection for Shopify
+  var cartBox = null;
+  if (config.enableCartRecovery && platform === 'Shopify') {
+    fetch('/cart.js')
+      .then(function(r) { return r.json(); })
+      .then(function(cart) {
+        if (cart && cart.item_count > 0) {
+          detectedCart = cart;
+          var itemTitles = cart.items.map(function(it) { return it.title; }).slice(0, 2).join(', ');
+          if (cart.items.length > 2) itemTitles += ' +' + (cart.items.length - 2) + ' more';
+
+          cartBox = document.createElement('div');
+          cartBox.style.backgroundColor = '#ecfdf5';
+          cartBox.style.border = '1px solid #a7f3d0';
+          cartBox.style.padding = '10px';
+          cartBox.style.borderRadius = '10px';
+          cartBox.style.fontSize = '12px';
+          cartBox.style.color = '#065f46';
+
+          cartBox.innerHTML = '<strong>🛒 ' + cart.item_count + ' items in your cart</strong><br><span style="font-size:11px;color:#047857;">' + itemTitles + ' (₹' + (cart.total_price / 100).toFixed(2) + ')</span>';
+
+          var cartAction = document.createElement('button');
+          cartAction.innerText = 'Ask for Cart Help / Discount ➔';
+          cartAction.style.width = '100%';
+          cartAction.style.marginTop = '6px';
+          cartAction.style.padding = '6px';
+          cartAction.style.backgroundColor = '#059669';
+          cartAction.style.color = '#ffffff';
+          cartAction.style.border = 'none';
+          cartAction.style.borderRadius = '6px';
+          cartAction.style.fontWeight = '600';
+          cartAction.style.fontSize = '11.5px';
+          cartAction.style.cursor = 'pointer';
+
+          cartAction.onclick = function() {
+            var cartMsg = 'Hi! I have ' + cart.item_count + ' item(s) in my cart (' + itemTitles + ') totaling ₹' + (cart.total_price / 100).toFixed(2) + '. Can you assist with my order or available offers?';
+            window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(cartMsg), '_blank');
+          };
+
+          cartBox.appendChild(cartAction);
+          body.insertBefore(cartBox, body.firstChild);
+        }
+      })
+      .catch(function() {});
+  }
+
+  // Greeting Bubble
   var greetingBubble = document.createElement('div');
   greetingBubble.style.backgroundColor = '#ffffff';
   greetingBubble.style.padding = '12px 14px';
@@ -219,6 +473,72 @@ export async function GET(req: NextRequest) {
   }
   greetingBubble.innerText = computedGreeting;
   body.appendChild(greetingBubble);
+
+  // Multi-department list rendering
+  if (Array.isArray(config.departments) && config.departments.length > 0) {
+    var deptHeader = document.createElement('div');
+    deptHeader.style.fontSize = '11px';
+    deptHeader.style.fontWeight = '700';
+    deptHeader.style.textTransform = 'uppercase';
+    deptHeader.style.letterSpacing = '0.05em';
+    deptHeader.style.color = '#64748b';
+    deptHeader.innerText = 'Select a Department';
+    body.appendChild(deptHeader);
+
+    var deptContainer = document.createElement('div');
+    deptContainer.style.display = 'flex';
+    deptContainer.style.flexDirection = 'column';
+    deptContainer.style.gap = '6px';
+
+    config.departments.forEach(function(dept) {
+      var dBtn = document.createElement('button');
+      dBtn.className = 'whatin-dept-item';
+      dBtn.style.display = 'flex';
+      dBtn.style.alignItems = 'center';
+      dBtn.style.justifyContent = 'space-between';
+      dBtn.style.padding = '9px 12px';
+      dBtn.style.backgroundColor = '#ffffff';
+      dBtn.style.border = '1px solid #e2e8f0';
+      dBtn.style.borderRadius = '10px';
+      dBtn.style.cursor = 'pointer';
+      dBtn.style.textAlign = 'left';
+      dBtn.style.transition = 'all 0.15s ease';
+
+      var dLeft = document.createElement('div');
+      var dTitle = document.createElement('div');
+      dTitle.style.fontWeight = '600';
+      dTitle.style.fontSize = '12.5px';
+      dTitle.style.color = '#0f172a';
+      dTitle.innerText = dept.title || dept.name;
+
+      var dDesc = document.createElement('div');
+      dDesc.style.fontSize = '11px';
+      dDesc.style.color = '#64748b';
+      dDesc.innerText = dept.description || '';
+
+      dLeft.appendChild(dTitle);
+      if (dept.description) dLeft.appendChild(dDesc);
+
+      var dArrow = document.createElement('span');
+      dArrow.innerText = '➔';
+      dArrow.style.color = config.themeColor;
+      dArrow.style.fontSize = '12px';
+
+      dBtn.appendChild(dLeft);
+      dBtn.appendChild(dArrow);
+
+      dBtn.onclick = function() {
+        var targetPhone = (dept.phone || config.phoneNumber).replace(/\\D/g, '');
+        var deptMsg = computedGreeting + ' [Department: ' + (dept.title || dept.name) + ']';
+        window.open('https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(deptMsg), '_blank');
+        card.style.display = 'none';
+      };
+
+      deptContainer.appendChild(dBtn);
+    });
+
+    body.appendChild(deptContainer);
+  }
 
   // Determine smart contextual inquiry message
   var effectiveInquiryMsg = detectedProduct && detectedProduct.title
@@ -345,6 +665,10 @@ export async function GET(req: NextRequest) {
   card.appendChild(body);
 
   btn.onclick = function() {
+    if (nudge) {
+      nudge.remove();
+      nudge = null;
+    }
     card.style.display = card.style.display === 'none' ? 'flex' : 'none';
   };
 

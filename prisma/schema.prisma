@@ -2068,6 +2068,7 @@ model WhatsAppClient {
   apiRequestLogs     WhatsAppApiRequestLog[]
   websiteWidget      WhatsAppWebsiteWidget?
   googleSheetSync    WhatsAppGoogleSheetSync?
+  outboundWebhooks   WhatsAppOutboundWebhook[]
 }
 
 model WhatsAppAuditLog {
@@ -2299,22 +2300,33 @@ model WhatsAppApiRequestLog {
 // ---------------------------------------------------------
 
 model WhatsAppWebsiteWidget {
-  id                 String          @id @default(uuid())
-  clientId           String          @unique
-  client             WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  themeColor         String          @default("#25D366") // Brand primary hex color
-  position           String          @default("bottom-right") // bottom-right, bottom-left
-  heading            String          @default("Chat with us on WhatsApp")
-  subheading         String          @default("Typically replies in a few minutes")
-  welcomeMessage     String          @default("Hi! I have an inquiry from your website.")
-  avatarUrl          String?
-  requireLeadForm    Boolean         @default(false) // If true, collects Name & Phone before opening WhatsApp
-  showOnMobile       Boolean         @default(true)
-  allowedDomains     String?         // Optional comma-separated domain origins e.g. "mysite.com,app.mysite.com"
-  totalClicks        Int             @default(0)
-  totalLeadsCaptured Int             @default(0)
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  id                   String          @id @default(uuid())
+  clientId             String          @unique
+  client               WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  themeColor           String          @default("#25D366") // Brand primary hex color
+  position             String          @default("bottom-right") // bottom-right, bottom-left
+  heading              String          @default("Chat with us on WhatsApp")
+  subheading           String          @default("Typically replies in a few minutes")
+  welcomeMessage       String          @default("Hi! I have an inquiry from your website.")
+  avatarUrl            String?
+  requireLeadForm      Boolean         @default(false) // If true, collects Name & Phone before opening WhatsApp
+  showOnMobile         Boolean         @default(true)
+  allowedDomains       String?         // Optional comma-separated domain origins e.g. "mysite.com,app.mysite.com"
+  clientCategory       String          @default("GENERAL") // GENERAL, APPAREL, WHOLESALE, ELECTRONICS, HEALTHCARE, REAL_ESTATE
+  departments          String?         // JSON string array of department cards: [{ id, title, description, phone, icon }]
+  proactiveNudge       Boolean         @default(false)
+  nudgeDelaySeconds    Int             @default(5)
+  nudgeText            String          @default("👋 Need quick help or custom pricing? Chat with us!")
+  enableCartRecovery   Boolean         @default(false) // Shopify/WooCommerce cart item detection
+  businessHoursEnabled Boolean         @default(false)
+  businessHoursStart   String          @default("09:00") // HH:mm format
+  businessHoursEnd     String          @default("18:00") // HH:mm format
+  timezone             String          @default("Asia/Kolkata")
+  offlineNotice        String          @default("We are currently offline. Leave a message and we will get back to you during business hours!")
+  totalClicks          Int             @default(0)
+  totalLeadsCaptured   Int             @default(0)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 }
 
 // ---------------------------------------------------------
@@ -2337,5 +2349,47 @@ model WhatsAppGoogleSheetSync {
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
 }
+
+// ---------------------------------------------------------
+// Developer Outbound Webhook Subscriptions
+// ---------------------------------------------------------
+
+model WhatsAppOutboundWebhook {
+  id               String                       @id @default(uuid())
+  clientId         String
+  client           WhatsAppClient               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  targetUrl        String
+  secretKey        String                       // Secret key for HMAC-SHA256 signature verification
+  subscribedEvents String                       @default("[\"message.received\",\"message.status_update\",\"lead.captured\"]") // JSON array of event names
+  isActive         Boolean                      @default(true)
+  description      String?
+  totalDispatched  Int                          @default(0)
+  totalFailed      Int                          @default(0)
+  lastDispatchedAt DateTime?
+  lastStatusCode   Int?
+  lastError        String?
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  logs             WhatsAppOutboundWebhookLog[]
+
+  @@index([clientId])
+}
+
+model WhatsAppOutboundWebhookLog {
+  id             String                  @id @default(uuid())
+  webhookId      String
+  webhook        WhatsAppOutboundWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event          String
+  payload        String                  // JSON serialized event payload
+  statusCode     Int?
+  responseTimeMs Int?
+  success        Boolean                 @default(true)
+  errorMessage   String?
+  createdAt      DateTime                @default(now())
+
+  @@index([webhookId, createdAt])
+}
+
 
 

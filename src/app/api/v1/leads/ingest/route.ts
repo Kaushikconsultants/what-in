@@ -4,6 +4,8 @@ import { validateApiKey, logApiRequest, hashApiKey } from "@/lib/apiKeyAuth";
 import { sendWhatsAppTemplateAction } from "@/app/actions/whatsAppPlatformActions";
 import { emitInboxEvent } from "@/lib/inboxEvents";
 import { syncLeadToGoogleSheet } from "@/lib/googleSheetsSync";
+import { dispatchOutboundWebhook } from "@/lib/outboundWebhookDispatcher";
+import { checkRateLimit, withRateLimitHeaders } from "@/lib/rateLimiter";
 
 /**
  * Helper to authenticate webhook request via Header or Query String
@@ -118,6 +120,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { success: false, error: auth.error || "Unauthorized." },
       { status: 401 }
+    );
+  }
+
+  const rateLimit = checkRateLimit(auth.apiKey?.id || auth.client.id, 120, 60);
+  if (!rateLimit.allowed) {
+    return withRateLimitHeaders(
+      NextResponse.json({ success: false, error: "Rate limit exceeded. Try again later." }, { status: 429 }),
+      rateLimit
     );
   }
 
@@ -324,6 +334,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // 6. Real-time Outbound Webhook dispatch
+    dispatchOutboundWebhook(auth.client.id, "lead.captured", {
+      leadId: customer.id,
+      name: customer.contactPerson || name,
+      phone: cleanPhone,
+      email,
+      source,
+      city,
+      state,
+      notes: fullNotes,
+      tags,
+      capturedAt: new Date().toISOString(),
+    });
+
     logApiRequest({
       clientId: auth.client.id,
       apiKeyId: auth.apiKey?.id,
@@ -334,17 +358,20 @@ export async function POST(req: NextRequest) {
       requestPayloadPreview: `Captured lead: ${name} (${cleanPhone}) via ${source}`,
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Lead ingested and processed successfully.",
-      data: {
-        customerId: customer.id,
-        conversationId: conversation.id,
-        phone: cleanPhone,
-        source,
-        welcomeTemplateDispatched: Boolean(welcomeResult?.success),
-      },
-    });
+    return withRateLimitHeaders(
+      NextResponse.json({
+        success: true,
+        message: "Lead ingested and processed successfully.",
+        data: {
+          customerId: customer.id,
+          conversationId: conversation.id,
+          phone: cleanPhone,
+          source,
+          welcomeTemplateDispatched: Boolean(welcomeResult?.success),
+        },
+      }),
+      rateLimit
+    );
   } catch (err: any) {
     console.error("[API v1 /leads/ingest POST] Error:", err);
     logApiRequest({

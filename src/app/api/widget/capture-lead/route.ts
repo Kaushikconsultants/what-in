@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { syncLeadToGoogleSheet } from "@/lib/googleSheetsSync";
 import { emitInboxEvent } from "@/lib/inboxEvents";
+import { dispatchOutboundWebhook } from "@/lib/outboundWebhookDispatcher";
 
 /**
  * POST /api/widget/capture-lead
@@ -119,6 +120,20 @@ export async function POST(req: NextRequest) {
           phone: cleanPhone,
           source,
         },
+      });
+
+      // Outbound Webhook dispatch to external subscribers (Zapier, ERP, Custom CRM)
+      dispatchOutboundWebhook(client.id, "lead.captured", {
+        leadId: customer?.id,
+        name: customer?.contactPerson || leadName,
+        phone: cleanPhone,
+        email: email || null,
+        source,
+        pageUrl: pageUrl || null,
+        pageTitle: pageTitle || null,
+        customMessage: customMessage || null,
+        platform: effectivePlatform,
+        capturedAt: new Date().toISOString(),
       });
     }
 
