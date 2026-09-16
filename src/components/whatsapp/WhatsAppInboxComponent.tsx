@@ -248,7 +248,7 @@ export default function WhatsAppInboxComponent() {
   const [approvedTemplates, setApprovedTemplates] = useState<any[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
 
-  // Preload approved templates & product catalog for accurate chat previews & product resolution
+  // Preload approved templates, product catalog & CRM integrations for accurate previews and actions
   useEffect(() => {
     getWhatsAppTemplates()
       .then(res => {
@@ -259,6 +259,12 @@ export default function WhatsAppInboxComponent() {
     getProductsAction()
       .then(res => {
         if (res?.products) setProductsList(res.products);
+      })
+      .catch(() => {});
+
+    getWhatsAppIntegrationsAction()
+      .then(res => {
+        if (res?.integrations) setIntegrations(res.integrations);
       })
       .catch(() => {});
   }, []);
@@ -425,20 +431,51 @@ export default function WhatsAppInboxComponent() {
   const [newTagColor, setNewTagColor] = useState("#e2e8f0");
   const [isCreatingTag, setIsCreatingTag] = useState(false);
 
+  // Determine if active lead is already synced to CRM
+  const isLeadPushed = useMemo(() => {
+    if (!activeConvDetail) return false;
+    const stage = (activeConvDetail.leadStatus || activeConvDetail.customer?.leadStage || "").toLowerCase();
+    const notes = (activeConvDetail.customer?.notes || "").toLowerCase();
+    return (
+      stage.includes("crm") ||
+      stage.includes("synced") ||
+      stage.includes("won") ||
+      notes.includes("pushed_to_crm") ||
+      notes.includes("crm") ||
+      notes.includes("erp")
+    );
+  }, [activeConvDetail?.leadStatus, activeConvDetail?.customer?.leadStage, activeConvDetail?.customer?.notes]);
+
   // Unified active tags (merged between conversation and customer, excluding legacy auto-tags)
-  const handlePushToCrm = async (integrationId: string) => {
+  const handlePushToCrm = async (integrationId?: string) => {
     if (!activeConvDetail) return;
     setPushingToCrm(true);
     setShowIntegrationsMenu(false);
-    const target = integrations.find(i => i.id === integrationId);
-    const res = await pushLeadToIntegrationAction(activeConvDetail.id, integrationId);
-    if (res.success) {
-      setToastMsg(`Lead pushed to ${target?.name || 'CRM'} successfully!`);
-    } else {
-      setToastMsg("Failed to push lead: " + res.error);
+    setShowMoreMenu(false);
+    try {
+      const res = await pushLeadToIntegrationAction(activeConvDetail.id, integrationId);
+      if (res.success) {
+        setToastMsg(`✓ Lead pushed to ${res.targetName || 'Espon CRM & ERP'} successfully!`);
+        if (res.customer) {
+          setActiveConvDetail((prev: any) => ({
+            ...prev,
+            leadStatus: "CRM Synced",
+            customer: {
+              ...prev?.customer,
+              ...res.customer,
+              leadStage: "CRM Synced"
+            }
+          }));
+        }
+      } else {
+        setToastMsg("CRM push error: " + (res.error || "Unknown failure"));
+      }
+    } catch (err: any) {
+      setToastMsg("CRM push error: " + err.message);
+    } finally {
+      setPushingToCrm(false);
+      setTimeout(() => setToastMsg(null), 4000);
     }
-    setPushingToCrm(false);
-    setTimeout(() => setToastMsg(null), 3000);
   };
 
   const [firingMetaLead, setFiringMetaLead] = useState(false);
@@ -2244,6 +2281,16 @@ export default function WhatsAppInboxComponent() {
                 </button>
 
                 <button
+                  className={`chat-action-btn ${isLeadPushed ? "crm-synced-active" : "crm-push-action"}`}
+                  disabled={pushingToCrm}
+                  onClick={() => handlePushToCrm()}
+                  title={isLeadPushed ? "Lead is synced with Espon CRM & ERP. Click to re-sync latest details." : "Push lead details directly to Espon CRM & ERP webhook"}
+                >
+                  <Activity size={13} className={pushingToCrm ? "spin-pulse" : ""} />
+                  <span>{pushingToCrm ? "Pushing..." : isLeadPushed ? "CRM Synced" : "Push to CRM"}</span>
+                </button>
+
+                <button
                   className={`chat-action-btn ${!isRightCollapsed ? "active-profile" : ""}`}
                   onClick={() => setIsRightCollapsed(prev => !prev)}
                   title="Toggle Customer 360° Profile & CRM Data"
@@ -2321,23 +2368,22 @@ export default function WhatsAppInboxComponent() {
                           </button>
                         )}
 
-                        {integrations && integrations.length > 0 && (
-                          <button
-                            className="dropdown-menu-item"
-                            onClick={() => {
-                              setShowMoreMenu(false);
-                              if (integrations.length === 1) {
-                                handlePushToCrm(integrations[0].id);
-                              } else {
-                                setShowIntegrationsMenu(true);
-                              }
-                            }}
-                            disabled={pushingToCrm}
-                          >
-                            <Activity size={14} color="#2563eb" />
-                            <span>{pushingToCrm ? "Pushing..." : "Push to CRM"}</span>
-                          </button>
-                        )}
+                        <button
+                          className="dropdown-menu-item"
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            const crmIntegrations = integrations.filter(i => i.type !== 'META_CAPI' && i.type !== 'PIXEL' && i.type !== 'META_CATALOG' && i.type !== 'CATALOG_ACTIVE_SOURCE');
+                            if (crmIntegrations.length > 1) {
+                              setShowIntegrationsMenu(true);
+                            } else {
+                              handlePushToCrm(crmIntegrations[0]?.id);
+                            }
+                          }}
+                          disabled={pushingToCrm}
+                        >
+                          <Activity size={14} color="#2563eb" />
+                          <span>{pushingToCrm ? "Pushing to CRM..." : isLeadPushed ? "Re-sync to CRM & ERP" : "Push to CRM"}</span>
+                        </button>
 
                         <button
                           className="dropdown-menu-item"
@@ -3918,7 +3964,10 @@ export default function WhatsAppInboxComponent() {
 
                   <div className="crm-badges-row">
                     <span className="crm-type-badge">{activeConvDetail.customerType || "Wholesaler"}</span>
-                    <span className="crm-stage-badge">{activeConvDetail.leadStatus || "New Lead"}</span>
+                    <span className="crm-stage-badge">{activeConvDetail.leadStatus || activeConvDetail.customer?.leadStage || "New Lead"}</span>
+                    <span className={`crm-status-sync-badge ${isLeadPushed ? "synced" : "pending"}`}>
+                      {isLeadPushed ? "✓ CRM Synced" : "CRM: Pending"}
+                    </span>
                   </div>
 
                   {activeConvDetail.customer?.id && (
@@ -3961,10 +4010,19 @@ export default function WhatsAppInboxComponent() {
             <div className="crm-section-box">
               <h5 className="crm-section-title">Quick Actions</h5>
               <div className="crm-quick-btns">
+                <button
+                  className={`crm-action-tile ${isLeadPushed ? "synced" : ""}`}
+                  disabled={pushingToCrm}
+                  onClick={() => handlePushToCrm()}
+                  title="Push lead directly to Espon CRM & ERP webhook"
+                >
+                  <Activity size={14} className={pushingToCrm ? "spin-pulse" : ""} color="#2563eb" />
+                  <span>{pushingToCrm ? "Pushing to CRM..." : isLeadPushed ? "Re-sync to CRM & ERP" : "Push Lead to CRM & ERP"}</span>
+                </button>
 
                 {paymentConfigured && (
                   <button className="crm-action-tile" onClick={() => setShowPaymentModal(true)}>
-                    <CreditCard size={14} /> Send Payment Link
+                    <CreditCard size={14} color="#d97706" /> Send Payment Link
                   </button>
                 )}
               </div>

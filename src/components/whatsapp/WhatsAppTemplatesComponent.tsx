@@ -61,6 +61,26 @@ const CATEGORIES = [
   { value: "AUTHENTICATION", label: "Authentication", desc: "One-time passwords (OTP) and login account verification codes" },
 ];
 
+const FALLBACK_PRODUCT_IMAGES = [
+  "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=800&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1584865288642-42078afe6942?w=800&auto=format&fit=crop&q=80"
+];
+
+const getValidProductImage = (p: any, fallbackIdx = 0): string => {
+  if (!p) return FALLBACK_PRODUCT_IMAGES[fallbackIdx % FALLBACK_PRODUCT_IMAGES.length];
+  if (p.primaryImage && typeof p.primaryImage === "string" && p.primaryImage.startsWith("http")) {
+    return p.primaryImage;
+  }
+  if (Array.isArray(p.images) && p.images.length > 0 && typeof p.images[0] === "string" && p.images[0].startsWith("http")) {
+    return p.images[0];
+  }
+  return FALLBACK_PRODUCT_IMAGES[fallbackIdx % FALLBACK_PRODUCT_IMAGES.length];
+};
+
 const getUtilityPresetsList = (brand: string, domain: string) => [
   {
     id: "ORDER_CONFIRMATION",
@@ -3807,8 +3827,17 @@ export default function WhatsAppTemplatesComponent() {
                           key={p.id || idx}
                           className="flex-shrink-0 flex items-center gap-2 pl-1.5 pr-2 py-1 bg-white dark:bg-slate-800 rounded-xl border border-sky-200 dark:border-slate-700 text-xs shadow-2xs"
                         >
-                          <div className="w-7 h-7 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
-                            <img src={p.primaryImage || p.images?.[0]} alt={p.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                          <div className="w-7 h-7 rounded-lg overflow-hidden bg-gray-100 dark:bg-slate-700 flex-shrink-0 border border-gray-200 dark:border-slate-700 relative flex items-center justify-center">
+                            <img
+                              src={getValidProductImage(p, idx)}
+                              alt={p.name}
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover"
+                              onError={(e: any) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = FALLBACK_PRODUCT_IMAGES[idx % FALLBACK_PRODUCT_IMAGES.length];
+                              }}
+                            />
                           </div>
                           <div className="flex flex-col">
                             <span className="font-bold text-gray-900 dark:text-gray-100 text-[11px] truncate max-w-[120px]">{p.name}</span>
@@ -4764,10 +4793,14 @@ export default function WhatsAppTemplatesComponent() {
                         {(selectedCatalogProducts.length > 0 || inventoryProducts.length > 0) && (
                           <div className="relative rounded-xl overflow-hidden h-32 bg-gray-900 border border-gray-200 dark:border-slate-700">
                             <img
-                              src={selectedCatalogProducts[0]?.primaryImage || inventoryProducts[0]?.primaryImage || "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80"}
+                              src={getValidProductImage(selectedCatalogProducts[0] || inventoryProducts[0], 0)}
                               alt="Catalog cover"
                               referrerPolicy="no-referrer"
                               className="w-full h-full object-cover opacity-85"
+                              onError={(e: any) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = FALLBACK_PRODUCT_IMAGES[0];
+                              }}
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-2.5">
                               <div className="text-white font-black text-xs drop-shadow-sm flex items-center gap-1.5">

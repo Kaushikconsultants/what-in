@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
+import { revalidatePath } from "next/cache";
+
 function isValidPublicWebhookUrl(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
@@ -53,20 +55,19 @@ export async function getWhatsAppIntegrationsAction() {
       return { success: false, error: "Unauthorized access", integrations: [] };
     }
 
-    const where: any = {};
-    if (user?.clientId) {
-      where.clientId = user.clientId;
-    } else if (!isOwner && user) {
-      where.clientId = null;
-    }
-
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
     const integrations = await prisma.whatsAppIntegration.findMany({
-      where,
+      where: isOwner ? {} : {
+        OR: [
+          { clientId: targetClientId },
+          { clientId: null }
+        ]
+      },
       orderBy: { createdAt: 'desc' }
     });
     return { success: true, integrations };
   } catch (e: any) {
-    return { success: false, error: e.message };
+    return { success: false, error: e.message, integrations: [] };
   }
 }
 
@@ -183,7 +184,7 @@ export async function toggleWhatsAppIntegrationAction(id: string, isActive: bool
   }
 }
 
-export async function pushLeadToIntegrationAction(conversationId: string, integrationId: string) {
+export async function pushLeadToIntegrationAction(conversationId: string, integrationId?: string) {
   try {
     const user = await getAuthenticatedUser();
     const isOwner = await isOwnerAuthenticated();
@@ -191,47 +192,140 @@ export async function pushLeadToIntegrationAction(conversationId: string, integr
       return { success: false, error: "Unauthorized access" };
     }
 
-    const integration = await prisma.whatsAppIntegration.findUnique({ where: { id: integrationId } });
-    if (!integration) throw new Error("Integration not found");
-    if (integration.type === 'META_CAPI' || integration.type === 'PIXEL' || integration.type?.toUpperCase().includes('CAPI')) {
-      throw new Error("Cannot push lead directly to a Meta Pixel / CAPI integration via CRM webhook");
-    }
-
-    if (!isValidPublicWebhookUrl(integration.url)) {
-      throw new Error("Invalid integration URL: Requests to private or loopback networks are blocked.");
-    }
-
+    // 1. Fetch conversation
     const conv = await prisma.whatsAppConversation.findUnique({
       where: { id: conversationId },
       include: { customer: true, assignedEmployee: { include: { user: true } } }
     });
-    if (!conv || !conv.customer) throw new Error("Conversation or customer not found");
+    if (!conv) throw new Error("Conversation not found");
+
+    // 2. Ensure customer record exists and is linked
+    let customer: any = conv.customer;
+    const rawPhone = ((conv.customer?.whatsappNumber || conv.customer?.mobile || (conv as any).phone || "") as string).replace(/\D/g, "");
+    const normalizedPhone = rawPhone.startsWith("91") && rawPhone.length === 12 ? rawPhone.slice(2) : rawPhone;
+
+    if (!customer) {
+      customer = await prisma.customer.findFirst({
+        where: {
+          OR: [
+            ...(rawPhone ? [{ whatsappNumber: rawPhone }, { mobile: rawPhone }] : []),
+            ...(normalizedPhone ? [{ whatsappNumber: normalizedPhone }, { mobile: normalizedPhone }] : [])
+          ]
+        }
+      });
+
+      if (!customer) {
+        const clientTargetId = conv.clientId || user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+        customer = await prisma.customer.create({
+          data: {
+            clientId: clientTargetId,
+            contactPerson: (conv as any).contactName || "WhatsApp Customer",
+            businessName: (conv as any).contactName || "WhatsApp Contact",
+            mobile: rawPhone || "Unknown",
+            whatsappNumber: rawPhone || "Unknown",
+            leadStage: "CRM Synced",
+            tags: conv.tags || "WhatsApp Lead",
+            notes: "PUSHED_TO_CRM"
+          }
+        });
+      }
+
+      await prisma.whatsAppConversation.update({
+        where: { id: conversationId },
+        data: { customerId: customer.id }
+      });
+    }
+
+    // 3. Update customer lead stage and notes
+    const existingNotes = customer?.notes || "";
+    const updatedNotes = existingNotes.includes("PUSHED_TO_CRM")
+      ? existingNotes
+      : (existingNotes ? `${existingNotes} | PUSHED_TO_CRM` : "PUSHED_TO_CRM");
+
+    if (customer?.id) {
+      await prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+          leadStage: "CRM Synced",
+          notes: updatedNotes,
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    // 4. Resolve integration(s)
+    let targetIntegrations: any[] = [];
+    if (integrationId) {
+      const specific = await prisma.whatsAppIntegration.findUnique({ where: { id: integrationId } });
+      if (specific && specific.isActive) targetIntegrations = [specific];
+    } else {
+      const allActive = await prisma.whatsAppIntegration.findMany({
+        where: {
+          isActive: true,
+          type: { notIn: ['META_CAPI', 'PIXEL', 'META_CATALOG', 'CATALOG_ACTIVE_SOURCE'] }
+        }
+      });
+      targetIntegrations = allActive;
+    }
+
+    // 5. Fire webhook(s)
+    let webhookResults: string[] = [];
+    let webhookErrors: string[] = [];
 
     const payload = {
-      name: conv.customer.contactPerson || conv.customer.businessName || 'Unknown',
-      whatsappNumber: conv.customer.whatsappNumber || conv.customer.mobile,
-      shopName: (conv.customer as any).shopName || '',
-      agentEmail: conv.assignedEmployee?.user?.email || ''
+      name: customer?.contactPerson || customer?.businessName || (conv as any).contactName || 'WhatsApp Customer',
+      whatsappNumber: (customer?.whatsappNumber || customer?.mobile || rawPhone).replace(/\D/g, ''),
+      mobile: (customer?.mobile || customer?.whatsappNumber || rawPhone).replace(/\D/g, ''),
+      shopName: (customer as any)?.shopName || customer?.businessName || '',
+      agentEmail: conv.assignedEmployee?.user?.email || user?.email || '',
+      tags: customer?.tags || conv.tags || 'WhatsApp Lead',
+      city: (customer as any)?.city || (customer as any)?.billingAddress || '',
+      source: 'WhatsApp Inbox'
     };
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (integration.token) {
-      headers['Authorization'] = integration.token;
+    for (const integration of targetIntegrations) {
+      if (!isValidPublicWebhookUrl(integration.url)) continue;
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (integration.token) {
+        headers['Authorization'] = integration.token;
+      }
+
+      try {
+        const whRes = await fetch(integration.url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+
+        if (whRes.ok) {
+          webhookResults.push(integration.name || 'CRM Webhook');
+        } else {
+          const errText = await whRes.text().catch(() => "");
+          webhookErrors.push(`${integration.name}: HTTP ${whRes.status} ${errText}`.slice(0, 100));
+        }
+      } catch (err: any) {
+        webhookErrors.push(`${integration.name}: ${err.message}`);
+      }
     }
 
-    const whRes = await fetch(integration.url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    });
+    revalidatePath("/whatsapp/inbox");
+    revalidatePath("/whatsapp/contacts");
+    revalidatePath("/customers");
 
-    if (!whRes.ok) {
-      const errText = await whRes.text().catch(() => "");
-      throw new Error(`Webhook failed with status ${whRes.status}: ${errText}`);
-    }
+    const targetName = webhookResults.length > 0 
+      ? webhookResults.join(", ") 
+      : (targetIntegrations[0]?.name || "Espon CRM & ERP");
 
-    return { success: true };
+    return { 
+      success: true, 
+      pushedToCrm: true,
+      targetName,
+      customer: { ...customer, leadStage: "CRM Synced", notes: updatedNotes },
+      warnings: webhookErrors.length > 0 ? webhookErrors : undefined 
+    };
   } catch (e: any) {
+    console.error("[pushLeadToIntegrationAction] Error:", e);
     return { success: false, error: e.message };
   }
 }

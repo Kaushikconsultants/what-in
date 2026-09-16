@@ -10054,14 +10054,39 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
       prisma.product.count({ where: { status: 'Active', stockQuantity: { gt: 0 } } }).catch(() => 0)
     ]);
 
-    // Fallback images pool if product has no images uploaded yet
-    const fallbackImagesPool = [
-      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1581338834647-b0fb40704e21?w=800&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800&auto=format&fit=crop&q=80"
-    ];
+    // Category-specific high-resolution activewear product photography pool
+    const getProductFallbackImage = (name: string, category: string, index: number) => {
+      const lower = `${name} ${category}`.toLowerCase();
+      if (lower.includes("short") || lower.includes("bermuda")) {
+        const shorts = [
+          "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800&auto=format&fit=crop&q=80",
+          "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&auto=format&fit=crop&q=80"
+        ];
+        return shorts[index % shorts.length];
+      }
+      if (lower.includes("pant") || lower.includes("jogger") || lower.includes("cargo") || lower.includes("terry") || lower.includes("lycra") || lower.includes("track")) {
+        const pants = [
+          "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=800&auto=format&fit=crop&q=80",
+          "https://images.unsplash.com/photo-1517445312882-bc9910d016b7?w=800&auto=format&fit=crop&q=80",
+          "https://images.unsplash.com/photo-1584865288642-42078afe6942?w=800&auto=format&fit=crop&q=80"
+        ];
+        return pants[index % pants.length];
+      }
+      if (lower.includes("tee") || lower.includes("t-shirt") || lower.includes("polo") || lower.includes("shirt")) {
+        const tees = [
+          "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80",
+          "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=800&auto=format&fit=crop&q=80"
+        ];
+        return tees[index % tees.length];
+      }
+      const generic = [
+        "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=800&auto=format&fit=crop&q=80"
+      ];
+      return generic[index % generic.length];
+    };
 
     // GROUP / DEDUPLICATE VARIANTS BY BASE PRODUCT (handle or clean name)
     const masterProductMap = new Map<string, any>();
@@ -10141,10 +10166,15 @@ export async function getWhatsAppInventoryCatalogAction(params?: {
 
     const uniqueProducts = Array.from(masterProductMap.values()).slice(0, limit);
 
-    const formattedProducts = uniqueProducts.map((p) => {
+    const formattedProducts = uniqueProducts.map((p, idx) => {
       const discountPercent = p.mrp > p.sellingPrice ? Math.round(((p.mrp - p.sellingPrice) / p.mrp) * 100) : 0;
-      const primaryImage = p.images.length > 0 ? p.images[0] : fallbackImagesPool[p.fallbackIndex % fallbackImagesPool.length];
-      const allImages = p.images.length > 0 ? p.images : [primaryImage];
+      
+      // Filter out broken URLs or empty URLs
+      const validImages = (p.images || []).filter((img: string) => img && typeof img === 'string' && img.startsWith('http') && !img.includes('files/1/0992/9231/5780/files/1_60ce86e7') && !img.includes('files/1/0992/9231/5780/files/1_987ebfd6') && !img.includes('2003_1080x1080_pad_ffffff'));
+      
+      const fallbackImg = getProductFallbackImage(p.name, p.category, p.fallbackIndex ?? idx);
+      const primaryImage = validImages.length > 0 ? validImages[0] : fallbackImg;
+      const allImages = validImages.length > 0 ? validImages : [primaryImage];
       const productUrl = `https://${brandDomain}/products/${p.handle}`;
       const sizeList = p.sizes.length > 0 ? p.sizes.join(", ") : p.size || "Standard";
 
