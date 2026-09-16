@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { handleIncomingAILogic } from "@/lib/whatsappAI";
 import { executeFlowEngine } from "@/lib/whatsappFlowEngine";
@@ -1001,10 +1002,40 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
   return { status: "success" };
 }
 
+// Cryptographic signature verification helper for Meta WhatsApp Webhooks
+export function verifyMetaWebhookSignature(rawBody: string, signatureHeader: string | null, appSecret?: string | null): boolean {
+  const secret = appSecret || process.env.META_APP_SECRET || process.env.WHATSAPP_APP_SECRET;
+  if (!secret) {
+    // If no App Secret is configured in environment, allow through so current operations are not affected
+    return true;
+  }
+  if (!signatureHeader) {
+    console.warn("[Meta Webhook Security] Missing X-Hub-Signature-256 header while APP_SECRET is configured.");
+    return false;
+  }
+  try {
+    const signature = signatureHeader.replace(/^sha256=/i, "").trim();
+    const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+    if (signature.length !== expected.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"));
+  } catch (err) {
+    console.error("[Meta Webhook Security] Signature verification error:", err);
+    return false;
+  }
+}
+
 // POST Endpoint - Global Webhook Handler
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    const signatureHeader = req.headers.get("x-hub-signature-256");
+
+    if (!verifyMetaWebhookSignature(rawBody, signatureHeader)) {
+      console.warn("[WhatsApp Webhook] Forbidden: Invalid or missing X-Hub-Signature-256");
+      return NextResponse.json({ error: "Invalid webhook signature" }, { status: 403 });
+    }
+
+    const body = JSON.parse(rawBody);
     const clientIdHeader = req.headers.get("x-client-id");
     const result = await processWebhookPayload(body, clientIdHeader);
     return NextResponse.json(result);

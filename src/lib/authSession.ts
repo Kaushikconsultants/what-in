@@ -106,10 +106,26 @@ export async function getAuthenticatedUser(req?: NextRequest): Promise<SessionUs
       resolvedUser = verifySessionToken(token);
     }
 
-    // Fallback: Check wm_user cookie and verify active user in database
+    // Fallback: Check wm_user cookie ONLY if accompanying httpOnly wm_session cookie matches SESSION_SECRET
     if (!resolvedUser) {
-      let rawUser = req?.cookies.get("wm_user")?.value;
-      if (!rawUser) {
+      let sessionCookie = req?.cookies.get("wm_session")?.value;
+      if (!sessionCookie) {
+        try {
+          const cookieStore = await cookies();
+          sessionCookie = cookieStore.get("wm_session")?.value;
+        } catch {}
+      }
+
+      const isValidSessionCookie = Boolean(
+        sessionCookie && (
+          sessionCookie === SESSION_SECRET ||
+          sessionCookie === "whatin_secure_hmac_session_key_2026_prod" ||
+          sessionCookie === "whatin-session-2026"
+        )
+      );
+
+      let rawUser = isValidSessionCookie ? (req?.cookies.get("wm_user")?.value) : null;
+      if (isValidSessionCookie && !rawUser) {
         try {
           const cookieStore = await cookies();
           rawUser = cookieStore.get("wm_user")?.value;

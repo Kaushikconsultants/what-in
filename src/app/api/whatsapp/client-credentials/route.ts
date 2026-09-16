@@ -52,14 +52,23 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    const isAdminOrOwner = isOwner || (user && (user.role === "ADMIN" || user.role === "SUPER_ADMIN" || user.role === "OWNER"));
+
+    const maskSecret = (val: string | null | undefined) => {
+      if (!val) return "";
+      if (isAdminOrOwner) return val;
+      if (val.length <= 8) return "••••••••";
+      return val.slice(0, 4) + "••••••••" + val.slice(-4);
+    };
+
     return NextResponse.json({
       wabaId: client.wabaId || "",
       phoneId: client.phoneId || "",
-      metaAccessToken: client.metaAccessToken || "",
+      metaAccessToken: maskSecret(client.metaAccessToken),
       webhookVerifyToken: client.webhookVerifyToken || "",
       phoneNumber: client.phoneNumber || "",
       shopifyDomain: client.shopifyDomain || "",
-      shopifyToken: client.shopifyToken || "",
+      shopifyToken: maskSecret(client.shopifyToken),
       webhookUrl: client.customWebhookUrl || `https://what-in.tinkal.in/api/whatsapp/webhook/${client.id}`,
       isClientBound: true,
       clientId: client.id,
@@ -72,13 +81,13 @@ export async function GET(req: NextRequest) {
       // Payment Gateways
       activeGateway: client.activeGateway || "",
       razorpayKeyId: client.razorpayKeyId || "",
-      razorpayKeySecret: client.razorpayKeySecret || "",
+      razorpayKeySecret: maskSecret(client.razorpayKeySecret),
       cashfreeAppId: client.cashfreeAppId || "",
-      cashfreeSecretKey: client.cashfreeSecretKey || "",
+      cashfreeSecretKey: maskSecret(client.cashfreeSecretKey),
       merchantUpiId: client.merchantUpiId || "",
       merchantUpiName: client.merchantUpiName || "",
       // AI Configuration
-      geminiApiKey: client.geminiApiKey || "",
+      geminiApiKey: maskSecret(client.geminiApiKey),
       aiModel: client.aiModel || "gemini-2.5-flash",
       aiSystemPrompt: client.aiSystemPrompt || "",
       welcomeMessage: client.welcomeMessage || "Welcome! How can we help you today?",
@@ -119,27 +128,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No client profile found" }, { status: 404 });
     }
 
+    const safeSecret = (newVal: any, existingVal: any) => {
+      if (newVal === undefined) return existingVal;
+      if (typeof newVal === "string" && newVal.includes("••••")) return existingVal;
+      return newVal;
+    };
+
     const updated = await prisma.whatsAppClient.update({
       where: { id: client.id },
       data: {
         wabaId: body.wabaId !== undefined ? body.wabaId : client.wabaId,
         phoneId: body.phoneId !== undefined ? body.phoneId : client.phoneId,
-        metaAccessToken: body.metaAccessToken !== undefined ? body.metaAccessToken : client.metaAccessToken,
-        webhookVerifyToken: body.webhookVerifyToken !== undefined ? body.webhookVerifyToken : client.webhookVerifyToken,
+        metaAccessToken: safeSecret(body.metaAccessToken, client.metaAccessToken),
+        webhookVerifyToken: safeSecret(body.webhookVerifyToken, client.webhookVerifyToken),
         phoneNumber: body.phoneNumber !== undefined ? body.phoneNumber : client.phoneNumber,
         shopifyDomain: body.shopifyDomain !== undefined ? body.shopifyDomain : client.shopifyDomain,
-        shopifyToken: body.shopifyToken !== undefined ? body.shopifyToken : client.shopifyToken,
+        shopifyToken: safeSecret(body.shopifyToken, client.shopifyToken),
         customWebhookUrl: body.customWebhookUrl !== undefined ? body.customWebhookUrl : client.customWebhookUrl,
         // Gateways
         activeGateway: body.activeGateway !== undefined ? body.activeGateway : client.activeGateway,
         razorpayKeyId: body.razorpayKeyId !== undefined ? body.razorpayKeyId : client.razorpayKeyId,
-        razorpayKeySecret: body.razorpayKeySecret !== undefined ? body.razorpayKeySecret : client.razorpayKeySecret,
+        razorpayKeySecret: safeSecret(body.razorpayKeySecret, client.razorpayKeySecret),
         cashfreeAppId: body.cashfreeAppId !== undefined ? body.cashfreeAppId : client.cashfreeAppId,
-        cashfreeSecretKey: body.cashfreeSecretKey !== undefined ? body.cashfreeSecretKey : client.cashfreeSecretKey,
+        cashfreeSecretKey: safeSecret(body.cashfreeSecretKey, client.cashfreeSecretKey),
         merchantUpiId: body.merchantUpiId !== undefined ? body.merchantUpiId : client.merchantUpiId,
         merchantUpiName: body.merchantUpiName !== undefined ? body.merchantUpiName : client.merchantUpiName,
         // AI Configuration
-        geminiApiKey: body.geminiApiKey !== undefined ? body.geminiApiKey : client.geminiApiKey,
+        geminiApiKey: safeSecret(body.geminiApiKey, client.geminiApiKey),
         aiModel: body.aiModel !== undefined ? body.aiModel : client.aiModel,
         aiSystemPrompt: body.aiSystemPrompt !== undefined ? body.aiSystemPrompt : client.aiSystemPrompt,
         welcomeMessage: body.welcomeMessage !== undefined ? body.welcomeMessage : client.welcomeMessage,
