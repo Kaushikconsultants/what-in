@@ -280,12 +280,21 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
               (targetStatus === 'SENT' && existingMsg.status !== 'READ' && existingMsg.status !== 'DELIVERED');
 
             if (shouldUpdate) {
+              let updatedMetadata: string | undefined = undefined;
+              if (targetStatus === 'FAILED' && st.errors?.[0]) {
+                try {
+                  const curr = typeof existingMsg.metadata === 'string' ? JSON.parse(existingMsg.metadata || '{}') : (existingMsg.metadata || {});
+                  updatedMetadata = JSON.stringify({ ...curr, metaError: st.errors[0] });
+                } catch (_) {}
+              }
+
               await prisma.whatsAppMessage.update({
                 where: { id: existingMsg.id },
                 data: {
                   status: targetStatus,
                   deliveredAt: (targetStatus === 'DELIVERED' || targetStatus === 'READ') ? (existingMsg.deliveredAt || now) : undefined,
-                  readAt: targetStatus === 'READ' ? (existingMsg.readAt || now) : undefined
+                  readAt: targetStatus === 'READ' ? (existingMsg.readAt || now) : undefined,
+                  metadata: updatedMetadata
                 }
               });
               emitInboxEvent({
