@@ -2064,6 +2064,10 @@ model WhatsAppClient {
   abandonedCheckouts ShopifyAbandonedCheckout[]
   shopifyFlows       ShopifyAutomationFlow[]
   auditLogs          WhatsAppAuditLog[]
+  apiKeys            WhatsAppApiKey[]
+  apiRequestLogs     WhatsAppApiRequestLog[]
+  websiteWidget      WhatsAppWebsiteWidget?
+  googleSheetSync    WhatsAppGoogleSheetSync?
 }
 
 model WhatsAppAuditLog {
@@ -2241,4 +2245,97 @@ model ProductUploadedImage {
   size      Int?
   createdAt DateTime @default(now())
 }
+
+// ---------------------------------------------------------
+// Developer API, Scoped Keys, Rotation & Security Logs Suite
+// ---------------------------------------------------------
+
+model WhatsAppApiKey {
+  id                 String          @id @default(uuid())
+  clientId           String
+  client             WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name               String          // e.g. "ERP Sync Key", "Lead Capture Webhook", "Production Zapier"
+  keyPrefix          String          // Display prefix e.g. "wapi_live_9a3c"
+  keyHash            String          // Cryptographic SHA-256 hash of secret key
+  scopes             String          @default("[\"messages:send\",\"leads:write\",\"contacts:read\"]") // JSON array of permission strings
+  status             String          @default("ACTIVE") // ACTIVE, ROTATED, REVOKED, EXPIRED
+  expiresAt          DateTime?
+  gracePeriodEndsAt  DateTime?       // For seamless zero-downtime rotation
+  lastUsedAt         DateTime?
+  usageCount         Int             @default(0)
+  createdByEmail     String?
+  ipWhitelist        String?         // Optional comma-separated CIDR/IP list
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  requestLogs        WhatsAppApiRequestLog[]
+
+  @@index([clientId])
+  @@index([keyHash])
+}
+
+model WhatsAppApiRequestLog {
+  id                    String          @id @default(uuid())
+  clientId              String?
+  client                WhatsAppClient? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  apiKeyId              String?
+  apiKey                WhatsAppApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  endpoint              String          // e.g. "/api/v1/messages/send-template"
+  httpMethod            String          // GET, POST, PUT, DELETE
+  statusCode            Int             // 200, 400, 401, 403, 429, 500
+  responseTimeMs        Int             // Latency in milliseconds
+  ipAddress             String?
+  userAgent             String?
+  requestPayloadPreview String?         // Truncated sanitized payload for inspection
+  errorMessage          String?
+  createdAt             DateTime        @default(now())
+
+  @@index([clientId, createdAt])
+  @@index([apiKeyId])
+}
+
+// ---------------------------------------------------------
+// Smart Website-to-WhatsApp Widget Customizer
+// ---------------------------------------------------------
+
+model WhatsAppWebsiteWidget {
+  id                 String          @id @default(uuid())
+  clientId           String          @unique
+  client             WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  themeColor         String          @default("#25D366") // Brand primary hex color
+  position           String          @default("bottom-right") // bottom-right, bottom-left
+  heading            String          @default("Chat with us on WhatsApp")
+  subheading         String          @default("Typically replies in a few minutes")
+  welcomeMessage     String          @default("Hi! I have an inquiry from your website.")
+  avatarUrl          String?
+  requireLeadForm    Boolean         @default(false) // If true, collects Name & Phone before opening WhatsApp
+  showOnMobile       Boolean         @default(true)
+  allowedDomains     String?         // Optional comma-separated domain origins e.g. "mysite.com,app.mysite.com"
+  totalClicks        Int             @default(0)
+  totalLeadsCaptured Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+// ---------------------------------------------------------
+// Native 2-Way Google Sheets Automation
+// ---------------------------------------------------------
+
+model WhatsAppGoogleSheetSync {
+  id                 String          @id @default(uuid())
+  clientId           String          @unique
+  client             WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  spreadsheetId      String?
+  sheetName          String?         @default("Leads")
+  syncLeads          Boolean         @default(true)
+  syncOrders         Boolean         @default(true)
+  syncStatus         Boolean         @default(true)
+  webhookSecret      String?
+  googleScriptUrl    String?         // Google Apps Script Webhook URL for 2-way sync
+  lastSyncedAt       DateTime?
+  totalRowsSynced    Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
 

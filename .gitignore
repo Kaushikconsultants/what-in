@@ -1,4 +1,4 @@
-﻿# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
 /node_modules
@@ -30,11 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
-.env
-.env.local
-.env.production
-!.env.example
+# env files (can opt-in for committing if needed)
+.env*
 
 # vercel
 .vercel
@@ -45,4 +42,12 @@ next-env.d.ts
 
 src/components/whatsapp/LegacyInboxComponent.tsx
 
-*.db
+extracted_inbox.jsx
+*.js
+!src/**
+!public/sw.js
+# ignore scratch scripts
+add_webhook_log.js
+extract.js
+fix_*.js
+update_*.js
