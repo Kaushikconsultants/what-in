@@ -85,16 +85,21 @@ export async function POST(req: NextRequest) {
 
     // Permanently persist the media in PostgreSQL so it never expires after Meta's 30-day window
     try {
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "WhatsAppUploadedMedia" ("id", "filename", "mimeType", "data", "size", "createdAt")
-         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-         ON CONFLICT ("id") DO UPDATE SET "data" = EXCLUDED."data", "size" = EXCLUDED."size", "mimeType" = EXCLUDED."mimeType";`,
-        returnedMediaId,
-        finalFilename,
-        finalMimeType,
-        finalBuffer,
-        finalBuffer.length
-      );
+      await prisma.whatsAppUploadedMedia.upsert({
+        where: { id: returnedMediaId },
+        update: {
+          data: finalBuffer,
+          size: finalBuffer.length,
+          mimeType: finalMimeType
+        },
+        create: {
+          id: returnedMediaId,
+          filename: finalFilename,
+          mimeType: finalMimeType,
+          data: finalBuffer,
+          size: finalBuffer.length
+        }
+      });
     } catch (dbErr) {
       console.warn("[upload-media] DB persistence warning:", dbErr);
     }

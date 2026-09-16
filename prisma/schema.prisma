@@ -2223,3 +2223,22 @@ model ShopifyWebhookLog {
   errorMsg    String?
   createdAt   DateTime @default(now())
 }
+
+model WhatsAppUploadedMedia {
+  id        String   @id
+  filename  String?
+  mimeType  String?
+  data      Bytes?
+  size      Int?
+  createdAt DateTime @default(now())
+}
+
+model ProductUploadedImage {
+  id        String   @id
+  filename  String?
+  mimeType  String?
+  data      Bytes?
+  size      Int?
+  createdAt DateTime @default(now())
+}
+
