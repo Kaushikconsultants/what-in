@@ -14,6 +14,17 @@ import {
   MousePointerClick,
   Users,
   Percent,
+  ShoppingBag,
+  Globe,
+  Code2,
+  Tag,
+  Cpu,
+  Layers,
+  ExternalLink,
+  HelpCircle,
+  Info,
+  ShieldCheck,
+  Terminal,
 } from "lucide-react";
 
 const COLOR_PRESETS = [
@@ -28,6 +39,7 @@ export default function WebsiteWidgetBuilderComponent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState<"shopify" | "wordpress" | "html" | "gtm">("shopify");
 
   // Widget Settings
   const [themeColor, setThemeColor] = useState("#25D366");
@@ -114,6 +126,22 @@ export default function WebsiteWidgetBuilderComponent() {
 
   const conversionRate = totalClicks > 0 ? ((totalLeads / totalClicks) * 100).toFixed(1) : "0.0";
 
+  // Helper to format platform-specific snippet
+  const getPlatformSnippet = (platform: "shopify" | "wordpress" | "html" | "gtm") => {
+    const rawTag = embedSnippet || `<script src="https://whatsapp.esponsports.com/api/widget/script.js" async></script>`;
+    switch (platform) {
+      case "shopify":
+        return `<!-- Whatmore WhatsApp Widget for Shopify -->\n<!-- Paste into Layout/theme.liquid right above </body> -->\n${rawTag}`;
+      case "wordpress":
+        return `<!-- Whatmore WhatsApp Widget for WordPress & WooCommerce -->\n<!-- Paste into WPCode > Header & Footer > Footer -->\n${rawTag}`;
+      case "gtm":
+        return `<!-- Whatmore WhatsApp Widget (GTM Custom HTML Tag) -->\n<!-- Set Trigger: All Pages (DOM Ready) -->\n${rawTag}`;
+      case "html":
+      default:
+        return `<!-- Whatmore WhatsApp Widget (HTML, Webflow, Wix, Squarespace) -->\n<!-- Paste just before the closing </body> tag -->\n${rawTag}`;
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-7xl">
       {/* Top Analytics Cards */}
@@ -149,28 +177,237 @@ export default function WebsiteWidgetBuilderComponent() {
         </div>
       </div>
 
-      {/* Embed Code Banner */}
-      <div className="bg-slate-900 rounded-2xl p-5 border border-slate-700 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
-        <div>
-          <h3 className="text-sm font-bold text-white m-0 flex items-center gap-2">
-            <Sparkles size={16} className="text-amber-400" /> 1-Click Embed Snippet
-          </h3>
-          <p className="text-xs text-slate-400 m-0 mt-0.5">
-            Paste this 1-line HTML tag just before the closing <code>&lt;/body&gt;</code> tag on your website.
-          </p>
+      {/* Interactive Platform Setup Guide & Embed Snippet Suite */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 shadow-xs flex flex-col gap-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-slate-700/80 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="p-2 bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                <Code2 size={18} />
+              </span>
+              <h3 className="text-base font-bold text-gray-900 dark:text-white m-0">
+                Installation & Setup Guide
+              </h3>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-slate-400 m-0 mt-1">
+              Select your website platform below for step-by-step integration instructions and optimized code snippets.
+            </p>
+          </div>
+
+          {/* Platform Switcher Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-gray-100 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setSelectedPlatform("shopify")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                selectedPlatform === "shopify"
+                  ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-900"
+              }`}
+            >
+              <ShoppingBag size={14} /> Shopify
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedPlatform("wordpress")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                selectedPlatform === "wordpress"
+                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-900"
+              }`}
+            >
+              <Globe size={14} /> WordPress / WooCommerce
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedPlatform("html")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                selectedPlatform === "html"
+                  ? "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-900"
+              }`}
+            >
+              <Code2 size={14} /> HTML / Webflow / Wix
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedPlatform("gtm")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                selectedPlatform === "gtm"
+                  ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-xs"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-900"
+              }`}
+            >
+              <Tag size={14} /> Google Tag Manager
+            </button>
+          </div>
         </div>
 
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(embedSnippet);
-            setCopiedScript(true);
-            setTimeout(() => setCopiedScript(false), 2500);
-          }}
-          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 shadow-xs"
-        >
-          {copiedScript ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-          <span>{copiedScript ? "Snippet Copied!" : "Copy Embed Code"}</span>
-        </button>
+        {/* Code Snippet Box */}
+        <div className="bg-slate-900 rounded-xl border border-slate-700/80 p-4 text-white flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Terminal size={14} className="text-indigo-400" />
+              <span className="text-xs font-mono font-bold text-slate-300">
+                {selectedPlatform === "shopify" && "Shopify Liquid Snippet"}
+                {selectedPlatform === "wordpress" && "WordPress Footer Snippet"}
+                {selectedPlatform === "html" && "Universal HTML / Webflow Snippet"}
+                {selectedPlatform === "gtm" && "GTM Custom HTML Snippet"}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(getPlatformSnippet(selectedPlatform));
+                setCopiedScript(true);
+                setTimeout(() => setCopiedScript(false), 2500);
+              }}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              {copiedScript ? <Check size={13} className="text-emerald-300" /> : <Copy size={13} />}
+              <span>{copiedScript ? "Copied to Clipboard!" : "Copy Snippet"}</span>
+            </button>
+          </div>
+
+          <pre className="font-mono text-xs text-indigo-200 bg-slate-950/70 p-3.5 rounded-lg overflow-x-auto border border-slate-800 m-0">
+            <code>{getPlatformSnippet(selectedPlatform)}</code>
+          </pre>
+        </div>
+
+        {/* Platform Step-by-Step Instructions */}
+        <div className="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-4 border border-gray-200/80 dark:border-slate-700/60">
+          {selectedPlatform === "shopify" && (
+            <div className="flex flex-col gap-3">
+              <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <ShoppingBag size={15} className="text-emerald-500" /> Shopify Installation Instructions (2 Minutes)
+              </div>
+              <ol className="text-xs text-gray-600 dark:text-slate-300 space-y-2 list-decimal list-inside m-0 pl-1 leading-relaxed">
+                <li>Log in to your <strong>Shopify Admin</strong> dashboard.</li>
+                <li>In the left menu, click <strong>Online Store</strong> &rarr; <strong>Themes</strong>.</li>
+                <li>Next to your active live theme, click the <strong>Actions (•••)</strong> dropdown and select <strong>Edit code</strong>.</li>
+                <li>In the left file navigator under <strong>Layout</strong>, click to open <strong><code>theme.liquid</code></strong>.</li>
+                <li>Scroll to the bottom of <code>theme.liquid</code> to locate the closing <strong><code>&lt;/body&gt;</code></strong> tag.</li>
+                <li>Paste the copied snippet immediately above the <code>&lt;/body&gt;</code> tag and click <strong>Save</strong>.</li>
+              </ol>
+              <div className="mt-1 p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 rounded-lg text-[11.5px] text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                <CheckCircle2 size={16} className="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                <span>
+                  <strong>Shopify Auto-Detection Active:</strong> When customers view any product on your Shopify store, the widget automatically detects the product name and price so their WhatsApp inquiry is pre-filled with the exact item!
+                </span>
+              </div>
+            </div>
+          )}
+
+          {selectedPlatform === "wordpress" && (
+            <div className="flex flex-col gap-3">
+              <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <Globe size={15} className="text-blue-500" /> WordPress & WooCommerce Installation Instructions
+              </div>
+              <ol className="text-xs text-gray-600 dark:text-slate-300 space-y-2 list-decimal list-inside m-0 pl-1 leading-relaxed">
+                <li>Log in to your <strong>WordPress Admin</strong> dashboard.</li>
+                <li>Go to <strong>Plugins</strong> &rarr; <strong>Add New Plugin</strong>.</li>
+                <li>Search for <strong>WPCode (Insert Headers and Footers)</strong> and click <strong>Install Now</strong> &rarr; <strong>Activate</strong>.</li>
+                <li>In the left sidebar, click <strong>Code Snippets</strong> &rarr; <strong>Header & Footer</strong>.</li>
+                <li>Scroll down to the <strong>Footer</strong> box, paste the snippet, and click <strong>Save Changes</strong>.</li>
+                <li><em>(Alternative for theme developers)</em>: Paste directly into your child theme's <code>footer.php</code> right above <code>&lt;?php wp_footer(); ?&gt;</code>.</li>
+              </ol>
+              <div className="mt-1 p-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 rounded-lg text-[11.5px] text-blue-800 dark:text-blue-300 flex items-start gap-2">
+                <CheckCircle2 size={16} className="shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                <span>
+                  <strong>WooCommerce Context Aware:</strong> On WooCommerce single product pages, the widget detects <code>.product_title</code> and catalog links automatically without needing extra plugins.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {selectedPlatform === "html" && (
+            <div className="flex flex-col gap-3">
+              <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <Code2 size={15} className="text-indigo-500" /> Custom HTML, Webflow & Wix Instructions
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-600 dark:text-slate-300">
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                  <div className="font-bold text-gray-900 dark:text-white mb-1">Webflow</div>
+                  <p className="m-0 leading-relaxed text-[11.5px]">
+                    Go to <strong>Project Settings</strong> &rarr; <strong>Custom Code</strong> &rarr; paste the snippet into <strong>Footer Code</strong> &rarr; Save & Publish.
+                  </p>
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                  <div className="font-bold text-gray-900 dark:text-white mb-1">Wix</div>
+                  <p className="m-0 leading-relaxed text-[11.5px]">
+                    Go to <strong>Settings</strong> &rarr; <strong>Custom Code</strong> &rarr; click <strong>+ Add Custom Code</strong> &rarr; paste snippet & select <strong>Body - End</strong>.
+                  </p>
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                  <div className="font-bold text-gray-900 dark:text-white mb-1">Static HTML / React</div>
+                  <p className="m-0 leading-relaxed text-[11.5px]">
+                    Paste the <code>&lt;script&gt;</code> tag immediately before the closing <code>&lt;/body&gt;</code> tag in your <code>index.html</code>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedPlatform === "gtm" && (
+            <div className="flex flex-col gap-3">
+              <div className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <Tag size={15} className="text-amber-500" /> Google Tag Manager (GTM) Deployment
+              </div>
+              <ol className="text-xs text-gray-600 dark:text-slate-300 space-y-2 list-decimal list-inside m-0 pl-1 leading-relaxed">
+                <li>Log in to your <strong>Google Tag Manager</strong> account and open your Container.</li>
+                <li>Navigate to <strong>Tags</strong> and click <strong>New</strong>.</li>
+                <li>Under <strong>Tag Configuration</strong>, choose <strong>Custom HTML</strong>.</li>
+                <li>Paste the script snippet into the HTML editor.</li>
+                <li>Under <strong>Triggering</strong>, select <strong>Initialization - All Pages</strong> (or <strong>All Pages / DOM Ready</strong>).</li>
+                <li>Name the tag <code>Whatmore WhatsApp Widget</code>, save, and click <strong>Submit</strong> &rarr; <strong>Publish</strong>.</li>
+              </ol>
+            </div>
+          )}
+        </div>
+
+        {/* How It Differentiates Across Platforms Deep-Dive Banner */}
+        <div className="p-4 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Cpu size={16} className="text-indigo-600 dark:text-indigo-400" />
+            <h4 className="text-xs font-bold text-gray-900 dark:text-white m-0">
+              How the Universal Snippet Automatically Differentiates Across Platforms
+            </h4>
+          </div>
+          <p className="text-[11.5px] text-gray-600 dark:text-slate-300 m-0 leading-relaxed">
+            You do <strong>not</strong> need different scripts or complicated plugins. The widget client has built-in smart runtime detection:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-indigo-100 dark:border-indigo-950 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <ShoppingBag size={14} /> Shopify Runtime
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-slate-400 m-0 mt-1">
+                Detects <code>window.Shopify</code> & <code>ShopifyAnalytics</code>. On product pages, it extracts title, price, and variant URL to pre-fill the WhatsApp chat inquiry.
+              </p>
+            </div>
+
+            <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-indigo-100 dark:border-indigo-950 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
+                <Globe size={14} /> WooCommerce Runtime
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-slate-400 m-0 mt-1">
+                Detects <code>.woocommerce</code> class and <code>.product_title</code> in the DOM, tagging the lead with <code>[WooCommerce Lead]</code> in your CRM.
+              </p>
+            </div>
+
+            <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-indigo-100 dark:border-indigo-950 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                <Layers size={14} /> Marketing UTM Tracking
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-slate-400 m-0 mt-1">
+                Captures <code>utm_source</code>, <code>utm_campaign</code>, and current page URL universally on all platforms, streaming attribution into your CRM & Google Sheets.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Main Grid: Customizer Controls + Simulator */}

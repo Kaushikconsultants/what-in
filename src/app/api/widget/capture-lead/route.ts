@@ -10,7 +10,7 @@ import { emitInboxEvent } from "@/lib/inboxEvents";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { clientId, name, phone, email, pageUrl, pageTitle, utmSource, customMessage } = body;
+    const { clientId, name, phone, email, pageUrl, pageTitle, utmSource, customMessage, platform } = body;
 
     if (!clientId) {
       return NextResponse.json({ success: false, error: "Missing clientId." }, { status: 400 });
@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
     if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
 
     const leadName = (name || "Website Visitor").trim();
-    const source = utmSource || "Website Widget";
+    const effectivePlatform = platform || "Website";
+    const source = utmSource || `${effectivePlatform} Widget`;
 
     let customer = null;
     if (cleanPhone.length >= 10) {
@@ -45,7 +46,8 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const noteContent = `Inquiry from ${pageTitle || pageUrl || "Website"}${customMessage ? `: "${customMessage}"` : ""}`;
+      const noteContent = `[${effectivePlatform}] Inquiry from ${pageTitle || pageUrl || "Website"}${customMessage ? `: "${customMessage}"` : ""}`;
+      const platformTag = effectivePlatform !== "Website" ? `${effectivePlatform} Lead` : "Website Lead";
 
       if (customer) {
         customer = await prisma.customer.update({
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
           data: {
             contactPerson: leadName !== "Website Visitor" ? leadName : customer.contactPerson,
             billingAddress: email ? `Email: ${email}` : customer.billingAddress,
-            tags: customer.tags ? (customer.tags.includes("Website Lead") ? customer.tags : `${customer.tags}, Website Lead`) : "Website Lead",
+            tags: customer.tags ? (customer.tags.includes(platformTag) ? customer.tags : `${customer.tags}, ${platformTag}`) : platformTag,
             notes: customer.notes ? `${customer.notes}\n[${source}]: ${noteContent}` : noteContent,
           },
         });

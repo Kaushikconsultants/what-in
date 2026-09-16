@@ -59,6 +59,46 @@ export async function GET(req: NextRequest) {
   var isMobile = window.innerWidth <= 768;
   if (isMobile && !config.showOnMobile) return;
 
+  // Platform & Environment Auto-Detection
+  var platform = 'Custom HTML';
+  var detectedProduct = null;
+
+  try {
+    if (window.Shopify || window.ShopifyAnalytics) {
+      platform = 'Shopify';
+      if (window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
+        var sp = window.ShopifyAnalytics.meta.product;
+        detectedProduct = {
+          title: sp.title || sp.name || '',
+          price: sp.price ? (sp.price / 100).toFixed(2) : ''
+        };
+      } else if (window.location.pathname.indexOf('/products/') !== -1) {
+        var shopifyTitleEl = document.querySelector('.product-single__title, .product__title, h1.product-title, h1');
+        if (shopifyTitleEl) {
+          detectedProduct = {
+            title: shopifyTitleEl.innerText.trim(),
+            price: ''
+          };
+        }
+      }
+    } else if (document.body && (document.body.classList.contains('woocommerce') || document.body.classList.contains('woocommerce-page'))) {
+      platform = 'WooCommerce';
+      var wooTitleEl = document.querySelector('.product_title, h1.entry-title');
+      if (wooTitleEl) {
+        detectedProduct = {
+          title: wooTitleEl.innerText.trim(),
+          price: ''
+        };
+      }
+    } else if (window.wp || (document.body && document.body.className.indexOf('wp-') !== -1)) {
+      platform = 'WordPress';
+    } else if (window.Webflow) {
+      platform = 'Webflow';
+    } else if (window.wixData || window.Wix) {
+      platform = 'Wix';
+    }
+  } catch (err) {}
+
   // Create container
   var container = document.createElement('div');
   container.id = 'whatin-widget-container';
@@ -172,8 +212,18 @@ export async function GET(req: NextRequest) {
   greetingBubble.style.lineHeight = '1.4';
   greetingBubble.style.color = '#1e293b';
   greetingBubble.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
-  greetingBubble.innerText = config.welcomeMessage;
+
+  var computedGreeting = config.welcomeMessage;
+  if (detectedProduct && detectedProduct.title) {
+    computedGreeting = 'Hi! Inquiring about ' + detectedProduct.title + ' from your store.';
+  }
+  greetingBubble.innerText = computedGreeting;
   body.appendChild(greetingBubble);
+
+  // Determine smart contextual inquiry message
+  var effectiveInquiryMsg = detectedProduct && detectedProduct.title
+    ? ('Hi! I am interested in *' + detectedProduct.title + '*' + (detectedProduct.price ? ' (Price: ' + detectedProduct.price + ')' : '') + '\\n\\nProduct Link: ' + window.location.href)
+    : (config.welcomeMessage + ' (Page: ' + document.title + ' - ' + window.location.href + ')');
 
   if (config.requireLeadForm) {
     var form = document.createElement('form');
@@ -235,19 +285,21 @@ export async function GET(req: NextRequest) {
           name: nameVal,
           phone: phoneVal,
           pageUrl: window.location.href,
-          pageTitle: document.title,
-          utmSource: new URLSearchParams(window.location.search).get('utm_source') || 'Website Widget'
+          pageTitle: detectedProduct && detectedProduct.title ? (detectedProduct.title + ' (' + platform + ')') : document.title,
+          platform: platform,
+          utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget'),
+          customMessage: effectiveInquiryMsg
         })
       })
       .then(function(res) { return res.json(); })
       .then(function(data) {
-        window.open(data.whatsappUrl || ('https://wa.me/' + config.phoneNumber), '_blank');
+        window.open(data.whatsappUrl || ('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(effectiveInquiryMsg)), '_blank');
         card.style.display = 'none';
         submitBtn.disabled = false;
         submitBtn.innerText = 'Start Chat on WhatsApp ➔';
       })
       .catch(function() {
-        window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(config.welcomeMessage + ' (Page: ' + document.title + ')'), '_blank');
+        window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(effectiveInquiryMsg), '_blank');
         card.style.display = 'none';
         submitBtn.disabled = false;
       });
@@ -275,13 +327,14 @@ export async function GET(req: NextRequest) {
         body: JSON.stringify({
           clientId: clientId,
           pageUrl: window.location.href,
-          pageTitle: document.title,
-          utmSource: new URLSearchParams(window.location.search).get('utm_source') || 'Website Widget'
+          pageTitle: detectedProduct && detectedProduct.title ? (detectedProduct.title + ' (' + platform + ')') : document.title,
+          platform: platform,
+          utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget'),
+          customMessage: effectiveInquiryMsg
         })
       }).catch(function() {});
 
-      var targetMsg = config.welcomeMessage + ' (From: ' + document.title + ' - ' + window.location.href + ')';
-      window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(targetMsg), '_blank');
+      window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(effectiveInquiryMsg), '_blank');
       card.style.display = 'none';
     };
 
