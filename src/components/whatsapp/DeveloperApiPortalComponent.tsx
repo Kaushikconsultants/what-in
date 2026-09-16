@@ -22,6 +22,12 @@ import {
   Code2,
   Search,
   Filter,
+  FileText,
+  Image,
+  MousePointer,
+  Sparkles,
+  Layers,
+  Bookmark,
 } from "lucide-react";
 
 interface ApiKeyItem {
@@ -88,6 +94,7 @@ export default function DeveloperApiPortalComponent() {
   const [playgroundBody, setPlaygroundBody] = useState<string>("");
   const [playgroundResponse, setPlaygroundResponse] = useState<any>(null);
   const [runningPlayground, setRunningPlayground] = useState(false);
+  const [selectedTemplatePreset, setSelectedTemplatePreset] = useState<string>("body-vars");
 
   // Logs State
   const [logs, setLogs] = useState<RequestLogItem[]>([]);
@@ -99,6 +106,150 @@ export default function DeveloperApiPortalComponent() {
   });
 
   const appBaseUrl = typeof window !== "undefined" ? window.location.origin : "https://whatsapp.esponsports.com";
+
+  // Template Component Presets (Body variables, Documents, Images, Interactive Buttons, Shorthand)
+  const TEMPLATE_PRESETS = [
+    {
+      id: "body-vars",
+      name: "Body Text Variables",
+      badge: "{{1}}, {{2}}",
+      icon: FileText,
+      desc: "Substitute customer name, order number, amount, and date in message body text.",
+      body: {
+        to: "919876543210",
+        templateName: "order_confirmation",
+        languageCode: "en_US",
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: "Aman Sharma" },
+              { type: "text", text: "ORD-9824" },
+              { type: "text", text: "₹1,499" },
+              { type: "text", text: "Oct 24, 2026" },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      id: "document-pdf",
+      name: "Document / PDF Invoice",
+      badge: "PDF Invoice",
+      icon: FileCode,
+      desc: "Attach invoice PDF, brochure, or price list with a custom downloaded filename.",
+      body: {
+        to: "919876543210",
+        templateName: "invoice_dispatch",
+        languageCode: "en_US",
+        components: [
+          {
+            type: "header",
+            parameters: [
+              {
+                type: "document",
+                document: {
+                  link: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                  filename: "Invoice_ORD9824.pdf",
+                },
+              },
+            ],
+          },
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: "Aman Sharma" },
+              { type: "text", text: "ORD-9824" },
+              { type: "text", text: "₹1,499" },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      id: "header-image",
+      name: "Header Image Banner",
+      badge: "JPG / PNG",
+      icon: Image,
+      desc: "Attach high-res promo graphic, product picture, or announcement banner.",
+      body: {
+        to: "919876543210",
+        templateName: "festive_sale_promo",
+        languageCode: "en_US",
+        components: [
+          {
+            type: "header",
+            parameters: [
+              {
+                type: "image",
+                image: {
+                  link: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800",
+                },
+              },
+            ],
+          },
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: "Aman" },
+              { type: "text", text: "FLAT30" },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      id: "interactive-buttons",
+      name: "Dynamic URL & Quick Reply Buttons",
+      badge: "Buttons",
+      icon: MousePointer,
+      desc: "Dynamic tracking link suffix and quick reply decision button payloads.",
+      body: {
+        to: "919876543210",
+        templateName: "order_status_update",
+        languageCode: "en_US",
+        components: [
+          {
+            type: "body",
+            parameters: [
+              { type: "text", text: "Aman" },
+              { type: "text", text: "Dispatched" },
+            ],
+          },
+          {
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [{ type: "text", text: "orders/ORD-9824/track" }],
+          },
+          {
+            type: "button",
+            sub_type: "quick_reply",
+            index: "1",
+            parameters: [{ type: "payload", payload: "CONFIRM_RECEIVED" }],
+          },
+        ],
+      },
+    },
+    {
+      id: "shorthand",
+      name: "Developer Shorthand (Easy Mode)",
+      badge: "Fastest",
+      icon: Zap,
+      desc: "Direct keys (bodyVariables, headerDocument, buttonUrlSuffix) without nesting components.",
+      body: {
+        to: "919876543210",
+        templateName: "invoice_dispatch",
+        languageCode: "en_US",
+        bodyVariables: ["Aman Sharma", "ORD-9824", "₹1,499"],
+        headerDocument: {
+          link: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+          filename: "Invoice_ORD9824.pdf",
+        },
+        buttonUrlSuffix: "orders/ORD-9824/track",
+      },
+    },
+  ];
 
   // Fetch API Keys
   const fetchKeys = async () => {
@@ -120,7 +271,7 @@ export default function DeveloperApiPortalComponent() {
   const fetchLogs = async (statusFilter = "") => {
     setLoadingLogs(true);
     try {
-      const url = `/api/v1/logs?limit=50${statusFilter ? `&status=${statusFilter}` : ""}`;
+      const url = statusFilter ? `/api/v1/logs?status=${statusFilter}` : "/api/v1/logs";
       const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
@@ -227,12 +378,7 @@ export default function DeveloperApiPortalComponent() {
       method: "POST",
       path: "/api/v1/messages/send-template",
       title: "Send Pre-Approved WhatsApp Template",
-      body: {
-        to: "919876543210",
-        templateName: "welcome_greeting",
-        languageCode: "en_US",
-        components: [],
-      },
+      body: TEMPLATE_PRESETS[0].body,
     },
     "send-text": {
       method: "POST",
@@ -908,11 +1054,47 @@ echo $response;
 
               {endpointSamples[selectedEndpoint]?.body && (
                 <div>
+                  {selectedEndpoint === "send-template" && (
+                    <div className="flex flex-col gap-2 mb-3 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-indigo-100 dark:border-indigo-950">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800 dark:text-slate-200 flex items-center gap-1.5">
+                          <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
+                          Template Component & Media Presets:
+                        </span>
+                        <span className="text-[11px] text-gray-500 dark:text-slate-400">Click to load working payload</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {TEMPLATE_PRESETS.map((preset) => {
+                          const Icon = preset.icon;
+                          const active = selectedTemplatePreset === preset.id;
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedTemplatePreset(preset.id);
+                                setPlaygroundBody(JSON.stringify(preset.body, null, 2));
+                              }}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                                active
+                                  ? "bg-indigo-600 text-white shadow-xs"
+                                  : "bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 hover:border-indigo-400"
+                              }`}
+                            >
+                              <Icon size={13} />
+                              <span>{preset.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <label className="text-xs font-bold text-gray-700 dark:text-slate-300 block mb-1">
                     JSON Request Payload
                   </label>
                   <textarea
-                    rows={7}
+                    rows={8}
                     value={playgroundBody}
                     onChange={(e) => setPlaygroundBody(e.target.value)}
                     className="w-full p-3 font-mono text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-emerald-400 focus:outline-indigo-500"
@@ -940,6 +1122,174 @@ echo $response;
                 </div>
               )}
             </div>
+
+            {/* Template Variables, Media & Buttons Comprehensive Reference Guide */}
+            {selectedEndpoint === "send-template" && (
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 shadow-xs flex flex-col gap-5">
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-700/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                      <Layers size={18} />
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-white m-0">
+                        Template Components & Parameters Specification
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 m-0 mt-0.5">
+                        Supported syntax for dynamic text variables, invoices, images, videos, and interactive buttons.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 1. Body Text Variables */}
+                  <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-900 dark:text-white">
+                        <FileText size={15} className="text-indigo-500" />
+                        <span>1. Body Text Variables ({"{{1}}, {{2}}"})</span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold">
+                        type: &quot;body&quot;
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-gray-600 dark:text-slate-300 m-0 leading-relaxed">
+                      Replaces dynamic placeholders in order. Index 0 substitutes {"{{1}}"}, Index 1 substitutes {"{{2}}"}.
+                    </p>
+                    <pre className="p-2.5 bg-slate-950 text-emerald-300 rounded-lg text-[11px] font-mono overflow-x-auto m-0">
+{`{
+  "type": "body",
+  "parameters": [
+    { "type": "text", "text": "Aman Sharma" },
+    { "type": "text", "text": "ORD-9824" },
+    { "type": "text", "text": "₹1,499" }
+  ]
+}`}
+                    </pre>
+                  </div>
+
+                  {/* 2. Documents / PDF Invoices */}
+                  <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-900 dark:text-white">
+                        <FileCode size={15} className="text-blue-500" />
+                        <span>2. Header Documents & PDF Invoices</span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold">
+                        type: &quot;document&quot;
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-gray-600 dark:text-slate-300 m-0 leading-relaxed">
+                      Attach invoice PDF, brochure, or quotation. <code>filename</code> specifies the downloaded file title.
+                    </p>
+                    <pre className="p-2.5 bg-slate-950 text-blue-300 rounded-lg text-[11px] font-mono overflow-x-auto m-0">
+{`{
+  "type": "header",
+  "parameters": [
+    {
+      "type": "document",
+      "document": {
+        "link": "https://example.com/invoice.pdf",
+        "filename": "Invoice_ORD9824.pdf"
+      }
+    }
+  ]
+}`}
+                    </pre>
+                  </div>
+
+                  {/* 3. Header Images & Videos */}
+                  <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-900 dark:text-white">
+                        <Image size={15} className="text-emerald-500" />
+                        <span>3. Header Images & Video Banners</span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">
+                        type: &quot;image&quot; | &quot;video&quot;
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-gray-600 dark:text-slate-300 m-0 leading-relaxed">
+                      Pass a public HTTPS image (JPEG, PNG up to 5MB) or video link (MP4 up to 16MB).
+                    </p>
+                    <pre className="p-2.5 bg-slate-950 text-amber-300 rounded-lg text-[11px] font-mono overflow-x-auto m-0">
+{`{
+  "type": "header",
+  "parameters": [
+    {
+      "type": "image",
+      "image": {
+        "link": "https://example.com/banner.jpg"
+      }
+    }
+  ]
+}`}
+                    </pre>
+                  </div>
+
+                  {/* 4. Interactive Buttons */}
+                  <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-gray-900 dark:text-white">
+                        <MousePointer size={15} className="text-purple-500" />
+                        <span>4. Interactive Buttons (URL & Quick Reply)</span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 font-bold">
+                        type: &quot;button&quot;
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-gray-600 dark:text-slate-300 m-0 leading-relaxed">
+                      Pass dynamic tracking URL suffixes, quick reply callback payloads, or coupon codes.
+                    </p>
+                    <pre className="p-2.5 bg-slate-950 text-purple-300 rounded-lg text-[11px] font-mono overflow-x-auto m-0">
+{`[
+  {
+    "type": "button",
+    "sub_type": "url",
+    "index": "0",
+    "parameters": [{ "type": "text", "text": "orders/ORD-9824/track" }]
+  },
+  {
+    "type": "button",
+    "sub_type": "quick_reply",
+    "index": "1",
+    "parameters": [{ "type": "payload", "payload": "CONFIRM_YES" }]
+  }
+]`}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* Developer Shorthand Callout */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-50/80 to-purple-50/80 dark:from-indigo-950/30 dark:to-purple-950/30 border border-indigo-200 dark:border-indigo-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                      <Zap size={14} className="text-indigo-600 dark:text-indigo-400" />
+                      Pro-Tip: Developer Friendly Shorthand Available
+                    </div>
+                    <p className="text-[11.5px] text-gray-600 dark:text-slate-300 m-0 mt-0.5 leading-relaxed">
+                      Instead of building nested <code>components</code> arrays, you can also send direct fields:{" "}
+                      <code>bodyVariables: [&quot;Aman&quot;, &quot;ORD-9824&quot;]</code>,{" "}
+                      <code>headerDocument: &quot;https://.../invoice.pdf&quot;</code>, and <code>buttonUrlSuffix: &quot;track/123&quot;</code>.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shorthandPreset = TEMPLATE_PRESETS.find((p) => p.id === "shorthand");
+                      if (shorthandPreset) {
+                        setSelectedTemplatePreset("shorthand");
+                        setPlaygroundBody(JSON.stringify(shorthandPreset.body, null, 2));
+                      }
+                    }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shrink-0 transition-all shadow-xs"
+                  >
+                    Load Shorthand Example
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

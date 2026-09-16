@@ -59,12 +59,124 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let finalComponents = Array.isArray(components) ? [...components] : [];
+
+    // 1. Friendly Header Media Support (Documents/PDFs, Images, Videos, Text)
+    if (body.headerMedia || body.headerImage || body.headerDocument || body.headerVideo || body.headerText) {
+      const hasHeader = finalComponents.some((c: any) => c.type?.toLowerCase() === "header");
+      if (!hasHeader) {
+        if (body.headerDocument || body.headerMedia?.type === "document") {
+          const docUrl = typeof body.headerDocument === "string"
+            ? body.headerDocument
+            : (body.headerDocument?.link || body.headerDocument?.url || body.headerMedia?.link || body.headerMedia?.url);
+          const docFilename = body.headerDocument?.filename || body.headerDocument?.name || body.headerFilename || "Document.pdf";
+          if (docUrl) {
+            finalComponents.push({
+              type: "header",
+              parameters: [{
+                type: "document",
+                document: { link: docUrl, filename: docFilename }
+              }]
+            });
+          }
+        } else if (body.headerImage || body.headerMedia?.type === "image") {
+          const imgUrl = typeof body.headerImage === "string"
+            ? body.headerImage
+            : (body.headerImage?.link || body.headerImage?.url || body.headerMedia?.link || body.headerMedia?.url);
+          if (imgUrl) {
+            finalComponents.push({
+              type: "header",
+              parameters: [{
+                type: "image",
+                image: { link: imgUrl }
+              }]
+            });
+          }
+        } else if (body.headerVideo || body.headerMedia?.type === "video") {
+          const vidUrl = typeof body.headerVideo === "string"
+            ? body.headerVideo
+            : (body.headerVideo?.link || body.headerVideo?.url || body.headerMedia?.link || body.headerMedia?.url);
+          if (vidUrl) {
+            finalComponents.push({
+              type: "header",
+              parameters: [{
+                type: "video",
+                video: { link: vidUrl }
+              }]
+            });
+          }
+        } else if (body.headerText) {
+          finalComponents.push({
+            type: "header",
+            parameters: [{
+              type: "text",
+              text: String(body.headerText)
+            }]
+          });
+        }
+      }
+    }
+
+    // 2. Friendly Body Variables Support (e.g. bodyVariables: ["Aman", "ORD-1002", "₹1,499"])
+    if (body.bodyVariables || body.parameters) {
+      const rawVars = body.bodyVariables || body.parameters;
+      const hasBody = finalComponents.some((c: any) => c.type?.toLowerCase() === "body");
+      if (!hasBody) {
+        if (Array.isArray(rawVars)) {
+          finalComponents.push({
+            type: "body",
+            parameters: rawVars.map((v: any) => ({
+              type: "text",
+              text: typeof v === "object" ? String(v.text || "") : String(v)
+            }))
+          });
+        } else if (typeof rawVars === "object") {
+          const sortedKeys = Object.keys(rawVars).sort((a, b) => Number(a) - Number(b));
+          finalComponents.push({
+            type: "body",
+            parameters: sortedKeys.map((k) => ({
+              type: "text",
+              text: String(rawVars[k])
+            }))
+          });
+        }
+      }
+    }
+
+    // 3. Friendly Interactive Buttons Support (URL tracking suffix, quick reply payload, coupon code)
+    if (body.buttonPayload || body.buttonUrlSuffix || body.couponCode) {
+      if (body.buttonPayload) {
+        finalComponents.push({
+          type: "button",
+          sub_type: "quick_reply",
+          index: String(body.buttonIndex || 0),
+          parameters: [{ type: "payload", payload: String(body.buttonPayload) }]
+        });
+      }
+      if (body.buttonUrlSuffix) {
+        finalComponents.push({
+          type: "button",
+          sub_type: "url",
+          index: String(body.buttonIndex || 0),
+          parameters: [{ type: "text", text: String(body.buttonUrlSuffix) }]
+        });
+      }
+      if (body.couponCode) {
+        finalComponents.push({
+          type: "button",
+          sub_type: "copy_code",
+          index: String(body.buttonIndex || 0),
+          parameters: [{ type: "coupon_code", coupon_code: String(body.couponCode) }]
+        });
+      }
+    }
+
     // Dispatch template via core platform engine
     const res = await sendWhatsAppTemplateAction(
       cleanPhone,
       templateName.trim(),
       languageCode,
-      components,
+      finalComponents,
       undefined,
       "Developer API"
     );
