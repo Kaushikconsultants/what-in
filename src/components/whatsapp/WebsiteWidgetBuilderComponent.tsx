@@ -308,6 +308,11 @@ export default function WebsiteWidgetBuilderComponent() {
       }));
       setDepartments(eduDepts);
       setActiveTab("education");
+    } else {
+      // Clear any lingering education departments when switching to other presets
+      setDepartments([]);
+      // Switch back to design tab if currently on education tab
+      setActiveTab((prev) => prev === "education" ? "design" : prev);
     }
   };
 
