@@ -247,11 +247,11 @@ export default function WebsiteWidgetBuilderComponent() {
         </div>
 
         {/* Code Snippet Box */}
-        <div className="bg-slate-900 rounded-xl border border-slate-700/80 p-4 text-white flex flex-col gap-3">
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700/80 p-5 flex flex-col gap-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Terminal size={14} className="text-indigo-400" />
-              <span className="text-xs font-mono font-bold text-slate-300">
+              <Terminal size={15} className="text-indigo-600 dark:text-indigo-400" />
+              <span className="text-xs font-mono font-bold text-gray-700 dark:text-slate-300">
                 {selectedPlatform === "shopify" && "Shopify Liquid Snippet"}
                 {selectedPlatform === "wordpress" && "WordPress Footer Snippet"}
                 {selectedPlatform === "html" && "Universal HTML / Webflow Snippet"}
@@ -265,14 +265,14 @@ export default function WebsiteWidgetBuilderComponent() {
                 setCopiedScript(true);
                 setTimeout(() => setCopiedScript(false), 2500);
               }}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
             >
               {copiedScript ? <Check size={13} className="text-emerald-300" /> : <Copy size={13} />}
               <span>{copiedScript ? "Copied to Clipboard!" : "Copy Snippet"}</span>
             </button>
           </div>
 
-          <pre className="font-mono text-xs text-indigo-200 bg-slate-950/70 p-3.5 rounded-lg overflow-x-auto border border-slate-800 m-0">
+          <pre className="font-mono text-xs text-indigo-700 dark:text-indigo-200 bg-white dark:bg-slate-950 p-4 rounded-xl overflow-x-auto border border-gray-200 dark:border-slate-800 m-0">
             <code>{getPlatformSnippet(selectedPlatform)}</code>
           </pre>
         </div>

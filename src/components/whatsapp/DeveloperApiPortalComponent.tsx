@@ -549,27 +549,27 @@ echo $response;
   return (
     <div className="flex flex-col gap-6 w-full max-w-7xl">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-gradient-to-r dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900 border border-gray-200 dark:border-indigo-500/20 rounded-2xl p-6 text-gray-900 dark:text-white shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+            <div className="p-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 rounded-xl">
               <Code2 size={20} />
             </div>
-            <h2 className="text-xl font-black tracking-tight text-white m-0">
+            <h2 className="text-xl font-black tracking-tight text-gray-900 dark:text-white m-0">
               Universal Developer REST API & Webhooks
             </h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30">
               v1.0 Live
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-300 m-0 max-w-2xl">
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 m-0 max-w-2xl">
             Integrate WhatsApp messaging, instant lead ingestion, CRM contacts, and automated workflows directly into your ERP, mobile apps, Zapier, or marketing funnels.
           </p>
         </div>
 
         <button
           onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all shrink-0"
         >
           <Plus size={16} /> Generate New API Key
         </button>
@@ -579,40 +579,40 @@ echo $response;
       <div className="flex items-center gap-2 border-b border-gray-200 dark:border-slate-800 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveSubTab("keys")}
-          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap ${
+          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
             activeSubTab === "keys"
-              ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400"
-              : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
+              ? "bg-indigo-50 text-indigo-600 border border-indigo-200/80 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-900/60 shadow-xs"
+              : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
           <Key size={15} /> API Keys ({keys.length})
         </button>
         <button
           onClick={() => setActiveSubTab("docs")}
-          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap ${
+          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
             activeSubTab === "docs"
-              ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400"
-              : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
+              ? "bg-indigo-50 text-indigo-600 border border-indigo-200/80 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-900/60 shadow-xs"
+              : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
           <Terminal size={15} /> Documentation & Playground
         </button>
         <button
           onClick={() => setActiveSubTab("logs")}
-          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap ${
+          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
             activeSubTab === "logs"
-              ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400"
-              : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
+              ? "bg-indigo-50 text-indigo-600 border border-indigo-200/80 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-900/60 shadow-xs"
+              : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
           <Activity size={15} /> Request & Audit Logs
         </button>
         <button
           onClick={() => setActiveSubTab("webhooks")}
-          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap ${
+          className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
             activeSubTab === "webhooks"
-              ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400"
-              : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800"
+              ? "bg-indigo-50 text-indigo-600 border border-indigo-200/80 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-900/60 shadow-xs"
+              : "text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
           }`}
         >
           <Zap size={15} /> Inbound Lead Webhook
@@ -1409,12 +1409,16 @@ echo $response;
             </p>
           </div>
 
-          <div className="p-4 bg-slate-900 rounded-xl border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Webhook Endpoint URL</div>
-              <code className="text-xs font-mono text-emerald-400 break-all">
-                {`${appBaseUrl}/api/v1/leads/ingest?apiKey=wapi_live_YOUR_KEY`}
-              </code>
+          <div className="p-5 bg-slate-50 dark:bg-slate-900/90 rounded-2xl border border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div className="overflow-hidden flex-1">
+              <div className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Terminal size={14} className="text-indigo-600 dark:text-indigo-400" /> Webhook Endpoint URL
+              </div>
+              <div className="bg-white dark:bg-slate-950 p-3 rounded-xl border border-gray-200 dark:border-slate-800">
+                <code className="text-xs sm:text-sm font-mono text-indigo-700 dark:text-emerald-400 break-all font-bold select-all">
+                  {`${appBaseUrl}/api/v1/leads/ingest?apiKey=wapi_live_YOUR_KEY`}
+                </code>
+              </div>
             </div>
             <button
               onClick={() => {
@@ -1422,7 +1426,7 @@ echo $response;
                 navigator.clipboard.writeText(`${appBaseUrl}/api/v1/leads/ingest?apiKey=${revealedKey || sampleKey}`);
                 alert("Webhook URL copied to clipboard!");
               }}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0"
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-xs transition-all"
             >
               <Copy size={14} /> Copy Webhook URL
             </button>

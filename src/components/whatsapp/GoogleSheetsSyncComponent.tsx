@@ -120,26 +120,26 @@ export default function GoogleSheetsSyncComponent() {
   return (
     <div className="flex flex-col gap-6 w-full max-w-7xl">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-2xl p-6 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-gradient-to-r dark:from-emerald-950 dark:via-slate-900 dark:to-slate-900 border border-gray-200 dark:border-emerald-500/30 rounded-2xl p-6 text-gray-900 dark:text-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400">
+            <div className="p-2 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 rounded-xl">
               <FileSpreadsheet size={22} />
             </div>
-            <h2 className="text-xl font-black text-white m-0">Native 2-Way Google Sheets Automation</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <h2 className="text-xl font-black text-gray-900 dark:text-white m-0">Native 2-Way Google Sheets Automation</h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-500/30">
               Active Sync
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-300 m-0 max-w-2xl">
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-slate-300 m-0 max-w-2xl">
             Stream incoming WhatsApp leads, orders, and customer details directly into your Google Spreadsheets in real time.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className="text-xs text-slate-400 font-medium">Rows Synced</div>
-            <div className="text-xl font-black text-emerald-400">{totalRowsSynced.toLocaleString()}</div>
+            <div className="text-xs text-gray-500 dark:text-slate-400 font-medium">Rows Synced</div>
+            <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">{totalRowsSynced.toLocaleString()}</div>
           </div>
         </div>
       </div>
@@ -259,11 +259,11 @@ export default function GoogleSheetsSyncComponent() {
         </form>
 
         {/* Right Column: Apps Script Code Template */}
-        <div className="lg:col-span-6 bg-slate-900 rounded-2xl border border-slate-700 p-5 shadow-md flex flex-col gap-3">
+        <div className="lg:col-span-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 shadow-xs flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-white">
-              <Code2 size={18} className="text-emerald-400" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 m-0">
+            <div className="flex items-center gap-2 text-gray-900 dark:text-white">
+              <Code2 size={18} className="text-emerald-600 dark:text-emerald-400" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-800 dark:text-slate-300 m-0">
                 Google Apps Script Setup (Code.gs)
               </h4>
             </div>
@@ -274,20 +274,20 @@ export default function GoogleSheetsSyncComponent() {
                 setCopiedCode(true);
                 setTimeout(() => setCopiedCode(false), 2000);
               }}
-              className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all"
             >
-              {copiedCode ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+              {copiedCode ? <Check size={13} className="text-emerald-300" /> : <Copy size={13} />}
               <span>{copiedCode ? "Copied" : "Copy Code"}</span>
             </button>
           </div>
 
-          <div className="p-3 bg-slate-950 rounded-xl overflow-x-auto max-h-[380px]">
+          <div className="p-3.5 bg-slate-950 rounded-xl overflow-x-auto max-h-[380px] border border-slate-800">
             <pre className="text-xs font-mono text-emerald-400 leading-relaxed m-0 whitespace-pre">
               {scriptTemplate || `// Open your Google Sheet -> Extensions -> Apps Script -> Paste code`}
             </pre>
           </div>
 
-          <div className="text-[11px] text-slate-400 leading-normal pl-1">
+          <div className="text-[11.5px] text-gray-500 dark:text-slate-400 leading-normal pl-1">
             <strong>3-Step Instructions:</strong>
             <ol className="list-decimal pl-4 mt-1 space-y-1">
               <li>Open your Google Sheet, click <strong>Extensions ➔ Apps Script</strong>.</li>
