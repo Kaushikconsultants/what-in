@@ -64,7 +64,9 @@ import {
   CheckCircle,
   Copy,
   Lock,
-  ArrowLeft
+  ArrowLeft,
+  CornerDownLeft,
+  Globe
 } from "lucide-react";
 import {
   getWhatsAppConversations,
@@ -155,6 +157,48 @@ export const renderWhatsAppFormattedText = (text: string) => {
       {parseInlineWhatsAppTokens(line)}
     </React.Fragment>
   ));
+};
+
+export interface ParsedWhatsAppCtaButton {
+  text: string;
+  url: string;
+}
+
+export const extractWhatsAppCtaAndBody = (rawContent: string): { bodyText: string; ctaButtons: ParsedWhatsAppCtaButton[] } => {
+  if (!rawContent) return { bodyText: "", ctaButtons: [] };
+  const lines = String(rawContent).split("\n");
+  const bodyLines: string[] = [];
+  const ctaButtons: ParsedWhatsAppCtaButton[] = [];
+
+  // Match CTA button patterns at the end of the message:
+  // e.g. "🔗 *Visit store 🌐*: https://esponsports.com"
+  // "🔗 Visit store: https://esponsports.com"
+  // "👉 Visit Website: https://..."
+  const ctaRegex = /^(?:🔗|👉|➡️|🌐)?\s*\*?([^*:\n]+)\*?\s*:\s*(https?:\/\/[^\s]+)$/i;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(ctaRegex);
+    if (match && (trimmed.startsWith("🔗") || trimmed.startsWith("👉") || trimmed.includes("Visit") || trimmed.includes("Store") || trimmed.includes("Catalog") || trimmed.includes("Website") || trimmed.includes("Link") || trimmed.includes("Shop") || trimmed.includes("View") || trimmed.includes("http"))) {
+      let btnTitle = match[1].replace(/^[🔗👉➡️🌐\s*]+|[*\s:]+$/g, "").trim();
+      // Remove any surrounding bold or emoji artifacts cleanly
+      btnTitle = btnTitle.replace(/^\*+|\*+$/g, "").trim();
+      const url = match[2].trim();
+      ctaButtons.push({ text: btnTitle || "Visit Link", url });
+    } else {
+      bodyLines.push(line);
+    }
+  }
+
+  // If no CTA lines were detected, return raw text as body
+  if (ctaButtons.length === 0) {
+    return { bodyText: rawContent, ctaButtons: [] };
+  }
+
+  return {
+    bodyText: bodyLines.join("\n").trim(),
+    ctaButtons
+  };
 };
 
 // Helper to force download media instead of opening in a new tab
@@ -2825,7 +2869,7 @@ export default function WhatsAppInboxComponent() {
                                 src={resolveSafeMediaUrl(msg.mediaUrl)}
                                 alt="Header Media"
                                 referrerPolicy="no-referrer"
-                                style={{ width: "100%", aspectRatio: "1.91 / 1", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }}
+                                style={{ width: "100%", aspectRatio: "1.91 / 1", objectFit: "cover", borderRadius: "8px", cursor: "pointer", display: "block" }}
                                 onError={(e) => {
                                   (e.currentTarget as HTMLElement).style.display = "none";
                                 }}
@@ -2834,11 +2878,11 @@ export default function WhatsAppInboxComponent() {
                             )}
                             
                             {/* Text Body */}
-                            <p className="message-text-content">
-                              {msg.content}
-                            </p>
+                            <div className="message-text-content">
+                              {renderWhatsAppFormattedText(msg.content)}
+                            </div>
 
-                            {/* Passive Interactive Options Preview */}
+                            {/* Native WhatsApp Interactive Reply Buttons */}
                             {(() => {
                               let options: string[] = [];
                               try {
@@ -2854,14 +2898,20 @@ export default function WhatsAppInboxComponent() {
                               if (options.length === 0) return null;
 
                               return (
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "4px" }}>
+                                <div className="msg-template-buttons-container">
                                   {options.map((optText, oIdx) => (
-                                    <div key={oIdx} className="msg-interactive-option">
-                                      <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-                                        <span className="msg-interactive-dot" />
-                                        {optText}
-                                      </span>
-                                    </div>
+                                    <button
+                                      key={oIdx}
+                                      type="button"
+                                      className="msg-template-btn"
+                                      onClick={() => {
+                                        setMessageInput(optText);
+                                      }}
+                                      title={`Reply with: ${optText}`}
+                                    >
+                                      <CornerDownLeft size={13} style={{ opacity: 0.8 }} />
+                                      <span>{optText}</span>
+                                    </button>
                                   ))}
                                 </div>
                               );
@@ -3292,22 +3342,45 @@ export default function WhatsAppInboxComponent() {
                         })()}
 
                         {/* Standard Text & Unsupported Format Renderer */}
-                        {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && msg.messageType !== "ORDER" && msg.messageType !== "TEMPLATE" && (
-                          <div className="message-text-content">
-                            {msg.messageType === "UNSUPPORTED" ? (
-                              msg.content && msg.content !== "[Message]" ? (
-                                <span>{renderWhatsAppFormattedText(msg.content)}</span>
+                        {msg.messageType !== "DOCUMENT" && msg.messageType !== "IMAGE" && msg.messageType !== "VIDEO" && msg.messageType !== "AUDIO" && msg.messageType !== "PAYMENT_LINK" && msg.messageType !== "BUTTONS" && msg.messageType !== "LIST" && msg.messageType !== "ORDER" && msg.messageType !== "TEMPLATE" && (() => {
+                          const { bodyText, ctaButtons } = extractWhatsAppCtaAndBody(msg.content || "");
+                          return (
+                            <div className="message-text-content">
+                              {msg.messageType === "UNSUPPORTED" ? (
+                                bodyText && bodyText !== "[Message]" ? (
+                                  <div>{renderWhatsAppFormattedText(bodyText)}</div>
+                                ) : (
+                                  <span style={{ color: "#38bdf8", display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600 }}>
+                                    <ShoppingBag size={14} />
+                                    <span>WhatsApp Catalog Order Received</span>
+                                  </span>
+                                )
                               ) : (
-                                <span style={{ color: "#38bdf8", display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600 }}>
-                                  <ShoppingBag size={14} />
-                                  <span>WhatsApp Catalog Order Received</span>
-                                </span>
-                              )
-                            ) : (
-                              renderWhatsAppFormattedText(msg.content)
-                            )}
-                          </div>
-                        )}
+                                <div>{renderWhatsAppFormattedText(bodyText)}</div>
+                              )}
+
+                              {/* Native WhatsApp CTA Action Buttons (as seen on receiver's WhatsApp) */}
+                              {ctaButtons.length > 0 && (
+                                <div className="msg-template-buttons-container" style={{ marginTop: "8px" }}>
+                                  {ctaButtons.map((btn, bIdx) => (
+                                    <a
+                                      key={bIdx}
+                                      href={btn.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="msg-template-btn"
+                                      style={{ textDecoration: "none" }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <ExternalLink size={13} />
+                                      <span>{btn.text}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {msg.status === "FAILED" && (() => {
                           let errorObj: any = null;
