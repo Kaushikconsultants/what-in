@@ -695,11 +695,15 @@ export default function WhatsAppInboxComponent() {
   const resolveSafeMediaUrl = (url?: string | null) => {
     if (!url) return "";
     const clean = url.trim();
+    if (clean.startsWith("data:") || clean.startsWith("blob:")) return clean;
     if (clean.includes("/api/whatsapp/media/")) {
       const idx = clean.indexOf("/api/whatsapp/media/");
       return clean.slice(idx);
     }
-    return clean;
+    if (clean.startsWith("http://") || clean.startsWith("https://")) {
+      return clean;
+    }
+    return `/api/whatsapp/media/${clean}`;
   };
 
   // Fetch Employees List for Filtering & Assignment
@@ -2612,7 +2616,7 @@ export default function WhatsAppInboxComponent() {
                               <span className="doc-filesize">Attachment Document</span>
                             </div>
                             {msg.mediaUrl && (
-                              <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="doc-download-btn">
+                              <a href={resolveSafeMediaUrl(msg.mediaUrl)} target="_blank" rel="noreferrer" className="doc-download-btn">
                                 Download
                               </a>
                             )}
@@ -2634,14 +2638,14 @@ export default function WhatsAppInboxComponent() {
                                   }}
                                   onClick={() => window.open(resolveSafeMediaUrl(msg.mediaUrl), "_blank")}
                                 />
-                                <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ position: "absolute", bottom: "8px", right: "8px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} title="Download Image">
+                                <button onClick={(e) => forceDownloadMedia(resolveSafeMediaUrl(msg.mediaUrl), e)} style={{ position: "absolute", bottom: "8px", right: "8px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} title="Download Image">
                                   <Download size={14} />
                                 </button>
                               </div>
                             ) : (
                               <div className="message-media-expired">
                                 <ImageIcon size={14} />
-                                <span>Image expired (Stored only for 30 days)</span>
+                                <span>Image expired on WhatsApp servers (30-day limit)</span>
                               </div>
                             )}
                             {msg.content && msg.content !== "[IMAGE]" && !msg.content.startsWith("Attached file:") && <p className="message-text-content" style={{ marginTop: "4px" }}>{msg.content}</p>}
@@ -2651,9 +2655,9 @@ export default function WhatsAppInboxComponent() {
                         {/* Video Message Renderer */}
                         {msg.messageType === "VIDEO" && (
                           <div style={{ marginTop: "4px", position: "relative" }}>
-                            <video src={msg.mediaUrl || ""} controls style={{ width: "100%", maxHeight: "220px", borderRadius: "8px" }} />
+                            <video src={resolveSafeMediaUrl(msg.mediaUrl)} controls style={{ width: "100%", maxHeight: "220px", borderRadius: "8px" }} />
                             {msg.mediaUrl && (
-                              <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} style={{ position: "absolute", top: "8px", right: "8px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 10 }} title="Download Video">
+                              <button onClick={(e) => forceDownloadMedia(resolveSafeMediaUrl(msg.mediaUrl), e)} style={{ position: "absolute", top: "8px", right: "8px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", zIndex: 10 }} title="Download Video">
                                 <Download size={14} />
                               </button>
                             )}
