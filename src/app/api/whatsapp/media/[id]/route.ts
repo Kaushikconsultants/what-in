@@ -62,8 +62,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
     const metaUrlData = await metaUrlRes.json();
 
-    if (!metaUrlData.url) {
-      return NextResponse.json({ error: "Media URL not found from Meta API", details: metaUrlData }, { status: 404 });
+    if (!metaUrlData.url || !metaUrlRes.ok) {
+      // Create a clean SVG placeholder image so HTML <img> & media tags don't throw 404 network errors in DevTools
+      const expiredSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240" fill="none">
+  <rect width="400" height="240" rx="12" fill="#F8FAFC"/>
+  <rect x="1" y="1" width="398" height="238" rx="11" stroke="#E2E8F0" stroke-width="2" stroke-dasharray="6 6"/>
+  <circle cx="200" cy="95" r="26" fill="#E2E8F0"/>
+  <path d="M192 95H208M200 87V103" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="200" y="145" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="700" fill="#475569" text-anchor="middle">WhatsApp Media Expired</text>
+  <text x="200" y="165" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#94A3B8" text-anchor="middle">Meta removes temporary media after 30 days</text>
+</svg>`;
+
+      return new NextResponse(expiredSvg, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/svg+xml; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+          'Content-Disposition': `inline; filename="whatsapp-media-expired-${mediaId}.svg"`
+        }
+      });
     }
 
     // Step 2: Download binary media file securely
@@ -72,7 +89,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     if (!mediaFileRes.ok) {
-      return NextResponse.json({ error: "Failed to download media file from Meta" }, { status: mediaFileRes.status });
+      const expiredSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240" fill="none">
+  <rect width="400" height="240" rx="12" fill="#F8FAFC"/>
+  <rect x="1" y="1" width="398" height="238" rx="11" stroke="#E2E8F0" stroke-width="2" stroke-dasharray="6 6"/>
+  <circle cx="200" cy="95" r="26" fill="#E2E8F0"/>
+  <path d="M192 95H208" stroke="#94A3B8" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="200" y="145" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="700" fill="#475569" text-anchor="middle">Media Unavailable</text>
+  <text x="200" y="165" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#94A3B8" text-anchor="middle">Could not retrieve file from Meta CDN</text>
+</svg>`;
+
+      return new NextResponse(expiredSvg, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/svg+xml; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+          'Content-Disposition': `inline; filename="whatsapp-media-unavailable-${mediaId}.svg"`
+        }
+      });
     }
 
     // Step 3: Stream it back to the client directly with proper headers and Content-Length to enable seeking/playback in HTML5 audio

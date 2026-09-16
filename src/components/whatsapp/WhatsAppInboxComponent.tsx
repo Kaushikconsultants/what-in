@@ -657,11 +657,12 @@ export default function WhatsAppInboxComponent() {
 
   const resolveSafeMediaUrl = (url?: string | null) => {
     if (!url) return "";
-    if (url.includes("/api/whatsapp/media/")) {
-      const idx = url.indexOf("/api/whatsapp/media/");
-      return url.slice(idx);
+    const clean = url.trim();
+    if (clean.includes("/api/whatsapp/media/")) {
+      const idx = clean.indexOf("/api/whatsapp/media/");
+      return clean.slice(idx);
     }
-    return url;
+    return clean;
   };
 
   // Fetch Employees List for Filtering & Assignment
@@ -998,8 +999,9 @@ export default function WhatsAppInboxComponent() {
 
         eventSource.onmessage = (event) => {
           try {
+            if (!event.data) return;
             const parsed = JSON.parse(event.data);
-            if (parsed.type === "CONNECTED") return;
+            if (parsed.type === "CONNECTED" || parsed.type === "PING") return;
 
             // Trigger instant silent refresh on real-time event
             fetchConversationsList(true);
@@ -1015,7 +1017,12 @@ export default function WhatsAppInboxComponent() {
             eventSource = null;
           }
           // Graceful exponential reconnect fallback
-          reconnectTimeout = setTimeout(connectSSE, 5000);
+          if (!reconnectTimeout) {
+            reconnectTimeout = setTimeout(() => {
+              reconnectTimeout = null;
+              connectSSE();
+            }, 5000);
+          }
         };
       } catch (_) {}
     };
@@ -2614,13 +2621,27 @@ export default function WhatsAppInboxComponent() {
                             <div className="message-audio-header">
                               <span className="message-audio-title">Voice Message</span>
                               {msg.mediaUrl && (
-                                <button onClick={(e) => forceDownloadMedia(msg.mediaUrl, e)} className="message-audio-dl" title="Download Audio">
+                                <button onClick={(e) => forceDownloadMedia(resolveSafeMediaUrl(msg.mediaUrl), e)} className="message-audio-dl" title="Download Audio">
                                   <Download size={14} />
                                 </button>
                               )}
                             </div>
                             {msg.mediaUrl ? (
-                              <audio src={msg.mediaUrl} controls style={{ width: "100%", height: "36px" }} />
+                              <audio
+                                src={resolveSafeMediaUrl(msg.mediaUrl)}
+                                controls
+                                style={{ width: "100%", height: "36px" }}
+                                onError={(e) => {
+                                  const parent = (e.currentTarget as HTMLElement).parentElement;
+                                  if (parent) {
+                                    (e.currentTarget as HTMLElement).style.display = "none";
+                                    const fallback = document.createElement("div");
+                                    fallback.className = "message-media-expired";
+                                    fallback.innerHTML = "<span>Voice note expired on WhatsApp servers</span>";
+                                    parent.appendChild(fallback);
+                                  }
+                                }}
+                              />
                             ) : (
                               <div className="message-media-expired">
                                 <Mic size={14} />
@@ -2875,6 +2896,9 @@ export default function WhatsAppInboxComponent() {
                                     alt="Template Header" 
                                     referrerPolicy="no-referrer"
                                     style={{ width: "100%", maxHeight: "200px", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }}
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLElement).style.display = "none";
+                                    }}
                                     onClick={() => window.open(resolveSafeMediaUrl(headerMediaUrl), "_blank")}
                                   />
                                 </div>
@@ -2887,6 +2911,9 @@ export default function WhatsAppInboxComponent() {
                                     controls 
                                     playsInline 
                                     style={{ width: "100%", borderRadius: "8px", maxHeight: "240px", objectFit: "cover" }}
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLElement).style.display = "none";
+                                    }}
                                   />
                                 </div>
                               )}

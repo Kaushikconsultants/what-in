@@ -60,7 +60,7 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
   const businessName = activeConvDetail?.customer?.businessName || "";
   const phone = activeConvDetail?.customer?.whatsappNumber || activeConvDetail?.customer?.mobile || "";
   const agentName = activeConvDetail?.assignedEmployee?.user?.name || "Sales Rep";
-  const brandName = "Whatmore";
+  const brandName = "Espon";
   const city = (activeConvDetail?.customer as any)?.city || "";
   const state = (activeConvDetail?.customer as any)?.state || "";
 
@@ -92,10 +92,10 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
       newVars[bodyVars[0]] = customerName || "Customer";
     }
     if (bodyVars[1]) {
-      newVars[bodyVars[1]] = agentName || brandName || "Whatmore";
+      newVars[bodyVars[1]] = agentName || brandName || "Espon";
     }
     if (bodyVars[2]) {
-      newVars[bodyVars[2]] = brandName || "Whatmore";
+      newVars[bodyVars[2]] = brandName || "Espon";
     }
     setVariables(newVars);
 
@@ -117,10 +117,10 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
       initialVars[vars[0]] = customerName || "Customer";
     }
     if (vars[1]) {
-      initialVars[vars[1]] = agentName || brandName || "Whatmore";
+      initialVars[vars[1]] = agentName || brandName || "Espon";
     }
     if (vars[2]) {
-      initialVars[vars[2]] = brandName || "Whatmore";
+      initialVars[vars[2]] = brandName || "Espon";
     }
     setVariables(initialVars);
 
@@ -154,7 +154,7 @@ export default function TemplatePickerModal({ onClose, activeConvDetail, onSendT
         parameters: bodyVars.map((v, idx) => {
           let textVal = (variables[v] || "").trim();
           if (!textVal || textVal === v) {
-            textVal = idx === 0 ? (customerName || "Customer") : idx === 1 ? (agentName || brandName || "Whatmore") : (brandName || "Whatmore");
+            textVal = idx === 0 ? (customerName || "Customer") : idx === 1 ? (agentName || brandName || "Espon") : (brandName || "Espon");
           }
           return { type: "text", text: textVal };
         })

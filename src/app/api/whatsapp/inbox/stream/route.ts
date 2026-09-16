@@ -23,11 +23,40 @@ export async function GET(req: NextRequest) {
 
     const stream = new ReadableStream({
       start(controller) {
+        let isClosed = false;
+
+        const safeEnqueue = (data: string) => {
+          if (isClosed) return;
+          try {
+            controller.enqueue(encoder.encode(data));
+          } catch (_) {
+            isClosed = true;
+            cleanup();
+          }
+        };
+
+        const cleanup = () => {
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer);
+            heartbeatTimer = null;
+          }
+          if (unsubscribe) {
+            unsubscribe();
+            unsubscribe = null;
+          }
+        };
+
+        // Listen for client abort / tab close
+        req.signal.addEventListener("abort", () => {
+          isClosed = true;
+          cleanup();
+          try {
+            controller.close();
+          } catch (_) {}
+        });
+
         // 1. Initial connection ack
-        try {
-          const initMsg = JSON.stringify({ type: "CONNECTED", timestamp: Date.now() });
-          controller.enqueue(encoder.encode(`data: ${initMsg}\n\n`));
-        } catch (_) {}
+        safeEnqueue(`data: ${JSON.stringify({ type: "CONNECTED", timestamp: Date.now() })}\n\n`);
 
         // 2. Subscribe to internal event bus
         unsubscribe = subscribeInboxEvents((event: InboxEvent) => {
@@ -35,21 +64,13 @@ export async function GET(req: NextRequest) {
           if (!isAdmin && userClientId && event.clientId && event.clientId !== userClientId) {
             return;
           }
-
-          try {
-            const chunk = `data: ${JSON.stringify(event)}\n\n`;
-            controller.enqueue(encoder.encode(chunk));
-          } catch (_) {}
+          safeEnqueue(`data: ${JSON.stringify(event)}\n\n`);
         });
 
-        // 3. Heartbeat ping every 15s to keep connections alive through proxies / Cloudflare
+        // 3. Heartbeat ping every 10s to keep connection alive through HTTP/2 proxies & Cloudflare
         heartbeatTimer = setInterval(() => {
-          try {
-            controller.enqueue(encoder.encode(`: keepalive\n\n`));
-          } catch (_) {
-            if (heartbeatTimer) clearInterval(heartbeatTimer);
-          }
-        }, 15000);
+          safeEnqueue(`data: ${JSON.stringify({ type: "PING", timestamp: Date.now() })}\n\n`);
+        }, 10000);
       },
       cancel() {
         if (unsubscribe) {
