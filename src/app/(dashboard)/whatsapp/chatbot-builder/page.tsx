@@ -3116,19 +3116,43 @@ export default function WhatsAppChatbotBuilderPage() {
                           type="file"
                           accept="image/*"
                           style={{ display: "none" }}
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (evt) => {
-                                const result = evt.target?.result as string;
-                                setNodes((prev) =>
-                                  prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: result } : n))
-                                );
-                                setToastMsg(`✓ Image "${file.name}" uploaded successfully!`);
-                                setTimeout(() => setToastMsg(null), 3000);
-                              };
-                              reader.readAsDataURL(file);
+                              setToastMsg(`Uploading "${file.name}" to WhatsApp Cloud...`);
+                              try {
+                                const formData = new FormData();
+                                formData.append("file", file);
+                                const res = await fetch("/api/whatsapp/upload-media", { method: "POST", body: formData });
+                                const data = await res.json();
+                                if (data.success && data.mediaId) {
+                                  setNodes((prev) =>
+                                    prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: data.mediaId } : n))
+                                  );
+                                  setToastMsg(`✓ Image "${file.name}" uploaded successfully!`);
+                                } else {
+                                  const reader = new FileReader();
+                                  reader.onload = (evt) => {
+                                    const result = evt.target?.result as string;
+                                    setNodes((prev) =>
+                                      prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: result } : n))
+                                    );
+                                  };
+                                  reader.readAsDataURL(file);
+                                  setToastMsg(`✓ Image attached`);
+                                }
+                              } catch (_) {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  const result = evt.target?.result as string;
+                                  setNodes((prev) =>
+                                    prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: result } : n))
+                                  );
+                                };
+                                reader.readAsDataURL(file);
+                                setToastMsg(`✓ Image attached`);
+                              }
+                              setTimeout(() => setToastMsg(null), 3000);
                             }
                           }}
                         />
@@ -3151,20 +3175,20 @@ export default function WhatsAppChatbotBuilderPage() {
 
                     <input
                       type="text"
-                      placeholder="Or paste image URL or CTRL+V to paste image file directly..."
+                      placeholder="Or paste image URL, Meta Media ID, or CTRL+V to paste image..."
                       value={selectedNode.imageUrl || ""}
                       onChange={(e) =>
                         setNodes((prev) =>
                           prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: e.target.value } : n))
                         )
                       }
-                      onPaste={(e) => {
+                      onPaste={async (e) => {
                         const items = e.clipboardData?.items;
                         if (!items) return;
                         
                         for (let i = 0; i < items.length; i++) {
                           if (items[i].type.indexOf("image") !== -1) {
-                            e.preventDefault(); // Prevent pasting the filename string
+                            e.preventDefault();
                             const file = items[i].getAsFile();
                             if (!file) continue;
                             
@@ -3174,17 +3198,41 @@ export default function WhatsAppChatbotBuilderPage() {
                               return;
                             }
 
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              const result = reader.result as string;
-                              setNodes((prev) =>
-                                prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: result } : n))
-                              );
-                              setToastMsg(`✓ Image pasted successfully!`);
-                              setTimeout(() => setToastMsg(null), 3000);
-                            };
-                            reader.readAsDataURL(file);
-                            return; // Stop after first image
+                            setToastMsg("Uploading pasted image...");
+                            try {
+                              const formData = new FormData();
+                              formData.append("file", file);
+                              const res = await fetch("/api/whatsapp/upload-media", { method: "POST", body: formData });
+                              const data = await res.json();
+                              if (data.success && data.mediaId) {
+                                setNodes((prev) =>
+                                  prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: data.mediaId } : n))
+                                );
+                                setToastMsg(`✓ Image pasted & uploaded!`);
+                              } else {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  const result = reader.result as string;
+                                  setNodes((prev) =>
+                                    prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: result } : n))
+                                  );
+                                };
+                                reader.readAsDataURL(file);
+                                setToastMsg(`✓ Image pasted!`);
+                              }
+                            } catch (_) {
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const result = reader.result as string;
+                                setNodes((prev) =>
+                                  prev.map((n) => (n.id === selectedNode.id ? { ...n, imageUrl: result } : n))
+                                );
+                              };
+                              reader.readAsDataURL(file);
+                              setToastMsg(`✓ Image pasted!`);
+                            }
+                            setTimeout(() => setToastMsg(null), 3000);
+                            return;
                           }
                         }
                       }}

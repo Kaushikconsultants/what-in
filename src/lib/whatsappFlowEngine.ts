@@ -16,6 +16,90 @@ function interpolate(str: string, vars: Record<string, string>) {
   return s;
 }
 
+// Resolve image header for WhatsApp Cloud API (supports Meta media IDs, base64 data URLs, and HTTPS links)
+async function resolveMetaImageHeader(imageUrl: string, creds: { token: string; phoneId: string }): Promise<{ id?: string; link?: string } | null> {
+  if (!imageUrl) return null;
+  const cleanImg = imageUrl.trim();
+
+  // 1. If it's a Meta Media ID (pure digits)
+  if (/^\d+$/.test(cleanImg)) {
+    return { id: cleanImg };
+  }
+
+  // 2. If it's a base64 data URL, persist in DB & upload to Meta
+  if (cleanImg.startsWith('data:image')) {
+    try {
+      const [meta, b64] = cleanImg.split(',');
+      const mime = meta.match(/:(.*?);/)?.[1] || 'image/jpeg';
+      const buf = Buffer.from(b64, 'base64');
+      const mediaKey = `flow_img_${Date.now()}`;
+      
+      // Save permanently in DB
+      await prisma.whatsAppUploadedMedia.upsert({
+        where: { id: mediaKey },
+        update: { data: buf, size: buf.length, mimeType: mime },
+        create: { id: mediaKey, filename: `${mediaKey}.jpg`, mimeType: mime, data: buf, size: buf.length }
+      }).catch(() => {});
+
+      // Upload to Meta Cloud API to get a real media ID
+      const form = new FormData();
+      const blob = new Blob([new Uint8Array(buf)], { type: mime });
+      form.append('file', blob, `${mediaKey}.jpg`);
+      form.append('type', mime);
+      form.append('messaging_product', 'whatsapp');
+
+      const metaRes = await fetch(`https://graph.facebook.com/v20.0/${creds.phoneId}/media`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${creds.token}` },
+        body: form
+      });
+      const metaData = await metaRes.json().catch(() => ({}));
+      if (metaData?.id) {
+        return { id: metaData.id };
+      }
+    } catch (err) {
+      console.warn("[Flow Engine] Failed to upload base64 image to Meta:", err);
+    }
+  }
+
+  // 3. If it's an internal media proxy URL or DB ID
+  if (cleanImg.includes('/api/whatsapp/media/')) {
+    const idFromUrl = cleanImg.split('/api/whatsapp/media/')[1]?.split('?')[0];
+    if (idFromUrl && /^\d+$/.test(idFromUrl)) {
+      return { id: idFromUrl };
+    }
+    if (idFromUrl) {
+      try {
+        const dbMedia = await prisma.whatsAppUploadedMedia.findUnique({ where: { id: idFromUrl } });
+        if (dbMedia?.data) {
+          const form = new FormData();
+          const blob = new Blob([new Uint8Array(dbMedia.data)], { type: dbMedia.mimeType || 'image/jpeg' });
+          form.append('file', blob, dbMedia.filename || `${idFromUrl}.jpg`);
+          form.append('type', dbMedia.mimeType || 'image/jpeg');
+          form.append('messaging_product', 'whatsapp');
+
+          const metaRes = await fetch(`https://graph.facebook.com/v20.0/${creds.phoneId}/media`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${creds.token}` },
+            body: form
+          });
+          const metaData = await metaRes.json().catch(() => ({}));
+          if (metaData?.id) {
+            return { id: metaData.id };
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  // 4. If valid HTTP/HTTPS link
+  if (cleanImg.startsWith('http://') || cleanImg.startsWith('https://')) {
+    return { link: cleanImg };
+  }
+
+  return null;
+}
+
 // Dispatch a single flow node as a WhatsApp message
 async function dispatchNode(toPhone: string, node: any, vars: Record<string, string>, conversationId?: string) {
   const inter = (s: string) => interpolate(s, vars);
@@ -66,8 +150,9 @@ async function dispatchNode(toPhone: string, node: any, vars: Record<string, str
       }
 
     } else if (type === 'IMAGE') {
+      const imgHeader = await resolveMetaImageHeader(inter(node.imageUrl || ''), creds);
       payload.type = 'image';
-      payload.image = { link: inter(node.imageUrl || '') };
+      payload.image = imgHeader || { link: inter(node.imageUrl || '') };
       if (node.text) payload.image.caption = inter(node.text);
 
     } else if (type === 'VIDEO') {
@@ -98,10 +183,13 @@ async function dispatchNode(toPhone: string, node: any, vars: Record<string, str
           }
         };
         if (node.imageUrl) {
-          payload.interactive.header = {
-            type: 'image',
-            image: { link: inter(node.imageUrl) }
-          };
+          const imgHeader = await resolveMetaImageHeader(inter(node.imageUrl), creds);
+          if (imgHeader) {
+            payload.interactive.header = {
+              type: 'image',
+              image: imgHeader
+            };
+          }
         }
       } else {
         // Use List
@@ -227,8 +315,17 @@ async function dispatchNode(toPhone: string, node: any, vars: Record<string, str
       return; // Logic node, nothing to dispatch
     }
 
-    const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
-    const responseData = await response.json().catch(() => ({}));
+    let response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+    let responseData = await response.json().catch(() => ({}));
+    
+    // Resilient Fallback: If interactive message failed with an image header, retry without the header
+    if (!response.ok && payload.type === 'interactive' && payload.interactive?.header) {
+      console.warn(`[Flow Engine] Interactive message with header failed (${response.status} ${JSON.stringify(responseData)}). Retrying without header...`);
+      delete payload.interactive.header;
+      response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+      responseData = await response.json().catch(() => ({}));
+    }
+
     const wasSuccess = response.ok;
     const metaMessageId = responseData?.messages?.[0]?.id || null;
     if (wasSuccess && resolvedConvId) {
@@ -323,7 +420,7 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
           nodeId: node.id || "UNKNOWN",
           nodeType: type || "MESSAGE",
           actionDesc: `Executed block: ${node.title || type}`,
-          payload: {},
+          payload: { nodeId: node.id, nodeTitle: node.title, type, text: node.text?.slice(0, 100) },
           responseStatus: 200,
         }
       });
