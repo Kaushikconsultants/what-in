@@ -66,7 +66,8 @@ export default function WhatsAppHeaderNav() {
         pathname.startsWith("/whatsapp/flows") ||
         pathname.startsWith("/whatsapp/chatbots") ||
         pathname.startsWith("/whatsapp/chatbot-builder") ||
-        pathname.startsWith("/whatsapp/contacts")
+        pathname.startsWith("/whatsapp/contacts") ||
+        pathname.startsWith("/whatsapp/tags")
       );
     }
     return pathname.startsWith(path);

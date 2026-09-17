@@ -10691,6 +10691,591 @@ export async function installIndustryChatbotPresetAction(presetId: string) {
   }
 }
 
+// ---------------------------------------------------------
+// WHATSAPP TAG MANAGER ACTIONS
+// ---------------------------------------------------------
 
+const DEFAULT_TAG_PALETTE = [
+  "#6366f1", // Indigo
+  "#10b981", // Emerald
+  "#06b6d4", // Cyan
+  "#f59e0b", // Amber
+  "#f43f5e", // Rose
+  "#8b5cf6", // Violet
+  "#3b82f6", // Blue
+  "#ec4899", // Pink
+  "#14b8a6", // Teal
+  "#f97316", // Orange
+  "#64748b", // Slate
+  "#84cc16"  // Lime
+];
 
+export async function getAllWhatsAppTagsWithCountsAction() {
+  try {
+    // 1. Fetch all WhatsAppTag records
+    let dbTags = await prisma.whatsAppTag.findMany({
+      orderBy: { name: 'asc' }
+    });
 
+    // 2. Fetch all customers and their tags, totalSpend, orders, temperature
+    const allCustomers = await prisma.customer.findMany({
+      select: {
+        id: true,
+        tags: true,
+        totalPurchaseValue: true,
+        totalOrders: true,
+        temperature: true,
+        status: true,
+        leadStage: true
+      }
+    });
+
+    // Also fetch active conversation tags
+    const allConversations = await prisma.whatsAppConversation.findMany({
+      select: { id: true, tags: true }
+    });
+
+    // 3. Auto-discover unindexed tags in customers or conversations
+    const existingTagNameSet = new Set(dbTags.map(t => t.name.toLowerCase().trim()));
+    const discoveredTagsSet = new Set<string>();
+
+    allCustomers.forEach(c => {
+      if (c.tags) {
+        c.tags.split(',').forEach(raw => {
+          const t = raw.trim();
+          if (t && t.length > 0 && !existingTagNameSet.has(t.toLowerCase())) {
+            const lower = t.toLowerCase();
+            if (lower !== 'whatsapp lead' && lower !== 'auto created') {
+              discoveredTagsSet.add(t);
+            }
+          }
+        });
+      }
+    });
+
+    allConversations.forEach(conv => {
+      if (conv.tags) {
+        conv.tags.split(',').forEach(raw => {
+          const t = raw.trim();
+          if (t && t.length > 0 && !existingTagNameSet.has(t.toLowerCase())) {
+            const lower = t.toLowerCase();
+            if (lower !== 'whatsapp lead' && lower !== 'auto created') {
+              discoveredTagsSet.add(t);
+            }
+          }
+        });
+      }
+    });
+
+    if (discoveredTagsSet.size > 0) {
+      let colorIdx = dbTags.length;
+      for (const newTagName of Array.from(discoveredTagsSet)) {
+        try {
+          const color = DEFAULT_TAG_PALETTE[colorIdx % DEFAULT_TAG_PALETTE.length];
+          const created = await prisma.whatsAppTag.create({
+            data: { name: newTagName, color }
+          });
+          dbTags.push(created);
+          colorIdx++;
+        } catch (e) {
+          // ignore duplicate race condition
+        }
+      }
+    }
+
+    // 4. Compute metrics per tag
+    let totalTaggedCustomerIds = new Set<string>();
+
+    const tagsWithMetrics = dbTags.map(tag => {
+      const lowerTagName = tag.name.toLowerCase().trim();
+      let customerCount = 0;
+      let totalRevenue = 0;
+      let totalOrders = 0;
+      let hotLeadsCount = 0;
+
+      allCustomers.forEach(c => {
+        if (!c.tags) return;
+        const tokens = c.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+        if (tokens.includes(lowerTagName)) {
+          customerCount++;
+          totalTaggedCustomerIds.add(c.id);
+          totalRevenue += Number(c.totalPurchaseValue || 0);
+          totalOrders += Number(c.totalOrders || 0);
+          if (String(c.temperature || '').toUpperCase() === 'HOT') {
+            hotLeadsCount++;
+          }
+        }
+      });
+
+      // Count active conversations
+      let convCount = 0;
+      allConversations.forEach(cv => {
+        if (!cv.tags) return;
+        const tokens = cv.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+        if (tokens.includes(lowerTagName)) convCount++;
+      });
+
+      return {
+        id: tag.id,
+        name: tag.name,
+        color: tag.color || '#6366f1',
+        createdAt: tag.createdAt,
+        customerCount,
+        conversationCount: convCount,
+        totalRevenue,
+        totalOrders,
+        hotLeadsCount
+      };
+    });
+
+    // Sort by customerCount descending by default, then name
+    tagsWithMetrics.sort((a, b) => b.customerCount - a.customerCount || a.name.localeCompare(b.name));
+
+    const totalCustomersCount = allCustomers.length;
+    const totalTagged = totalTaggedCustomerIds.size;
+    const untaggedCount = Math.max(0, totalCustomersCount - totalTagged);
+
+    return {
+      success: true,
+      tags: tagsWithMetrics,
+      stats: {
+        totalTags: tagsWithMetrics.length,
+        totalCustomers: totalCustomersCount,
+        totalTaggedCustomers: totalTagged,
+        untaggedCustomersCount: untaggedCount,
+        tagCoveragePercentage: totalCustomersCount > 0 ? Math.round((totalTagged / totalCustomersCount) * 100) : 0
+      }
+    };
+  } catch (e: any) {
+    console.error("getAllWhatsAppTagsWithCountsAction error:", e);
+    return { success: false, error: e.message, tags: [], stats: { totalTags: 0, totalCustomers: 0, totalTaggedCustomers: 0, untaggedCustomersCount: 0, tagCoveragePercentage: 0 } };
+  }
+}
+
+export async function createWhatsAppTagAction(data: { name: string; color?: string }) {
+  try {
+    const rawName = data.name?.trim();
+    if (!rawName || rawName.length < 2) {
+      return { success: false, error: "Tag name must be at least 2 characters long." };
+    }
+
+    const existing = await prisma.whatsAppTag.findFirst({
+      where: { name: { equals: rawName, mode: 'insensitive' } }
+    });
+
+    if (existing) {
+      return { success: false, error: `Tag "${rawName}" already exists.` };
+    }
+
+    const tag = await prisma.whatsAppTag.create({
+      data: {
+        name: rawName,
+        color: data.color || DEFAULT_TAG_PALETTE[Math.floor(Math.random() * DEFAULT_TAG_PALETTE.length)]
+      }
+    });
+
+    revalidatePath("/whatsapp/tags");
+    revalidatePath("/whatsapp/contacts");
+    revalidatePath("/whatsapp/templates");
+    return { success: true, tag };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function updateWhatsAppTagAction(data: {
+  id: string;
+  oldName: string;
+  newName: string;
+  color?: string;
+}) {
+  try {
+    const trimmedNewName = data.newName?.trim();
+    const trimmedOldName = data.oldName?.trim();
+
+    if (!trimmedNewName || trimmedNewName.length < 2) {
+      return { success: false, error: "Tag name must be at least 2 characters long." };
+    }
+
+    // Check if new name already exists on another tag
+    if (trimmedNewName.toLowerCase() !== trimmedOldName.toLowerCase()) {
+      const duplicate = await prisma.whatsAppTag.findFirst({
+        where: {
+          name: { equals: trimmedNewName, mode: 'insensitive' },
+          id: { not: data.id }
+        }
+      });
+      if (duplicate) {
+        return { success: false, error: `A tag named "${trimmedNewName}" already exists.` };
+      }
+    }
+
+    // 1. Update tag record
+    const updatedTag = await prisma.whatsAppTag.update({
+      where: { id: data.id },
+      data: {
+        name: trimmedNewName,
+        color: data.color || undefined
+      }
+    });
+
+    // 2. If name changed, rename it in all Customer records
+    if (trimmedNewName.toLowerCase() !== trimmedOldName.toLowerCase()) {
+      const customersWithTag = await prisma.customer.findMany({
+        where: { tags: { contains: trimmedOldName, mode: 'insensitive' } },
+        select: { id: true, tags: true }
+      });
+
+      for (const cust of customersWithTag) {
+        if (!cust.tags) continue;
+        const tokens = cust.tags.split(',').map(t => t.trim()).filter(Boolean);
+        let changed = false;
+        const newTokens = tokens.map(t => {
+          if (t.toLowerCase() === trimmedOldName.toLowerCase()) {
+            changed = true;
+            return trimmedNewName;
+          }
+          return t;
+        });
+
+        if (changed) {
+          const unique = Array.from(new Set(newTokens));
+          await prisma.customer.update({
+            where: { id: cust.id },
+            data: { tags: unique.join(', ') }
+          });
+        }
+      }
+
+      // Also update WhatsApp conversations
+      const convsWithTag = await prisma.whatsAppConversation.findMany({
+        where: { tags: { contains: trimmedOldName, mode: 'insensitive' } },
+        select: { id: true, tags: true }
+      });
+
+      for (const conv of convsWithTag) {
+        if (!conv.tags) continue;
+        const tokens = conv.tags.split(',').map(t => t.trim()).filter(Boolean);
+        let changed = false;
+        const newTokens = tokens.map(t => {
+          if (t.toLowerCase() === trimmedOldName.toLowerCase()) {
+            changed = true;
+            return trimmedNewName;
+          }
+          return t;
+        });
+
+        if (changed) {
+          const unique = Array.from(new Set(newTokens));
+          await prisma.whatsAppConversation.update({
+            where: { id: conv.id },
+            data: { tags: unique.join(', ') }
+          });
+        }
+      }
+    }
+
+    revalidatePath("/whatsapp/tags");
+    revalidatePath("/whatsapp/contacts");
+    revalidatePath("/whatsapp/templates");
+    return { success: true, tag: updatedTag };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function deleteWhatsAppTagAction(data: {
+  id: string;
+  name: string;
+  untagCustomers?: boolean;
+}) {
+  try {
+    const tagName = data.name.trim();
+
+    // 1. Delete from WhatsAppTag
+    await prisma.whatsAppTag.delete({
+      where: { id: data.id }
+    });
+
+    // 2. Untag customers if requested (default true)
+    if (data.untagCustomers !== false) {
+      const customersWithTag = await prisma.customer.findMany({
+        where: { tags: { contains: tagName, mode: 'insensitive' } },
+        select: { id: true, tags: true }
+      });
+
+      for (const cust of customersWithTag) {
+        if (!cust.tags) continue;
+        const tokens = cust.tags.split(',').map(t => t.trim()).filter(Boolean);
+        const filtered = tokens.filter(t => t.toLowerCase() !== tagName.toLowerCase());
+        await prisma.customer.update({
+          where: { id: cust.id },
+          data: { tags: filtered.join(', ') }
+        });
+      }
+
+      const convsWithTag = await prisma.whatsAppConversation.findMany({
+        where: { tags: { contains: tagName, mode: 'insensitive' } },
+        select: { id: true, tags: true }
+      });
+
+      for (const conv of convsWithTag) {
+        if (!conv.tags) continue;
+        const tokens = conv.tags.split(',').map(t => t.trim()).filter(Boolean);
+        const filtered = tokens.filter(t => t.toLowerCase() !== tagName.toLowerCase());
+        await prisma.whatsAppConversation.update({
+          where: { id: conv.id },
+          data: { tags: filtered.join(', ') }
+        });
+      }
+    }
+
+    revalidatePath("/whatsapp/tags");
+    revalidatePath("/whatsapp/contacts");
+    revalidatePath("/whatsapp/templates");
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function getTagCustomersAction(params: {
+  tagName: string;
+  search?: string;
+  limit?: number;
+}) {
+  try {
+    const tagName = params.tagName?.trim();
+    if (!tagName) {
+      return { success: false, error: "Tag name is required.", customers: [], summary: null };
+    }
+
+    const search = params.search?.trim().toLowerCase() || "";
+    const limit = Math.max(1, Math.min(200, Number(params.limit) || 100));
+
+    // Query customers who have this tag
+    const matchingCusts = await prisma.customer.findMany({
+      where: {
+        tags: { contains: tagName, mode: 'insensitive' }
+      },
+      include: {
+        whatsAppConversations: {
+          select: { id: true, lastMessageAt: true, status: true },
+          take: 1
+        },
+        orders: {
+          select: { id: true, totalValue: true, orderStatus: true, orderDate: true },
+          take: 3,
+          orderBy: { orderDate: 'desc' }
+        }
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // Exact token check & search filter
+    const lowerTagName = tagName.toLowerCase();
+    const filtered = matchingCusts.filter(c => {
+      if (!c.tags) return false;
+      const tokens = c.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+      if (!tokens.includes(lowerTagName)) return false;
+
+      if (search) {
+        const matchName = (c.contactPerson || '').toLowerCase().includes(search);
+        const matchBusiness = (c.businessName || '').toLowerCase().includes(search);
+        const matchPhone = (c.mobile || '').includes(search) || (c.whatsappNumber || '').includes(search);
+        return matchName || matchBusiness || matchPhone;
+      }
+      return true;
+    });
+
+    let totalRevenue = 0;
+    let totalOrders = 0;
+    let hotCount = 0;
+
+    filtered.forEach(c => {
+      totalRevenue += Number(c.totalPurchaseValue || 0);
+      totalOrders += Number(c.totalOrders || 0);
+      if (String(c.temperature || '').toUpperCase() === 'HOT') hotCount++;
+    });
+
+    const paginatedCustomers = filtered.slice(0, limit).map(c => {
+      const allTags = (c.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      return {
+        id: c.id,
+        name: c.contactPerson || c.businessName || "Unnamed Customer",
+        businessName: c.businessName,
+        mobile: c.mobile,
+        whatsappNumber: c.whatsappNumber || c.mobile,
+        customerType: c.customerType || "Customer",
+        leadStage: c.leadStage || "Contacted",
+        status: c.status || "Active",
+        temperature: c.temperature || "WARM",
+        totalOrders: c.totalOrders || 0,
+        totalPurchaseValue: c.totalPurchaseValue || 0,
+        tags: allTags,
+        lastContactDate: c.lastContactDate || c.updatedAt,
+        conversationId: c.whatsAppConversations?.[0]?.id || null,
+        recentOrders: c.orders || []
+      };
+    });
+
+    return {
+      success: true,
+      tagName,
+      customers: paginatedCustomers,
+      totalCount: filtered.length,
+      summary: {
+        totalCustomers: filtered.length,
+        totalRevenue,
+        totalOrders,
+        hotCount
+      }
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message, customers: [], summary: null };
+  }
+}
+
+export async function addTagToCustomersAction(data: {
+  tagName: string;
+  customerIds: string[];
+}) {
+  try {
+    const tagName = data.tagName.trim();
+    if (!tagName || !data.customerIds || data.customerIds.length === 0) {
+      return { success: false, error: "Tag name and at least one customer required." };
+    }
+
+    // Ensure tag exists in WhatsAppTag table
+    const existingTag = await prisma.whatsAppTag.findFirst({
+      where: { name: { equals: tagName, mode: 'insensitive' } }
+    });
+    if (!existingTag) {
+      await prisma.whatsAppTag.create({
+        data: { name: tagName, color: DEFAULT_TAG_PALETTE[Math.floor(Math.random() * DEFAULT_TAG_PALETTE.length)] }
+      }).catch(() => {});
+    }
+
+    for (const customerId of data.customerIds) {
+      const cust = await prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { id: true, tags: true }
+      });
+      if (!cust) continue;
+
+      const tokens = (cust.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      if (!tokens.some(t => t.toLowerCase() === tagName.toLowerCase())) {
+        tokens.push(tagName);
+        const updatedStr = tokens.join(', ');
+
+        await prisma.customer.update({
+          where: { id: customerId },
+          data: { tags: updatedStr }
+        });
+
+        await prisma.whatsAppConversation.updateMany({
+          where: { customerId },
+          data: { tags: updatedStr }
+        });
+      }
+    }
+
+    revalidatePath("/whatsapp/tags");
+    revalidatePath("/whatsapp/contacts");
+    return { success: true, count: data.customerIds.length };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function removeTagFromCustomerAction(data: {
+  tagName: string;
+  customerId: string;
+}) {
+  try {
+    const tagName = data.tagName.trim();
+    const cust = await prisma.customer.findUnique({
+      where: { id: data.customerId },
+      select: { id: true, tags: true }
+    });
+
+    if (!cust) return { success: false, error: "Customer not found." };
+
+    const tokens = (cust.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    const filtered = tokens.filter(t => t.toLowerCase() !== tagName.toLowerCase());
+    const updatedStr = filtered.join(', ');
+
+    await prisma.customer.update({
+      where: { id: data.customerId },
+      data: { tags: updatedStr }
+    });
+
+    await prisma.whatsAppConversation.updateMany({
+      where: { customerId: data.customerId },
+      data: { tags: updatedStr }
+    });
+
+    revalidatePath("/whatsapp/tags");
+    revalidatePath("/whatsapp/contacts");
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function searchAvailableCustomersForTagAction(params: {
+  tagName: string;
+  search?: string;
+  limit?: number;
+}) {
+  try {
+    const tagName = params.tagName.trim().toLowerCase();
+    const search = params.search?.trim() || "";
+    const limit = Math.min(30, Math.max(1, params.limit || 15));
+
+    const whereClause: any = {};
+    if (search) {
+      whereClause.OR = [
+        { contactPerson: { contains: search, mode: 'insensitive' } },
+        { businessName: { contains: search, mode: 'insensitive' } },
+        { mobile: { contains: search } },
+        { whatsappNumber: { contains: search } }
+      ];
+    }
+
+    const candidates = await prisma.customer.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        contactPerson: true,
+        businessName: true,
+        mobile: true,
+        whatsappNumber: true,
+        tags: true,
+        customerType: true
+      },
+      take: 50,
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // Filter out customers that already have this tag
+    const available = candidates.filter(c => {
+      const tokens = (c.tags || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+      return !tokens.includes(tagName);
+    }).slice(0, limit);
+
+    return {
+      success: true,
+      customers: available.map(c => ({
+        id: c.id,
+        name: c.contactPerson || c.businessName || "Unnamed Contact",
+        businessName: c.businessName,
+        phone: c.whatsappNumber || c.mobile,
+        tags: (c.tags || '').split(',').map(t => t.trim()).filter(Boolean),
+        customerType: c.customerType || "Customer"
+      }))
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message, customers: [] };
+  }
+}

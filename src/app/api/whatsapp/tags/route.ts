@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
+import {
+  getAllWhatsAppTagsWithCountsAction,
+  getTagCustomersAction,
+  createWhatsAppTagAction,
+  updateWhatsAppTagAction,
+  deleteWhatsAppTagAction
+} from '@/app/actions/whatsAppPlatformActions';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,8 +17,24 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
     }
 
+    const { searchParams } = req.nextUrl;
+    const withCounts = searchParams.get("withCounts") === "true";
+    const forCustomers = searchParams.get("customers") === "true";
+    const tagName = searchParams.get("tagName");
+
+    if (forCustomers && tagName) {
+      const search = searchParams.get("search") || "";
+      const result = await getTagCustomersAction({ tagName, search });
+      return NextResponse.json(result);
+    }
+
+    if (withCounts) {
+      const result = await getAllWhatsAppTagsWithCountsAction();
+      return NextResponse.json(result);
+    }
+
     const rawTags = await prisma.whatsAppTag.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { name: 'asc' }
     });
     const tags = rawTags.filter(t => {
       const l = t.name.toLowerCase().trim();
@@ -28,28 +51,16 @@ export async function POST(req: NextRequest) {
     const authUser = await getAuthenticatedUser(req);
     const isOwner = isOwnerAuthenticated(req);
     if (!isOwner && (!authUser || (authUser.role !== "ADMIN" && authUser.role !== "SUPER_ADMIN" && authUser.role !== "MANAGER"))) {
-      return NextResponse.json({ success: false, error: "Only admins can create new tags." }, { status: 403 });
+      return NextResponse.json({ success: false, error: "Only admins can manage tags." }, { status: 403 });
     }
 
-    const { name, color } = await req.json();
-
-    // Check if tag already exists
-    const existing = await prisma.whatsAppTag.findFirst({
-      where: { name: { equals: name.trim(), mode: 'insensitive' } }
-    });
-
-    if (existing) {
-      return NextResponse.json({ success: false, error: "Tag already exists." }, { status: 400 });
+    const body = await req.json();
+    const result = await createWhatsAppTagAction({ name: body.name, color: body.color });
+    if (!result.success) {
+      return NextResponse.json(result, { status: 400 });
     }
 
-    const newTag = await prisma.whatsAppTag.create({
-      data: {
-        name: name.trim(),
-        color: color || '#e2e8f0'
-      }
-    });
-
-    return NextResponse.json({ success: true, tag: newTag });
+    return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -63,7 +74,28 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
     }
 
-    const { conversationId, tagName, action } = await req.json();
+    const body = await req.json();
+
+    // 1. Tag edit / rename flow
+    if (body.id && (body.newName || body.color)) {
+      if (!isOwner && (!authUser || (authUser.role !== "ADMIN" && authUser.role !== "SUPER_ADMIN" && authUser.role !== "MANAGER"))) {
+        return NextResponse.json({ success: false, error: "Only admins can edit tags." }, { status: 403 });
+      }
+
+      const res = await updateWhatsAppTagAction({
+        id: body.id,
+        oldName: body.oldName || body.name || "",
+        newName: body.newName || body.name || "",
+        color: body.color
+      });
+      if (!res.success) {
+        return NextResponse.json(res, { status: 400 });
+      }
+      return NextResponse.json(res);
+    }
+
+    // 2. Conversation tag toggle flow
+    const { conversationId, tagName, action } = body;
 
     if (!conversationId || !tagName || !action) {
       return NextResponse.json({ success: false, error: "conversationId, tagName, and action ('add'|'remove') are required." }, { status: 400 });
@@ -108,6 +140,35 @@ export async function PUT(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, tags: updatedTagsStr });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const authUser = await getAuthenticatedUser(req);
+    const isOwner = isOwnerAuthenticated(req);
+    if (!isOwner && (!authUser || (authUser.role !== "ADMIN" && authUser.role !== "SUPER_ADMIN" && authUser.role !== "MANAGER"))) {
+      return NextResponse.json({ success: false, error: "Only admins can delete tags." }, { status: 403 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { searchParams } = req.nextUrl;
+    const id = body.id || searchParams.get("id");
+    const name = body.name || searchParams.get("name");
+    const untagCustomers = body.untagCustomers !== false;
+
+    if (!id || !name) {
+      return NextResponse.json({ success: false, error: "Tag id and name are required." }, { status: 400 });
+    }
+
+    const result = await deleteWhatsAppTagAction({ id, name, untagCustomers });
+    if (!result.success) {
+      return NextResponse.json(result, { status: 400 });
+    }
+
+    return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

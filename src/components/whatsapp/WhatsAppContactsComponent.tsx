@@ -66,6 +66,7 @@ export default function WhatsAppContactsComponent() {
   const [crmFilter, setCrmFilter] = useState<"ALL" | "DONE" | "NOT_DONE">("ALL");
   const [tagFilter, setTagFilter] = useState("ALL");
   const [allAvailableTags, setAllAvailableTags] = useState<string[]>([]);
+  const [tagColorMap, setTagColorMap] = useState<Record<string, string>>({});
 
   // Pagination states (50 contacts per page)
   const [currentPage, setCurrentPage] = useState(1);
@@ -163,6 +164,11 @@ export default function WhatsAppContactsComponent() {
       .then((d) => {
         if (d.success && d.tags) {
           const names = d.tags.map((t: any) => t.name);
+          const colorMap: Record<string, string> = {};
+          d.tags.forEach((t: any) => {
+            if (t.name && t.color) colorMap[t.name.toLowerCase().trim()] = t.color;
+          });
+          setTagColorMap(colorMap);
           setAllAvailableTags((prev) => Array.from(new Set([...prev, ...names])));
         }
       })
@@ -1057,6 +1063,15 @@ export default function WhatsAppContactsComponent() {
           </button>
 
           <button
+            onClick={() => router.push("/whatsapp/tags")}
+            className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Manage customer tags, edit colors, and view tagged customer cohorts"
+          >
+            <Tag size={14} className="text-indigo-600 dark:text-indigo-400" />
+            <span>Tag Manager</span>
+          </button>
+
+          <button
             onClick={openAddModal}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
           >
@@ -1327,13 +1342,25 @@ export default function WhatsAppContactsComponent() {
                       <div className="flex items-center gap-1.5 flex-nowrap">
                         {c.tags && c.tags.length > 0 ? (
                           <>
-                            {/* First Tag */}
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-md text-[11px] font-bold truncate max-w-[150px]"
-                              title={c.tags[0]}
-                            >
-                              🏷️ {c.tags[0]}
-                            </span>
+                            {/* First Tag with dynamic color */}
+                            {(() => {
+                              const tName = c.tags[0];
+                              const tColor = tagColorMap[tName?.toLowerCase()?.trim()] || "#6366f1";
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold truncate max-w-[150px]"
+                                  style={{
+                                    backgroundColor: `${tColor}15`,
+                                    color: tColor,
+                                    border: `1px solid ${tColor}40`
+                                  }}
+                                  title={tName}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tColor }} />
+                                  <span>{tName}</span>
+                                </span>
+                              );
+                            })()}
 
                             {/* +N More button */}
                             {c.tags.length > 1 && (

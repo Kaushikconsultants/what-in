@@ -2,25 +2,26 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { FileCode, Radio, Zap, Bot, Users, CheckCircle2, ShieldCheck, Activity, PhoneCall, RefreshCw, Filter } from "lucide-react";
+import { FileCode, Radio, Zap, Bot, Users, Tag, CheckCircle2, ShieldCheck, Activity, PhoneCall, RefreshCw, Filter } from "lucide-react";
 import WhatsAppTemplatesComponent from "@/components/whatsapp/WhatsAppTemplatesComponent";
 import WhatsAppBroadcastsComponent from "@/components/whatsapp/WhatsAppBroadcastsComponent";
 import WhatsAppFlowsComponent from "@/components/whatsapp/WhatsAppFlowsComponent";
 import WhatsAppChatbotsComponent from "@/components/whatsapp/WhatsAppChatbotsComponent";
 import WhatsAppContactsComponent from "@/components/whatsapp/WhatsAppContactsComponent";
+import WhatsAppTagManagerComponent from "@/components/whatsapp/WhatsAppTagManagerComponent";
 import { getMetaPhoneHealthAndLimitsAction } from "@/app/actions/whatsAppPlatformActions";
 
 interface WhatsAppHubProps {
-  initialTab?: "templates" | "broadcasts" | "flows" | "chatbots" | "contacts";
+  initialTab?: "templates" | "broadcasts" | "flows" | "chatbots" | "contacts" | "tags";
 }
 
 function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
   const searchParams = useSearchParams();
-  const tabFromQuery = searchParams.get("tab") as "templates" | "broadcasts" | "flows" | "chatbots" | "contacts" | null;
+  const tabFromQuery = searchParams.get("tab") as "templates" | "broadcasts" | "flows" | "chatbots" | "contacts" | "tags" | null;
 
-  const validTabs = ["templates", "broadcasts", "flows", "chatbots", "contacts"];
+  const validTabs = ["templates", "broadcasts", "flows", "chatbots", "contacts", "tags"];
 
-  const [activeTab, setActiveTab] = useState<"templates" | "broadcasts" | "flows" | "chatbots" | "contacts">(
+  const [activeTab, setActiveTab] = useState<"templates" | "broadcasts" | "flows" | "chatbots" | "contacts" | "tags">(
     tabFromQuery && validTabs.includes(tabFromQuery)
       ? tabFromQuery
       : initialTab
@@ -45,7 +46,7 @@ function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
   });
   const [loadingHealth, setLoadingHealth] = useState(false);
 
-  const fetchHealth = async () => {
+  const refreshHealth = async () => {
     setLoadingHealth(true);
     try {
       const res = await getMetaPhoneHealthAndLimitsAction();
@@ -53,22 +54,21 @@ function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
         setMetaHealth({
           qualityRating: res.qualityRating || "GREEN",
           dailyLimitTier: res.dailyLimitTier || "10,000 / 24h",
-          throughput: res.throughput || 80,
+          throughput: typeof res.throughput === "number" ? res.throughput : 80,
           optedOutCount: res.optedOutCount || 0,
           verifiedName: res.verifiedName || "WhatsApp Account",
           displayPhoneNumber: res.displayPhoneNumber || "+91 74043 88242",
           isConnected: res.isConnected ?? true
         });
       }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingHealth(false);
+    } catch (err) {
+      console.error("Error refreshing Meta health:", err);
     }
+    setLoadingHealth(false);
   };
 
   useEffect(() => {
-    fetchHealth();
+    refreshHealth();
   }, []);
 
   useEffect(() => {
@@ -77,7 +77,7 @@ function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
     }
   }, [tabFromQuery]);
 
-  const handleTabChange = (tab: "templates" | "broadcasts" | "flows" | "chatbots" | "contacts") => {
+  const handleTabChange = (tab: "templates" | "broadcasts" | "flows" | "chatbots" | "contacts" | "tags") => {
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -93,99 +93,77 @@ function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
         <div>
           <div className="flex items-center gap-3 mb-1.5">
             <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-              WhatsApp Hub
+              WhatsApp Control Hub
             </h1>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 shadow-2xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              Meta Connected
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+              Cloud API v20.0
             </span>
           </div>
-          <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm">
-            Manage Meta-approved templates, broadcast campaigns, interactive flows, automated chatbots, and CRM contacts.
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            Manage Meta-approved templates, broadcast campaigns, interactive flows, automated chatbots, CRM contacts, and customer tags.
           </p>
         </div>
 
-        <button
-          onClick={fetchHealth}
-          disabled={loadingHealth}
-          className="self-start md:self-auto px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 shadow-2xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-        >
-          <RefreshCw size={13} className={loadingHealth ? "animate-spin text-indigo-600" : "text-slate-400"} />
-          <span>Refresh Health</span>
-        </button>
-      </div>
-
-      {/* Meta Phone Number Health & Messaging Limit Bar */}
-      <div className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          {/* Phone Number & Verified Badge */}
-          <div className="flex items-center gap-3 pr-4 border-r border-slate-200 dark:border-slate-800">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/20">
-              <PhoneCall size={16} />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                <span>{metaHealth.verifiedName}</span>
-                <CheckCircle2 size={13} className="text-emerald-500 fill-emerald-500 text-white" />
-              </div>
-              <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-medium">
-                {metaHealth.displayPhoneNumber}
-              </div>
-            </div>
-          </div>
-
+        {/* Live Meta Account Health Bar */}
+        <div className="flex flex-wrap items-center gap-2">
           {/* Quality Rating */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Quality:</span>
-            <span className={`px-2.5 py-1 rounded-lg font-bold text-xs flex items-center gap-1.5 border ${
+          <span
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border shadow-2xs ${
               metaHealth.qualityRating === "GREEN"
-                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
+                ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
                 : metaHealth.qualityRating === "YELLOW"
-                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60"
-                : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60"
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${
-                metaHealth.qualityRating === "GREEN" ? "bg-emerald-500 animate-pulse" : metaHealth.qualityRating === "YELLOW" ? "bg-amber-500" : "bg-rose-500"
-              }`} />
-              {metaHealth.qualityRating === "GREEN" ? "High Quality (Green)" : metaHealth.qualityRating === "YELLOW" ? "Medium Warning (Yellow)" : "Low Quality (Red)"}
-            </span>
-          </div>
+                ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                : "bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800"
+            }`}
+            title="Meta Phone Number Quality Rating"
+          >
+            <ShieldCheck size={14} />
+            <span>Quality: {metaHealth.qualityRating}</span>
+          </span>
 
           {/* Daily Limit Tier */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Daily Limit:</span>
-            <span className="px-2.5 py-1 rounded-lg font-bold text-xs bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 flex items-center gap-1.5">
-              <Zap size={12} className="text-indigo-500" />
-              {metaHealth.dailyLimitTier}
-            </span>
-          </div>
-
-          {/* Throughput */}
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Throughput:</span>
-            <span className="px-2.5 py-1 rounded-lg font-bold text-xs bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 flex items-center gap-1.5">
-              <Activity size={12} className="text-sky-500" />
-              {String(metaHealth.throughput).toUpperCase() === "STANDARD" || metaHealth.throughput === 80
-                ? "80 msgs/sec (Standard)"
-                : `${metaHealth.throughput} msgs/sec`}
-            </span>
-          </div>
-        </div>
-
-        {/* DND Suppression Count */}
-        <div className="flex items-center gap-2">
-          <span className="px-3 py-1.5 rounded-xl font-bold text-xs bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5" title="Opted-out customer contacts automatically excluded to protect your Meta phone quality rating">
-            <Filter size={13} className="text-indigo-500" />
-            <span className="font-black text-indigo-600 dark:text-indigo-400">{metaHealth.optedOutCount}</span> Unsubscribed (DND)
+          <span
+            className="px-3 py-1.5 rounded-xl font-bold text-xs bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1.5"
+            title="Meta 24-Hour Unique Business-Initiated Messaging Limit"
+          >
+            <Activity size={14} />
+            <span>Tier: {metaHealth.dailyLimitTier}</span>
           </span>
+
+          {/* Phone Number Indicator */}
+          {metaHealth.displayPhoneNumber && (
+            <span
+              className="px-3 py-1.5 rounded-xl font-bold text-xs bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 hidden sm:flex"
+              title="Verified Meta Phone Number"
+            >
+              <PhoneCall size={14} className="text-emerald-500" />
+              <span>{metaHealth.displayPhoneNumber}</span>
+            </span>
+          )}
+
+          {/* Opted-Out Suppressions Count */}
+          <span
+            className="px-3 py-1.5 rounded-xl font-bold text-xs bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5"
+            title="Opted-out customer contacts automatically excluded to protect your Meta phone quality rating"
+          >
+            <Filter size={14} className="text-slate-400" />
+            <span>{metaHealth.optedOutCount} Blocked</span>
+          </span>
+
+          {/* Refresh Button */}
+          <button
+            onClick={refreshHealth}
+            disabled={loadingHealth}
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
+            title="Refresh Meta account quality metrics"
+          >
+            <RefreshCw size={14} className={loadingHealth ? "animate-spin text-indigo-600" : ""} />
+          </button>
         </div>
       </div>
 
-      {/* Segmented Pill Navigation Tabs */}
-      <div className="w-fit p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-2xs flex items-center gap-1 overflow-x-auto">
+      {/* Modern Tabs Navigation Bar */}
+      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl w-fit border border-slate-200/80 dark:border-slate-700 overflow-x-auto max-w-full">
         <button
           onClick={() => handleTabChange("templates")}
           className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
@@ -245,6 +223,18 @@ function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
           <Users size={14} />
           <span>Contacts</span>
         </button>
+
+        <button
+          onClick={() => handleTabChange("tags")}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "tags"
+              ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+          }`}
+        >
+          <Tag size={14} />
+          <span>Tag Manager</span>
+        </button>
       </div>
 
       {/* Tab Panels */}
@@ -254,6 +244,7 @@ function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
         {activeTab === "flows" && <WhatsAppFlowsComponent />}
         {activeTab === "chatbots" && <WhatsAppChatbotsComponent />}
         {activeTab === "contacts" && <WhatsAppContactsComponent />}
+        {activeTab === "tags" && <WhatsAppTagManagerComponent />}
       </div>
     </div>
   );
