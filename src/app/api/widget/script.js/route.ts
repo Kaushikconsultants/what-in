@@ -411,50 +411,106 @@ export async function GET(req: NextRequest) {
     body.appendChild(offlineBox);
   }
 
-  // Cart Recovery Inspection for Shopify
+  // Cart Recovery & Active Cart Inspection for Shopify
   var cartBox = null;
-  if (config.enableCartRecovery && platform === 'Shopify') {
+  if (platform === 'Shopify') {
     fetch('/cart.js')
       .then(function(r) { return r.json(); })
       .then(function(cart) {
         if (cart && cart.item_count > 0) {
-          detectedCart = cart;
-          var itemTitles = cart.items.map(function(it) { return it.title; }).slice(0, 2).join(', ');
-          if (cart.items.length > 2) itemTitles += ' +' + (cart.items.length - 2) + ' more';
-
-          cartBox = document.createElement('div');
-          cartBox.style.backgroundColor = '#ecfdf5';
-          cartBox.style.border = '1px solid #a7f3d0';
-          cartBox.style.padding = '10px';
-          cartBox.style.borderRadius = '10px';
-          cartBox.style.fontSize = '12px';
-          cartBox.style.color = '#065f46';
-
-          cartBox.innerHTML = '<strong>🛒 ' + cart.item_count + ' items in your cart</strong><br><span style="font-size:11px;color:#047857;">' + itemTitles + ' (₹' + (cart.total_price / 100).toFixed(2) + ')</span>';
-
-          var cartAction = document.createElement('button');
-          cartAction.innerText = 'Ask for Cart Help / Discount ➔';
-          cartAction.style.width = '100%';
-          cartAction.style.marginTop = '6px';
-          cartAction.style.padding = '6px';
-          cartAction.style.backgroundColor = '#059669';
-          cartAction.style.color = '#ffffff';
-          cartAction.style.border = 'none';
-          cartAction.style.borderRadius = '6px';
-          cartAction.style.fontWeight = '600';
-          cartAction.style.fontSize = '11.5px';
-          cartAction.style.cursor = 'pointer';
-
-          cartAction.onclick = function() {
-            var cartMsg = 'Hi! I have ' + cart.item_count + ' item(s) in my cart (' + itemTitles + ') totaling ₹' + (cart.total_price / 100).toFixed(2) + '. Can you assist with my order or available offers?';
-            window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(cartMsg), '_blank');
+          detectedCart = {
+            item_count: cart.item_count,
+            total_price: cart.total_price ? (cart.total_price / 100) : 0,
+            currency: cart.currency || 'INR',
+            items: (cart.items || []).map(function(it) {
+              return {
+                title: it.title || it.product_title,
+                quantity: it.quantity,
+                price: it.price ? (it.price / 100) : 0,
+                image: it.image || (it.featured_image ? it.featured_image.url : ''),
+                variant_title: it.variant_title || null,
+                url: it.url ? (window.location.origin + it.url) : null
+              };
+            })
           };
 
-          cartBox.appendChild(cartAction);
-          body.insertBefore(cartBox, body.firstChild);
+          if (config.enableCartRecovery) {
+            var itemTitles = cart.items.map(function(it) { return it.title; }).slice(0, 2).join(', ');
+            if (cart.items.length > 2) itemTitles += ' +' + (cart.items.length - 2) + ' more';
+
+            cartBox = document.createElement('div');
+            cartBox.style.backgroundColor = '#ecfdf5';
+            cartBox.style.border = '1px solid #a7f3d0';
+            cartBox.style.padding = '10px';
+            cartBox.style.borderRadius = '10px';
+            cartBox.style.fontSize = '12px';
+            cartBox.style.color = '#065f46';
+
+            cartBox.innerHTML = '<strong>🛒 ' + cart.item_count + ' items in your cart</strong><br><span style="font-size:11px;color:#047857;">' + itemTitles + ' (₹' + (cart.total_price / 100).toFixed(2) + ')</span>';
+
+            var cartAction = document.createElement('button');
+            cartAction.innerText = 'Ask for Cart Help / Discount ➔';
+            cartAction.style.width = '100%';
+            cartAction.style.marginTop = '6px';
+            cartAction.style.padding = '6px';
+            cartAction.style.backgroundColor = '#059669';
+            cartAction.style.color = '#ffffff';
+            cartAction.style.border = 'none';
+            cartAction.style.borderRadius = '6px';
+            cartAction.style.fontWeight = '600';
+            cartAction.style.fontSize = '11.5px';
+            cartAction.style.cursor = 'pointer';
+
+            cartAction.onclick = function() {
+              openWhatsAppWithSession('Hi! Can you assist with my order / available offers?');
+            };
+
+            cartBox.appendChild(cartAction);
+            body.insertBefore(cartBox, body.firstChild);
+          }
         }
       })
       .catch(function() {});
+  }
+
+  // Helper to generate a 4-character uppercase alphanumeric reference token
+  function generateRefCode() {
+    return 'W' + Math.random().toString(36).substring(2, 6).toUpperCase();
+  }
+
+  // Send visitor session context to backend and launch WhatsApp with clean prefilled text + ref tag
+  function openWhatsAppWithSession(cleanText, targetPhoneOverride) {
+    var refCode = generateRefCode();
+    var phoneToUse = (targetPhoneOverride || config.phoneNumber || '').replace(/\\D/g, '');
+    var textToSend = cleanText + ' [Ref: ' + refCode + ']';
+
+    try {
+      var payloadData = JSON.stringify({
+        clientId: clientId,
+        refId: refCode,
+        pageUrl: window.location.href,
+        pageTitle: (detectedProduct && detectedProduct.title) ? (detectedProduct.title + ' (' + platform + ')') : document.title,
+        platform: platform,
+        detectedProduct: detectedProduct,
+        cart: detectedCart,
+        utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget'),
+        customMessage: cleanText
+      });
+
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([payloadData], { type: 'application/json' }));
+      } else {
+        fetch(appUrl + '/api/widget/capture-lead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payloadData,
+          keepalive: true
+        }).catch(function() {});
+      }
+    } catch (err) {}
+
+    window.open('https://wa.me/' + phoneToUse + '?text=' + encodeURIComponent(textToSend), '_blank');
+    card.style.display = 'none';
   }
 
   // Greeting Bubble
@@ -529,9 +585,7 @@ export async function GET(req: NextRequest) {
 
       dBtn.onclick = function() {
         var targetPhone = (dept.phone || config.phoneNumber).replace(/\\D/g, '');
-        var deptMsg = computedGreeting + ' [Department: ' + (dept.title || dept.name) + ']';
-        window.open('https://wa.me/' + targetPhone + '?text=' + encodeURIComponent(deptMsg), '_blank');
-        card.style.display = 'none';
+        openWhatsAppWithSession('Hi! I would like to connect with ' + (dept.title || dept.name) + '.', targetPhone);
       };
 
       deptContainer.appendChild(dBtn);
@@ -540,10 +594,10 @@ export async function GET(req: NextRequest) {
     body.appendChild(deptContainer);
   }
 
-  // Determine smart contextual inquiry message
-  var effectiveInquiryMsg = detectedProduct && detectedProduct.title
-    ? ('Hi! I am interested in *' + detectedProduct.title + '*' + (detectedProduct.price ? ' (Price: ' + detectedProduct.price + ')' : '') + '\\n\\nProduct Link: ' + window.location.href)
-    : (config.welcomeMessage + ' (Page: ' + document.title + ' - ' + window.location.href + ')');
+  // Clean prefilled inquiry message (No URL dumps, no page links in text)
+  var cleanInquiryMsg = detectedProduct && detectedProduct.title
+    ? ('Hi! Can I get more info on ' + detectedProduct.title + '?')
+    : (config.welcomeMessage || 'Hello! Can I get more info on this?');
 
   if (config.requireLeadForm) {
     var form = document.createElement('form');
@@ -597,29 +651,35 @@ export async function GET(req: NextRequest) {
       submitBtn.disabled = true;
       submitBtn.innerText = 'Opening WhatsApp...';
 
+      var refCode = generateRefCode();
+      var textToSend = cleanInquiryMsg + ' [Ref: ' + refCode + ']';
+
       fetch(appUrl + '/api/widget/capture-lead', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId: clientId,
+          refId: refCode,
           name: nameVal,
           phone: phoneVal,
           pageUrl: window.location.href,
           pageTitle: detectedProduct && detectedProduct.title ? (detectedProduct.title + ' (' + platform + ')') : document.title,
           platform: platform,
+          detectedProduct: detectedProduct,
+          cart: detectedCart,
           utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget'),
-          customMessage: effectiveInquiryMsg
+          customMessage: cleanInquiryMsg
         })
       })
       .then(function(res) { return res.json(); })
       .then(function(data) {
-        window.open(data.whatsappUrl || ('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(effectiveInquiryMsg)), '_blank');
+        window.open(data.whatsappUrl || ('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(textToSend)), '_blank');
         card.style.display = 'none';
         submitBtn.disabled = false;
         submitBtn.innerText = 'Start Chat on WhatsApp ➔';
       })
       .catch(function() {
-        window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(effectiveInquiryMsg), '_blank');
+        window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(textToSend), '_blank');
         card.style.display = 'none';
         submitBtn.disabled = false;
       });
@@ -640,22 +700,7 @@ export async function GET(req: NextRequest) {
     directBtn.style.textAlign = 'center';
 
     directBtn.onclick = function() {
-      // Async click tracking
-      fetch(appUrl + '/api/widget/capture-lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: clientId,
-          pageUrl: window.location.href,
-          pageTitle: detectedProduct && detectedProduct.title ? (detectedProduct.title + ' (' + platform + ')') : document.title,
-          platform: platform,
-          utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget'),
-          customMessage: effectiveInquiryMsg
-        })
-      }).catch(function() {});
-
-      window.open('https://wa.me/' + config.phoneNumber + '?text=' + encodeURIComponent(effectiveInquiryMsg), '_blank');
-      card.style.display = 'none';
+      openWhatsAppWithSession(cleanInquiryMsg);
     };
 
     body.appendChild(directBtn);

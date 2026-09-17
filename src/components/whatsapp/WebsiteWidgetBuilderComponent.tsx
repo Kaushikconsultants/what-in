@@ -52,8 +52,12 @@ import {
 const COLOR_PRESETS = [
   { name: "WhatsApp Green", hex: "#25D366" },
   { name: "Indigo Modern", hex: "#4F46E5" },
+  { name: "Royal Blue", hex: "#2563EB" },
   { name: "Ocean Sky", hex: "#0EA5E9" },
+  { name: "Emerald Pro", hex: "#059669" },
   { name: "Coral Rose", hex: "#E11D48" },
+  { name: "Violet Electric", hex: "#7C3AED" },
+  { name: "Vibrant Orange", hex: "#EA580C" },
   { name: "Pitch Charcoal", hex: "#0F172A" },
 ];
 
@@ -662,30 +666,81 @@ export default function WebsiteWidgetBuilderComponent() {
             <div className="flex flex-col gap-4">
               {/* Theme Color */}
               <div>
-                <label className="text-xs font-bold text-gray-700 dark:text-slate-300 block mb-2">Theme Color</label>
-                <div className="flex items-center gap-2 mb-2">
-                  {COLOR_PRESETS.map((preset) => (
-                    <button
-                      key={preset.hex}
-                      type="button"
-                      onClick={() => setThemeColor(preset.hex)}
-                      className={`w-7 h-7 rounded-full border-2 transition-all ${
-                        themeColor.toLowerCase() === preset.hex.toLowerCase()
-                          ? "scale-110 border-indigo-600 shadow-sm"
-                          : "border-transparent opacity-80 hover:opacity-100"
-                      }`}
-                      style={{ backgroundColor: preset.hex }}
-                      title={preset.name}
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-gray-700 dark:text-slate-300">Theme Color</label>
+                  <span className="text-[11px] font-medium text-gray-400">Select preset or enter custom brand hex</span>
+                </div>
+
+                {/* Preset Palette Circles */}
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {COLOR_PRESETS.map((preset) => {
+                    const isSelected = themeColor.toLowerCase() === preset.hex.toLowerCase();
+                    return (
+                      <button
+                        key={preset.hex}
+                        type="button"
+                        onClick={() => setThemeColor(preset.hex)}
+                        className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center cursor-pointer ${
+                          isSelected
+                            ? "scale-110 border-slate-900 dark:border-white shadow-md ring-2 ring-black/20 dark:ring-white/30"
+                            : "border-transparent opacity-85 hover:opacity-100 hover:scale-105"
+                        }`}
+                        style={{ backgroundColor: preset.hex }}
+                        title={`${preset.name} (${preset.hex})`}
+                      >
+                        {isSelected && <Check size={13} className="text-white drop-shadow-sm" />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Color Input & Hex Box */}
+                <div className="flex items-center gap-2.5 p-2.5 bg-gray-50 dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700">
+                  <div className="relative flex items-center justify-center">
+                    <input
+                      type="color"
+                      value={themeColor.startsWith("#") && themeColor.length === 7 ? themeColor : "#25D366"}
+                      onChange={(e) => setThemeColor(e.target.value.toUpperCase())}
+                      className="opacity-0 absolute inset-0 w-8 h-8 cursor-pointer z-10"
+                      title="Click to open full color spectrum picker"
                     />
-                  ))}
-                  <input
-                    type="color"
-                    value={themeColor}
-                    onChange={(e) => setThemeColor(e.target.value)}
-                    className="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent"
-                    title="Custom Color"
-                  />
-                  <span className="text-xs font-mono font-bold text-gray-600 dark:text-slate-400 ml-2">{themeColor}</span>
+                    <div
+                      className="w-8 h-8 rounded-xl border border-gray-300 dark:border-slate-600 shadow-xs flex items-center justify-center text-white cursor-pointer transition-transform hover:scale-105"
+                      style={{ backgroundColor: themeColor }}
+                    >
+                      <Sparkles size={13} className="drop-shadow-xs" />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-500">HEX:</span>
+                    <input
+                      type="text"
+                      maxLength={7}
+                      value={themeColor}
+                      placeholder="#4F46E5"
+                      onChange={(e) => {
+                        let val = e.target.value.trim();
+                        if (val && !val.startsWith("#")) val = `#${val}`;
+                        setThemeColor(val.toUpperCase());
+                      }}
+                      className="w-28 px-3 py-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-gray-900 dark:text-white uppercase focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30"
+                    />
+                    {!COLOR_PRESETS.some((p) => p.hex.toLowerCase() === themeColor.toLowerCase()) && (
+                      <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md">
+                        Custom
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setThemeColor("#25D366")}
+                    className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition"
+                    title="Reset to WhatsApp official green"
+                  >
+                    Reset Green
+                  </button>
                 </div>
               </div>
 

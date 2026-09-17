@@ -569,12 +569,12 @@ export default function WhatsAppInboxComponent() {
     const msgs = [...activeConvDetail.messages];
 
     msgs.sort((a: any, b: any) => {
-      const isAAd = a.senderName === "META_CTWA_AD" || a.messageType === "META_CTWA_AD";
-      const isBAd = b.senderName === "META_CTWA_AD" || b.messageType === "META_CTWA_AD";
+      const isAAd = a.senderName === "META_CTWA_AD" || a.messageType === "META_CTWA_AD" || a.senderName === "WEBSITE_VISITOR_CONTEXT" || a.messageType === "WEBSITE_VISITOR_CONTEXT";
+      const isBAd = b.senderName === "META_CTWA_AD" || b.messageType === "META_CTWA_AD" || b.senderName === "WEBSITE_VISITOR_CONTEXT" || b.messageType === "WEBSITE_VISITOR_CONTEXT";
       let timeA = new Date(a.sentAt).getTime();
       let timeB = new Date(b.sentAt).getTime();
 
-      // If one is Ad referral and the other is Customer incoming message within 30s, force Ad referral before customer message
+      // If one is Ad/Website referral and the other is Customer incoming message within 30s, force referral before customer message
       if (isAAd && b.senderType === "CUSTOMER" && Math.abs(timeA - timeB) <= 30000) {
         return -1;
       }
@@ -2616,6 +2616,189 @@ export default function WhatsAppInboxComponent() {
                             >
                               View Ad on Meta ↗
                             </a>
+                          )}
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  );
+                }
+
+                // Render Smart Website Visitor & Active Cart Referral Card inside the chat stream
+                if (msg.senderName === "WEBSITE_VISITOR_CONTEXT" || msg.messageType === "WEBSITE_VISITOR_CONTEXT") {
+                  let contextObj: any = {};
+                  try {
+                    contextObj = typeof msg.metadata === "string" ? JSON.parse(msg.metadata) : (msg.metadata || {});
+                  } catch (_) {}
+
+                  const pageTitle = contextObj.pageTitle || "Website Storefront";
+                  const pageUrl = contextObj.pageUrl || "";
+                  const platform = contextObj.platform || "Website";
+                  const product = contextObj.detectedProduct;
+                  const cart = contextObj.cart;
+                  const cartItems: any[] = cart && Array.isArray(cart.items) ? cart.items : [];
+                  const hasCart = cartItems.length > 0 || (cart && cart.item_count > 0);
+                  const cartItemCount = cart?.item_count || cartItems.length;
+                  const cartTotal = cart?.total_price
+                    ? (typeof cart.total_price === "number" ? cart.total_price.toLocaleString("en-IN") : cart.total_price)
+                    : null;
+
+                  return (
+                    <React.Fragment key={msg.id}>
+                      {dateDividerNode}
+                      <div style={{ display: "flex", justifyContent: "center", margin: "14px 0" }}>
+                        <div style={{
+                          maxWidth: "92%",
+                          width: "460px",
+                          background: "linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%)",
+                          border: "1px solid #a7f3d0",
+                          borderRadius: "16px",
+                          padding: "14px 16px",
+                          boxShadow: "0 4px 16px rgba(16, 185, 129, 0.08)",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px"
+                        }}>
+                          {/* Header Badge */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <div style={{
+                                width: "30px",
+                                height: "30px",
+                                borderRadius: "8px",
+                                background: "#059669",
+                                color: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "14px",
+                                fontWeight: "bold"
+                              }}>
+                                🛍️
+                              </div>
+                              <div>
+                                <span style={{ fontSize: "11px", fontWeight: 800, color: "#047857", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                  WEBSITE STORE REFERRAL
+                                </span>
+                                <div style={{ fontSize: "10px", color: "#475569" }}>
+                                  Inquiry originated from your {platform} store
+                                </div>
+                              </div>
+                            </div>
+                            <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }} title={new Date(msg.sentAt).toLocaleString([], { dateStyle: "full", timeStyle: "medium" })}>
+                              {formatMessageBubbleTime(msg.sentAt)}
+                            </span>
+                          </div>
+
+                          {/* Visited Webpage Box */}
+                          <div style={{ background: "white", padding: "10px 12px", borderRadius: "10px", border: "1px solid #d1fae5" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                                  Active Page Visited
+                                </div>
+                                <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a", marginTop: "2px", lineHeight: "1.3" }}>
+                                  {pageTitle}
+                                </div>
+                                {product && product.price && (
+                                  <div style={{ fontSize: "11.5px", color: "#059669", fontWeight: 600, marginTop: "2px" }}>
+                                    Product Price: ₹{product.price}
+                                  </div>
+                                )}
+                              </div>
+                              {pageUrl && (
+                                <a
+                                  href={pageUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    color: "#047857",
+                                    background: "#ecfdf5",
+                                    border: "1px solid #a7f3d0",
+                                    padding: "5px 9px",
+                                    borderRadius: "6px",
+                                    textDecoration: "none",
+                                    whiteSpace: "nowrap",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "3px"
+                                  }}
+                                >
+                                  Open Page ↗
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Active Cart Items Section */}
+                          {hasCart && (
+                            <div style={{ background: "white", padding: "10px 12px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 700, color: "#065f46" }}>
+                                  <span>🛒</span> Cart Context ({cartItemCount} item{cartItemCount > 1 ? "s" : ""})
+                                </div>
+                                {cartTotal && (
+                                  <div style={{ fontSize: "12px", fontWeight: 800, color: "#059669" }}>
+                                    Total: ₹{cartTotal}
+                                  </div>
+                                )}
+                              </div>
+
+                              {cartItems.length > 0 ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                  {cartItems.map((item: any, idx: number) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        padding: "6px 8px",
+                                        background: "#f8fafc",
+                                        borderRadius: "8px",
+                                        fontSize: "11.5px"
+                                      }}
+                                    >
+                                      <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
+                                        {item.image && (
+                                          <img
+                                            src={item.image}
+                                            alt={item.title}
+                                            style={{ width: "32px", height: "32px", objectFit: "cover", borderRadius: "6px", flexShrink: 0 }}
+                                            onError={(e) => { (e.currentTarget as HTMLElement).style.display = "none"; }}
+                                          />
+                                        )}
+                                        <div style={{ minWidth: 0 }}>
+                                          <div style={{ fontWeight: 600, color: "#1e293b", lineHeight: "1.2", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {item.title}
+                                          </div>
+                                          {item.variant_title && (
+                                            <div style={{ fontSize: "10px", color: "#64748b" }}>
+                                              {item.variant_title}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div style={{ textAlign: "right", whiteSpace: "nowrap", marginLeft: "8px" }}>
+                                        <div style={{ fontWeight: 700, color: "#0f172a" }}>
+                                          Qty: {item.quantity}
+                                        </div>
+                                        {item.price && (
+                                          <div style={{ fontSize: "10.5px", color: "#059669", fontWeight: 600 }}>
+                                            ₹{item.price}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: "11.5px", color: "#64748b" }}>
+                                  {cartItemCount} items in cart {cartTotal ? `totaling ₹${cartTotal}` : ""}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

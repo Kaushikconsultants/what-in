@@ -423,6 +423,18 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       textContent = summary.trim();
     }
 
+    // Feature: Detect and extract Widget Visitor Tracking Reference Token [Ref: WXXXX]
+    let widgetRefCode: string | null = null;
+    const refMatch = textContent.match(/\[(?:Ref:?\s*)?([A-Za-z0-9]{4,10})\]/i);
+    if (refMatch) {
+      widgetRefCode = refMatch[1].toUpperCase();
+      // Clean up textContent so the agent inbox and customer view shows ONLY clean natural text
+      textContent = textContent.replace(/\s*\[(?:Ref:?\s*)?[A-Za-z0-9]{4,10}\]/gi, "").trim();
+      if (!textContent) {
+        textContent = "Hello! Can I get more info on this?";
+      }
+    }
+
     // WhatsApp Catalog Order Parsing with Intelligent Product Resolution
     let orderMetadata: any = null;
     if (msg.type === "order" && msg.order) {
@@ -871,6 +883,105 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
           sentAt: new Date(messageTimestamp.getTime() - 1000)
         }
       }).catch(() => {});
+    }
+
+    // Feature: Extract and render Website Visitor & Cart Context Referral Card
+    try {
+      let visitorSessionLog = null;
+      if (widgetRefCode) {
+        visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
+          where: {
+            nodeType: "WIDGET_SESSION_REF",
+            nodeId: widgetRefCode
+          },
+          orderBy: { createdAt: "desc" }
+        });
+      }
+
+      // If not matched by ref code directly, check if a visitor session was logged for this cleanPhone in the last 30 min
+      if (!visitorSessionLog && cleanPhone) {
+        const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+        visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
+          where: {
+            nodeType: "WIDGET_SESSION_REF",
+            phone: cleanPhone,
+            createdAt: { gte: thirtyMinsAgo }
+          },
+          orderBy: { createdAt: "desc" }
+        });
+      }
+
+      if (visitorSessionLog && visitorSessionLog.payload) {
+        const payloadData = typeof visitorSessionLog.payload === "string"
+          ? JSON.parse(visitorSessionLog.payload)
+          : (visitorSessionLog.payload as any);
+
+        const websiteContextMeta = {
+          type: "WEBSITE_VISITOR_CONTEXT",
+          refId: widgetRefCode || payloadData.refId || "WIDGET",
+          pageUrl: payloadData.pageUrl || "",
+          pageTitle: payloadData.pageTitle || "Online Store",
+          platform: payloadData.platform || "Website",
+          detectedProduct: payloadData.detectedProduct || null,
+          cart: payloadData.cart || null,
+        };
+
+        const cartItemCount = payloadData.cart?.item_count || payloadData.cart?.items?.length || 0;
+        const cartTotal = payloadData.cart?.total_price ? ` (₹${payloadData.cart.total_price})` : "";
+        const cartSummary = cartItemCount > 0 ? ` | Cart: ${cartItemCount} item(s)${cartTotal}` : "";
+
+        const contextMsg = await prisma.whatsAppMessage.create({
+          data: {
+            conversationId: conversation.id,
+            senderType: "SYSTEM",
+            senderName: "WEBSITE_VISITOR_CONTEXT",
+            messageType: "WEBSITE_VISITOR_CONTEXT",
+            content: `🌐 Website Inquiry: "${websiteContextMeta.pageTitle}"${cartSummary}`,
+            metadata: JSON.stringify(websiteContextMeta),
+            status: "SENT",
+            sentAt: new Date(messageTimestamp.getTime() - 1000)
+          }
+        });
+
+        // Real-time SSE dispatch so live inboxes render the referral card instantly
+        emitInboxEvent({
+          type: "NEW_MESSAGE",
+          conversationId: conversation.id,
+          clientId,
+          messageId: contextMsg.id,
+          data: {
+            id: contextMsg.id,
+            conversationId: conversation.id,
+            senderType: "SYSTEM",
+            senderName: "WEBSITE_VISITOR_CONTEXT",
+            messageType: "WEBSITE_VISITOR_CONTEXT",
+            content: contextMsg.content,
+            metadata: JSON.stringify(websiteContextMeta),
+            status: "SENT",
+            sentAt: contextMsg.sentAt
+          }
+        });
+
+        // Auto-tag customer
+        const existingTags = (customer.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean);
+        let tagsChanged = false;
+        if (!existingTags.includes("Website_Visitor")) {
+          existingTags.push("Website_Visitor");
+          tagsChanged = true;
+        }
+        if (cartItemCount > 0 && !existingTags.includes("Cart_Abandonment")) {
+          existingTags.push("Cart_Abandonment");
+          tagsChanged = true;
+        }
+        if (tagsChanged) {
+          await prisma.customer.update({
+            where: { id: customer.id },
+            data: { tags: existingTags.join(', ') }
+          }).catch(() => {});
+        }
+      }
+    } catch (e: any) {
+      console.error("[WhatsApp Webhook] Visitor context resolution error:", e?.message);
     }
 
     console.log(`[WhatsApp Webhook] Incoming message from ${formatWhatsAppPhone(fullPhone)}: "${textContent.slice(0, 50)}" (Tenant: ${client?.businessName || 'Global'})`);

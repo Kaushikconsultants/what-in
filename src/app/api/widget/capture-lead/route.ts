@@ -11,7 +11,7 @@ import { dispatchOutboundWebhook } from "@/lib/outboundWebhookDispatcher";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { clientId, name, phone, email, pageUrl, pageTitle, utmSource, customMessage, platform } = body;
+    const { clientId, refId, name, phone, email, pageUrl, pageTitle, utmSource, customMessage, platform, detectedProduct, cart } = body;
 
     if (!clientId) {
       return NextResponse.json({ success: false, error: "Missing clientId." }, { status: 400 });
@@ -34,6 +34,31 @@ export async function POST(req: NextRequest) {
     const leadName = (name || "Website Visitor").trim();
     const effectivePlatform = platform || "Website";
     const source = utmSource || `${effectivePlatform} Widget`;
+
+    // Persist visitor session context for chatbox attribution (Meta Ad style referral)
+    if (refId) {
+      await prisma.whatsAppChatbotLog.create({
+        data: {
+          clientId: client.id,
+          phone: cleanPhone || "WIDGET_SESSION",
+          nodeId: refId.toString().toUpperCase(),
+          nodeType: "WIDGET_SESSION_REF",
+          actionDesc: `Website context: ${pageTitle || pageUrl || "Storefront"}`,
+          payload: {
+            refId: refId.toString().toUpperCase(),
+            pageUrl: pageUrl || "",
+            pageTitle: pageTitle || "",
+            platform: effectivePlatform,
+            detectedProduct: detectedProduct || null,
+            cart: cart || null,
+            customMessage: customMessage || null,
+            name: leadName !== "Website Visitor" ? leadName : null,
+            phone: cleanPhone || null,
+            createdAt: new Date().toISOString(),
+          },
+        },
+      }).catch((e) => console.warn("[Capture Lead] Ref Log save skipped:", e.message));
+    }
 
     let customer = null;
     if (cleanPhone.length >= 10) {
@@ -133,6 +158,8 @@ export async function POST(req: NextRequest) {
         pageTitle: pageTitle || null,
         customMessage: customMessage || null,
         platform: effectivePlatform,
+        detectedProduct: detectedProduct || null,
+        cart: cart || null,
         capturedAt: new Date().toISOString(),
       });
     }
@@ -146,10 +173,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Build WhatsApp URL with context
-    let greeting = client.websiteWidget?.welcomeMessage || "Hi! I have an inquiry from your website.";
-    if (pageTitle) {
-      greeting += ` (Page: ${pageTitle})`;
+    // Build clean WhatsApp URL with tracking ref (NO messy page URLs or cart text dumped into the customer message)
+    let greeting = customMessage || client.websiteWidget?.welcomeMessage || "Hello! Can I get more info on this?";
+    if (refId) {
+      greeting += ` [Ref: ${refId.toString().toUpperCase()}]`;
     }
 
     const whatsappUrl = `https://wa.me/${targetWhatsApp}?text=${encodeURIComponent(greeting)}`;
