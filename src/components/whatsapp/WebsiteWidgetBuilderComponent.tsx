@@ -43,9 +43,14 @@ import {
   UserCheck,
   BadgePercent,
   BusFront,
-  Home,
   Trophy,
   ClipboardList,
+  X,
+  Search,
+  Download,
+  ArrowUpRight,
+  ShoppingCart,
+  MessageCircle,
 } from "lucide-react";
 
 
@@ -231,6 +236,96 @@ export default function WebsiteWidgetBuilderComponent() {
   // Simulator State
   const [simulatorOpen, setSimulatorOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<"design" | "departments" | "nudge_hours" | "education">("design");
+
+  // Leads & Storefront Activity Modal
+  const [showLeadsModal, setShowLeadsModal] = useState(false);
+  const [leadsModalTab, setLeadsModalTab] = useState<"leads" | "sessions">("leads");
+  const [leadsList, setLeadsList] = useState<any[]>([]);
+  const [sessionsList, setSessionsList] = useState<any[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [leadsSearch, setLeadsSearch] = useState("");
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+
+  const fetchLeads = async () => {
+    setLoadingLeads(true);
+    try {
+      const res = await fetch("/api/widget/leads");
+      const data = await res.json();
+      if (data.success) {
+        setLeadsList(data.leads || []);
+        setSessionsList(data.sessions || []);
+      }
+    } catch (err) {
+      console.error("Failed to load website leads", err);
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
+
+  const openLeadsModalWithTab = (tab: "leads" | "sessions") => {
+    setLeadsModalTab(tab);
+    setShowLeadsModal(true);
+    fetchLeads();
+  };
+
+  const handleCopyLeadPhone = (phone: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(phone);
+    }
+    setCopiedPhone(phone);
+    setTimeout(() => setCopiedPhone(null), 2000);
+  };
+
+  const exportLeadsCsv = () => {
+    if (!leadsList.length) return;
+    const headers = ["Name", "Business Name", "Mobile", "WhatsApp", "Source", "Tags", "Lead Stage", "Date Captured"];
+    const rows = leadsList.map((l) => [
+      `"${(l.name || "").replace(/"/g, '""')}"`,
+      `"${(l.businessName || "").replace(/"/g, '""')}"`,
+      `"${l.mobile || ""}"`,
+      `"${l.whatsappNumber || ""}"`,
+      `"${(l.source || "").replace(/"/g, '""')}"`,
+      `"${(l.tags?.join(", ") || "").replace(/"/g, '""')}"`,
+      `"${(l.leadStage || "").replace(/"/g, '""')}"`,
+      `"${new Date(l.createdAt).toLocaleString()}"`,
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `website_leads_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const filteredLeads = leadsList.filter((l: any) => {
+    if (!leadsSearch.trim()) return true;
+    const q = leadsSearch.toLowerCase();
+    return (
+      (l.name || "").toLowerCase().includes(q) ||
+      (l.businessName || "").toLowerCase().includes(q) ||
+      (l.mobile || "").includes(q) ||
+      (l.whatsappNumber || "").includes(q) ||
+      (l.tags || []).some((t: string) => t.toLowerCase().includes(q)) ||
+      (l.lastMessageText || "").toLowerCase().includes(q)
+    );
+  });
+
+  const filteredSessions = sessionsList.filter((s: any) => {
+    if (!leadsSearch.trim()) return true;
+    const q = leadsSearch.toLowerCase();
+    return (
+      (s.pageTitle || "").toLowerCase().includes(q) ||
+      (s.pageUrl || "").toLowerCase().includes(q) ||
+      (s.actionDesc || "").toLowerCase().includes(q) ||
+      (s.refId || "").toLowerCase().includes(q) ||
+      (s.phone || "").includes(q) ||
+      (s.cart?.items || []).some((it: any) => (it.title || "").toLowerCase().includes(q))
+    );
+  });
 
   // Fetch current config
   const fetchConfig = async () => {
@@ -419,36 +514,66 @@ export default function WebsiteWidgetBuilderComponent() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-7xl">
-      {/* Top Analytics Cards */}
+      {/* Top Analytics Cards - Clickable to view leads & live visitor sessions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-xl">
-            <MousePointerClick size={22} />
+        {/* Total Widget Clicks */}
+        <div
+          onClick={() => openLeadsModalWithTab("sessions")}
+          className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs flex items-center justify-between gap-4 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group relative overflow-hidden"
+          title="Click to view live storefront clicks and active cart sessions"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-xl group-hover:scale-105 transition-transform">
+              <MousePointerClick size={22} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Widget Clicks</div>
+              <div className="text-xl font-black text-gray-900 dark:text-white mt-0.5">{totalClicks.toLocaleString()}</div>
+            </div>
           </div>
-          <div>
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Widget Clicks</div>
-            <div className="text-xl font-black text-gray-900 dark:text-white mt-0.5">{totalClicks.toLocaleString()}</div>
-          </div>
+          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-200/50 dark:border-emerald-800/50 flex items-center gap-1 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            View Activity <ChevronRight size={12} />
+          </span>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-xl">
-            <Users size={22} />
+        {/* Leads Captured */}
+        <div
+          onClick={() => openLeadsModalWithTab("leads")}
+          className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-indigo-200 dark:border-indigo-900/60 shadow-xs flex items-center justify-between gap-4 cursor-pointer hover:border-indigo-500 hover:shadow-lg transition-all group relative overflow-hidden ring-2 ring-indigo-500/10"
+          title="Click to view all captured website customers and conversations"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-xl group-hover:scale-105 transition-transform">
+              <Users size={22} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Leads Captured</div>
+              <div className="text-xl font-black text-gray-900 dark:text-white mt-0.5">{totalLeads.toLocaleString()}</div>
+            </div>
           </div>
-          <div>
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Leads Captured</div>
-            <div className="text-xl font-black text-gray-900 dark:text-white mt-0.5">{totalLeads.toLocaleString()}</div>
-          </div>
+          <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-2.5 py-1 rounded-full border border-indigo-200/50 dark:border-indigo-800/50 flex items-center gap-1 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+            View Customers <ChevronRight size={12} />
+          </span>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs flex items-center gap-4">
-          <div className="p-3 bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 rounded-xl">
-            <Percent size={22} />
+        {/* Capture Conversion */}
+        <div
+          onClick={() => openLeadsModalWithTab("leads")}
+          className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xs flex items-center justify-between gap-4 cursor-pointer hover:border-purple-500 hover:shadow-md transition-all group"
+          title="Click to view customer conversion details"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400 rounded-xl group-hover:scale-105 transition-transform">
+              <Percent size={22} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Capture Conversion</div>
+              <div className="text-xl font-black text-gray-900 dark:text-white mt-0.5">{conversionRate}%</div>
+            </div>
           </div>
-          <div>
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Capture Conversion</div>
-            <div className="text-xl font-black text-gray-900 dark:text-white mt-0.5">{conversionRate}%</div>
-          </div>
+          <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/80 px-2.5 py-1 rounded-full border border-purple-200/50 dark:border-purple-800/50 flex items-center gap-1 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+            Analytics <ChevronRight size={12} />
+          </span>
         </div>
       </div>
 
@@ -1447,6 +1572,405 @@ export default function WebsiteWidgetBuilderComponent() {
           </div>
         </div>
       </div>
+      {/* Captured Leads & Storefront Activity Modal */}
+      {showLeadsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between gap-4 bg-gray-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                  <Users size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white m-0 flex items-center gap-2">
+                    Website Leads & Storefront Activity
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-semibold">
+                      {leadsModalTab === "leads" ? `${leadsList.length} Customers` : `${sessionsList.length} Sessions`}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 m-0 mt-0.5">
+                    Customers who contacted via your storefront widget and live active cart browsing sessions
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {leadsModalTab === "leads" && leadsList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={exportLeadsCsv}
+                    className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Export website leads to CSV file"
+                  >
+                    <Download size={13} />
+                    <span>Export CSV</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={fetchLeads}
+                  disabled={loadingLeads}
+                  className="p-2 text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl transition-colors cursor-pointer"
+                  title="Refresh leads and sessions"
+                >
+                  <RefreshCw size={15} className={loadingLeads ? "animate-spin" : ""} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowLeadsModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-slate-200 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Close modal"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Tabs & Search Subheader */}
+            <div className="px-5 py-3 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Tab Pills */}
+              <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-800 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setLeadsModalTab("leads")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    leadsModalTab === "leads"
+                      ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                      : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  <Users size={14} />
+                  <span>Captured Customers ({leadsList.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLeadsModalTab("sessions")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    leadsModalTab === "sessions"
+                      ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs"
+                      : "text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Live Storefront Sessions ({sessionsList.length})</span>
+                </button>
+              </div>
+
+              {/* Search Box */}
+              <div className="relative w-full sm:w-72">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder={leadsModalTab === "leads" ? "Search name, phone, tags..." : "Search page, products, ref..."}
+                  value={leadsSearch}
+                  onChange={(e) => setLeadsSearch(e.target.value)}
+                  className="w-full pl-9 pr-8 py-1.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+                {leadsSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setLeadsSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Body Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {loadingLeads ? (
+                <div className="py-16 flex flex-col items-center justify-center gap-3">
+                  <RefreshCw size={28} className="animate-spin text-indigo-600 dark:text-indigo-400" />
+                  <p className="text-xs text-gray-500 font-medium">Loading website leads and active sessions...</p>
+                </div>
+              ) : leadsModalTab === "leads" ? (
+                /* TAB 1: CAPTURED CUSTOMERS */
+                filteredLeads.length === 0 ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-center p-4">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-500 mb-3">
+                      <Users size={28} />
+                    </div>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white m-0">No captured leads found</h4>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm mt-1">
+                      {leadsSearch
+                        ? "No customers matched your search query. Try clearing the filter."
+                        : "Customers who click the WhatsApp widget on your store or submit their details will be automatically listed here."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {filteredLeads.map((lead) => {
+                      const cleanPhone = (lead.mobile || lead.whatsappNumber || "").replace(/\D/g, "");
+                      const initials = (lead.name || "WL").slice(0, 2).toUpperCase();
+                      const hasCart = lead.session?.cart && lead.session.cart.item_count > 0;
+                      const cartCount = lead.session?.cart?.item_count || 0;
+                      const cartTotal = lead.session?.cart?.total_price || 0;
+
+                      return (
+                        <div
+                          key={lead.id}
+                          className="bg-white dark:bg-slate-800/80 rounded-xl border border-gray-200 dark:border-slate-700/80 p-4 shadow-2xs hover:border-indigo-300 dark:hover:border-indigo-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        >
+                          {/* Left: Avatar & Info */}
+                          <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                              {initials}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                                  {lead.name}
+                                </span>
+                                {lead.businessName && lead.businessName !== lead.name && (
+                                  <span className="text-[11px] text-gray-400">
+                                    • {lead.businessName}
+                                  </span>
+                                )}
+                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 font-semibold">
+                                  {lead.source}
+                                </span>
+                              </div>
+
+                              {/* Phone & Date */}
+                              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-slate-400 flex-wrap">
+                                <span className="flex items-center gap-1 font-mono font-medium text-gray-700 dark:text-slate-300">
+                                  +{cleanPhone}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyLeadPhone(cleanPhone)}
+                                    className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                                    title="Copy phone number"
+                                  >
+                                    {copiedPhone === cleanPhone ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                                  </button>
+                                </span>
+
+                                <span>•</span>
+
+                                <span>
+                                  {new Date(lead.createdAt).toLocaleDateString("en-IN", {
+                                    day: "numeric",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+
+                                <a
+                                  href={`https://wa.me/${cleanPhone}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] font-semibold text-emerald-600 hover:underline flex items-center gap-1"
+                                >
+                                  <MessageCircle size={12} />
+                                  <span>WhatsApp</span>
+                                </a>
+                              </div>
+
+                              {/* Browsing Context & Cart */}
+                              {lead.session && (
+                                <div className="mt-2 text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2 flex-wrap bg-slate-50 dark:bg-slate-900/60 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+                                  <span className="font-semibold text-gray-400 text-[11px]">Context:</span>
+                                  <span className="font-medium truncate max-w-xs" title={lead.session.pageTitle}>
+                                    🌐 {lead.session.pageTitle}
+                                  </span>
+                                  {hasCart && (
+                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                                      <ShoppingCart size={11} /> {cartCount} items (₹{cartTotal})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Tags */}
+                              {lead.tags && lead.tags.length > 0 && (
+                                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                  {lead.tags.map((t: string) => (
+                                    <span
+                                      key={t}
+                                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                        t.includes("Cart")
+                                          ? "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200/60"
+                                          : t.includes("Lead")
+                                          ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60"
+                                          : "bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300"
+                                      }`}
+                                    >
+                                      {t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right: Actions */}
+                          <div className="flex items-center gap-2 shrink-0 md:self-center">
+                            <a
+                              href={`/whatsapp?phone=${cleanPhone}${lead.conversationId ? `&convId=${lead.conversationId}` : ""}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                              <span>Open in Inbox</span>
+                              <ArrowUpRight size={13} />
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* TAB 2: LIVE STOREFRONT SESSIONS */
+                filteredSessions.length === 0 ? (
+                  <div className="py-16 flex flex-col items-center justify-center text-center p-4">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-500 mb-3">
+                      <MousePointerClick size={28} />
+                    </div>
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white m-0">No storefront activity yet</h4>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 max-w-sm mt-1">
+                      Live visitor clicks and Add-To-Cart events from your website will stream here in real time.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {filteredSessions.map((s) => {
+                      const isAddToCart = s.eventType === "ADD_TO_CART";
+                      const hasCart = s.cart && s.cart.items && s.cart.items.length > 0;
+                      const isExpanded = expandedSessionId === s.id;
+
+                      return (
+                        <div
+                          key={s.id}
+                          className="bg-white dark:bg-slate-800/80 rounded-xl border border-gray-200 dark:border-slate-700/80 p-4 shadow-2xs hover:border-emerald-300 dark:hover:border-emerald-700 transition-all flex flex-col gap-2.5"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
+                                  isAddToCart
+                                    ? "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                    : "bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                                }`}
+                              >
+                                {isAddToCart ? <ShoppingCart size={11} /> : <MousePointerClick size={11} />}
+                                <span>{isAddToCart ? "Add To Cart Event" : "Widget Click"}</span>
+                              </span>
+
+                              <span className="font-bold text-xs text-gray-900 dark:text-white">
+                                {s.pageTitle || "Online Store"}
+                              </span>
+
+                              <span className="text-[10px] text-gray-400 font-mono">
+                                [Ref: {s.refId}]
+                              </span>
+                            </div>
+
+                            <span className="text-[11px] text-gray-400 font-medium">
+                              {new Date(s.createdAt).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+
+                          {/* Page URL & Custom Message */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                            <a
+                              href={s.pageUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 truncate max-w-lg"
+                            >
+                              <Globe size={12} />
+                              <span className="truncate">{s.pageUrl}</span>
+                              <ExternalLink size={10} />
+                            </a>
+
+                            {hasCart && (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedSessionId(isExpanded ? null : s.id)}
+                                className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-1 self-start cursor-pointer"
+                              >
+                                <ShoppingCart size={12} />
+                                <span>{s.cart.item_count} items (₹{s.cart.total_price})</span>
+                                <ChevronRight size={12} className={`transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Custom Message preview if sent */}
+                          {s.customMessage && (
+                            <div className="bg-gray-50 dark:bg-slate-900/60 p-2 rounded-lg text-xs text-gray-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
+                              <MessageSquare size={13} className="text-gray-400 shrink-0" />
+                              <span>"{s.customMessage}"</span>
+                            </div>
+                          )}
+
+                          {/* Cart Items Breakdown Dropdown */}
+                          {hasCart && isExpanded && (
+                            <div className="mt-2 p-3 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 flex flex-col gap-2">
+                              <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                Shopping Cart Breakdown ({s.cart.item_count} items • Total: ₹{s.cart.total_price})
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {s.cart.items.map((item: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 flex items-center gap-2.5"
+                                  >
+                                    {item.image && (
+                                      <img
+                                        src={item.image}
+                                        alt={item.title}
+                                        className="w-10 h-10 object-cover rounded-md border border-gray-200 dark:border-slate-700 shrink-0"
+                                      />
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-bold text-xs text-gray-900 dark:text-white truncate">
+                                        {item.title}
+                                      </div>
+                                      <div className="text-[11px] text-gray-500">
+                                        Qty: {item.quantity} • ₹{item.price}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 border-t border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50 flex items-center justify-between text-xs text-gray-500">
+              <span>Auto-synced with store telemetry & CRM</span>
+              <button
+                type="button"
+                onClick={() => setShowLeadsModal(false)}
+                className="px-4 py-1.5 bg-gray-200 dark:bg-slate-800 hover:bg-gray-300 dark:hover:bg-slate-700 text-gray-800 dark:text-slate-200 font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
