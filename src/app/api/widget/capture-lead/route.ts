@@ -4,26 +4,60 @@ import { syncLeadToGoogleSheet } from "@/lib/googleSheetsSync";
 import { emitInboxEvent } from "@/lib/inboxEvents";
 import { dispatchOutboundWebhook } from "@/lib/outboundWebhookDispatcher";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+};
+
+/**
+ * OPTIONS /api/widget/capture-lead
+ * Handles CORS preflight requests from external customer storefronts.
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 /**
  * POST /api/widget/capture-lead
- * Captures visitor name and phone from the website widget before launching WhatsApp.
+ * Captures visitor clicks, browsing context, active cart items, and optional form leads before launching WhatsApp.
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { clientId, refId, eventType, name, phone, email, pageUrl, pageTitle, utmSource, customMessage, platform, detectedProduct, cart } = body;
-
-    if (!clientId) {
-      return NextResponse.json({ success: false, error: "Missing clientId." }, { status: 400 });
+    let body: any = {};
+    const rawText = await req.text().catch(() => "");
+    if (rawText) {
+      try {
+        body = JSON.parse(rawText);
+      } catch {
+        body = {};
+      }
     }
 
-    const client = await prisma.whatsAppClient.findUnique({
-      where: { id: clientId },
-      include: { websiteWidget: true },
-    });
+    const { clientId, refId, eventType, name, phone, email, pageUrl, pageTitle, utmSource, customMessage, platform, detectedProduct, cart } = body;
+
+    let client = clientId
+      ? await prisma.whatsAppClient.findUnique({
+          where: { id: clientId },
+          include: { websiteWidget: true },
+        })
+      : null;
 
     if (!client) {
-      return NextResponse.json({ success: false, error: "Invalid client." }, { status: 404 });
+      client = await prisma.whatsAppClient.findFirst({
+        where: { isActive: true },
+        include: { websiteWidget: true },
+      });
+    }
+
+    if (!client) {
+      return NextResponse.json(
+        { success: false, error: "Invalid client." },
+        { status: 404, headers: corsHeaders }
+      );
     }
 
     const targetWhatsApp = (client.phoneNumber || "917404388242").replace(/\D/g, "");
@@ -68,7 +102,10 @@ export async function POST(req: NextRequest) {
 
       // Fast exit for background add-to-cart beacon without phone
       if (isAddToCart && (!cleanPhone || cleanPhone.length < 10)) {
-        return NextResponse.json({ success: true, event: "ADD_TO_CART_RECORDED", refId });
+        return NextResponse.json(
+          { success: true, event: "ADD_TO_CART_RECORDED", refId },
+          { headers: corsHeaders }
+        );
       }
     }
 
@@ -185,21 +222,23 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Build clean WhatsApp URL with tracking ref (NO messy page URLs or cart text dumped into the customer message)
-    let greeting = customMessage || client.websiteWidget?.welcomeMessage || "Hello! Can I get more info on this?";
-    if (refId) {
-      greeting += ` [Ref: ${refId.toString().toUpperCase()}]`;
-    }
-
+    // Build 100% clean WhatsApp URL (NO ref codes, no URLs or cart text in customer message)
+    const greeting = customMessage || client.websiteWidget?.welcomeMessage || "Hello! Can I get more info on this?";
     const whatsappUrl = `https://wa.me/${targetWhatsApp}?text=${encodeURIComponent(greeting)}`;
 
-    return NextResponse.json({
-      success: true,
-      whatsappUrl,
-      customerId: customer?.id,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        whatsappUrl,
+        customerId: customer?.id,
+      },
+      { headers: corsHeaders }
+    );
   } catch (err: any) {
     console.error("[Widget Capture Lead] Error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: err.message },
+      { status: 500, headers: corsHeaders }
+    );
   }
 }

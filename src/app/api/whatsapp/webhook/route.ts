@@ -911,6 +911,40 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         });
       }
 
+      // Fallback 2: Recent Website Click Correlation (within last 15 minutes for this store)
+      if (!visitorSessionLog) {
+        const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+        visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
+          where: {
+            ...(clientId ? { clientId } : {}),
+            nodeType: "WIDGET_SESSION_REF",
+            createdAt: { gte: fifteenMinsAgo }
+          },
+          orderBy: { createdAt: "desc" }
+        });
+      }
+
+      // Fallback 3: Website Greeting Text check (within last 60 minutes)
+      if (!visitorSessionLog) {
+        const lowerText = textContent.toLowerCase();
+        const isWebsiteGreeting = lowerText.includes("info on this") ||
+          lowerText.includes("inquiry from your website") ||
+          lowerText.includes("inquiring about") ||
+          lowerText.includes("connect with");
+
+        if (isWebsiteGreeting) {
+          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+          visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
+            where: {
+              ...(clientId ? { clientId } : {}),
+              nodeType: "WIDGET_SESSION_REF",
+              createdAt: { gte: oneHourAgo }
+            },
+            orderBy: { createdAt: "desc" }
+          });
+        }
+      }
+
       if (visitorSessionLog && visitorSessionLog.payload) {
         const payloadData = typeof visitorSessionLog.payload === "string"
           ? JSON.parse(visitorSessionLog.payload)
@@ -965,6 +999,10 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         // Auto-tag customer
         const existingTags = (customer.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean);
         let tagsChanged = false;
+        if (!existingTags.includes("Website Lead")) {
+          existingTags.push("Website Lead");
+          tagsChanged = true;
+        }
         if (!existingTags.includes("Website_Visitor")) {
           existingTags.push("Website_Visitor");
           tagsChanged = true;
@@ -977,6 +1015,14 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
           await prisma.customer.update({
             where: { id: customer.id },
             data: { tags: existingTags.join(', ') }
+          }).catch(() => {});
+        }
+
+        // Increment leads captured in website widget analytics
+        if (clientId) {
+          await prisma.whatsAppWebsiteWidget.updateMany({
+            where: { clientId },
+            data: { totalLeadsCaptured: { increment: 1 } }
           }).catch(() => {});
         }
       }

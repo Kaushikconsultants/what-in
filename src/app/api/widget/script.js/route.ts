@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
+}
+
 /**
  * GET /api/widget/script.js
  * Serves the dynamic, zero-dependency embeddable website widget JavaScript.
@@ -508,11 +521,12 @@ export async function GET(req: NextRequest) {
                 });
 
                 if (navigator.sendBeacon) {
-                  navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([cartPayload], { type: 'application/json' }));
+                  navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([cartPayload], { type: 'text/plain;charset=UTF-8' }));
                 } else {
                   fetch(appUrl + '/api/widget/capture-lead', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
                     body: cartPayload,
                     keepalive: true
                   }).catch(function() {});
@@ -592,11 +606,11 @@ export async function GET(req: NextRequest) {
     return visitorSessionId || ('W' + Math.random().toString(36).substring(2, 6).toUpperCase());
   }
 
-  // Send visitor session context to backend and launch WhatsApp with clean prefilled text + ref tag
+  // Send visitor session context to backend and launch WhatsApp with 100% clean prefilled text (NO ref codes in text)
   function openWhatsAppWithSession(cleanText, targetPhoneOverride) {
     var refCode = generateRefCode();
     var phoneToUse = (targetPhoneOverride || config.phoneNumber || '').replace(/\\D/g, '');
-    var textToSend = cleanText + ' [Ref: ' + refCode + ']';
+    var textToSend = cleanText;
 
     try {
       var payloadData = JSON.stringify({
@@ -612,11 +626,12 @@ export async function GET(req: NextRequest) {
       });
 
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([payloadData], { type: 'application/json' }));
+        navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([payloadData], { type: 'text/plain;charset=UTF-8' }));
       } else {
         fetch(appUrl + '/api/widget/capture-lead', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
           body: payloadData,
           keepalive: true
         }).catch(function() {});
@@ -766,11 +781,12 @@ export async function GET(req: NextRequest) {
       submitBtn.innerText = 'Opening WhatsApp...';
 
       var refCode = generateRefCode();
-      var textToSend = cleanInquiryMsg + ' [Ref: ' + refCode + ']';
+      var textToSend = cleanInquiryMsg;
 
       fetch(appUrl + '/api/widget/capture-lead', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify({
           clientId: clientId,
           refId: refCode,
@@ -841,6 +857,7 @@ export async function GET(req: NextRequest) {
     status: 200,
     headers: {
       "Content-Type": "application/javascript; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
       "Cache-Control": "public, max-age=300, s-maxage=600",
     },
   });

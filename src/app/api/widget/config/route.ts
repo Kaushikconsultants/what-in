@@ -68,10 +68,39 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Count captured leads that originated from website
+    const websiteLeadsCount = await prisma.customer.count({
+      where: {
+        clientId: client.id,
+        OR: [
+          { source: { contains: "Widget", mode: "insensitive" } },
+          { source: { contains: "Website", mode: "insensitive" } },
+          { tags: { contains: "Website", mode: "insensitive" } },
+          { tags: { contains: "Website_Visitor", mode: "insensitive" } },
+          { tags: { contains: "Website Lead", mode: "insensitive" } },
+        ],
+      },
+    });
+
+    const effectiveLeads = Math.max(widget.totalLeadsCaptured || 0, websiteLeadsCount);
+    const effectiveClicks = Math.max(widget.totalClicks || 0, effectiveLeads);
+
+    if (effectiveLeads > (widget.totalLeadsCaptured || 0) || effectiveClicks > (widget.totalClicks || 0)) {
+      await prisma.whatsAppWebsiteWidget.update({
+        where: { id: widget.id },
+        data: {
+          totalLeadsCaptured: effectiveLeads,
+          totalClicks: effectiveClicks,
+        },
+      }).catch(() => {});
+    }
+
     return NextResponse.json({
       success: true,
       widget: {
         ...widget,
+        totalClicks: effectiveClicks,
+        totalLeadsCaptured: effectiveLeads,
         departments: parsedDepartments,
         phoneNumber: client.phoneNumber || "+91 74043 88242",
         embedSnippet: `<script src="${process.env.NEXT_PUBLIC_APP_URL || "https://whatsapp.esponsports.com"}/api/widget/script.js?clientId=${client.id}" async></script>`,
