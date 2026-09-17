@@ -16,7 +16,8 @@ async function resolveClient(req: NextRequest) {
     if (client) return client;
   }
 
-  return null;
+  // Fallback to active client on single-tenant / domain setups
+  return await prisma.whatsAppClient.findFirst({ where: { isActive: true } });
 }
 
 /**
@@ -69,9 +70,12 @@ export async function GET(req: NextRequest) {
       nodeType: "WIDGET_SESSION_REF",
     };
     if (cleanQueryPhone.length >= 6) {
+      const last10 = cleanQueryPhone.slice(-10);
       sessionWhere.OR = [
-        { phone: { contains: cleanQueryPhone } },
-        { payload: { contains: cleanQueryPhone } },
+        { phone: cleanQueryPhone },
+        { phone: `91${last10}` },
+        { phone: last10 },
+        { phone: { contains: last10 } },
       ];
     }
 

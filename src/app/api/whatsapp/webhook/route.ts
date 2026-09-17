@@ -901,6 +901,17 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
           },
           orderBy: { createdAt: "desc" }
         });
+
+        // Link customer phone to all session logs with this refId so future live activity & drawer immediately correlate
+        if (cleanPhone && cleanPhone.length >= 10) {
+          await prisma.whatsAppChatbotLog.updateMany({
+            where: {
+              nodeType: "WIDGET_SESSION_REF",
+              nodeId: { equals: widgetRefCode, mode: "insensitive" }
+            },
+            data: { phone: cleanPhone }
+          }).catch(() => {});
+        }
       }
 
       // If not matched by ref code, check if a visitor session was logged with this customer's exact phone in the last 2 hours (only if NOT a Meta CTWA ad lead)

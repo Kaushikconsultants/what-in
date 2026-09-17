@@ -66,6 +66,23 @@ export async function POST(req: NextRequest) {
     let cleanPhone = (phone || identifiedPhone || "").toString().replace(/\D/g, "");
     if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
 
+    // Auto-correlate: If phone is not provided in telemetry payload, resolve from existing linked session
+    if ((!cleanPhone || cleanPhone.length < 10) && refId) {
+      const linked = await prisma.whatsAppChatbotLog.findFirst({
+        where: {
+          clientId: client.id,
+          nodeType: "WIDGET_SESSION_REF",
+          nodeId: { equals: refId.toString().toUpperCase(), mode: "insensitive" },
+          NOT: { phone: "WIDGET_SESSION" }
+        },
+        select: { phone: true },
+        orderBy: { createdAt: "desc" }
+      });
+      if (linked?.phone && linked.phone !== "WIDGET_SESSION") {
+        cleanPhone = linked.phone;
+      }
+    }
+
     const leadName = (name || "Website Visitor").trim();
     const effectivePlatform = platform || "Website";
     const source = utmSource || `${effectivePlatform} Widget`;
@@ -200,7 +217,7 @@ export async function POST(req: NextRequest) {
         }
 
         return NextResponse.json(
-          { success: true, event: "LIVE_ACTIVITY_RECORDED", refId },
+          { success: true, event: "LIVE_ACTIVITY_RECORDED", refId, identifiedPhone: cleanPhone || null },
           { headers: corsHeaders }
         );
       }

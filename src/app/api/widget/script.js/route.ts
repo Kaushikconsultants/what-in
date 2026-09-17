@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     avatarUrl: "",
     requireLeadForm: false,
     showOnMobile: true,
-    phoneNumber: "917404388242",
+    phoneNumber: (client.phoneNumber || "917404388242").replace(/\D/g, ""),
     clientCategory: "GENERAL",
     departments: [],
     proactiveNudge: false,
@@ -789,25 +789,50 @@ export async function GET(req: NextRequest) {
         }
       }
       var strPayload = JSON.stringify(payload);
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([strPayload], { type: 'text/plain;charset=UTF-8' }));
-      } else {
-        fetch(appUrl + '/api/widget/capture-lead', {
-          method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-          body: strPayload,
-          keepalive: true
-        }).catch(function() {});
-      }
+      fetch(appUrl + '/api/widget/capture-lead', {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: strPayload,
+        keepalive: true
+      }).then(function(res) {
+        return res.json();
+      }).then(function(data) {
+        if (data && data.identifiedPhone) {
+          setIdentifiedPhone(data.identifiedPhone);
+        }
+      }).catch(function() {});
     } catch (e) {}
   }
 
   // ⚡ Automatic Live Telemetry Triggers:
-  // 1. Silent Page View Telemetry 1.2 seconds after DOM is ready
+  // 1. Silent Page View Telemetry after DOM is ready
   setTimeout(function() {
     sendLiveTelemetry('PAGE_VIEW');
-  }, 1200);
+  }, 600);
+
+  // 1b. Listen to single-page / AJAX navigations (Shopify Turbo / Barba / History API)
+  try {
+    var lastTrackedUrl = window.location.href;
+    function checkUrlChange() {
+      if (window.location.href !== lastTrackedUrl) {
+        lastTrackedUrl = window.location.href;
+        addCurrentPageToJourney();
+        setTimeout(function() {
+          sendLiveTelemetry('PAGE_VIEW');
+        }, 250);
+      }
+    }
+    window.addEventListener('popstate', checkUrlChange);
+    if (window.history && window.history.pushState) {
+      var rawPushState = window.history.pushState;
+      window.history.pushState = function() {
+        var ret = rawPushState.apply(this, arguments);
+        setTimeout(checkUrlChange, 150);
+        return ret;
+      };
+    }
+  } catch (e) {}
 
   // 2. Auto-capture visitor phone from any form input on website (e.g. checkout, contact forms)
   try {
