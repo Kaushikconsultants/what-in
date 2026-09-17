@@ -2569,58 +2569,30 @@ export default function WhatsAppInboxComponent() {
                   <span>Profile</span>
                 </button>
 
-                <button
-                  className={`chat-action-btn ${showWebsiteTrackingDrawer ? "active-profile" : ""}`}
-                  onClick={() => {
-                    setShowWebsiteTrackingDrawer(prev => !prev);
-                    if (!showWebsiteTrackingDrawer && activeCustomerPhone) {
-                      fetchCustomerWebSessions(activeCustomerPhone);
-                    }
-                  }}
-                  title={
-                    activeWebsiteTrackingData.isOnlineNow
-                      ? "Customer is online on your website right now! Click to view live activity."
-                      : "View Live Website Activity, Browsing History & Searches"
-                  }
-                  style={
-                    activeWebsiteTrackingData.isOnlineNow
-                      ? {
-                          backgroundColor: "#ecfdf5",
-                          color: "#047857",
-                          borderColor: "#6ee7b7",
-                          boxShadow: "0 1px 4px rgba(16, 185, 129, 0.25)",
-                          fontWeight: 600,
-                        }
-                      : undefined
-                  }
-                >
-                  <Globe size={13} style={activeWebsiteTrackingData.isOnlineNow ? { color: "#059669" } : undefined} />
-                  <span>Website Tracking</span>
-                  {activeWebsiteTrackingData.isOnlineNow && (
-                    <span
-                      style={{
-                        display: "inline-block",
-                        width: 7,
-                        height: 7,
-                        borderRadius: "50%",
-                        backgroundColor: "#10b981",
-                        boxShadow: "0 0 0 2px #a7f3d0",
-                        animation: "pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-                        marginLeft: 2,
-                      }}
-                    />
-                  )}
-                </button>
-
-                {/* More Actions Dropdown Menu */}
+                 {/* More Actions Dropdown Menu */}
                 <div style={{ position: "relative" }}>
                   <button
                     className={`chat-action-btn ${showMoreMenu ? "active-more" : ""}`}
                     onClick={() => setShowMoreMenu(prev => !prev)}
-                    title="More Conversation Actions"
-                    style={{ padding: "6px 8px" }}
+                    title="More Conversation Actions & Website Tracking"
+                    style={{ padding: "6px 8px", position: "relative" }}
                   >
                     <MoreVertical size={14} />
+                    {activeWebsiteTrackingData.isOnlineNow && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: 3,
+                          right: 3,
+                          width: 7,
+                          height: 7,
+                          borderRadius: "50%",
+                          backgroundColor: "#10b981",
+                          boxShadow: "0 0 0 1.5px #fff",
+                          animation: "pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                        }}
+                      />
+                    )}
                   </button>
 
                   {showMoreMenu && (
@@ -2630,6 +2602,37 @@ export default function WhatsAppInboxComponent() {
                         onClick={() => setShowMoreMenu(false)} 
                       />
                       <div className="chat-header-dropdown-menu">
+                        <button
+                          className="dropdown-menu-item"
+                          onClick={() => {
+                            setShowMoreMenu(false);
+                            setShowWebsiteTrackingDrawer(true);
+                            if (activeCustomerPhone) {
+                              fetchCustomerWebSessions(activeCustomerPhone);
+                            }
+                          }}
+                        >
+                          <Globe size={14} color={activeWebsiteTrackingData.isOnlineNow ? "#059669" : "#4f46e5"} />
+                          <span style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1 }}>
+                            Website Tracking
+                            {activeWebsiteTrackingData.isOnlineNow && (
+                              <span
+                                style={{
+                                  fontSize: "9.5px",
+                                  fontWeight: 700,
+                                  backgroundColor: "#ecfdf5",
+                                  color: "#047857",
+                                  padding: "1px 6px",
+                                  borderRadius: "10px",
+                                  border: "1px solid #6ee7b7",
+                                }}
+                              >
+                                Online Now
+                              </span>
+                            )}
+                          </span>
+                        </button>
+
                         <button
                           className="dropdown-menu-item"
                           onClick={() => {
@@ -6089,7 +6092,6 @@ export default function WhatsAppInboxComponent() {
           </div>
         </div>
       )}
-      {`/* End of inbox panels */`}
     </div>
   );
 }
