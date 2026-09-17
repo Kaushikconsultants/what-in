@@ -892,12 +892,12 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       let visitorSessionLog = null;
       const effectiveClientId = conversation?.clientId || clientId || client?.id;
 
-      if (effectiveClientId && widgetRefCode) {
+      if (widgetRefCode) {
         visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
           where: {
-            clientId: effectiveClientId,
+            ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
             nodeType: "WIDGET_SESSION_REF",
-            nodeId: widgetRefCode
+            nodeId: { equals: widgetRefCode, mode: "insensitive" }
           },
           orderBy: { createdAt: "desc" }
         });

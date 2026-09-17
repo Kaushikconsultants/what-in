@@ -28,21 +28,24 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const clientId = searchParams.get("clientId") || searchParams.get("tenant") || "";
 
-  if (!clientId || clientId.trim().length < 5) {
-    return new NextResponse("// WhatIn / WhatMore Widget: Missing or invalid clientId parameter.", {
-      status: 400,
-      headers: { "Content-Type": "application/javascript", ...corsHeaders },
+  let client = null;
+  if (clientId && clientId.trim().length >= 5) {
+    client = await prisma.whatsAppClient.findUnique({
+      where: { id: clientId.trim() },
+      include: { websiteWidget: true },
     });
   }
 
-  const client = await prisma.whatsAppClient.findUnique({
-    where: { id: clientId.trim() },
-    include: { websiteWidget: true },
-  });
+  if (!client) {
+    client = await prisma.whatsAppClient.findFirst({
+      where: { isActive: true },
+      include: { websiteWidget: true },
+    });
+  }
 
-  if (!client || !client.isActive) {
-    return new NextResponse("// WhatIn / WhatMore Widget: Client not found or inactive.", {
-      status: 403,
+  if (!client) {
+    return new NextResponse("// WhatIn / WhatMore Widget: Client not configured or inactive.", {
+      status: 404,
       headers: { "Content-Type": "application/javascript", ...corsHeaders },
     });
   }
@@ -122,7 +125,7 @@ export async function GET(req: NextRequest) {
   window.__WHATIN_WIDGET_LOADED__ = true;
 
   var config = ${JSON.stringify(widgetConfig)};
-  var clientId = "${clientId}";
+  var clientId = "${client.id}";
   var appUrl = "${appUrl}";
 
   var isMobile = window.innerWidth <= 768;
@@ -983,11 +986,13 @@ export async function GET(req: NextRequest) {
 
   // Send visitor session context to backend and launch WhatsApp with 100% clean prefilled text (NO ref codes in text)
   function openWhatsAppWithSession(cleanText, targetPhoneOverride) {
+    var refCode = generateRefCode();
     var phoneToUse = (targetPhoneOverride || config.phoneNumber || '').replace(/\D/g, '');
-    var textToSend = cleanText;
+    var textToSend = cleanText + ' [Ref: ' + refCode + ']';
 
     try {
       var payloadData = JSON.stringify(buildPayload({
+        refId: refCode,
         customMessage: cleanText
       }));
 
@@ -1154,7 +1159,7 @@ export async function GET(req: NextRequest) {
       submitBtn.innerText = 'Opening WhatsApp...';
 
       var refCode = generateRefCode();
-      var textToSend = cleanInquiryMsg;
+      var textToSend = cleanInquiryMsg + ' [Ref: ' + refCode + ']';
 
       fetch(appUrl + '/api/widget/capture-lead', {
         method: 'POST',
