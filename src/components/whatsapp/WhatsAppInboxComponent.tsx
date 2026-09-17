@@ -32,6 +32,7 @@ import {
   Bot,
   Zap,
   MoreVertical,
+  Plus,
   PlusCircle,
   FileCode,
   CreditCard,
@@ -1139,16 +1140,22 @@ export default function WhatsAppInboxComponent() {
 
     const isNewConv = lastScrollConvIdRef.current !== selectedConvId;
     if (isNewConv) {
-      chatBottomRef.current?.scrollIntoView({ behavior: "auto" });
+      container.scrollTop = container.scrollHeight;
     } else {
       const threshold = 150; // pixels from the bottom
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
       if (isNearBottom) {
-        chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
       }
     }
     lastScrollConvIdRef.current = selectedConvId;
   }, [activeConvDetail?.messages, selectedConvId]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+    }
+  }, [selectedConvId]);
 
   // Handle Send Message
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -2276,6 +2283,33 @@ export default function WhatsAppInboxComponent() {
                       <Copy size={11} color="#6366f1" />
                     </span>
                   </div>
+
+                  {/* Active Conversation Tags & Status Badges */}
+                  <div className="chat-header-tags-row">
+                    <span className={`stage-tag ${(activeConvDetail.leadStatus || activeConvDetail.customer?.leadStage || 'New Lead').toLowerCase().replace(/\s+/g, '-')}`}>
+                      {activeConvDetail.leadStatus || activeConvDetail.customer?.leadStage || "New Lead"}
+                    </span>
+                    {activeTagsList.filter((t: string) => {
+                      if (!t || t === "Auto Created" || t === "WhatsApp Lead") return false;
+                      const assignedName = activeConvDetail.assignedEmployee?.user?.name;
+                      if (assignedName && t.toLowerCase() === assignedName.toLowerCase()) return false;
+                      return true;
+                    }).map((tag: string) => (
+                      <span key={tag} className="chat-header-tag-pill" title={`Tag: ${tag}`}>
+                        <Tag size={10} />
+                        <span>{tag}</span>
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setShowTagsModal(true)}
+                      className="chat-header-add-tag-btn"
+                      title="Manage or add tags"
+                    >
+                      <Plus size={10} />
+                      <span>Tag</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2416,22 +2450,7 @@ export default function WhatsAppInboxComponent() {
                           </button>
                         )}
 
-                        <button
-                          className="dropdown-menu-item"
-                          onClick={() => {
-                            setShowMoreMenu(false);
-                            const crmIntegrations = integrations.filter(i => i.type !== 'META_CAPI' && i.type !== 'PIXEL' && i.type !== 'META_CATALOG' && i.type !== 'CATALOG_ACTIVE_SOURCE');
-                            if (crmIntegrations.length > 1) {
-                              setShowIntegrationsMenu(true);
-                            } else {
-                              handlePushToCrm(crmIntegrations[0]?.id);
-                            }
-                          }}
-                          disabled={pushingToCrm}
-                        >
-                          <Activity size={14} color="#2563eb" />
-                          <span>{pushingToCrm ? "Pushing to CRM..." : isLeadPushed ? "Re-sync to CRM & ERP" : "Push to CRM"}</span>
-                        </button>
+
 
                         <button
                           className="dropdown-menu-item"
