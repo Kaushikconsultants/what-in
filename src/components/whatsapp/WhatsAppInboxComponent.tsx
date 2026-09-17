@@ -590,6 +590,20 @@ export default function WhatsAppInboxComponent() {
     return msgs;
   }, [activeConvDetail?.messages]);
 
+  // Extract latest Website Visitor Context & Cart Context for CRM 360 profile panel
+  const latestWebsiteContext = useMemo(() => {
+    if (!activeConvDetail?.messages) return null;
+    const ctxMsg = [...activeConvDetail.messages].reverse().find(
+      (m: any) => m.senderName === "WEBSITE_VISITOR_CONTEXT" || m.messageType === "WEBSITE_VISITOR_CONTEXT"
+    );
+    if (!ctxMsg) return null;
+    try {
+      return typeof ctxMsg.metadata === "string" ? JSON.parse(ctxMsg.metadata) : ctxMsg.metadata;
+    } catch (_) {
+      return null;
+    }
+  }, [activeConvDetail?.messages]);
+
   // Quote Form State
   const [quoteItems, setQuoteItems] = useState([
     { name: "Cotton Polo T-Shirt (ESP-902)", quantity: 200, rate: 290 },
@@ -4284,6 +4298,63 @@ export default function WhatsAppInboxComponent() {
                 <span className="metric-value">{activeConvDetail.customer?.totalOrders || 0} Orders</span>
               </div>
             </div>
+
+            {/* Live Store Browsing & Active Cart Activity Card in CRM Panel */}
+            {latestWebsiteContext && (
+              <div className="crm-section-box" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "12px", padding: "12px" }}>
+                <h5 className="crm-section-title" style={{ color: "#065f46", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>🌐</span> Store & Cart Activity
+                  </span>
+                  <span style={{ fontSize: "10px", background: "#dcfce7", color: "#166534", padding: "2px 6px", borderRadius: "6px", fontWeight: 700 }}>
+                    {latestWebsiteContext.platform || "Shopify"}
+                  </span>
+                </h5>
+                <div style={{ fontSize: "11.5px", color: "#1e293b" }}>
+                  <div style={{ fontWeight: 600, color: "#047857" }}>Browsing Page:</div>
+                  <div style={{ fontWeight: 700, marginTop: "2px", lineHeight: "1.3" }}>{latestWebsiteContext.pageTitle || "Online Store"}</div>
+                  {latestWebsiteContext.pageUrl && (
+                    <a
+                      href={latestWebsiteContext.pageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontSize: "11px", color: "#059669", textDecoration: "underline", display: "inline-block", marginTop: "4px" }}
+                    >
+                      Open Live Page ↗
+                    </a>
+                  )}
+                </div>
+
+                {latestWebsiteContext.cart && (latestWebsiteContext.cart.items?.length > 0 || latestWebsiteContext.cart.item_count > 0) && (
+                  <div style={{ marginTop: "10px", borderTop: "1px solid #bbf7d0", paddingTop: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11.5px", fontWeight: 700, color: "#065f46" }}>
+                      <span>🛒 Active Cart:</span>
+                      <span>
+                        {latestWebsiteContext.cart.item_count || latestWebsiteContext.cart.items?.length} items
+                        {latestWebsiteContext.cart.total_price ? ` (₹${latestWebsiteContext.cart.total_price})` : ""}
+                      </span>
+                    </div>
+                    {latestWebsiteContext.cart.items && latestWebsiteContext.cart.items.length > 0 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "6px" }}>
+                        {latestWebsiteContext.cart.items.slice(0, 3).map((it: any, i: number) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "11px", color: "#334155", background: "white", padding: "4px 6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "160px" }}>
+                              {it.quantity}x {it.title}
+                            </span>
+                            {it.price && <span style={{ fontWeight: 600, color: "#047857" }}>₹{it.price}</span>}
+                          </div>
+                        ))}
+                        {latestWebsiteContext.cart.items.length > 3 && (
+                          <div style={{ fontSize: "10px", color: "#64748b", textAlign: "center", marginTop: "2px" }}>
+                            +{latestWebsiteContext.cart.items.length - 3} more items in cart
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Quick Actions Panel */}
             <div className="crm-section-box">
