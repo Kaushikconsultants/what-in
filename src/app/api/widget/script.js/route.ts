@@ -411,71 +411,185 @@ export async function GET(req: NextRequest) {
     body.appendChild(offlineBox);
   }
 
-  // Cart Recovery & Active Cart Inspection for Shopify
-  var cartBox = null;
-  if (platform === 'Shopify') {
-    fetch('/cart.js')
-      .then(function(r) { return r.json(); })
-      .then(function(cart) {
-        if (cart && cart.item_count > 0) {
-          detectedCart = {
-            item_count: cart.item_count,
-            total_price: cart.total_price ? (cart.total_price / 100) : 0,
-            currency: cart.currency || 'INR',
-            items: (cart.items || []).map(function(it) {
-              return {
-                title: it.title || it.product_title,
-                quantity: it.quantity,
-                price: it.price ? (it.price / 100) : 0,
-                image: it.image || (it.featured_image ? it.featured_image.url : ''),
-                variant_title: it.variant_title || null,
-                url: it.url ? (window.location.origin + it.url) : null
-              };
-            })
-          };
-
-          if (config.enableCartRecovery) {
-            var itemTitles = cart.items.map(function(it) { return it.title; }).slice(0, 2).join(', ');
-            if (cart.items.length > 2) itemTitles += ' +' + (cart.items.length - 2) + ' more';
-
-            cartBox = document.createElement('div');
-            cartBox.style.backgroundColor = '#ecfdf5';
-            cartBox.style.border = '1px solid #a7f3d0';
-            cartBox.style.padding = '10px';
-            cartBox.style.borderRadius = '10px';
-            cartBox.style.fontSize = '12px';
-            cartBox.style.color = '#065f46';
-
-            cartBox.innerHTML = '<strong>🛒 ' + cart.item_count + ' items in your cart</strong><br><span style="font-size:11px;color:#047857;">' + itemTitles + ' (₹' + (cart.total_price / 100).toFixed(2) + ')</span>';
-
-            var cartAction = document.createElement('button');
-            cartAction.innerText = 'Ask for Cart Help / Discount ➔';
-            cartAction.style.width = '100%';
-            cartAction.style.marginTop = '6px';
-            cartAction.style.padding = '6px';
-            cartAction.style.backgroundColor = '#059669';
-            cartAction.style.color = '#ffffff';
-            cartAction.style.border = 'none';
-            cartAction.style.borderRadius = '6px';
-            cartAction.style.fontWeight = '600';
-            cartAction.style.fontSize = '11.5px';
-            cartAction.style.cursor = 'pointer';
-
-            cartAction.onclick = function() {
-              openWhatsAppWithSession('Hi! Can you assist with my order / available offers?');
-            };
-
-            cartBox.appendChild(cartAction);
-            body.insertBefore(cartBox, body.firstChild);
-          }
-        }
-      })
-      .catch(function() {});
+  // Persistent Visitor Session Reference (Stored in browser storage across page navigation)
+  var visitorSessionId = null;
+  try {
+    visitorSessionId = sessionStorage.getItem('__whatin_session_ref');
+    if (!visitorSessionId) {
+      visitorSessionId = 'W' + Math.random().toString(36).substring(2, 6).toUpperCase();
+      sessionStorage.setItem('__whatin_session_ref', visitorSessionId);
+    }
+  } catch (e) {
+    visitorSessionId = 'W' + Math.random().toString(36).substring(2, 6).toUpperCase();
   }
 
-  // Helper to generate a 4-character uppercase alphanumeric reference token
+  // Cart Recovery & Active Cart Inspection for Shopify
+  var cartBox = null;
+
+  function updateAndSyncCart(shouldFireBackend) {
+    if (platform === 'Shopify') {
+      fetch('/cart.js')
+        .then(function(r) { return r.json(); })
+        .then(function(cart) {
+          if (cart && typeof cart.item_count === 'number') {
+            detectedCart = {
+              item_count: cart.item_count,
+              total_price: cart.total_price ? (cart.total_price / 100) : 0,
+              currency: cart.currency || 'INR',
+              items: (cart.items || []).map(function(it) {
+                return {
+                  title: it.title || it.product_title,
+                  quantity: it.quantity,
+                  price: it.price ? (it.price / 100) : 0,
+                  image: it.image || (it.featured_image ? it.featured_image.url : ''),
+                  variant_title: it.variant_title || null,
+                  url: it.url ? (window.location.origin + it.url) : null
+                };
+              })
+            };
+
+            if (config.enableCartRecovery && cart.item_count > 0) {
+              var itemTitles = cart.items.map(function(it) { return it.title; }).slice(0, 2).join(', ');
+              if (cart.items.length > 2) itemTitles += ' +' + (cart.items.length - 2) + ' more';
+
+              if (!cartBox) {
+                cartBox = document.createElement('div');
+                cartBox.id = 'whatin-cart-box';
+                cartBox.style.backgroundColor = '#ecfdf5';
+                cartBox.style.border = '1px solid #a7f3d0';
+                cartBox.style.padding = '10px';
+                cartBox.style.borderRadius = '10px';
+                cartBox.style.fontSize = '12px';
+                cartBox.style.color = '#065f46';
+
+                var cartAction = document.createElement('button');
+                cartAction.innerText = 'Ask for Cart Help / Discount ➔';
+                cartAction.style.width = '100%';
+                cartAction.style.marginTop = '6px';
+                cartAction.style.padding = '6px';
+                cartAction.style.backgroundColor = '#059669';
+                cartAction.style.color = '#ffffff';
+                cartAction.style.border = 'none';
+                cartAction.style.borderRadius = '6px';
+                cartAction.style.fontWeight = '600';
+                cartAction.style.fontSize = '11.5px';
+                cartAction.style.cursor = 'pointer';
+
+                cartAction.onclick = function() {
+                  openWhatsAppWithSession('Hi! Can you assist with my order / available offers?');
+                };
+
+                cartBox.appendChild(cartAction);
+                body.insertBefore(cartBox, body.firstChild);
+              }
+
+              var summarySpan = cartBox.querySelector('strong');
+              if (summarySpan) {
+                summarySpan.innerText = '🛒 ' + cart.item_count + ' items in your cart';
+              }
+            } else if (cartBox && cart.item_count === 0) {
+              cartBox.remove();
+              cartBox = null;
+            }
+
+            // Immediately fire live Add to Cart event to our software backend!
+            if (shouldFireBackend && cart.item_count > 0) {
+              try {
+                var cartPayload = JSON.stringify({
+                  clientId: clientId,
+                  refId: visitorSessionId,
+                  eventType: 'ADD_TO_CART',
+                  pageUrl: window.location.href,
+                  pageTitle: (detectedProduct && detectedProduct.title) ? (detectedProduct.title + ' (' + platform + ')') : document.title,
+                  platform: platform,
+                  detectedProduct: detectedProduct,
+                  cart: detectedCart,
+                  utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' AddToCart')
+                });
+
+                if (navigator.sendBeacon) {
+                  navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([cartPayload], { type: 'application/json' }));
+                } else {
+                  fetch(appUrl + '/api/widget/capture-lead', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: cartPayload,
+                    keepalive: true
+                  }).catch(function() {});
+                }
+              } catch (_) {}
+            }
+          }
+        })
+        .catch(function() {});
+    }
+  }
+
+  // Initial cart fetch on page load
+  updateAndSyncCart(false);
+
+  // Real-Time AJAX Interceptor for Add-To-Cart actions (Shopify & WooCommerce)
+  try {
+    if (window.fetch) {
+      var originalFetch = window.fetch;
+      window.fetch = function() {
+        var args = arguments;
+        var url = args[0];
+        var isCartApi = typeof url === 'string' && (
+          url.indexOf('/cart/add') !== -1 ||
+          url.indexOf('/cart/change') !== -1 ||
+          url.indexOf('/cart/update') !== -1 ||
+          url.indexOf('/cart/clear') !== -1
+        );
+
+        return originalFetch.apply(this, args).then(function(response) {
+          if (isCartApi) {
+            setTimeout(function() { updateAndSyncCart(true); }, 350);
+          }
+          return response;
+        });
+      };
+    }
+
+    if (window.XMLHttpRequest) {
+      var originalOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this.__whatin_is_cart = typeof url === 'string' && (
+          url.indexOf('/cart/add') !== -1 ||
+          url.indexOf('/cart/change') !== -1 ||
+          url.indexOf('/cart/update') !== -1
+        );
+        return originalOpen.apply(this, arguments);
+      };
+
+      var originalSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.send = function() {
+        if (this.__whatin_is_cart) {
+          this.addEventListener('load', function() {
+            setTimeout(function() { updateAndSyncCart(true); }, 350);
+          });
+        }
+        return originalSend.apply(this, arguments);
+      };
+    }
+
+    document.addEventListener('cart:updated', function() { updateAndSyncCart(true); });
+    document.addEventListener('cart:build', function() { updateAndSyncCart(true); });
+    document.addEventListener('ajaxCart.afterCartLoad', function() { updateAndSyncCart(true); });
+
+    document.addEventListener('click', function(e) {
+      var target = e.target;
+      if (!target) return;
+      var btn = target.closest('button[name="add"], .btn-add-to-cart, [data-add-to-cart], .product-form__submit, .single_add_to_cart_button');
+      if (btn) {
+        setTimeout(function() { updateAndSyncCart(true); }, 750);
+      }
+    }, true);
+  } catch (err) {}
+
+  // Helper to generate or reuse visitor reference token
   function generateRefCode() {
-    return 'W' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    return visitorSessionId || ('W' + Math.random().toString(36).substring(2, 6).toUpperCase());
   }
 
   // Send visitor session context to backend and launch WhatsApp with clean prefilled text + ref tag

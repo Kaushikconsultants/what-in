@@ -11,7 +11,7 @@ import { dispatchOutboundWebhook } from "@/lib/outboundWebhookDispatcher";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { clientId, refId, name, phone, email, pageUrl, pageTitle, utmSource, customMessage, platform, detectedProduct, cart } = body;
+    const { clientId, refId, eventType, name, phone, email, pageUrl, pageTitle, utmSource, customMessage, platform, detectedProduct, cart } = body;
 
     if (!clientId) {
       return NextResponse.json({ success: false, error: "Missing clientId." }, { status: 400 });
@@ -37,15 +37,22 @@ export async function POST(req: NextRequest) {
 
     // Persist visitor session context for chatbox attribution (Meta Ad style referral)
     if (refId) {
+      const isAddToCart = eventType === "ADD_TO_CART";
+      const cartSummaryText = cart && cart.item_count ? ` (${cart.item_count} items - ₹${cart.total_price || 0})` : "";
+      const actionDesc = isAddToCart
+        ? `Live Add-To-Cart: ${pageTitle || "Product"}${cartSummaryText}`
+        : `Website context: ${pageTitle || pageUrl || "Storefront"}${cartSummaryText}`;
+
       await prisma.whatsAppChatbotLog.create({
         data: {
           clientId: client.id,
           phone: cleanPhone || "WIDGET_SESSION",
           nodeId: refId.toString().toUpperCase(),
           nodeType: "WIDGET_SESSION_REF",
-          actionDesc: `Website context: ${pageTitle || pageUrl || "Storefront"}`,
+          actionDesc,
           payload: {
             refId: refId.toString().toUpperCase(),
+            eventType: eventType || "VISITOR_CLICK",
             pageUrl: pageUrl || "",
             pageTitle: pageTitle || "",
             platform: effectivePlatform,
@@ -58,6 +65,11 @@ export async function POST(req: NextRequest) {
           },
         },
       }).catch((e) => console.warn("[Capture Lead] Ref Log save skipped:", e.message));
+
+      // Fast exit for background add-to-cart beacon without phone
+      if (isAddToCart && (!cleanPhone || cleanPhone.length < 10)) {
+        return NextResponse.json({ success: true, event: "ADD_TO_CART_RECORDED", refId });
+      }
     }
 
     let customer = null;
