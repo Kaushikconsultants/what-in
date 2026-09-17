@@ -59,14 +59,26 @@ export async function GET(req: NextRequest) {
       take: 100,
     });
 
+    const { searchParams } = new URL(req.url);
+    const queryPhone = searchParams.get("phone")?.trim() || "";
+    const cleanQueryPhone = queryPhone.replace(/\D/g, "");
+
     // 2. Fetch recent Storefront Widget Clicks & Add-To-Cart Sessions
+    const sessionWhere: any = {
+      clientId: client.id,
+      nodeType: "WIDGET_SESSION_REF",
+    };
+    if (cleanQueryPhone.length >= 6) {
+      sessionWhere.OR = [
+        { phone: { contains: cleanQueryPhone } },
+        { payload: { contains: cleanQueryPhone } },
+      ];
+    }
+
     const rawSessions = await prisma.whatsAppChatbotLog.findMany({
-      where: {
-        clientId: client.id,
-        nodeType: "WIDGET_SESSION_REF",
-      },
+      where: sessionWhere,
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take: cleanQueryPhone ? 100 : 50,
     });
 
     const parsedSessions = rawSessions.map((s) => {
@@ -90,6 +102,10 @@ export async function GET(req: NextRequest) {
         detectedProduct: payload.detectedProduct || null,
         cart: payload.cart || null,
         customMessage: payload.customMessage || null,
+        pageJourney: Array.isArray(payload.pageJourney) ? payload.pageJourney : [],
+        searches: Array.isArray(payload.searches) ? payload.searches : [],
+        categoryInsights: payload.categoryInsights || null,
+        sessionStats: payload.sessionStats || null,
         createdAt: s.createdAt,
       };
     });
@@ -127,6 +143,10 @@ export async function GET(req: NextRequest) {
           pageUrl: matchedSession.pageUrl,
           cart: matchedSession.cart,
           detectedProduct: matchedSession.detectedProduct,
+          pageJourney: matchedSession.pageJourney,
+          searches: matchedSession.searches,
+          categoryInsights: matchedSession.categoryInsights,
+          sessionStats: matchedSession.sessionStats,
         } : null,
       };
     });

@@ -950,6 +950,11 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
           ? JSON.parse(visitorSessionLog.payload)
           : (visitorSessionLog.payload as any);
 
+        const categoryInsights = payloadData.categoryInsights || null;
+        const pageJourney = Array.isArray(payloadData.pageJourney) ? payloadData.pageJourney : [];
+        const searches = Array.isArray(payloadData.searches) ? payloadData.searches : [];
+        const sessionStats = payloadData.sessionStats || null;
+
         const websiteContextMeta = {
           type: "WEBSITE_VISITOR_CONTEXT",
           refId: widgetRefCode || payloadData.refId || "WIDGET",
@@ -958,11 +963,24 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
           platform: payloadData.platform || "Website",
           detectedProduct: payloadData.detectedProduct || null,
           cart: payloadData.cart || null,
+          pageJourney,
+          searches,
+          categoryInsights,
+          sessionStats,
         };
 
         const cartItemCount = payloadData.cart?.item_count || payloadData.cart?.items?.length || 0;
         const cartTotal = payloadData.cart?.total_price ? ` (₹${payloadData.cart.total_price})` : "";
         const cartSummary = cartItemCount > 0 ? ` | Cart: ${cartItemCount} item(s)${cartTotal}` : "";
+
+        let headlineContent = `🌐 Website Inquiry: "${websiteContextMeta.pageTitle}"${cartSummary}`;
+        if (categoryInsights?.category === "EDUCATION" && categoryInsights.courses?.length) {
+          headlineContent = `🎓 Education Inquiry: "${categoryInsights.courses[0]}"${categoryInsights.universities?.[0] ? ` at ${categoryInsights.universities[0]}` : ""}`;
+        } else if (categoryInsights?.category === "REAL_ESTATE" && categoryInsights.properties?.length) {
+          headlineContent = `🏢 Property Inquiry: "${categoryInsights.properties[0]}"`;
+        } else if (categoryInsights?.category === "HEALTHCARE" && categoryInsights.specialties?.length) {
+          headlineContent = `🏥 Medical Inquiry: "${categoryInsights.specialties[0]}"`;
+        }
 
         const contextMsg = await prisma.whatsAppMessage.create({
           data: {
@@ -970,7 +988,7 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
             senderType: "SYSTEM",
             senderName: "WEBSITE_VISITOR_CONTEXT",
             messageType: "WEBSITE_VISITOR_CONTEXT",
-            content: `🌐 Website Inquiry: "${websiteContextMeta.pageTitle}"${cartSummary}`,
+            content: headlineContent,
             metadata: JSON.stringify(websiteContextMeta),
             status: "SENT",
             sentAt: new Date(messageTimestamp.getTime() - 1000)
@@ -1010,6 +1028,29 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         if (cartItemCount > 0 && !existingTags.includes("Cart_Abandonment")) {
           existingTags.push("Cart_Abandonment");
           tagsChanged = true;
+        }
+        if (categoryInsights?.category === "EDUCATION") {
+          if (!existingTags.includes("Education_Lead")) {
+            existingTags.push("Education_Lead");
+            tagsChanged = true;
+          }
+          if (categoryInsights.courses?.[0]) {
+            const cTag = `Course_${categoryInsights.courses[0].slice(0, 20).replace(/[^a-zA-Z0-9]/g, "_")}`;
+            if (!existingTags.includes(cTag)) {
+              existingTags.push(cTag);
+              tagsChanged = true;
+            }
+          }
+        } else if (categoryInsights?.category === "REAL_ESTATE") {
+          if (!existingTags.includes("Real_Estate_Lead")) {
+            existingTags.push("Real_Estate_Lead");
+            tagsChanged = true;
+          }
+        } else if (categoryInsights?.category === "HEALTHCARE") {
+          if (!existingTags.includes("Healthcare_Lead")) {
+            existingTags.push("Healthcare_Lead");
+            tagsChanged = true;
+          }
         }
         if (tagsChanged) {
           await prisma.customer.update({

@@ -1773,17 +1773,55 @@ export default function WebsiteWidgetBuilderComponent() {
                                 </a>
                               </div>
 
-                              {/* Browsing Context & Cart */}
+                              {/* Browsing Context & Multi-Category Intelligence */}
                               {lead.session && (
-                                <div className="mt-2 text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2 flex-wrap bg-slate-50 dark:bg-slate-900/60 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-                                  <span className="font-semibold text-gray-400 text-[11px]">Context:</span>
-                                  <span className="font-medium truncate max-w-xs" title={lead.session.pageTitle}>
-                                    🌐 {lead.session.pageTitle}
-                                  </span>
-                                  {hasCart && (
-                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-                                      <ShoppingCart size={11} /> {cartCount} items (₹{cartTotal})
+                                <div className="mt-2 text-xs text-slate-600 dark:text-slate-300 flex flex-col gap-1.5 bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-semibold text-gray-400 text-[11px]">Active Page:</span>
+                                    <span className="font-bold text-gray-900 dark:text-white truncate max-w-xs" title={lead.session.pageTitle}>
+                                      🌐 {lead.session.pageTitle}
                                     </span>
+                                    {hasCart && (
+                                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                                        <ShoppingCart size={11} /> {cartCount} items (₹{cartTotal})
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Education Intent */}
+                                  {lead.session.categoryInsights?.category === "EDUCATION" && (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[10px] font-bold text-indigo-600 uppercase">🎓 Education:</span>
+                                      {lead.session.categoryInsights.courses?.slice(0, 2).map((c: string) => (
+                                        <span key={c} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60">
+                                          {c}
+                                        </span>
+                                      ))}
+                                      {lead.session.categoryInsights.universities?.slice(0, 1).map((u: string) => (
+                                        <span key={u} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200/60">
+                                          🏛️ {u}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Searches */}
+                                  {lead.session.searches && lead.session.searches.length > 0 && (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[10px] font-bold text-slate-500 uppercase">🔍 Searches:</span>
+                                      {lead.session.searches.slice(0, 3).map((sq: string) => (
+                                        <span key={sq} className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                          "{sq}"
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Browsing Trail */}
+                                  {lead.session.pageJourney && lead.session.pageJourney.length > 1 && (
+                                    <div className="text-[10.5px] text-slate-500 font-mono overflow-hidden text-ellipsis whitespace-nowrap">
+                                      🧭 {lead.session.pageJourney.map((p: any) => p.path).slice(-3).join(" ➔ ")}
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -1857,11 +1895,17 @@ export default function WebsiteWidgetBuilderComponent() {
                                 className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 ${
                                   isAddToCart
                                     ? "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                    : s.categoryInsights?.category === "EDUCATION"
+                                    ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                                    : s.categoryInsights?.category === "REAL_ESTATE"
+                                    ? "bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                    : s.categoryInsights?.category === "HEALTHCARE"
+                                    ? "bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800"
                                     : "bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
                                 }`}
                               >
-                                {isAddToCart ? <ShoppingCart size={11} /> : <MousePointerClick size={11} />}
-                                <span>{isAddToCart ? "Add To Cart Event" : "Widget Click"}</span>
+                                {isAddToCart ? <ShoppingCart size={11} /> : <span>{s.categoryInsights?.category === "EDUCATION" ? "🎓" : s.categoryInsights?.category === "REAL_ESTATE" ? "🏢" : s.categoryInsights?.category === "HEALTHCARE" ? "🏥" : "🌐"}</span>}
+                                <span>{isAddToCart ? "Add To Cart Event" : s.categoryInsights?.category === "EDUCATION" ? "Education Lead" : s.categoryInsights?.category === "REAL_ESTATE" ? "Real Estate Lead" : s.categoryInsights?.category === "HEALTHCARE" ? "Healthcare Lead" : "Widget Click"}</span>
                               </span>
 
                               <span className="font-bold text-xs text-gray-900 dark:text-white">
@@ -1914,6 +1958,98 @@ export default function WebsiteWidgetBuilderComponent() {
                             <div className="bg-gray-50 dark:bg-slate-900/60 p-2 rounded-lg text-xs text-gray-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
                               <MessageSquare size={13} className="text-gray-400 shrink-0" />
                               <span>"{s.customMessage}"</span>
+                            </div>
+                          )}
+
+                          {/* Multi-Category Intent & Search Breakdown */}
+                          {s.categoryInsights && s.categoryInsights.category === "EDUCATION" && (
+                            <div className="bg-indigo-50/50 dark:bg-indigo-950/40 p-2.5 rounded-lg border border-indigo-100 dark:border-indigo-900/60 flex flex-col gap-1.5 text-xs">
+                              {s.categoryInsights.courses?.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-indigo-700 dark:text-indigo-300 text-[11px]">Courses:</span>
+                                  {s.categoryInsights.courses.map((c: string) => (
+                                    <span key={c} className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200">
+                                      🎓 {c}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {s.categoryInsights.universities?.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-purple-700 dark:text-purple-300 text-[11px]">Target Universities:</span>
+                                  {s.categoryInsights.universities.map((u: string) => (
+                                    <span key={u} className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+                                      🏛️ {u}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {s.categoryInsights.destinations?.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Destinations:</span>
+                                  {s.categoryInsights.destinations.map((d: string) => (
+                                    <span key={d} className="text-[10px] font-medium px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200">
+                                      🌍 {d}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Searched queries */}
+                          {s.searches && s.searches.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                              <span className="font-bold text-slate-500 text-[11px]">🔍 Searches:</span>
+                              {s.searches.map((sq: string) => (
+                                <span key={sq} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                                  "{sq}"
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Expandable Browsing Journey Trail */}
+                          {s.pageJourney && s.pageJourney.length > 0 && (
+                            <div className="border border-gray-100 dark:border-slate-800 rounded-lg overflow-hidden text-xs">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedSessionId(isExpanded ? null : s.id)}
+                                className="w-full px-3 py-2 bg-gray-50/80 dark:bg-slate-900/60 hover:bg-gray-100 dark:hover:bg-slate-800 text-left font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between cursor-pointer"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span>🧭</span>
+                                  <span>Browsing Trail ({s.pageJourney.length} page{s.pageJourney.length > 1 ? "s" : ""})</span>
+                                </span>
+                                <span className="text-[11px] text-indigo-600 dark:text-indigo-400">
+                                  {isExpanded ? "Hide Trail ▲" : "View Steps ▼"}
+                                </span>
+                              </button>
+
+                              {isExpanded && (
+                                <div className="p-3 bg-white dark:bg-slate-900 flex flex-col gap-2">
+                                  {s.pageJourney.map((step: any, sIdx: number) => {
+                                    const isLast = sIdx === s.pageJourney.length - 1;
+                                    return (
+                                      <div key={sIdx} className={`p-2 rounded-lg border text-xs flex items-center justify-between gap-2 ${isLast ? "bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800" : "bg-gray-50 dark:bg-slate-800/60 border-gray-100 dark:border-slate-800"}`}>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                            {sIdx + 1}
+                                          </span>
+                                          <div className="min-w-0">
+                                            <div className="font-bold text-gray-900 dark:text-white truncate">{step.title || step.path}</div>
+                                            <div className="text-[10.5px] text-gray-400 font-mono truncate">{step.path}</div>
+                                          </div>
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 text-right shrink-0">
+                                          {step.dwellSec > 0 && <span>⏱️ {step.dwellSec}s</span>}
+                                          {isLast && <div className="font-bold text-emerald-600 dark:text-emerald-400">WhatsApp CTA</div>}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           )}
 

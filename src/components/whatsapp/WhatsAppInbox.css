@@ -4909,3 +4909,315 @@ html.dark .chat-header-add-tag-btn:hover,
   border-color: #6366f1;
   color: #a5b4fc;
 }
+
+/* ========================================================================== */
+/* WEBSITE TRACKING & LIVE VISITOR ACTIVITY DRAWER */
+/* ========================================================================== */
+.website-tracking-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeInTrackingOverlay 0.2s ease-out;
+}
+
+@keyframes fadeInTrackingOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.website-tracking-drawer {
+  width: 480px;
+  max-width: 95vw;
+  height: 100%;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.18);
+  animation: slideInTrackingDrawer 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes slideInTrackingDrawer {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.website-tracking-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.website-tracking-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.website-tracking-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.website-tracking-title h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.tracking-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tracking-live-pill.live {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #6ee7b7;
+}
+
+.tracking-live-pill.offline {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 0 2px #a7f3d0;
+  animation: pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+.website-tracking-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #ffffff;
+}
+
+.tracking-section-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.tracking-section-card.highlight {
+  border-color: #6ee7b7;
+  background: #f0fdf4;
+}
+
+.tracking-section-card.education {
+  border-color: #c7d2fe;
+  background: #f8faff;
+}
+
+.tracking-section-card.realestate {
+  border-color: #fed7aa;
+  background: #fffaf5;
+}
+
+.tracking-section-card.healthcare {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.tracking-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.tracking-card-header h4 {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tracking-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+
+.tracking-search-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.tracking-timeline {
+  position: relative;
+  padding-left: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tracking-timeline::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 10px;
+  width: 2px;
+  background: #e2e8f0;
+}
+
+.tracking-timeline-step {
+  position: relative;
+  font-size: 12px;
+}
+
+.tracking-timeline-node {
+  position: absolute;
+  left: -26px;
+  top: 1px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #6366f1;
+  color: #6366f1;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tracking-timeline-node.active {
+  border-color: #10b981;
+  background: #10b981;
+  color: #ffffff;
+}
+
+.tracking-dwell-badge {
+  font-size: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Dark mode support */
+html.dark .website-tracking-drawer,
+[data-theme="dark"] .website-tracking-drawer {
+  background: #0f172a;
+  color: #f1f5f9;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.6);
+}
+
+html.dark .website-tracking-header,
+[data-theme="dark"] .website-tracking-header {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html.dark .website-tracking-title h3,
+[data-theme="dark"] .website-tracking-title h3 {
+  color: #f8fafc;
+}
+
+html.dark .website-tracking-body,
+[data-theme="dark"] .website-tracking-body {
+  background: #0f172a;
+}
+
+html.dark .tracking-section-card,
+[data-theme="dark"] .tracking-section-card {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+html.dark .tracking-section-card.highlight,
+[data-theme="dark"] .tracking-section-card.highlight {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #059669;
+}
+
+html.dark .tracking-section-card.education,
+[data-theme="dark"] .tracking-section-card.education {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: #4f46e5;
+}
+
+html.dark .tracking-section-card.realestate,
+[data-theme="dark"] .tracking-section-card.realestate {
+  background: rgba(249, 115, 22, 0.12);
+  border-color: #ea580c;
+}
+
+html.dark .tracking-section-card.healthcare,
+[data-theme="dark"] .tracking-section-card.healthcare {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: #0284c7;
+}
+
+html.dark .tracking-card-header h4,
+[data-theme="dark"] .tracking-card-header h4 {
+  color: #e2e8f0;
+}
+
+html.dark .tracking-search-chip,
+[data-theme="dark"] .tracking-search-chip {
+  background: #1e293b;
+  border-color: #475569;
+  color: #cbd5e1;
+}
+
+html.dark .tracking-timeline::before,
+[data-theme="dark"] .tracking-timeline::before {
+  background: #334155;
+}

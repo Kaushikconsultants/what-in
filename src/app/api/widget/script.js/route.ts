@@ -424,6 +424,32 @@ export async function GET(req: NextRequest) {
     body.appendChild(offlineBox);
   }
 
+  // Persistent Multi-Visit Visitor Identification (Stored in localStorage across future website visits)
+  var visitorUuid = null;
+  try {
+    visitorUuid = localStorage.getItem('__whatin_visitor_uuid');
+    if (!visitorUuid) {
+      visitorUuid = 'V-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+      localStorage.setItem('__whatin_visitor_uuid', visitorUuid);
+    }
+  } catch (e) {
+    visitorUuid = 'V-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+
+  var identifiedPhone = null;
+  try {
+    identifiedPhone = localStorage.getItem('__whatin_identified_phone') || null;
+  } catch (e) {}
+
+  function setIdentifiedPhone(ph) {
+    if (!ph) return;
+    var clean = String(ph).replace(/\D/g, '');
+    if (clean.length >= 10) {
+      identifiedPhone = clean;
+      try { localStorage.setItem('__whatin_identified_phone', clean); } catch (e) {}
+    }
+  }
+
   // Persistent Visitor Session Reference (Stored in browser storage across page navigation)
   var visitorSessionId = null;
   try {
@@ -435,6 +461,348 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     visitorSessionId = 'W' + Math.random().toString(36).substring(2, 6).toUpperCase();
   }
+
+  // Session & Browsing Journey Management (Education, E-Commerce, Real Estate, Healthcare)
+  var SESSION_KEY_JOURNEY = '__whatin_page_journey';
+  var SESSION_KEY_SEARCHES = '__whatin_searches';
+  var SESSION_KEY_INSIGHTS = '__whatin_insights';
+  var SESSION_KEY_START = '__whatin_session_start';
+
+  var sessionStartTime = Date.now();
+  try {
+    var storedStart = sessionStorage.getItem(SESSION_KEY_START);
+    if (storedStart) {
+      sessionStartTime = parseInt(storedStart, 10);
+    } else {
+      sessionStorage.setItem(SESSION_KEY_START, String(sessionStartTime));
+    }
+  } catch (e) {}
+
+  // 1. Record Current Page Visit in Journey Trail
+  var pageJourney = [];
+  try {
+    var rawJourney = sessionStorage.getItem(SESSION_KEY_JOURNEY);
+    if (rawJourney) {
+      pageJourney = JSON.parse(rawJourney);
+      if (!Array.isArray(pageJourney)) pageJourney = [];
+    }
+  } catch (e) { pageJourney = []; }
+
+  var pageEnterTime = Date.now();
+  var currentPath = window.location.pathname || '/';
+  var currentTitle = (document.title || currentPath).trim();
+  var currentUrl = window.location.href;
+
+  var lastEntry = pageJourney.length > 0 ? pageJourney[pageJourney.length - 1] : null;
+  if (!lastEntry || lastEntry.path !== currentPath) {
+    pageJourney.push({
+      path: currentPath,
+      title: currentTitle.slice(0, 100),
+      url: currentUrl,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      dwellSec: 0
+    });
+    if (pageJourney.length > 15) {
+      pageJourney = pageJourney.slice(-15);
+    }
+    try {
+      sessionStorage.setItem(SESSION_KEY_JOURNEY, JSON.stringify(pageJourney));
+    } catch (e) {}
+  }
+
+  function updateCurrentDwellTime() {
+    if (pageJourney.length > 0) {
+      var elapsed = Math.max(1, Math.round((Date.now() - pageEnterTime) / 1000));
+      pageJourney[pageJourney.length - 1].dwellSec = elapsed;
+      try {
+        sessionStorage.setItem(SESSION_KEY_JOURNEY, JSON.stringify(pageJourney));
+      } catch (e) {}
+    }
+  }
+  window.addEventListener('beforeunload', updateCurrentDwellTime);
+
+  // 2. Search Query Detection (URL query params & form/input search queries)
+  var detectedSearches = [];
+  try {
+    var rawSearches = sessionStorage.getItem(SESSION_KEY_SEARCHES);
+    if (rawSearches) {
+      detectedSearches = JSON.parse(rawSearches);
+      if (!Array.isArray(detectedSearches)) detectedSearches = [];
+    }
+  } catch (e) { detectedSearches = []; }
+
+  function recordSearchQuery(term) {
+    if (!term || typeof term !== 'string') return;
+    var cleanTerm = term.trim();
+    if (cleanTerm.length < 2 || cleanTerm.length > 100) return;
+    if (detectedSearches.indexOf(cleanTerm) === -1) {
+      detectedSearches.push(cleanTerm);
+      if (detectedSearches.length > 10) detectedSearches = detectedSearches.slice(-10);
+      try {
+        sessionStorage.setItem(SESSION_KEY_SEARCHES, JSON.stringify(detectedSearches));
+      } catch (e) {}
+      // Automatically send live search telemetry to CRM without WhatsApp message!
+      sendLiveTelemetry('SEARCH', { searchQuery: cleanTerm });
+    }
+  }
+
+  try {
+    var urlParams = new URLSearchParams(window.location.search);
+    var searchKeys = ['q', 's', 'search', 'query', 'keyword', 'term', 'course', 'university', 'college', 'destination'];
+    for (var sk = 0; sk < searchKeys.length; sk++) {
+      var sval = urlParams.get(searchKeys[sk]);
+      if (sval) recordSearchQuery(sval);
+    }
+  } catch (e) {}
+
+  try {
+    document.addEventListener('submit', function(e) {
+      var form = e.target;
+      if (!form) return;
+      var inputs = form.querySelectorAll('input[type="search"], input[name="q"], input[name="s"], input[name="search"], input[name*="query"], input[name*="keyword"]');
+      for (var j = 0; j < inputs.length; j++) {
+        if (inputs[j].value) recordSearchQuery(inputs[j].value);
+      }
+    }, true);
+
+    document.addEventListener('change', function(e) {
+      var input = e.target;
+      if (!input || input.tagName !== 'INPUT') return;
+      var isSearchInput = input.type === 'search' || 
+        ['q', 's', 'search', 'query'].indexOf(input.name) !== -1 ||
+        (input.placeholder && /search|course|university|college|find/i.test(input.placeholder));
+      if (isSearchInput && input.value) {
+        recordSearchQuery(input.value);
+      }
+    }, true);
+  } catch (e) {}
+
+  // 3. Multi-Category Smart Extractor (Education, Real Estate, Healthcare, E-Commerce)
+  var categoryInsights = {
+    category: config.clientCategory || 'GENERAL',
+    courses: [],
+    universities: [],
+    destinations: [],
+    products: [],
+    properties: [],
+    specialties: []
+  };
+
+  try {
+    var rawInsights = sessionStorage.getItem(SESSION_KEY_INSIGHTS);
+    if (rawInsights) {
+      var parsed = JSON.parse(rawInsights);
+      if (parsed && typeof parsed === 'object') {
+        categoryInsights = parsed;
+        if (!categoryInsights.courses) categoryInsights.courses = [];
+        if (!categoryInsights.universities) categoryInsights.universities = [];
+        if (!categoryInsights.destinations) categoryInsights.destinations = [];
+        if (!categoryInsights.products) categoryInsights.products = [];
+        if (!categoryInsights.properties) categoryInsights.properties = [];
+        if (!categoryInsights.specialties) categoryInsights.specialties = [];
+      }
+    }
+  } catch (e) {}
+
+  function addUniqueInsight(arr, val, maxLen) {
+    if (!val || typeof val !== 'string') return;
+    var c = val.trim();
+    if (c.length < 2 || c.length > 80) return;
+    if (arr.indexOf(c) === -1) {
+      arr.push(c);
+      if (arr.length > (maxLen || 6)) arr.shift();
+    }
+  }
+
+  try {
+    var fullPageText = (document.title + ' ' + window.location.pathname).toLowerCase();
+    var pageH1El = document.querySelector('h1');
+    var pageH1 = pageH1El ? pageH1El.innerText.trim() : '';
+
+    // Education Consultancy Intelligence
+    var isEducationSite = config.clientCategory === 'EDUCATION' || 
+      /course|program|degree|university|college|study-abroad|admission|scholarship|ielts|visa|campus|intake/i.test(window.location.href);
+
+    if (isEducationSite) {
+      if (categoryInsights.category === 'GENERAL') categoryInsights.category = 'EDUCATION';
+
+      var countryPatterns = [
+        { name: 'United Kingdom (UK)', regex: /\b(uk|united kingdom|london|england|scotland)\b/i },
+        { name: 'Canada', regex: /\b(canada|toronto|vancouver|ontario)\b/i },
+        { name: 'United States (USA)', regex: /\b(usa|united states|america|california|new york)\b/i },
+        { name: 'Australia', regex: /\b(australia|sydney|melbourne|brisbane)\b/i },
+        { name: 'Germany', regex: /\b(germany|berlin|munich)\b/i },
+        { name: 'Ireland', regex: /\b(ireland|dublin)\b/i },
+        { name: 'New Zealand', regex: /\b(new zealand|auckland)\b/i },
+        { name: 'Dubai / UAE', regex: /\b(dubai|uae)\b/i },
+        { name: 'Europe', regex: /\b(europe|france|italy|poland|netherlands)\b/i }
+      ];
+      countryPatterns.forEach(function(cp) {
+        if (cp.regex.test(fullPageText)) {
+          addUniqueInsight(categoryInsights.destinations, cp.name, 5);
+        }
+      });
+
+      var coursePatterns = [
+        { name: 'MBA / Business Admin', regex: /\b(mba|master of business|bba|business management|executive mba)\b/i },
+        { name: 'Computer Science / IT', regex: /\b(computer science|ms in cs|b\.?tech cs|software engineering|information technology)\b/i },
+        { name: 'Data Science & AI', regex: /\b(data science|artificial intelligence|machine learning|data analytics)\b/i },
+        { name: 'Medicine & Healthcare', regex: /\b(mbbs|medicine|nursing|pharmacy|biotechnology|dentistry)\b/i },
+        { name: 'Engineering', regex: /\b(mechanical engineering|civil engineering|electrical engineering|aerospace)\b/i },
+        { name: 'Finance & Accounting', regex: /\b(finance|accounting|fintech|economics)\b/i },
+        { name: 'Law / LLM', regex: /\b(llm|llb|law degree|international law)\b/i },
+        { name: 'Hospitality & Tourism', regex: /\b(hospitality|hotel management|tourism)\b/i }
+      ];
+      coursePatterns.forEach(function(kp) {
+        if (kp.regex.test(fullPageText)) {
+          addUniqueInsight(categoryInsights.courses, kp.name, 6);
+        }
+      });
+
+      if (pageH1 && pageH1.length < 65) {
+        if (/university|college|institute|academy/i.test(pageH1)) {
+          addUniqueInsight(categoryInsights.universities, pageH1, 5);
+        } else if (/master|bachelor|mba|msc|btech|diploma|degree|phd/i.test(pageH1)) {
+          addUniqueInsight(categoryInsights.courses, pageH1, 6);
+        }
+      }
+
+      var pathSegments = window.location.pathname.split('/').filter(Boolean);
+      for (var ps = 0; ps < pathSegments.length; ps++) {
+        var segClean = decodeURIComponent(pathSegments[ps]).replace(/[-_]/g, ' ');
+        if (ps > 0 && /universit|college|institution/i.test(pathSegments[ps - 1])) {
+          addUniqueInsight(categoryInsights.universities, segClean.toUpperCase(), 5);
+        } else if (ps > 0 && /course|program|degree/i.test(pathSegments[ps - 1])) {
+          addUniqueInsight(categoryInsights.courses, segClean.toUpperCase(), 6);
+        }
+      }
+    }
+
+    // Real Estate Intelligence
+    var isRealEstate = config.clientCategory === 'REAL_ESTATE' || /property|real-estate|flat|villa|apartment|bhk|plot|floor-plan/i.test(window.location.href);
+    if (isRealEstate) {
+      if (categoryInsights.category === 'GENERAL') categoryInsights.category = 'REAL_ESTATE';
+      if (pageH1 && pageH1.length < 65) {
+        addUniqueInsight(categoryInsights.properties, pageH1, 5);
+      }
+      var bhkMatch = fullPageText.match(/\b([1-5]\s*bhk|villa|penthouse|studio apartment|duplex|residential plot)\b/i);
+      if (bhkMatch) {
+        addUniqueInsight(categoryInsights.properties, bhkMatch[0].toUpperCase(), 5);
+      }
+    }
+
+    // Healthcare & Clinic Intelligence
+    var isHealthcare = config.clientCategory === 'HEALTHCARE' || /doctor|clinic|hospital|treatment|surgery|specialist/i.test(window.location.href);
+    if (isHealthcare) {
+      if (categoryInsights.category === 'GENERAL') categoryInsights.category = 'HEALTHCARE';
+      var specList = ['Cardiology', 'Dermatology', 'Orthopedics', 'Pediatrics', 'Dental', 'Neurology', 'IVF & Fertility', 'Ophthalmology', 'ENT'];
+      specList.forEach(function(sp) {
+        if (new RegExp(sp, 'i').test(fullPageText)) {
+          addUniqueInsight(categoryInsights.specialties, sp, 5);
+        }
+      });
+      if (pageH1 && (/dr\.|\bdoctor\b/i.test(pageH1) || /clinic|hospital/i.test(pageH1))) {
+        addUniqueInsight(categoryInsights.specialties, pageH1, 5);
+      }
+    }
+
+    // E-Commerce Accumulation
+    if (detectedProduct && detectedProduct.title) {
+      addUniqueInsight(categoryInsights.products, detectedProduct.title + (detectedProduct.price ? (' (₹' + detectedProduct.price + ')') : ''), 6);
+    }
+
+    try {
+      sessionStorage.setItem(SESSION_KEY_INSIGHTS, JSON.stringify(categoryInsights));
+    } catch (e) {}
+  } catch (e) {}
+
+  // Helper to generate or reuse visitor reference token
+  function generateRefCode() {
+    return visitorSessionId || ('W' + Math.random().toString(36).substring(2, 6).toUpperCase());
+  }
+
+  // Centralized Payload Generator
+  function buildPayload(extra) {
+    updateCurrentDwellTime();
+    var durationSec = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
+    var payload = {
+      clientId: clientId,
+      refId: generateRefCode(),
+      visitorUuid: visitorUuid,
+      identifiedPhone: identifiedPhone || null,
+      phone: identifiedPhone || null,
+      pageUrl: window.location.href,
+      pageTitle: (detectedProduct && detectedProduct.title) ? (detectedProduct.title + ' (' + platform + ')') : document.title,
+      platform: platform,
+      detectedProduct: detectedProduct,
+      cart: detectedCart,
+      pageJourney: pageJourney,
+      searches: detectedSearches,
+      categoryInsights: categoryInsights,
+      sessionStats: {
+        pageViews: pageJourney.length,
+        totalDurationSec: durationSec
+      },
+      utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget')
+    };
+
+    if (extra) {
+      for (var k in extra) {
+        if (extra.hasOwnProperty(k)) payload[k] = extra[k];
+      }
+    }
+    return payload;
+  }
+
+  // Silent Automatic Background Telemetry (Updates CRM history without user clicking WhatsApp)
+  function sendLiveTelemetry(eventType, extra) {
+    try {
+      var payload = buildPayload({
+        eventType: eventType || 'PAGE_VIEW',
+        isLiveActivity: true
+      });
+      if (extra) {
+        for (var k in extra) {
+          if (extra.hasOwnProperty(k)) payload[k] = extra[k];
+        }
+      }
+      var strPayload = JSON.stringify(payload);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([strPayload], { type: 'text/plain;charset=UTF-8' }));
+      } else {
+        fetch(appUrl + '/api/widget/capture-lead', {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: strPayload,
+          keepalive: true
+        }).catch(function() {});
+      }
+    } catch (e) {}
+  }
+
+  // ⚡ Automatic Live Telemetry Triggers:
+  // 1. Silent Page View Telemetry 1.2 seconds after DOM is ready
+  setTimeout(function() {
+    sendLiveTelemetry('PAGE_VIEW');
+  }, 1200);
+
+  // 2. Auto-capture visitor phone from any form input on website (e.g. checkout, contact forms)
+  try {
+    document.addEventListener('blur', function(e) {
+      var target = e.target;
+      if (!target || target.tagName !== 'INPUT') return;
+      var isPhoneInput = target.type === 'tel' || target.name === 'phone' || target.id === 'phone' || /phone|mobile/i.test(target.placeholder || target.name || '');
+      if (isPhoneInput && target.value) {
+        var clean = target.value.replace(/\D/g, '');
+        if (clean.length >= 10) {
+          setIdentifiedPhone(clean);
+          sendLiveTelemetry('IDENTIFIED', { identifiedPhone: clean });
+        }
+      }
+    }, true);
+  } catch (e) {}
+
 
   // Cart Recovery & Active Cart Inspection for Shopify
   var cartBox = null;
@@ -505,20 +873,13 @@ export async function GET(req: NextRequest) {
               cartBox = null;
             }
 
-            // Immediately fire live Add to Cart event to our software backend!
+            // Immediately fire live Add to Cart event to our software backend with full journey!
             if (shouldFireBackend && cart.item_count > 0) {
               try {
-                var cartPayload = JSON.stringify({
-                  clientId: clientId,
-                  refId: visitorSessionId,
+                var cartPayload = JSON.stringify(buildPayload({
                   eventType: 'ADD_TO_CART',
-                  pageUrl: window.location.href,
-                  pageTitle: (detectedProduct && detectedProduct.title) ? (detectedProduct.title + ' (' + platform + ')') : document.title,
-                  platform: platform,
-                  detectedProduct: detectedProduct,
-                  cart: detectedCart,
                   utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' AddToCart')
-                });
+                }));
 
                 if (navigator.sendBeacon) {
                   navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([cartPayload], { type: 'text/plain;charset=UTF-8' }));
@@ -601,29 +962,15 @@ export async function GET(req: NextRequest) {
     }, true);
   } catch (err) {}
 
-  // Helper to generate or reuse visitor reference token
-  function generateRefCode() {
-    return visitorSessionId || ('W' + Math.random().toString(36).substring(2, 6).toUpperCase());
-  }
-
   // Send visitor session context to backend and launch WhatsApp with 100% clean prefilled text (NO ref codes in text)
   function openWhatsAppWithSession(cleanText, targetPhoneOverride) {
-    var refCode = generateRefCode();
-    var phoneToUse = (targetPhoneOverride || config.phoneNumber || '').replace(/\\D/g, '');
+    var phoneToUse = (targetPhoneOverride || config.phoneNumber || '').replace(/\D/g, '');
     var textToSend = cleanText;
 
     try {
-      var payloadData = JSON.stringify({
-        clientId: clientId,
-        refId: refCode,
-        pageUrl: window.location.href,
-        pageTitle: (detectedProduct && detectedProduct.title) ? (detectedProduct.title + ' (' + platform + ')') : document.title,
-        platform: platform,
-        detectedProduct: detectedProduct,
-        cart: detectedCart,
-        utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget'),
+      var payloadData = JSON.stringify(buildPayload({
         customMessage: cleanText
-      });
+      }));
 
       if (navigator.sendBeacon) {
         navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([payloadData], { type: 'text/plain;charset=UTF-8' }));
@@ -655,6 +1002,12 @@ export async function GET(req: NextRequest) {
   var computedGreeting = config.welcomeMessage;
   if (detectedProduct && detectedProduct.title) {
     computedGreeting = 'Hi! Inquiring about ' + detectedProduct.title + ' from your store.';
+  } else if (categoryInsights.courses && categoryInsights.courses.length > 0) {
+    computedGreeting = 'Hi! I am interested in ' + categoryInsights.courses[0] + (categoryInsights.universities && categoryInsights.universities[0] ? (' at ' + categoryInsights.universities[0]) : '') + '. Could you share details?';
+  } else if (categoryInsights.properties && categoryInsights.properties.length > 0) {
+    computedGreeting = 'Hi! Inquiring about ' + categoryInsights.properties[0] + ' from your website.';
+  } else if (categoryInsights.specialties && categoryInsights.specialties.length > 0) {
+    computedGreeting = 'Hi! I would like consultation regarding ' + categoryInsights.specialties[0] + '.';
   }
   greetingBubble.innerText = computedGreeting;
   body.appendChild(greetingBubble);
@@ -775,6 +1128,7 @@ export async function GET(req: NextRequest) {
       e.preventDefault();
       var nameVal = nameInput.value.trim();
       var phoneVal = phoneInput.value.trim();
+      setIdentifiedPhone(phoneVal);
       if (!phoneVal) return;
 
       submitBtn.disabled = true;
@@ -787,19 +1141,11 @@ export async function GET(req: NextRequest) {
         method: 'POST',
         mode: 'cors',
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-        body: JSON.stringify({
-          clientId: clientId,
-          refId: refCode,
+        body: JSON.stringify(buildPayload({
           name: nameVal,
           phone: phoneVal,
-          pageUrl: window.location.href,
-          pageTitle: detectedProduct && detectedProduct.title ? (detectedProduct.title + ' (' + platform + ')') : document.title,
-          platform: platform,
-          detectedProduct: detectedProduct,
-          cart: detectedCart,
-          utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget'),
           customMessage: cleanInquiryMsg
-        })
+        }))
       })
       .then(function(res) { return res.json(); })
       .then(function(data) {

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { clientId, refId, eventType, name, phone, email, pageUrl, pageTitle, utmSource, customMessage, platform, detectedProduct, cart } = body;
+    const { clientId, refId, eventType, name, phone, identifiedPhone, visitorUuid, email, pageUrl, pageTitle, utmSource, customMessage, platform, detectedProduct, cart, pageJourney, searches, categoryInsights, sessionStats, isLiveActivity, searchQuery } = body;
 
     let client = clientId
       ? await prisma.whatsAppClient.findUnique({
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     const targetWhatsApp = (client.phoneNumber || "917404388242").replace(/\D/g, "");
 
-    let cleanPhone = (phone || "").toString().replace(/\D/g, "");
+    let cleanPhone = (phone || identifiedPhone || "").toString().replace(/\D/g, "");
     if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
 
     const leadName = (name || "Website Visitor").trim();
@@ -73,9 +73,17 @@ export async function POST(req: NextRequest) {
     if (refId) {
       const isAddToCart = eventType === "ADD_TO_CART";
       const cartSummaryText = cart && cart.item_count ? ` (${cart.item_count} items - ₹${cart.total_price || 0})` : "";
-      const actionDesc = isAddToCart
-        ? `Live Add-To-Cart: ${pageTitle || "Product"}${cartSummaryText}`
-        : `Website context: ${pageTitle || pageUrl || "Storefront"}${cartSummaryText}`;
+      
+      let actionDesc = `Website context: ${pageTitle || pageUrl || "Storefront"}${cartSummaryText}`;
+      if (isAddToCart) {
+        actionDesc = `Live Add-To-Cart: ${pageTitle || "Product"}${cartSummaryText}`;
+      } else if (categoryInsights && categoryInsights.category === "EDUCATION" && categoryInsights.courses?.length) {
+        actionDesc = `Education Inquiry: ${categoryInsights.courses[0]}${categoryInsights.universities?.[0] ? ` at ${categoryInsights.universities[0]}` : ""}`;
+      } else if (categoryInsights && categoryInsights.category === "REAL_ESTATE" && categoryInsights.properties?.length) {
+        actionDesc = `Real Estate Inquiry: ${categoryInsights.properties[0]}`;
+      } else if (categoryInsights && categoryInsights.category === "HEALTHCARE" && categoryInsights.specialties?.length) {
+        actionDesc = `Healthcare Inquiry: ${categoryInsights.specialties[0]}`;
+      }
 
       await prisma.whatsAppChatbotLog.create({
         data: {
@@ -95,6 +103,10 @@ export async function POST(req: NextRequest) {
             customMessage: customMessage || null,
             name: leadName !== "Website Visitor" ? leadName : null,
             phone: cleanPhone || null,
+            pageJourney: Array.isArray(pageJourney) ? pageJourney : [],
+            searches: Array.isArray(searches) ? searches : [],
+            categoryInsights: categoryInsights || null,
+            sessionStats: sessionStats || null,
             createdAt: new Date().toISOString(),
           },
         },
@@ -104,6 +116,90 @@ export async function POST(req: NextRequest) {
       if (isAddToCart && (!cleanPhone || cleanPhone.length < 10)) {
         return NextResponse.json(
           { success: true, event: "ADD_TO_CART_RECORDED", refId },
+          { headers: corsHeaders }
+        );
+      }
+
+      // Live Activity Telemetry (Silent future website activity automatically updating customer profile)
+      if (isLiveActivity) {
+        if (cleanPhone.length >= 10) {
+          const existingCustomer = await prisma.customer.findFirst({
+            where: {
+              clientId: client.id,
+              OR: [
+                { whatsappNumber: cleanPhone },
+                { mobile: cleanPhone },
+                { mobile: cleanPhone.slice(-10) },
+                { whatsappNumber: cleanPhone.slice(-10) }
+              ]
+            }
+          });
+
+          if (existingCustomer) {
+            const conv = await prisma.whatsAppConversation.findFirst({
+              where: { customerId: existingCustomer.id, clientId: client.id }
+            });
+
+            // Broadcast real-time SSE event to live connected agent inboxes
+            emitInboxEvent({
+              type: "CUSTOMER_LIVE_ACTIVITY",
+              conversationId: conv?.id,
+              clientId: client.id,
+              data: {
+                customerId: existingCustomer.id,
+                phone: cleanPhone,
+                eventType: eventType || "PAGE_VIEW",
+                pageUrl: pageUrl || "",
+                pageTitle: pageTitle || "",
+                actionDesc,
+                searches: Array.isArray(searches) ? searches : [],
+                categoryInsights: categoryInsights || null,
+                pageJourney: Array.isArray(pageJourney) ? pageJourney : [],
+                sessionStats: sessionStats || null,
+                timestamp: new Date().toISOString()
+              }
+            });
+
+            // Append live activity entry to CRM customer notes
+            const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+            let liveLogEntry = `\n[${timeStr}] 🌐 Browsing: "${pageTitle || pageUrl}"`;
+            if (eventType === "SEARCH" && searchQuery) {
+              liveLogEntry = `\n[${timeStr}] 🔍 Searched on site: "${searchQuery}"`;
+            } else if (categoryInsights?.courses?.length) {
+              liveLogEntry += ` (Course: ${categoryInsights.courses[0]})`;
+            }
+
+            const existingNotes = existingCustomer.notes || "";
+            const updatedNotes = existingNotes.length > 3000
+              ? (existingNotes.slice(-2500) + liveLogEntry)
+              : (existingNotes + liveLogEntry);
+
+            const existingTags = (existingCustomer.tags || "").split(",").map((t: string) => t.trim()).filter(Boolean);
+            let tagUpdated = false;
+            if (categoryInsights?.category === "EDUCATION" && !existingTags.includes("Education_Lead")) {
+              existingTags.push("Education_Lead");
+              tagUpdated = true;
+            }
+            if (categoryInsights?.courses?.[0]) {
+              const cTag = `Course_${categoryInsights.courses[0].slice(0, 20).replace(/[^a-zA-Z0-9]/g, "_")}`;
+              if (!existingTags.includes(cTag)) {
+                existingTags.push(cTag);
+                tagUpdated = true;
+              }
+            }
+
+            await prisma.customer.update({
+              where: { id: existingCustomer.id },
+              data: {
+                notes: updatedNotes,
+                tags: tagUpdated ? existingTags.join(", ") : undefined
+              }
+            }).catch(() => {});
+          }
+        }
+
+        return NextResponse.json(
+          { success: true, event: "LIVE_ACTIVITY_RECORDED", refId },
           { headers: corsHeaders }
         );
       }
@@ -121,8 +217,40 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const noteContent = `[${effectivePlatform}] Inquiry from ${pageTitle || pageUrl || "Website"}${customMessage ? `: "${customMessage}"` : ""}`;
-      const platformTag = effectivePlatform !== "Website" ? `${effectivePlatform} Lead` : "Website Lead";
+      let noteContent = `[${effectivePlatform}] Inquiry from "${pageTitle || pageUrl || "Website"}"${customMessage ? `: "${customMessage}"` : ""}`;
+      if (Array.isArray(searches) && searches.length > 0) {
+        noteContent += `\n🔍 Searches on site: ${searches.map((s) => `"${s}"`).join(", ")}`;
+      }
+      if (categoryInsights && categoryInsights.category === "EDUCATION") {
+        const eduParts = [];
+        if (categoryInsights.courses?.length) eduParts.push(`Courses: ${categoryInsights.courses.join(", ")}`);
+        if (categoryInsights.universities?.length) eduParts.push(`Universities: ${categoryInsights.universities.join(", ")}`);
+        if (categoryInsights.destinations?.length) eduParts.push(`Destinations: ${categoryInsights.destinations.join(", ")}`);
+        if (eduParts.length) noteContent += `\n🎓 Education Intent: ${eduParts.join(" | ")}`;
+      } else if (categoryInsights && categoryInsights.category === "REAL_ESTATE" && categoryInsights.properties?.length) {
+        noteContent += `\n🏢 Properties Viewed: ${categoryInsights.properties.join(", ")}`;
+      } else if (categoryInsights && categoryInsights.category === "HEALTHCARE" && categoryInsights.specialties?.length) {
+        noteContent += `\n🏥 Specialties: ${categoryInsights.specialties.join(", ")}`;
+      }
+      if (Array.isArray(pageJourney) && pageJourney.length > 1) {
+        const journeySummary = pageJourney.map((p) => p.title || p.path).join(" ➔ ");
+        noteContent += `\n🧭 Browsing Trail (${pageJourney.length} pages): ${journeySummary}`;
+      }
+
+      const generatedTags = ["Website Lead"];
+      if (effectivePlatform && effectivePlatform !== "Website") generatedTags.push(`${effectivePlatform} Lead`);
+      if (categoryInsights && categoryInsights.category === "EDUCATION") {
+        generatedTags.push("Education_Lead");
+        if (categoryInsights.courses?.[0]) {
+          generatedTags.push(`Course_${categoryInsights.courses[0].slice(0, 20).replace(/[^a-zA-Z0-9]/g, "_")}`);
+        }
+      } else if (categoryInsights && categoryInsights.category === "REAL_ESTATE") {
+        generatedTags.push("Real_Estate_Lead");
+      } else if (categoryInsights && categoryInsights.category === "HEALTHCARE") {
+        generatedTags.push("Healthcare_Lead");
+      }
+      if (cart && cart.item_count > 0) generatedTags.push("Cart_Abandonment");
+      const platformTag = generatedTags.join(", ");
 
       if (customer) {
         customer = await prisma.customer.update({
@@ -209,6 +337,10 @@ export async function POST(req: NextRequest) {
         platform: effectivePlatform,
         detectedProduct: detectedProduct || null,
         cart: cart || null,
+        pageJourney: pageJourney || [],
+        searches: searches || [],
+        categoryInsights: categoryInsights || null,
+        sessionStats: sessionStats || null,
         capturedAt: new Date().toISOString(),
       });
     }

@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
 
 export interface InboxEvent {
-  type: "NEW_MESSAGE" | "MESSAGE_STATUS" | "CONVERSATION_UPDATE" | "PAYMENT_OCR_DETECTED";
+  type: "NEW_MESSAGE" | "MESSAGE_STATUS" | "CONVERSATION_UPDATE" | "PAYMENT_OCR_DETECTED" | "CUSTOMER_LIVE_ACTIVITY";
   conversationId?: string;
   clientId?: string | null;
   messageId?: string;

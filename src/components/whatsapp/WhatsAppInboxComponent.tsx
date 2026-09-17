@@ -67,7 +67,8 @@ import {
   Lock,
   ArrowLeft,
   CornerDownLeft,
-  Globe
+  Globe,
+  Compass
 } from "lucide-react";
 import {
   getWhatsAppConversations,
@@ -292,6 +293,51 @@ export default function WhatsAppInboxComponent() {
   const [retryingMsgId, setRetryingMsgId] = useState<string | null>(null);
   const [approvedTemplates, setApprovedTemplates] = useState<any[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
+  const [expandedJourneyMsgIds, setExpandedJourneyMsgIds] = useState<Record<string, boolean>>({});
+  const [expandedCrmJourney, setExpandedCrmJourney] = useState<boolean>(false);
+
+  // Website Tracking & Live Activity States
+  const [showWebsiteTrackingDrawer, setShowWebsiteTrackingDrawer] = useState<boolean>(false);
+  const [liveCustomerActivityMap, setLiveCustomerActivityMap] = useState<Record<string, any>>({});
+  const [customerWebSessions, setCustomerWebSessions] = useState<any[]>([]);
+  const [loadingWebSessions, setLoadingWebSessions] = useState<boolean>(false);
+
+  // Active customer normalized phone number
+  const activeCustomerPhone = useMemo(() => {
+    if (!activeConvDetail) return "";
+    const p = (activeConvDetail.customer?.mobile || 
+               activeConvDetail.customer?.whatsappNumber || 
+               activeConvDetail.senderPhone || 
+               activeConvDetail.phone || "");
+    return String(p).replace(/\D/g, "");
+  }, [activeConvDetail]);
+
+  const fetchCustomerWebSessions = async (phoneToFetch?: string) => {
+    const targetPhone = phoneToFetch || activeCustomerPhone;
+    if (!targetPhone || targetPhone.length < 6) return;
+    setLoadingWebSessions(true);
+    try {
+      const res = await fetch(`/api/widget/leads?phone=${targetPhone}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.sessions)) {
+        setCustomerWebSessions(data.sessions);
+      }
+    } catch (err) {
+      console.error("Failed to fetch customer web sessions:", err);
+    } finally {
+      setLoadingWebSessions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeCustomerPhone) {
+      fetchCustomerWebSessions(activeCustomerPhone);
+    } else {
+      setCustomerWebSessions([]);
+    }
+  }, [activeCustomerPhone]);
+
+
 
   // Preload approved templates, product catalog & CRM integrations for accurate previews and actions
   useEffect(() => {
@@ -603,6 +649,77 @@ export default function WhatsAppInboxComponent() {
       return null;
     }
   }, [activeConvDetail?.messages]);
+
+  // Consolidated Website Tracking Data
+  const activeWebsiteTrackingData = useMemo(() => {
+    const live = activeCustomerPhone ? liveCustomerActivityMap[activeCustomerPhone] : null;
+    const latestDbSession = customerWebSessions[0] || null;
+    const msgCtx = latestWebsiteContext;
+
+    const pageTitle = live?.pageTitle || latestDbSession?.pageTitle || msgCtx?.pageTitle || "Online Store";
+    const pageUrl = live?.pageUrl || latestDbSession?.pageUrl || msgCtx?.pageUrl || "";
+    const platform = live?.platform || latestDbSession?.platform || msgCtx?.platform || "Website";
+    const categoryInsights = live?.categoryInsights || latestDbSession?.categoryInsights || msgCtx?.categoryInsights || null;
+
+    const allSearches = Array.from(new Set([
+      ...(Array.isArray(live?.searches) ? live.searches : []),
+      ...(Array.isArray(latestDbSession?.searches) ? latestDbSession.searches : []),
+      ...(Array.isArray(msgCtx?.searches) ? msgCtx.searches : []),
+      ...(live?.searchQuery ? [live.searchQuery] : []),
+    ])).filter(Boolean) as string[];
+
+    const rawJourney = [
+      ...(Array.isArray(live?.pageJourney) ? live.pageJourney : []),
+      ...(Array.isArray(latestDbSession?.pageJourney) ? latestDbSession.pageJourney : []),
+      ...(Array.isArray(msgCtx?.pageJourney) ? msgCtx.pageJourney : []),
+    ];
+
+    const seenPaths = new Set<string>();
+    const pageJourney: any[] = [];
+    for (const step of rawJourney) {
+      const key = (step.path || step.url || "") + "_" + (step.timestamp || step.time || "");
+      if (!seenPaths.has(key)) {
+        seenPaths.add(key);
+        pageJourney.push(step);
+      }
+    }
+
+    const cart = live?.cart || latestDbSession?.cart || msgCtx?.cart || null;
+    const detectedProduct = live?.detectedProduct || latestDbSession?.detectedProduct || msgCtx?.detectedProduct || null;
+    const lastActivityTime = live?.timestamp || live?.lastActivityAt || latestDbSession?.createdAt || msgCtx?.timestamp || null;
+
+    // Active within last 10 minutes
+    const isOnlineNow = Boolean(
+      live?.isLiveNow || (
+        lastActivityTime &&
+        (Date.now() - new Date(lastActivityTime).getTime() < 10 * 60 * 1000)
+      )
+    );
+
+    const hasAnyData = Boolean(
+      live ||
+      latestDbSession ||
+      msgCtx ||
+      pageJourney.length > 0 ||
+      allSearches.length > 0 ||
+      categoryInsights
+    );
+
+    return {
+      hasAnyData,
+      isOnlineNow,
+      lastActivityTime,
+      pageTitle,
+      pageUrl,
+      platform,
+      categoryInsights,
+      searches: allSearches,
+      pageJourney,
+      cart,
+      detectedProduct,
+      liveEventLog: Array.isArray(live?.eventLog) ? live.eventLog : [],
+    };
+  }, [activeCustomerPhone, liveCustomerActivityMap, customerWebSessions, latestWebsiteContext]);
 
   // Quote Form State
   const [quoteItems, setQuoteItems] = useState([
@@ -1102,6 +1219,63 @@ export default function WhatsAppInboxComponent() {
             if (!event.data) return;
             const parsed = JSON.parse(event.data);
             if (parsed.type === "CONNECTED" || parsed.type === "PING") return;
+
+            // Silent real-time website tracking telemetry (does NOT pollute chatbox messages)
+            if (parsed.type === "CUSTOMER_LIVE_ACTIVITY" && parsed.data) {
+              const incoming = parsed.data;
+              const incomingPhone = String(incoming.phone || "").replace(/\D/g, "");
+              if (incomingPhone) {
+                setLiveCustomerActivityMap((prev) => {
+                  const existing = prev[incomingPhone] || {};
+                  const existingJourney = Array.isArray(existing.pageJourney) ? existing.pageJourney : [];
+                  const incomingJourney = Array.isArray(incoming.pageJourney) ? incoming.pageJourney : [];
+                  const combinedJourney = [...incomingJourney, ...existingJourney];
+                  const seen = new Set();
+                  const uniqueJourney = [];
+                  for (const step of combinedJourney) {
+                    const key = (step.path || step.url || "") + (step.timestamp || "");
+                    if (!seen.has(key)) {
+                      seen.add(key);
+                      uniqueJourney.push(step);
+                    }
+                  }
+
+                  const mergedSearches = Array.from(
+                    new Set([
+                      ...(Array.isArray(incoming.searches) ? incoming.searches : []),
+                      ...(Array.isArray(existing.searches) ? existing.searches : []),
+                      ...(incoming.searchQuery ? [incoming.searchQuery] : []),
+                    ])
+                  ).filter(Boolean);
+
+                  const existingLogs = Array.isArray(existing.eventLog) ? existing.eventLog : [];
+                  const newLogEntry = {
+                    id: Date.now() + Math.random().toString(),
+                    eventType: incoming.eventType || "PAGE_VIEW",
+                    pageTitle: incoming.pageTitle,
+                    pageUrl: incoming.pageUrl,
+                    searchQuery: incoming.searchQuery,
+                    timestamp: incoming.timestamp || new Date().toISOString(),
+                  };
+
+                  return {
+                    ...prev,
+                    [incomingPhone]: {
+                      ...existing,
+                      ...incoming,
+                      searches: mergedSearches,
+                      pageJourney: uniqueJourney.slice(0, 25),
+                      categoryInsights: incoming.categoryInsights || existing.categoryInsights || null,
+                      lastActivityAt: incoming.timestamp || new Date().toISOString(),
+                      isLiveNow: true,
+                      eventLog: [newLogEntry, ...existingLogs].slice(0, 30),
+                    },
+                  };
+                });
+                fetchCustomerWebSessions(incomingPhone);
+              }
+              return;
+            }
 
             // Trigger instant silent refresh on real-time event
             fetchConversationsList(true);
@@ -2395,6 +2569,49 @@ export default function WhatsAppInboxComponent() {
                   <span>Profile</span>
                 </button>
 
+                <button
+                  className={`chat-action-btn ${showWebsiteTrackingDrawer ? "active-profile" : ""}`}
+                  onClick={() => {
+                    setShowWebsiteTrackingDrawer(prev => !prev);
+                    if (!showWebsiteTrackingDrawer && activeCustomerPhone) {
+                      fetchCustomerWebSessions(activeCustomerPhone);
+                    }
+                  }}
+                  title={
+                    activeWebsiteTrackingData.isOnlineNow
+                      ? "Customer is online on your website right now! Click to view live activity."
+                      : "View Live Website Activity, Browsing History & Searches"
+                  }
+                  style={
+                    activeWebsiteTrackingData.isOnlineNow
+                      ? {
+                          backgroundColor: "#ecfdf5",
+                          color: "#047857",
+                          borderColor: "#6ee7b7",
+                          boxShadow: "0 1px 4px rgba(16, 185, 129, 0.25)",
+                          fontWeight: 600,
+                        }
+                      : undefined
+                  }
+                >
+                  <Globe size={13} style={activeWebsiteTrackingData.isOnlineNow ? { color: "#059669" } : undefined} />
+                  <span>Website Tracking</span>
+                  {activeWebsiteTrackingData.isOnlineNow && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        backgroundColor: "#10b981",
+                        boxShadow: "0 0 0 2px #a7f3d0",
+                        animation: "pulseDot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                        marginLeft: 2,
+                      }}
+                    />
+                  )}
+                </button>
+
                 {/* More Actions Dropdown Menu */}
                 <div style={{ position: "relative" }}>
                   <button
@@ -2637,7 +2854,7 @@ export default function WhatsAppInboxComponent() {
                   );
                 }
 
-                // Render Smart Website Visitor & Active Cart Referral Card inside the chat stream
+                // Render Smart Website Visitor & Browsing Activity Referral Card inside the chat stream
                 if (msg.senderName === "WEBSITE_VISITOR_CONTEXT" || msg.messageType === "WEBSITE_VISITOR_CONTEXT") {
                   let contextObj: any = {};
                   try {
@@ -2656,66 +2873,163 @@ export default function WhatsAppInboxComponent() {
                     ? (typeof cart.total_price === "number" ? cart.total_price.toLocaleString("en-IN") : cart.total_price)
                     : null;
 
+                  // Multi-Category Context & Browsing Activity
+                  const categoryInsights = contextObj.categoryInsights || null;
+                  const pageJourney: any[] = Array.isArray(contextObj.pageJourney) ? contextObj.pageJourney : [];
+                  const searches: string[] = Array.isArray(contextObj.searches) ? contextObj.searches : [];
+                  const sessionStats = contextObj.sessionStats || null;
+
+                  const isEducation = categoryInsights?.category === "EDUCATION" || (categoryInsights?.courses && categoryInsights.courses.length > 0);
+                  const isRealEstate = categoryInsights?.category === "REAL_ESTATE" || (categoryInsights?.properties && categoryInsights.properties.length > 0);
+                  const isHealthcare = categoryInsights?.category === "HEALTHCARE" || (categoryInsights?.specialties && categoryInsights.specialties.length > 0);
+
+                  let cardTheme = {
+                    badgeTitle: "WEBSITE STORE REFERRAL",
+                    badgeSub: `Inquiry originated from your ${platform} storefront`,
+                    badgeIcon: "🛍️",
+                    accentColor: "#059669",
+                    darkColor: "#065f46",
+                    bgGradient: "linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%)",
+                    borderColor: "#a7f3d0",
+                    shadow: "0 8px 24px rgba(16, 185, 129, 0.10)",
+                    pillBg: "#ecfdf5",
+                    pillBorder: "#a7f3d0",
+                    pillColor: "#047857"
+                  };
+
+                  if (isEducation) {
+                    cardTheme = {
+                      badgeTitle: "EDUCATION CONSULTANCY LEAD",
+                      badgeSub: "Student browsing history & course intent captured",
+                      badgeIcon: "🎓",
+                      accentColor: "#6366f1",
+                      darkColor: "#4338ca",
+                      bgGradient: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 50%, #e0e7ff 100%)",
+                      borderColor: "#c7d2fe",
+                      shadow: "0 8px 24px rgba(99, 102, 241, 0.12)",
+                      pillBg: "#eef2ff",
+                      pillBorder: "#c7d2fe",
+                      pillColor: "#3730a3"
+                    };
+                  } else if (isRealEstate) {
+                    cardTheme = {
+                      badgeTitle: "REAL ESTATE & PROPERTY LEAD",
+                      badgeSub: "Buyer interest captured from property listings",
+                      badgeIcon: "🏢",
+                      accentColor: "#d97706",
+                      darkColor: "#b45309",
+                      bgGradient: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fef9c3 100%)",
+                      borderColor: "#fde68a",
+                      shadow: "0 8px 24px rgba(217, 119, 6, 0.10)",
+                      pillBg: "#fef3c7",
+                      pillBorder: "#fde68a",
+                      pillColor: "#92400e"
+                    };
+                  } else if (isHealthcare) {
+                    cardTheme = {
+                      badgeTitle: "HEALTHCARE & CLINICAL INQUIRY",
+                      badgeSub: "Patient consultation & specialty interest captured",
+                      badgeIcon: "🏥",
+                      accentColor: "#0d9488",
+                      darkColor: "#0f766e",
+                      bgGradient: "linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 50%, #e0f2fe 100%)",
+                      borderColor: "#99f6e4",
+                      shadow: "0 8px 24px rgba(13, 148, 136, 0.10)",
+                      pillBg: "#ccfbf1",
+                      pillBorder: "#99f6e4",
+                      pillColor: "#115e59"
+                    };
+                  } else if (!hasCart) {
+                    cardTheme = {
+                      badgeTitle: "WEBSITE VISITOR INQUIRY",
+                      badgeSub: `Visitor activity tracked from ${platform}`,
+                      badgeIcon: "🌐",
+                      accentColor: "#2563eb",
+                      darkColor: "#1d4ed8",
+                      bgGradient: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #f0fdf4 100%)",
+                      borderColor: "#bfdbfe",
+                      shadow: "0 8px 24px rgba(37, 99, 235, 0.10)",
+                      pillBg: "#dbeafe",
+                      pillBorder: "#bfdbfe",
+                      pillColor: "#1e40af"
+                    };
+                  }
+
+                  const isJourneyOpen = Boolean(expandedJourneyMsgIds[msg.id]);
+
                   return (
                     <React.Fragment key={msg.id}>
                       {dateDividerNode}
-                      <div style={{ display: "flex", justifyContent: "center", margin: "14px 0" }}>
+                      <div style={{ display: "flex", justifyContent: "center", margin: "16px 0" }}>
                         <div style={{
-                          maxWidth: "92%",
-                          width: "460px",
-                          background: "linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%)",
-                          border: "1px solid #a7f3d0",
-                          borderRadius: "16px",
-                          padding: "14px 16px",
-                          boxShadow: "0 4px 16px rgba(16, 185, 129, 0.08)",
+                          maxWidth: "94%",
+                          width: "480px",
+                          background: cardTheme.bgGradient,
+                          border: `1px solid ${cardTheme.borderColor}`,
+                          borderRadius: "18px",
+                          padding: "16px",
+                          boxShadow: cardTheme.shadow,
                           display: "flex",
                           flexDirection: "column",
-                          gap: "10px"
+                          gap: "12px",
+                          transition: "all 0.2s ease"
                         }}>
                           {/* Header Badge */}
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                               <div style={{
-                                width: "30px",
-                                height: "30px",
-                                borderRadius: "8px",
-                                background: "#059669",
+                                width: "34px",
+                                height: "34px",
+                                borderRadius: "10px",
+                                background: cardTheme.accentColor,
                                 color: "white",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                fontSize: "14px",
-                                fontWeight: "bold"
+                                fontSize: "16px",
+                                fontWeight: "bold",
+                                boxShadow: "0 2px 6px rgba(0,0,0,0.12)"
                               }}>
-                                🛍️
+                                {cardTheme.badgeIcon}
                               </div>
                               <div>
-                                <span style={{ fontSize: "11px", fontWeight: 800, color: "#047857", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                                  WEBSITE STORE REFERRAL
+                                <span style={{ fontSize: "11px", fontWeight: 800, color: cardTheme.darkColor, textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                                  {cardTheme.badgeTitle}
                                 </span>
-                                <div style={{ fontSize: "10px", color: "#475569" }}>
-                                  Inquiry originated from your {platform} store
+                                <div style={{ fontSize: "10px", color: "#475569", marginTop: "1px" }}>
+                                  {cardTheme.badgeSub}
                                 </div>
                               </div>
                             </div>
-                            <span style={{ fontSize: "10px", color: "#64748b", fontWeight: 500 }} title={new Date(msg.sentAt).toLocaleString([], { dateStyle: "full", timeStyle: "medium" })}>
+                            <span style={{ fontSize: "10.5px", color: "#64748b", fontWeight: 500 }} title={new Date(msg.sentAt).toLocaleString([], { dateStyle: "full", timeStyle: "medium" })}>
                               {formatMessageBubbleTime(msg.sentAt)}
                             </span>
                           </div>
 
-                          {/* Visited Webpage Box */}
-                          <div style={{ background: "white", padding: "10px 12px", borderRadius: "10px", border: "1px solid #d1fae5" }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                                  Active Page Visited
+                          {/* Active Visited Webpage Box */}
+                          <div style={{ background: "white", padding: "12px 14px", borderRadius: "12px", border: "1px solid rgba(0,0,0,0.06)", boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px" }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                  <Globe size={12} color={cardTheme.accentColor} />
+                                  <span>Active Page Visited</span>
                                 </div>
-                                <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a", marginTop: "2px", lineHeight: "1.3" }}>
+                                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "#0f172a", marginTop: "3px", lineHeight: "1.35", overflow: "hidden", textOverflow: "ellipsis" }}>
                                   {pageTitle}
                                 </div>
                                 {product && product.price && (
-                                  <div style={{ fontSize: "11.5px", color: "#059669", fontWeight: 600, marginTop: "2px" }}>
-                                    Product Price: ₹{product.price}
+                                  <div style={{ fontSize: "11.5px", color: "#059669", fontWeight: 700, marginTop: "2px" }}>
+                                    Price: ₹{product.price}
+                                  </div>
+                                )}
+                                {sessionStats && (
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", fontSize: "10.5px", color: "#64748b", fontWeight: 500 }}>
+                                    <span style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px" }}>
+                                      ⏱️ {Math.max(1, Math.round(sessionStats.totalDurationSec / 60))}m on site
+                                    </span>
+                                    <span style={{ background: "#f1f5f9", padding: "2px 6px", borderRadius: "4px" }}>
+                                      📄 {sessionStats.pageViews || (pageJourney.length || 1)} pages visited
+                                    </span>
                                   </div>
                                 )}
                               </div>
@@ -2727,27 +3041,126 @@ export default function WhatsAppInboxComponent() {
                                   style={{
                                     fontSize: "11px",
                                     fontWeight: 700,
-                                    color: "#047857",
-                                    background: "#ecfdf5",
-                                    border: "1px solid #a7f3d0",
-                                    padding: "5px 9px",
-                                    borderRadius: "6px",
+                                    color: cardTheme.darkColor,
+                                    background: cardTheme.pillBg,
+                                    border: `1px solid ${cardTheme.pillBorder}`,
+                                    padding: "6px 10px",
+                                    borderRadius: "8px",
                                     textDecoration: "none",
                                     whiteSpace: "nowrap",
                                     display: "flex",
                                     alignItems: "center",
-                                    gap: "3px"
+                                    gap: "4px",
+                                    flexShrink: 0
                                   }}
                                 >
-                                  Open Page ↗
+                                  <span>Open Page</span>
+                                  <ExternalLink size={11} />
                                 </a>
                               )}
                             </div>
                           </div>
 
+                          {/* Education Specific Intent Breakdown */}
+                          {isEducation && categoryInsights && (
+                            <div style={{ background: "white", padding: "12px 14px", borderRadius: "12px", border: "1px solid #e0e7ff", display: "flex", flexDirection: "column", gap: "8px" }}>
+                              <div style={{ fontSize: "11px", fontWeight: 700, color: "#4338ca", textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center", gap: "5px" }}>
+                                <span>🎓</span>
+                                <span>Education Consultancy Intent</span>
+                              </div>
+
+                              {categoryInsights.courses && categoryInsights.courses.length > 0 && (
+                                <div>
+                                  <div style={{ fontSize: "10px", fontWeight: 600, color: "#64748b", marginBottom: "4px" }}>Courses of Interest:</div>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                    {categoryInsights.courses.map((c: string, ci: number) => (
+                                      <span key={ci} style={{ fontSize: "11px", fontWeight: 700, background: "#ede9fe", color: "#5b21b6", padding: "3px 8px", borderRadius: "6px", border: "1px solid #ddd6fe" }}>
+                                        🎓 {c}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {categoryInsights.universities && categoryInsights.universities.length > 0 && (
+                                <div>
+                                  <div style={{ fontSize: "10px", fontWeight: 600, color: "#64748b", marginBottom: "4px" }}>Target Universities / Colleges:</div>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                    {categoryInsights.universities.map((u: string, ui: number) => (
+                                      <span key={ui} style={{ fontSize: "11px", fontWeight: 700, background: "#e0e7ff", color: "#3730a3", padding: "3px 8px", borderRadius: "6px", border: "1px solid #c7d2fe" }}>
+                                        🏛️ {u}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {categoryInsights.destinations && categoryInsights.destinations.length > 0 && (
+                                <div>
+                                  <div style={{ fontSize: "10px", fontWeight: 600, color: "#64748b", marginBottom: "4px" }}>Preferred Study Destinations:</div>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                    {categoryInsights.destinations.map((d: string, di: number) => (
+                                      <span key={di} style={{ fontSize: "11px", fontWeight: 600, background: "#f1f5f9", color: "#1e293b", padding: "2px 7px", borderRadius: "5px", border: "1px solid #e2e8f0" }}>
+                                        🌍 {d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Real Estate Specific Intent Breakdown */}
+                          {isRealEstate && categoryInsights && categoryInsights.properties && categoryInsights.properties.length > 0 && (
+                            <div style={{ background: "white", padding: "12px 14px", borderRadius: "12px", border: "1px solid #fde68a", display: "flex", flexDirection: "column", gap: "6px" }}>
+                              <div style={{ fontSize: "11px", fontWeight: 700, color: "#b45309", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                🏢 Properties & Layouts Viewed
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                {categoryInsights.properties.map((p: string, pi: number) => (
+                                  <span key={pi} style={{ fontSize: "11px", fontWeight: 700, background: "#fef3c7", color: "#92400e", padding: "3px 8px", borderRadius: "6px", border: "1px solid #fde68a" }}>
+                                    🏢 {p}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Healthcare Specific Intent Breakdown */}
+                          {isHealthcare && categoryInsights && categoryInsights.specialties && categoryInsights.specialties.length > 0 && (
+                            <div style={{ background: "white", padding: "12px 14px", borderRadius: "12px", border: "1px solid #99f6e4", display: "flex", flexDirection: "column", gap: "6px" }}>
+                              <div style={{ fontSize: "11px", fontWeight: 700, color: "#0f766e", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                                🏥 Specialties & Doctors Consulted
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                                {categoryInsights.specialties.map((sp: string, spi: number) => (
+                                  <span key={spi} style={{ fontSize: "11px", fontWeight: 700, background: "#ccfbf1", color: "#115e59", padding: "3px 8px", borderRadius: "6px", border: "1px solid #99f6e4" }}>
+                                    🩺 {sp}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Searched Queries on Site */}
+                          {searches.length > 0 && (
+                            <div style={{ background: "white", padding: "10px 12px", borderRadius: "10px", border: "1px solid rgba(0,0,0,0.06)" }}>
+                              <div style={{ fontSize: "10.5px", fontWeight: 700, color: "#475569", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                                🔍 Searched on Website ({searches.length})
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                                {searches.map((sq: string, sqi: number) => (
+                                  <span key={sqi} style={{ fontSize: "11px", fontWeight: 600, background: "#f8fafc", color: "#0f172a", padding: "3px 8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}>
+                                    "{sq}"
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {/* Active Cart Items Section */}
                           {hasCart && (
-                            <div style={{ background: "white", padding: "10px 12px", borderRadius: "10px", border: "1px solid #bbf7d0" }}>
+                            <div style={{ background: "white", padding: "12px 14px", borderRadius: "12px", border: "1px solid #bbf7d0" }}>
                               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", fontWeight: 700, color: "#065f46" }}>
                                   <span>🛒</span> Cart Context ({cartItemCount} item{cartItemCount > 1 ? "s" : ""})
@@ -2814,13 +3227,99 @@ export default function WhatsAppInboxComponent() {
                               )}
                             </div>
                           )}
+
+                          {/* Visitor Browsing Journey (Step-by-Step Collapsible Breadcrumb Trail) */}
+                          {pageJourney.length > 0 && (
+                            <div style={{ background: "white", borderRadius: "12px", border: "1px solid rgba(0,0,0,0.06)", overflow: "hidden" }}>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedJourneyMsgIds((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                                style={{
+                                  width: "100%",
+                                  padding: "10px 14px",
+                                  background: "none",
+                                  border: "none",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  cursor: "pointer",
+                                  fontSize: "11.5px",
+                                  fontWeight: 700,
+                                  color: cardTheme.darkColor,
+                                  outline: "none"
+                                }}
+                              >
+                                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                  <span>🧭</span>
+                                  <span>Visitor Browsing Trail ({pageJourney.length} page{pageJourney.length > 1 ? "s" : ""})</span>
+                                </span>
+                                <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 600, display: "flex", alignItems: "center", gap: "2px" }}>
+                                  {isJourneyOpen ? "Hide History ▲" : "View Trail ▼"}
+                                </span>
+                              </button>
+
+                              {isJourneyOpen ? (
+                                <div style={{ padding: "0 14px 12px 14px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                                  {pageJourney.map((step: any, sIdx: number) => {
+                                    const isLast = sIdx === pageJourney.length - 1;
+                                    return (
+                                      <div
+                                        key={sIdx}
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "flex-start",
+                                          gap: "8px",
+                                          padding: "6px 8px",
+                                          background: isLast ? cardTheme.pillBg : "#f8fafc",
+                                          borderRadius: "8px",
+                                          border: `1px solid ${isLast ? cardTheme.pillBorder : "#e2e8f0"}`,
+                                          fontSize: "11px"
+                                        }}
+                                      >
+                                        <span style={{
+                                          width: "18px",
+                                          height: "18px",
+                                          borderRadius: "50%",
+                                          background: isLast ? cardTheme.accentColor : "#94a3b8",
+                                          color: "white",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: "9px",
+                                          fontWeight: 800,
+                                          flexShrink: 0
+                                        }}>
+                                          {sIdx + 1}
+                                        </span>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div style={{ fontWeight: isLast ? 700 : 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={step.title}>
+                                            {step.title || step.path}
+                                          </div>
+                                          <div style={{ fontSize: "10px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px", marginTop: "1px" }}>
+                                            <span>{step.path}</span>
+                                            {step.dwellSec > 0 && <span>• ⏱️ {step.dwellSec}s dwell</span>}
+                                            {isLast && <span style={{ color: cardTheme.darkColor, fontWeight: 700 }}>• Active (WhatsApp CTA)</span>}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div style={{ padding: "0 14px 10px 14px", fontSize: "10.5px", color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {pageJourney.map((p: any) => p.path).slice(-3).join(" ➔ ")}
+                                  {pageJourney.length > 3 && " (more)"}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </React.Fragment>
                   );
                 }
 
-                if (isInternal) {
+                                if (isInternal) {
                   return (
                     <React.Fragment key={msg.id}>
                       {dateDividerNode}
@@ -4299,31 +4798,100 @@ export default function WhatsAppInboxComponent() {
               </div>
             </div>
 
-            {/* Live Store Browsing & Active Cart Activity Card in CRM Panel */}
+            {/* Live Store Browsing & Active Activity Card in CRM Panel */}
             {latestWebsiteContext && (
-              <div className="crm-section-box" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "12px", padding: "12px" }}>
-                <h5 className="crm-section-title" style={{ color: "#065f46", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+              <div className="crm-section-box" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px" }}>
+                <h5 className="crm-section-title" style={{ color: "#0f172a", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                   <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span>🌐</span> Store & Cart Activity
+                    <span>🌐</span> Website Activity & Intent
                   </span>
-                  <span style={{ fontSize: "10px", background: "#dcfce7", color: "#166534", padding: "2px 6px", borderRadius: "6px", fontWeight: 700 }}>
-                    {latestWebsiteContext.platform || "Shopify"}
+                  <span style={{ fontSize: "10px", background: "#e0e7ff", color: "#3730a3", padding: "2px 6px", borderRadius: "6px", fontWeight: 700 }}>
+                    {latestWebsiteContext.categoryInsights?.category || latestWebsiteContext.platform || "Storefront"}
                   </span>
                 </h5>
                 <div style={{ fontSize: "11.5px", color: "#1e293b" }}>
-                  <div style={{ fontWeight: 600, color: "#047857" }}>Browsing Page:</div>
+                  <div style={{ fontWeight: 600, color: "#64748b" }}>Active Webpage:</div>
                   <div style={{ fontWeight: 700, marginTop: "2px", lineHeight: "1.3" }}>{latestWebsiteContext.pageTitle || "Online Store"}</div>
                   {latestWebsiteContext.pageUrl && (
                     <a
                       href={latestWebsiteContext.pageUrl}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ fontSize: "11px", color: "#059669", textDecoration: "underline", display: "inline-block", marginTop: "4px" }}
+                      style={{ fontSize: "11px", color: "#4f46e5", textDecoration: "underline", display: "inline-block", marginTop: "4px" }}
                     >
                       Open Live Page ↗
                     </a>
                   )}
                 </div>
+
+                {/* Education Intent in CRM Panel */}
+                {latestWebsiteContext.categoryInsights && latestWebsiteContext.categoryInsights.category === "EDUCATION" && (
+                  <div style={{ marginTop: "8px", borderTop: "1px solid #e2e8f0", paddingTop: "8px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {latestWebsiteContext.categoryInsights.courses?.length > 0 && (
+                      <div style={{ fontSize: "11px" }}>
+                        <span style={{ fontWeight: 600, color: "#4338ca" }}>Courses: </span>
+                        <span style={{ color: "#334155" }}>{latestWebsiteContext.categoryInsights.courses.join(", ")}</span>
+                      </div>
+                    )}
+                    {latestWebsiteContext.categoryInsights.universities?.length > 0 && (
+                      <div style={{ fontSize: "11px" }}>
+                        <span style={{ fontWeight: 600, color: "#4338ca" }}>Target: </span>
+                        <span style={{ color: "#334155" }}>{latestWebsiteContext.categoryInsights.universities.join(", ")}</span>
+                      </div>
+                    )}
+                    {latestWebsiteContext.categoryInsights.destinations?.length > 0 && (
+                      <div style={{ fontSize: "11px" }}>
+                        <span style={{ fontWeight: 600, color: "#4338ca" }}>Countries: </span>
+                        <span style={{ color: "#334155" }}>{latestWebsiteContext.categoryInsights.destinations.join(", ")}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Searches in CRM Panel */}
+                {latestWebsiteContext.searches && latestWebsiteContext.searches.length > 0 && (
+                  <div style={{ marginTop: "8px", borderTop: "1px solid #e2e8f0", paddingTop: "6px" }}>
+                    <div style={{ fontSize: "10.5px", fontWeight: 700, color: "#475569", marginBottom: "3px" }}>
+                      🔍 Searched on Website:
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                      {latestWebsiteContext.searches.map((sq: string, sqi: number) => (
+                        <span key={sqi} style={{ fontSize: "10px", background: "white", padding: "2px 6px", borderRadius: "4px", border: "1px solid #cbd5e1" }}>
+                          "{sq}"
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Browsing Trail in CRM Panel */}
+                {latestWebsiteContext.pageJourney && latestWebsiteContext.pageJourney.length > 0 && (
+                  <div style={{ marginTop: "8px", borderTop: "1px solid #e2e8f0", paddingTop: "6px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCrmJourney(!expandedCrmJourney)}
+                      style={{ background: "none", border: "none", padding: 0, fontSize: "11px", fontWeight: 700, color: "#4f46e5", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+                    >
+                      <span>🧭 Browsing Trail ({latestWebsiteContext.pageJourney.length} pages)</span>
+                      <span>{expandedCrmJourney ? "▲" : "▼"}</span>
+                    </button>
+                    {expandedCrmJourney ? (
+                      <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {latestWebsiteContext.pageJourney.map((step: any, sIdx: number) => (
+                          <div key={sIdx} style={{ fontSize: "10.5px", color: "#334155", background: "white", padding: "4px 6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                            <span style={{ fontWeight: 700, color: "#64748b" }}>{sIdx + 1}. </span>
+                            <span style={{ fontWeight: 600 }}>{step.title || step.path}</span>
+                            {step.dwellSec > 0 && <span style={{ color: "#94a3b8" }}> ({step.dwellSec}s)</span>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: "10px", color: "#64748b", marginTop: "3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {latestWebsiteContext.pageJourney.map((p: any) => p.path).slice(-2).join(" ➔ ")}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {latestWebsiteContext.cart && (latestWebsiteContext.cart.items?.length > 0 || latestWebsiteContext.cart.item_count > 0) && (
                   <div style={{ marginTop: "10px", borderTop: "1px solid #bbf7d0", paddingTop: "8px" }}>
@@ -4344,18 +4912,12 @@ export default function WhatsAppInboxComponent() {
                             {it.price && <span style={{ fontWeight: 600, color: "#047857" }}>₹{it.price}</span>}
                           </div>
                         ))}
-                        {latestWebsiteContext.cart.items.length > 3 && (
-                          <div style={{ fontSize: "10px", color: "#64748b", textAlign: "center", marginTop: "2px" }}>
-                            +{latestWebsiteContext.cart.items.length - 3} more items in cart
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
                 )}
               </div>
             )}
-
             {/* Quick Actions Panel */}
             <div className="crm-section-box">
               <h5 className="crm-section-title">Quick Actions</h5>
@@ -5095,7 +5657,439 @@ export default function WhatsAppInboxComponent() {
           </div>
         </div>
       )}
-      {/* End of inbox panels */}
+            {/* ================================================================= */}
+      {/* DEDICATED WEBSITE TRACKING & LIVE ACTIVITY DRAWER */}
+      {/* ================================================================= */}
+      {showWebsiteTrackingDrawer && activeConvDetail && (
+        <div 
+          className="website-tracking-overlay"
+          onClick={() => setShowWebsiteTrackingDrawer(false)}
+        >
+          <div 
+            className="website-tracking-drawer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="website-tracking-header">
+              <div className="website-tracking-title-wrap">
+                <div className="website-tracking-title">
+                  <Globe size={18} color="#4f46e5" />
+                  <h3>Website Tracking & Live Activity</h3>
+                </div>
+                <div style={{ fontSize: "11px", color: "#64748b", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span>{activeConvDetail.customer?.contactPerson || activeConvDetail.customer?.businessName || activeCustomerPhone || "Visitor"}</span>
+                  {activeCustomerPhone && <span>• +{activeCustomerPhone}</span>}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {activeWebsiteTrackingData.isOnlineNow ? (
+                  <span className="tracking-live-pill live" title="Visitor is actively browsing your website right now">
+                    <span className="live-dot" />
+                    <span>Active Now</span>
+                  </span>
+                ) : (
+                  <span className="tracking-live-pill offline" title="Last recorded website visit">
+                    <Clock size={11} />
+                    <span>
+                      {activeWebsiteTrackingData.lastActivityTime 
+                        ? new Date(activeWebsiteTrackingData.lastActivityTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : "Offline"}
+                    </span>
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => fetchCustomerWebSessions(activeCustomerPhone)}
+                  title="Refresh website tracking data"
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    background: "#ffffff",
+                    borderRadius: "6px",
+                    padding: "5px 7px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#64748b",
+                  }}
+                >
+                  <RefreshCw size={13} className={loadingWebSessions ? "spin-pulse" : ""} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWebsiteTrackingDrawer(false)}
+                  title="Close Drawer"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    padding: "4px",
+                    color: "#64748b",
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="website-tracking-body">
+              {/* Live Telemetry Notice */}
+              {activeWebsiteTrackingData.isOnlineNow && (
+                <div style={{
+                  background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
+                  border: "1px solid #a7f3d0",
+                  borderRadius: "10px",
+                  padding: "10px 12px",
+                  fontSize: "11.5px",
+                  color: "#065f46",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 1px 2px rgba(16, 185, 129, 0.05)"
+                }}>
+                  <span className="live-dot" style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong>Live Activity Connected:</strong> Website actions update here automatically in real time without sending messages into WhatsApp.
+                  </div>
+                </div>
+              )}
+
+              {/* Active Webpage Card */}
+              <div className="tracking-section-card highlight">
+                <div className="tracking-card-header">
+                  <h4>
+                    <Globe size={14} color="#059669" />
+                    <span>{activeWebsiteTrackingData.isOnlineNow ? "Current Active Page" : "Last Visited Page"}</span>
+                  </h4>
+                  <span style={{ fontSize: "10px", fontWeight: 700, background: "#d1fae5", color: "#065f46", padding: "2px 6px", borderRadius: "4px" }}>
+                    {activeWebsiteTrackingData.platform || "Website"}
+                  </span>
+                </div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>
+                  {activeWebsiteTrackingData.pageTitle || "Online Store"}
+                </div>
+                {activeWebsiteTrackingData.pageUrl ? (
+                  <a
+                    href={activeWebsiteTrackingData.pageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontSize: "11.5px",
+                      color: "#2563eb",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      textDecoration: "none",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    <span>{activeWebsiteTrackingData.pageUrl}</span>
+                    <ExternalLink size={11} />
+                  </a>
+                ) : (
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Direct / Widget Interaction</span>
+                )}
+              </div>
+
+              {/* Multi-Category Intent Card */}
+              {activeWebsiteTrackingData.categoryInsights && (
+                <div className={`tracking-section-card ${
+                  activeWebsiteTrackingData.categoryInsights.category === "EDUCATION" ? "education" :
+                  activeWebsiteTrackingData.categoryInsights.category === "REAL_ESTATE" ? "realestate" :
+                  activeWebsiteTrackingData.categoryInsights.category === "HEALTHCARE" ? "healthcare" : ""
+                }`}>
+                  <div className="tracking-card-header">
+                    <h4>
+                      {activeWebsiteTrackingData.categoryInsights.category === "EDUCATION" && <span>🎓 Education & Study Abroad Intent</span>}
+                      {activeWebsiteTrackingData.categoryInsights.category === "REAL_ESTATE" && <span>🏢 Real Estate Property Intent</span>}
+                      {activeWebsiteTrackingData.categoryInsights.category === "HEALTHCARE" && <span>🩺 Medical & Specialty Intent</span>}
+                      {activeWebsiteTrackingData.categoryInsights.category === "STOREFRONT" && <span>🛍️ Storefront Shopping Intent</span>}
+                    </h4>
+                    <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", background: "#e0e7ff", color: "#3730a3", padding: "2px 6px", borderRadius: "4px" }}>
+                      {activeWebsiteTrackingData.categoryInsights.category}
+                    </span>
+                  </div>
+
+                  {/* Education Intent Details */}
+                  {activeWebsiteTrackingData.categoryInsights.category === "EDUCATION" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px" }}>
+                      {activeWebsiteTrackingData.categoryInsights.courses?.length > 0 && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#4338ca", display: "block", marginBottom: "4px" }}>
+                            Target Degrees & Courses:
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                            {activeWebsiteTrackingData.categoryInsights.courses.map((c: string, idx: number) => (
+                              <span key={idx} className="tracking-badge-pill">🎓 {c}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeWebsiteTrackingData.categoryInsights.universities?.length > 0 && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#4338ca", display: "block", marginBottom: "4px" }}>
+                            Universities Explored:
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                            {activeWebsiteTrackingData.categoryInsights.universities.map((u: string, idx: number) => (
+                              <span key={idx} className="tracking-badge-pill" style={{ background: "#fdf4ff", color: "#86198f", borderColor: "#f0abfc" }}>
+                                🏛️ {u}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeWebsiteTrackingData.categoryInsights.destinations?.length > 0 && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#4338ca", display: "block", marginBottom: "4px" }}>
+                            Study Destinations:
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                            {activeWebsiteTrackingData.categoryInsights.destinations.map((d: string, idx: number) => (
+                              <span key={idx} className="tracking-badge-pill" style={{ background: "#ecfdf5", color: "#065f46", borderColor: "#a7f3d0" }}>
+                                🌍 {d}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeWebsiteTrackingData.categoryInsights.testPreps?.length > 0 && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#4338ca", display: "block", marginBottom: "4px" }}>
+                            Exams & Test Preps:
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                            {activeWebsiteTrackingData.categoryInsights.testPreps.map((tp: string, idx: number) => (
+                              <span key={idx} className="tracking-badge-pill" style={{ background: "#fff7ed", color: "#9a3412", borderColor: "#fed7aa" }}>
+                                📝 {tp}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Real Estate Intent Details */}
+                  {activeWebsiteTrackingData.categoryInsights.category === "REAL_ESTATE" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px" }}>
+                      {activeWebsiteTrackingData.categoryInsights.properties?.length > 0 && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#c2410c", display: "block", marginBottom: "4px" }}>
+                            Properties Viewed:
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                            {activeWebsiteTrackingData.categoryInsights.properties.map((p: string, idx: number) => (
+                              <span key={idx} className="tracking-badge-pill" style={{ background: "#fff7ed", color: "#c2410c", borderColor: "#fed7aa" }}>
+                                🏢 {p}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeWebsiteTrackingData.categoryInsights.locations?.length > 0 && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#c2410c", display: "block", marginBottom: "4px" }}>
+                            Preferred Locations:
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                            {activeWebsiteTrackingData.categoryInsights.locations.map((loc: string, idx: number) => (
+                              <span key={idx} className="tracking-badge-pill" style={{ background: "#fef3c7", color: "#92400e", borderColor: "#fde68a" }}>
+                                📍 {loc}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Healthcare Intent Details */}
+                  {activeWebsiteTrackingData.categoryInsights.category === "HEALTHCARE" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px" }}>
+                      {activeWebsiteTrackingData.categoryInsights.specialties?.length > 0 && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#0369a1", display: "block", marginBottom: "4px" }}>
+                            Medical Specialties:
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                            {activeWebsiteTrackingData.categoryInsights.specialties.map((s: string, idx: number) => (
+                              <span key={idx} className="tracking-badge-pill" style={{ background: "#f0f9ff", color: "#0369a1", borderColor: "#bae6fd" }}>
+                                🩺 {s}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {activeWebsiteTrackingData.categoryInsights.doctors?.length > 0 && (
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#0369a1", display: "block", marginBottom: "4px" }}>
+                            Consulted Doctors:
+                          </span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                            {activeWebsiteTrackingData.categoryInsights.doctors.map((doc: string, idx: number) => (
+                              <span key={idx} className="tracking-badge-pill" style={{ background: "#f0fdf4", color: "#15803d", borderColor: "#bbf7d0" }}>
+                                👨‍⚕️ {doc}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Cart Details if Present */}
+              {activeWebsiteTrackingData.cart && (activeWebsiteTrackingData.cart.items?.length > 0 || activeWebsiteTrackingData.cart.item_count > 0) && (
+                <div className="tracking-section-card" style={{ borderColor: "#fed7aa", background: "#fffaf5" }}>
+                  <div className="tracking-card-header">
+                    <h4>
+                      <ShoppingBag size={14} color="#ea580c" />
+                      <span>Active Shopping Cart</span>
+                    </h4>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#ea580c" }}>
+                      {activeWebsiteTrackingData.cart.item_count || activeWebsiteTrackingData.cart.items?.length} items
+                      {activeWebsiteTrackingData.cart.total_price ? ` • ₹${activeWebsiteTrackingData.cart.total_price}` : ""}
+                    </span>
+                  </div>
+                  {activeWebsiteTrackingData.cart.items && activeWebsiteTrackingData.cart.items.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {activeWebsiteTrackingData.cart.items.map((it: any, i: number) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11.5px", background: "white", padding: "6px 8px", borderRadius: "6px", border: "1px solid #fed7aa" }}>
+                          <span style={{ fontWeight: 600, color: "#1e293b" }}>{it.title || it.name}</span>
+                          <span style={{ color: "#ea580c", fontWeight: 700 }}>
+                            {it.quantity}x {it.price ? `₹${it.price}` : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Website Search Queries */}
+              {activeWebsiteTrackingData.searches && activeWebsiteTrackingData.searches.length > 0 && (
+                <div className="tracking-section-card">
+                  <div className="tracking-card-header">
+                    <h4>
+                      <Search size={14} color="#6366f1" />
+                      <span>On-Site Search Queries ({activeWebsiteTrackingData.searches.length})</span>
+                    </h4>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {activeWebsiteTrackingData.searches.map((sq: string, sqi: number) => (
+                      <span key={sqi} className="tracking-search-chip">
+                        <Search size={10} color="#94a3b8" />
+                        <span>"{sq}"</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Step-by-Step Chronological Journey Trail */}
+              {activeWebsiteTrackingData.pageJourney && activeWebsiteTrackingData.pageJourney.length > 0 && (
+                <div className="tracking-section-card">
+                  <div className="tracking-card-header">
+                    <h4>
+                      <Compass size={14} color="#4f46e5" />
+                      <span>Browsing Journey Trail ({activeWebsiteTrackingData.pageJourney.length} pages)</span>
+                    </h4>
+                  </div>
+                  <div className="tracking-timeline">
+                    {activeWebsiteTrackingData.pageJourney.map((step: any, sIdx: number) => {
+                      const isLast = sIdx === activeWebsiteTrackingData.pageJourney.length - 1;
+                      return (
+                        <div key={sIdx} className="tracking-timeline-step">
+                          <div className={`tracking-timeline-node ${isLast ? "active" : ""}`}>
+                            {sIdx + 1}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "12px" }}>
+                              {step.title || step.path || "Page"}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px", flexWrap: "wrap" }}>
+                              <span style={{ fontSize: "11px", color: "#64748b", fontFamily: "monospace" }}>
+                                {step.path || "/"}
+                              </span>
+                              {step.dwellSeconds && (
+                                <span className="tracking-dwell-badge">
+                                  <Clock size={9} />
+                                  <span>{step.dwellSeconds}s</span>
+                                </span>
+                              )}
+                              {step.time && (
+                                <span style={{ fontSize: "10px", color: "#94a3b8" }}>
+                                  {step.time}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Real-Time Live Activity Event Log */}
+              {activeWebsiteTrackingData.liveEventLog && activeWebsiteTrackingData.liveEventLog.length > 0 && (
+                <div className="tracking-section-card">
+                  <div className="tracking-card-header">
+                    <h4>
+                      <Activity size={14} color="#10b981" />
+                      <span>Live Event Log ({activeWebsiteTrackingData.liveEventLog.length})</span>
+                    </h4>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {activeWebsiteTrackingData.liveEventLog.map((logItem: any, lIdx: number) => (
+                      <div key={lIdx} style={{ fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: "5px 8px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
+                        <span style={{ color: "#334155" }}>
+                          {logItem.eventType === "SEARCH" ? `🔍 Searched: "${logItem.searchQuery}"` : `📄 Viewed: ${logItem.pageTitle || logItem.pageUrl}`}
+                        </span>
+                        <span style={{ fontSize: "10px", color: "#94a3b8" }}>
+                          {new Date(logItem.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!activeWebsiteTrackingData.hasAnyData && (
+                <div style={{
+                  padding: "36px 20px",
+                  textAlign: "center",
+                  background: "#f8fafc",
+                  borderRadius: "12px",
+                  border: "1px dashed #cbd5e1",
+                  margin: "auto 0"
+                }}>
+                  <Globe size={36} color="#94a3b8" style={{ margin: "0 auto 12px auto", display: "block" }} />
+                  <h4 style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", marginBottom: "6px" }}>
+                    No Website Activity Recorded Yet
+                  </h4>
+                  <p style={{ fontSize: "12px", color: "#64748b", lineHeight: "1.5", maxWidth: "340px", margin: "0 auto" }}>
+                    When this customer visits your website with the WhatIn script installed, their visited pages, search queries, and intent will automatically stream here in real time without sending messages into WhatsApp.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {`/* End of inbox panels */`}
     </div>
   );
 }
