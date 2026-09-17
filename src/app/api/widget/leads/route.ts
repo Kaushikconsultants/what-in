@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser } from "@/lib/authSession";
 
 async function resolveClient(req: NextRequest) {
+  const user = await getAuthenticatedUser(req);
+  if (user?.clientId) {
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    if (client) return client;
+  }
+
   const { searchParams } = new URL(req.url);
   const paramClientId = searchParams.get("clientId");
   if (paramClientId) {
@@ -10,13 +16,7 @@ async function resolveClient(req: NextRequest) {
     if (client) return client;
   }
 
-  const user = await getAuthenticatedUser(req);
-  if (user?.clientId) {
-    const client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
-    if (client) return client;
-  }
-
-  return await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" } });
+  return null;
 }
 
 /**

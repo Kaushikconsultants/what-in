@@ -886,11 +886,16 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
     }
 
     // Feature: Extract and render Website Visitor & Cart Context Referral Card
+    // Strict matching: Only link if widgetRefCode is explicitly present or session was logged with this exact customer phone.
+    // Never match generic time-window sessions, and never match Meta CTWA Ad leads to random website sessions.
     try {
       let visitorSessionLog = null;
-      if (widgetRefCode) {
+      const effectiveClientId = conversation?.clientId || clientId || client?.id;
+
+      if (effectiveClientId && widgetRefCode) {
         visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
           where: {
+            clientId: effectiveClientId,
             nodeType: "WIDGET_SESSION_REF",
             nodeId: widgetRefCode
           },
@@ -898,51 +903,18 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         });
       }
 
-      // If not matched by ref code directly, check if a visitor session was logged for this cleanPhone in the last 30 min
-      if (!visitorSessionLog && cleanPhone) {
-        const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+      // If not matched by ref code, check if a visitor session was logged with this customer's exact phone in the last 2 hours (only if NOT a Meta CTWA ad lead)
+      if (!visitorSessionLog && !ctwaMetadata && effectiveClientId && cleanPhone && cleanPhone.length >= 10) {
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
         visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
           where: {
+            clientId: effectiveClientId,
             nodeType: "WIDGET_SESSION_REF",
             phone: cleanPhone,
-            createdAt: { gte: thirtyMinsAgo }
+            createdAt: { gte: twoHoursAgo }
           },
           orderBy: { createdAt: "desc" }
         });
-      }
-
-      // Fallback 2: Recent Website Click Correlation (within last 15 minutes for this store)
-      if (!visitorSessionLog) {
-        const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
-        visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
-          where: {
-            ...(clientId ? { clientId } : {}),
-            nodeType: "WIDGET_SESSION_REF",
-            createdAt: { gte: fifteenMinsAgo }
-          },
-          orderBy: { createdAt: "desc" }
-        });
-      }
-
-      // Fallback 3: Website Greeting Text check (within last 60 minutes)
-      if (!visitorSessionLog) {
-        const lowerText = textContent.toLowerCase();
-        const isWebsiteGreeting = lowerText.includes("info on this") ||
-          lowerText.includes("inquiry from your website") ||
-          lowerText.includes("inquiring about") ||
-          lowerText.includes("connect with");
-
-        if (isWebsiteGreeting) {
-          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-          visitorSessionLog = await prisma.whatsAppChatbotLog.findFirst({
-            where: {
-              ...(clientId ? { clientId } : {}),
-              nodeType: "WIDGET_SESSION_REF",
-              createdAt: { gte: oneHourAgo }
-            },
-            orderBy: { createdAt: "desc" }
-          });
-        }
       }
 
       if (visitorSessionLog && visitorSessionLog.payload) {

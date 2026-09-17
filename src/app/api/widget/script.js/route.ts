@@ -28,6 +28,25 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const clientId = searchParams.get("clientId") || searchParams.get("tenant") || "";
 
+  if (!clientId || clientId.trim().length < 5) {
+    return new NextResponse("// WhatIn / WhatMore Widget: Missing or invalid clientId parameter.", {
+      status: 400,
+      headers: { "Content-Type": "application/javascript", ...corsHeaders },
+    });
+  }
+
+  const client = await prisma.whatsAppClient.findUnique({
+    where: { id: clientId.trim() },
+    include: { websiteWidget: true },
+  });
+
+  if (!client || !client.isActive) {
+    return new NextResponse("// WhatIn / WhatMore Widget: Client not found or inactive.", {
+      status: 403,
+      headers: { "Content-Type": "application/javascript", ...corsHeaders },
+    });
+  }
+
   let widgetConfig: any = {
     themeColor: "#25D366",
     position: "bottom-right",

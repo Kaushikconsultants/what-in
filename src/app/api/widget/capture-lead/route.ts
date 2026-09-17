@@ -39,24 +39,22 @@ export async function POST(req: NextRequest) {
 
     const { clientId, refId, eventType, name, phone, identifiedPhone, visitorUuid, email, pageUrl, pageTitle, utmSource, customMessage, platform, detectedProduct, cart, pageJourney, searches, categoryInsights, sessionStats, isLiveActivity, searchQuery } = body;
 
-    let client = clientId
-      ? await prisma.whatsAppClient.findUnique({
-          where: { id: clientId },
-          include: { websiteWidget: true },
-        })
-      : null;
-
-    if (!client) {
-      client = await prisma.whatsAppClient.findFirst({
-        where: { isActive: true },
-        include: { websiteWidget: true },
-      });
+    if (!clientId || typeof clientId !== "string" || clientId.trim().length < 5) {
+      return NextResponse.json(
+        { success: false, error: "Missing or invalid clientId parameter." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
-    if (!client) {
+    const client = await prisma.whatsAppClient.findUnique({
+      where: { id: clientId.trim() },
+      include: { websiteWidget: true },
+    });
+
+    if (!client || !client.isActive) {
       return NextResponse.json(
-        { success: false, error: "Invalid client." },
-        { status: 404, headers: corsHeaders }
+        { success: false, error: "Client not found or inactive." },
+        { status: 403, headers: corsHeaders }
       );
     }
 
