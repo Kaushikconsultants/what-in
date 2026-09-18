@@ -116,6 +116,19 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Check for Microsoft Clarity integration
+  let clarityProjectId = "";
+  try {
+    const clarityInteg = await prisma.whatsAppIntegration.findFirst({
+      where: { clientId: client.id, type: "CLARITY", isActive: true }
+    });
+    if (clarityInteg?.token) clarityProjectId = clarityInteg.token.trim();
+  } catch {}
+  if (!clarityProjectId && process.env.CLARITY_PROJECT_ID) {
+    clarityProjectId = process.env.CLARITY_PROJECT_ID.trim();
+  }
+  widgetConfig.clarityProjectId = clarityProjectId;
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://whatsapp.esponsports.com";
 
   // Generate lightweight vanilla JS bundle
@@ -738,10 +751,60 @@ export async function GET(req: NextRequest) {
     } catch (e) {}
   } catch (e) {}
 
+  // Visual & Viewport Metrics
+  function getScrollDepth() {
+    try {
+      var docEl = document.documentElement;
+      var bodyEl = document.body;
+      var scrollTop = window.pageYOffset || docEl.scrollTop || bodyEl.scrollTop || 0;
+      var scrollHeight = Math.max(docEl.scrollHeight, bodyEl.scrollHeight, docEl.clientHeight);
+      var clientHeight = window.innerHeight || docEl.clientHeight || 0;
+      var maxScroll = scrollHeight - clientHeight;
+      if (maxScroll <= 0) return 100;
+      return Math.min(100, Math.max(0, Math.round((scrollTop / maxScroll) * 100)));
+    } catch (e) { return 0; }
+  }
+
+  function getViewportInfo() {
+    try {
+      var w = window.innerWidth;
+      var h = window.innerHeight;
+      var dev = w <= 768 ? 'Mobile' : (w <= 1024 ? 'Tablet' : 'Desktop');
+      return w + 'x' + h + ' (' + dev + ')';
+    } catch (e) { return 'Unknown'; }
+  }
+
   // Helper to generate or reuse visitor reference token
   function generateRefCode() {
     return visitorSessionId || ('W' + Math.random().toString(36).substring(2, 6).toUpperCase());
   }
+
+  // Microsoft Clarity Screen Recording Integration
+  try {
+    if (config.clarityProjectId && !window.clarity) {
+      (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", config.clarityProjectId);
+    }
+  } catch (e) {}
+
+  function syncClarityIdentification(phoneToSync) {
+    try {
+      if (window.clarity) {
+        var identVal = phoneToSync || identifiedPhone || generateRefCode();
+        var friendlyName = phoneToSync ? ('+' + phoneToSync) : ('Store Visitor ' + generateRefCode());
+        window.clarity('identify', identVal, null, null, friendlyName);
+        if (phoneToSync) window.clarity('set', 'phone', phoneToSync);
+        if (detectedCart && detectedCart.item_count) {
+          window.clarity('set', 'cart_items', detectedCart.item_count);
+          window.clarity('set', 'cart_total', detectedCart.total_price);
+        }
+      }
+    } catch (e) {}
+  }
+  setTimeout(function() { syncClarityIdentification(); }, 1500);
 
   // Centralized Payload Generator
   function buildPayload(extra) {
@@ -765,6 +828,10 @@ export async function GET(req: NextRequest) {
         pageViews: pageJourney.length,
         totalDurationSec: durationSec
       },
+      scrollDepth: getScrollDepth(),
+      viewport: getViewportInfo(),
+      isOnline: document.visibilityState !== 'hidden',
+      presenceState: document.visibilityState === 'hidden' ? 'AWAY' : 'ONLINE',
       utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget')
     };
 
@@ -800,10 +867,49 @@ export async function GET(req: NextRequest) {
       }).then(function(data) {
         if (data && data.identifiedPhone) {
           setIdentifiedPhone(data.identifiedPhone);
+          syncClarityIdentification(data.identifiedPhone);
         }
       }).catch(function() {});
     } catch (e) {}
   }
+
+  // ⚡ Instant Exit Beacon: Immediately informs software when user closes tab or navigates away
+  function sendExitBeacon() {
+    try {
+      updateCurrentDwellTime();
+      var exitPayload = JSON.stringify(buildPayload({
+        eventType: 'TAB_CLOSED',
+        isLiveActivity: true,
+        isOnline: false,
+        presenceState: 'OFFLINE'
+      }));
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([exitPayload], { type: 'text/plain;charset=UTF-8' }));
+      }
+    } catch (e) {}
+  }
+  window.addEventListener('pagehide', sendExitBeacon);
+  window.addEventListener('beforeunload', sendExitBeacon);
+
+  // ⚡ Tab Focus & Background Away Detection
+  document.addEventListener('visibilitychange', function() {
+    try {
+      if (document.visibilityState === 'hidden') {
+        sendLiveTelemetry('TAB_AWAY', { isOnline: false, presenceState: 'AWAY' });
+      } else {
+        sendLiveTelemetry('TAB_ACTIVE', { isOnline: true, presenceState: 'ONLINE' });
+      }
+    } catch (e) {}
+  });
+
+  // ⚡ Active Heartbeat Ping: Keeps customer marked as Online while viewing
+  setInterval(function() {
+    try {
+      if (document.visibilityState === 'visible') {
+        sendLiveTelemetry('HEARTBEAT', { isOnline: true, presenceState: 'ONLINE' });
+      }
+    } catch (e) {}
+  }, 25000);
 
   // ⚡ Automatic Live Telemetry Triggers:
   // 1. Silent Page View Telemetry after DOM is ready
@@ -832,6 +938,41 @@ export async function GET(req: NextRequest) {
         return ret;
       };
     }
+  } catch (e) {}
+
+  // 1c. Live Scroll Depth Meter (Throttled)
+  try {
+    var maxScrollSent = 0;
+    var scrollThrottle = null;
+    window.addEventListener('scroll', function() {
+      var current = getScrollDepth();
+      if (current > maxScrollSent + 15) {
+        maxScrollSent = current;
+        if (!scrollThrottle) {
+          scrollThrottle = setTimeout(function() {
+            scrollThrottle = null;
+            sendLiveTelemetry('SCROLL', { scrollDepth: maxScrollSent });
+          }, 1500);
+        }
+      }
+    }, { passive: true });
+  } catch (e) {}
+
+  // 1d. Live Element Clicks & Interactions
+  try {
+    document.addEventListener('click', function(e) {
+      try {
+        var target = e.target;
+        if (!target) return;
+        var actionEl = target.closest('button, a, .product-form__submit, [name="add"], .btn, select, [data-action]');
+        if (actionEl && !actionEl.closest('#whatin-widget-container')) {
+          var txt = (actionEl.innerText || actionEl.getAttribute('aria-label') || actionEl.title || actionEl.name || actionEl.tagName || '').trim().slice(0, 45);
+          if (txt) {
+            sendLiveTelemetry('INTERACTION', { lastInteraction: 'Clicked: ' + txt });
+          }
+        }
+      } catch (err) {}
+    }, true);
   } catch (e) {}
 
   // 2. Auto-capture visitor phone from any form input on website (e.g. checkout, contact forms)

@@ -158,6 +158,16 @@ export async function POST(req: NextRequest) {
               where: { customerId: existingCustomer.id, clientId: client.id }
             });
 
+            const isOnline = body.isOnline !== undefined
+              ? Boolean(body.isOnline)
+              : (eventType !== "TAB_CLOSED" && eventType !== "TAB_AWAY");
+
+            const presenceState = body.presenceState || (
+              eventType === "TAB_CLOSED"
+                ? "OFFLINE"
+                : (eventType === "TAB_AWAY" ? "AWAY" : "ONLINE")
+            );
+
             // Broadcast real-time SSE event to live connected agent inboxes
             emitInboxEvent({
               type: "CUSTOMER_LIVE_ACTIVITY",
@@ -174,18 +184,28 @@ export async function POST(req: NextRequest) {
                 categoryInsights: categoryInsights || null,
                 pageJourney: Array.isArray(pageJourney) ? pageJourney : [],
                 sessionStats: sessionStats || null,
+                scrollDepth: body.scrollDepth !== undefined ? Number(body.scrollDepth) : undefined,
+                viewport: body.viewport || undefined,
+                lastInteraction: body.lastInteraction || undefined,
+                isOnline,
+                presenceState,
                 timestamp: new Date().toISOString()
               }
             });
 
-            // Append live activity entry to CRM customer notes
-            const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-            let liveLogEntry = `\n[${timeStr}] 🌐 Browsing: "${pageTitle || pageUrl}"`;
-            if (eventType === "SEARCH" && searchQuery) {
-              liveLogEntry = `\n[${timeStr}] 🔍 Searched on site: "${searchQuery}"`;
-            } else if (categoryInsights?.courses?.length) {
-              liveLogEntry += ` (Course: ${categoryInsights.courses[0]})`;
-            }
+            // Append live activity entry to CRM customer notes (skip for heartbeats & small scrolls)
+            if (eventType !== "HEARTBEAT" && eventType !== "TAB_AWAY" && eventType !== "SCROLL") {
+              const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+              let liveLogEntry = `\n[${timeStr}] 🌐 Browsing: "${pageTitle || pageUrl}"`;
+              if (eventType === "SEARCH" && searchQuery) {
+                liveLogEntry = `\n[${timeStr}] 🔍 Searched on site: "${searchQuery}"`;
+              } else if (eventType === "TAB_CLOSED") {
+                liveLogEntry = `\n[${timeStr}] 🚪 Left website / Closed tab`;
+              } else if (body.lastInteraction) {
+                liveLogEntry = `\n[${timeStr}] 👆 ${body.lastInteraction}`;
+              } else if (categoryInsights?.courses?.length) {
+                liveLogEntry += ` (Course: ${categoryInsights.courses[0]})`;
+              }
 
             const existingNotes = existingCustomer.notes || "";
             const updatedNotes = existingNotes.length > 3000
@@ -215,13 +235,14 @@ export async function POST(req: NextRequest) {
             }).catch(() => {});
           }
         }
-
-        return NextResponse.json(
-          { success: true, event: "LIVE_ACTIVITY_RECORDED", refId, identifiedPhone: cleanPhone || null },
-          { headers: corsHeaders }
-        );
       }
+
+      return NextResponse.json(
+        { success: true, event: "LIVE_ACTIVITY_RECORDED", refId, identifiedPhone: cleanPhone || null },
+        { headers: corsHeaders }
+      );
     }
+  }
 
     let customer = null;
     if (cleanPhone.length >= 10) {

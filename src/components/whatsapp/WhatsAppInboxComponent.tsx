@@ -68,7 +68,9 @@ import {
   ArrowLeft,
   CornerDownLeft,
   Globe,
-  Compass
+  Compass,
+  Eye,
+  Monitor
 } from "lucide-react";
 import {
   getWhatsAppConversations,
@@ -688,13 +690,46 @@ export default function WhatsAppInboxComponent() {
     const detectedProduct = live?.detectedProduct || latestDbSession?.detectedProduct || msgCtx?.detectedProduct || null;
     const lastActivityTime = live?.timestamp || live?.lastActivityAt || latestDbSession?.createdAt || msgCtx?.timestamp || null;
 
-    // Active within last 10 minutes
-    const isOnlineNow = Boolean(
-      live?.isLiveNow || (
-        lastActivityTime &&
-        (Date.now() - new Date(lastActivityTime).getTime() < 10 * 60 * 1000)
-      )
-    );
+    // Presence state calculation:
+    // When visitor leaves/closes tab, script sends TAB_CLOSED beacon => presenceState: "OFFLINE", isOnline: false
+    // When visitor switches tab, script sends TAB_AWAY => presenceState: "AWAY", isOnline: false
+    // When visitor returns, script sends TAB_ACTIVE => presenceState: "ONLINE", isOnline: true
+    // Heartbeats are sent every 25s while active.
+    let presenceStatus: "ONLINE" | "AWAY" | "OFFLINE" = "OFFLINE";
+    const now = Date.now();
+    const lastActivityMs = lastActivityTime ? new Date(lastActivityTime).getTime() : 0;
+    const diffMs = lastActivityMs ? (now - lastActivityMs) : Infinity;
+
+    if (live) {
+      if (live.presenceState === "OFFLINE" || live.isOnline === false || live.eventType === "TAB_CLOSED") {
+        presenceStatus = "OFFLINE";
+      } else if (live.presenceState === "AWAY" || live.eventType === "TAB_AWAY") {
+        presenceStatus = diffMs < 3 * 60 * 1000 ? "AWAY" : "OFFLINE";
+      } else if (live.presenceState === "ONLINE" || live.isOnline === true || live.isLiveNow) {
+        // Active tab heartbeat is sent every 25s.
+        // If ping received within 45s: ONLINE
+        // If between 45s and 90s: AWAY
+        // If older than 90s: OFFLINE
+        if (diffMs < 45 * 1000) {
+          presenceStatus = "ONLINE";
+        } else if (diffMs < 90 * 1000) {
+          presenceStatus = "AWAY";
+        } else {
+          presenceStatus = "OFFLINE";
+        }
+      }
+    } else if (diffMs < 45 * 1000) {
+      presenceStatus = "ONLINE";
+    } else if (diffMs < 90 * 1000) {
+      presenceStatus = "AWAY";
+    } else {
+      presenceStatus = "OFFLINE";
+    }
+
+    const isOnlineNow = presenceStatus === "ONLINE";
+    const scrollDepth = typeof live?.scrollDepth === "number" ? live.scrollDepth : null;
+    const viewport = live?.viewport || null;
+    const lastInteraction = live?.lastInteraction || null;
 
     const hasAnyData = Boolean(
       live ||
@@ -708,6 +743,10 @@ export default function WhatsAppInboxComponent() {
     return {
       hasAnyData,
       isOnlineNow,
+      presenceStatus,
+      scrollDepth,
+      viewport,
+      lastInteraction,
       lastActivityTime,
       pageTitle,
       pageUrl,
@@ -1258,6 +1297,11 @@ export default function WhatsAppInboxComponent() {
                     timestamp: incoming.timestamp || new Date().toISOString(),
                   };
 
+                  const isNowOffline = incoming.presenceState === "OFFLINE" || incoming.eventType === "TAB_CLOSED" || incoming.isOnline === false;
+                  const isNowAway = !isNowOffline && (incoming.presenceState === "AWAY" || incoming.eventType === "TAB_AWAY");
+                  const presenceState = isNowOffline ? "OFFLINE" : (isNowAway ? "AWAY" : "ONLINE");
+                  const isLiveNow = presenceState === "ONLINE";
+
                   return {
                     ...prev,
                     [incomingPhone]: {
@@ -1267,7 +1311,12 @@ export default function WhatsAppInboxComponent() {
                       pageJourney: uniqueJourney.slice(0, 25),
                       categoryInsights: incoming.categoryInsights || existing.categoryInsights || null,
                       lastActivityAt: incoming.timestamp || new Date().toISOString(),
-                      isLiveNow: true,
+                      isLiveNow,
+                      presenceState,
+                      isOnline: !isNowOffline,
+                      scrollDepth: incoming.scrollDepth !== undefined ? incoming.scrollDepth : (existing.scrollDepth ?? null),
+                      viewport: incoming.viewport || existing.viewport || null,
+                      lastInteraction: incoming.lastInteraction || existing.lastInteraction || null,
                       eventLog: [newLogEntry, ...existingLogs].slice(0, 30),
                     },
                   };
@@ -5686,17 +5735,22 @@ export default function WhatsAppInboxComponent() {
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {activeWebsiteTrackingData.isOnlineNow ? (
+                {activeWebsiteTrackingData.presenceStatus === "ONLINE" ? (
                   <span className="tracking-live-pill live" title="Visitor is actively browsing your website right now">
                     <span className="live-dot" />
-                    <span>Active Now</span>
+                    <span>Online Now</span>
+                  </span>
+                ) : activeWebsiteTrackingData.presenceStatus === "AWAY" ? (
+                  <span className="tracking-live-pill away" title="Visitor has switched tabs or minimized browser">
+                    <span className="away-dot" />
+                    <span>Away (Tab Inactive)</span>
                   </span>
                 ) : (
-                  <span className="tracking-live-pill offline" title="Last recorded website visit">
+                  <span className="tracking-live-pill offline" title="Website closed or session ended">
                     <Clock size={11} />
                     <span>
                       {activeWebsiteTrackingData.lastActivityTime 
-                        ? new Date(activeWebsiteTrackingData.lastActivityTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        ? `Left ${new Date(activeWebsiteTrackingData.lastActivityTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                         : "Offline"}
                     </span>
                   </span>
@@ -5760,6 +5814,119 @@ export default function WhatsAppInboxComponent() {
                   </div>
                 </div>
               )}
+
+              {/* Live Screen & Visual Co-Browsing (Clarity Replay) */}
+              <div className="tracking-section-card" style={{
+                background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+                border: "1px solid #cbd5e1",
+                borderRadius: "12px",
+                padding: "14px",
+                boxShadow: "0 2px 5px rgba(0,0,0,0.03)"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "7px", fontWeight: 700, fontSize: "13px", color: "#1e293b" }}>
+                    <Monitor size={16} color="#4f46e5" />
+                    <span>Live Screen Co-Browsing</span>
+                  </div>
+                  <span style={{
+                    fontSize: "10.5px",
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: "12px",
+                    background: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#dcfce7" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#fef9c3" : "#f1f5f9",
+                    color: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#166534" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#854d0e" : "#64748b",
+                    border: `1px solid ${activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#bbf7d0" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#fde047" : "#e2e8f0"}`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px"
+                  }}>
+                    {activeWebsiteTrackingData.presenceStatus === "ONLINE" ? (
+                      <>
+                        <span className="live-dot" style={{ width: 6, height: 6 }} />
+                        <span>Live Sync</span>
+                      </>
+                    ) : activeWebsiteTrackingData.presenceStatus === "AWAY" ? (
+                      <>
+                        <span className="away-dot" style={{ width: 6, height: 6 }} />
+                        <span>Tab Paused</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={10} />
+                        <span>Session Ended</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+
+                {/* Live Scroll Depth Meter */}
+                <div style={{ marginBottom: "12px", background: "#ffffff", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", marginBottom: "6px" }}>
+                    <span style={{ color: "#64748b", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600 }}>
+                      <Eye size={13} color="#6366f1" />
+                      <span>Live Screen Scroll Depth</span>
+                    </span>
+                    <span style={{ fontWeight: 700, color: "#0f172a", fontSize: "11.5px" }}>
+                      {activeWebsiteTrackingData.scrollDepth !== null ? `${activeWebsiteTrackingData.scrollDepth}% of page` : "Top of Page (0%)"}
+                    </span>
+                  </div>
+                  <div style={{ width: "100%", height: "7px", background: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
+                    <div style={{
+                      width: `${activeWebsiteTrackingData.scrollDepth ?? 0}%`,
+                      height: "100%",
+                      background: "linear-gradient(90deg, #6366f1 0%, #10b981 100%)",
+                      borderRadius: "4px",
+                      transition: "width 0.35s ease"
+                    }} />
+                  </div>
+                </div>
+
+                {/* Viewport & Device + Last Interaction */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                  <div style={{ background: "#ffffff", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Device / Screen</div>
+                    <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#1e293b", marginTop: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {activeWebsiteTrackingData.viewport 
+                        ? `${activeWebsiteTrackingData.viewport.device || 'Desktop'} (${activeWebsiteTrackingData.viewport.width}x${activeWebsiteTrackingData.viewport.height})`
+                        : "Detecting..."}
+                    </div>
+                  </div>
+                  <div style={{ background: "#ffffff", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Last User Action</div>
+                    <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#1e293b", marginTop: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={activeWebsiteTrackingData.lastInteraction || "Browsing"}>
+                      {activeWebsiteTrackingData.lastInteraction || "Viewing page"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clarity Screen Recording Replay Action Button */}
+                <a
+                  href="https://clarity.microsoft.com/projects"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "7px",
+                    width: "100%",
+                    padding: "8px 14px",
+                    background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                    color: "#ffffff",
+                    borderRadius: "7px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+                    transition: "all 0.2s ease",
+                    cursor: "pointer"
+                  }}
+                >
+                  <Video size={14} color="#38bdf8" />
+                  <span>Watch Video Screen Replay (Clarity)</span>
+                  <ExternalLink size={12} color="#94a3b8" />
+                </a>
+              </div>
 
               {/* Active Webpage Card */}
               <div className="tracking-section-card highlight">
