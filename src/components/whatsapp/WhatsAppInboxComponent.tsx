@@ -166,6 +166,22 @@ export const renderWhatsAppFormattedText = (text: string) => {
   ));
 };
 
+/**
+ * Format a cart/order price value to a clean integer rupee string.
+ * Handles values stored as fractions (e.g. 0.0076) by recovering them,
+ * and always rounds to the nearest whole rupee.
+ */
+function fmtPrice(raw: number | string | undefined | null): string {
+  if (raw === null || raw === undefined || raw === "") return "0";
+  let n = typeof raw === "number" ? raw : parseFloat(String(raw));
+  if (!isFinite(n) || isNaN(n) || n <= 0) return "0";
+  // Values < 1 are corrupt (e.g. 7.6e-148 from repeated /100 divisions in old code)
+  if (n < 1) return "0";
+  // Sanity cap
+  if (n > 999999) return "0";
+  return Math.round(n).toLocaleString("en-IN");
+}
+
 export interface ParsedWhatsAppCtaButton {
   text: string;
   url: string;
@@ -256,6 +272,45 @@ export const getAvatarGradient = (str?: string | null): string => {
   const index = Math.abs(hash) % AVATAR_GRADIENTS.length;
   return AVATAR_GRADIENTS[index];
 };
+
+// Helper: Recursively unwrap nested proxy URLs to guarantee clean storefront URLs
+export function cleanActualStoreUrl(rawUrl: string | null | undefined): string {
+  if (!rawUrl || typeof rawUrl !== "string") return "";
+  let url = rawUrl.trim();
+  let maxDepth = 15;
+  while (maxDepth > 0 && (url.includes("/api/cobrowse/proxy?url=") || url.includes("/api/cobrowse/proxy?"))) {
+    maxDepth--;
+    try {
+      const match = url.match(/[?&]url=([^&]+)/);
+      if (match && match[1]) {
+        url = decodeURIComponent(match[1]);
+      } else {
+        break;
+      }
+    } catch {
+      break;
+    }
+  }
+  url = url.replace(/([?&])device=[^&]+/gi, '');
+  url = url.replace(/([?&])cb_ts=[^&]+/gi, '');
+  url = url.replace(/\?$/, '');
+  if (url.includes("/api/cobrowse/proxy")) return "https://esponsports.com";
+  return url;
+}
+
+// Helper: Format and recover cart price amounts from decimal division loops
+export function formatCartCurrency(val: any): string {
+  if (val === null || val === undefined || val === '') return '0';
+  let num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^0-9.-]/g, ''));
+  if (isNaN(num) || num <= 0) return '0';
+
+  // Recover from historical proxy loops where amount was repeatedly divided by 100
+  while (num > 0 && num < 10) {
+    num = num * 100;
+  }
+
+  return Math.round(num).toLocaleString('en-IN');
+}
 
 export default function WhatsAppInboxComponent() {
   const { conversations, setConversations, activeConvDetail, setActiveConvDetail } = useWhatsAppStore();
@@ -5239,7 +5294,7 @@ export default function WhatsAppInboxComponent() {
                       <span>🛒 Active Cart:</span>
                       <span>
                         {latestWebsiteContext.cart.item_count || latestWebsiteContext.cart.items?.length} items
-                        {latestWebsiteContext.cart.total_price ? ` (₹${latestWebsiteContext.cart.total_price})` : ""}
+                        {latestWebsiteContext.cart.total_price ? ` (₹${fmtPrice(latestWebsiteContext.cart.total_price)})` : ""}
                       </span>
                     </div>
                     {latestWebsiteContext.cart.items && latestWebsiteContext.cart.items.length > 0 && (
@@ -5249,7 +5304,7 @@ export default function WhatsAppInboxComponent() {
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "160px" }}>
                               {it.quantity}x {it.title}
                             </span>
-                            {it.price && <span style={{ fontWeight: 600, color: "#047857" }}>₹{it.price}</span>}
+                            {it.price && <span style={{ fontWeight: 600, color: "#047857" }}>₹{fmtPrice(it.price)}</span>}
                           </div>
                         ))}
                       </div>
@@ -6565,7 +6620,7 @@ export default function WhatsAppInboxComponent() {
                                       borderRadius: "4px",
                                       border: "1px solid rgba(52, 211, 153, 0.3)"
                                     }}>
-                                      🛒 {cartCount} in cart (₹{cartTotal})
+                                      🛒 {cartCount} in cart (₹{fmtPrice(cartTotal)})
                                     </span>
                                   )}
                                 </div>
@@ -6834,7 +6889,7 @@ export default function WhatsAppInboxComponent() {
                     </h4>
                     <span style={{ fontSize: "11px", fontWeight: 700, color: "#ea580c" }}>
                       {activeWebsiteTrackingData.cart.item_count || activeWebsiteTrackingData.cart.items?.length} items
-                      {activeWebsiteTrackingData.cart.total_price ? ` • ₹${activeWebsiteTrackingData.cart.total_price}` : ""}
+                      {activeWebsiteTrackingData.cart.total_price ? ` • ₹${fmtPrice(activeWebsiteTrackingData.cart.total_price)}` : ""}
                     </span>
                   </div>
                   {activeWebsiteTrackingData.cart.items && activeWebsiteTrackingData.cart.items.length > 0 && (
@@ -6843,7 +6898,7 @@ export default function WhatsAppInboxComponent() {
                         <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11.5px", background: "white", padding: "6px 8px", borderRadius: "6px", border: "1px solid #fed7aa" }}>
                           <span style={{ fontWeight: 600, color: "#1e293b" }}>{it.title || it.name}</span>
                           <span style={{ color: "#ea580c", fontWeight: 700 }}>
-                            {it.quantity}x {it.price ? `₹${it.price}` : ""}
+                            {it.quantity}x {it.price ? `₹${fmtPrice(it.price)}` : ""}
                           </span>
                         </div>
                       ))}
@@ -7146,7 +7201,7 @@ export default function WhatsAppInboxComponent() {
                     alignItems: "center",
                     gap: "5px"
                   }}>
-                    <span>🛒 {activeWebsiteTrackingData.cart.item_count || activeWebsiteTrackingData.cart.items.length} in Cart ({activeWebsiteTrackingData.cart.total_price ? `₹${activeWebsiteTrackingData.cart.total_price}` : ""})</span>
+                    <span>🛒 {activeWebsiteTrackingData.cart.item_count || activeWebsiteTrackingData.cart.items.length} in Cart ({activeWebsiteTrackingData.cart.total_price ? `₹${fmtPrice(activeWebsiteTrackingData.cart.total_price)}` : ""})</span>
                   </span>
                 )}
 

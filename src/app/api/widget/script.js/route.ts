@@ -121,6 +121,14 @@ export async function GET(req: NextRequest) {
   // Generate lightweight vanilla JS bundle
   const jsCode = `
 (function() {
+  // NEVER execute or send telemetry if running inside an iframe, preview, or cobrowse proxy mirror!
+  try {
+    if (window.self !== window.top) return;
+    if (window.location.pathname.indexOf('/api/cobrowse/proxy') !== -1 || window.location.href.indexOf('/api/cobrowse/proxy') !== -1) return;
+  } catch(e) {
+    return;
+  }
+
   if (window.__WHATIN_WIDGET_LOADED__) return;
   window.__WHATIN_WIDGET_LOADED__ = true;
 
@@ -1244,15 +1252,27 @@ export async function GET(req: NextRequest) {
           .then(function(r) { return r.json(); })
           .then(function(cart) {
             if (cart && typeof cart.item_count === 'number') {
+              // Shopify /cart.js always returns prices in paise (subunits)
+              // e.g. ₹760 = 76000, ₹7.60 = 760, ₹0.01 = 1
+              // Always divide integers by 100 to get rupees; clamp floats to 2 decimal places.
+              function cleanPrice(raw) {
+                if (typeof raw !== 'number') raw = parseFloat(raw) || 0;
+                if (!isFinite(raw) || raw <= 0) return 0;
+                // Shopify paise: integer >= 1 means subunit value
+                if (Number.isInteger(raw) && raw >= 1) return Math.round(raw / 100);
+                // Float value already in rupees (e.g. from WooCommerce or already converted)
+                return Math.round(raw);
+              }
+
               var formattedCart = {
                 item_count: cart.item_count,
-                total_price: cart.total_price ? (cart.total_price / 100) : 0,
+                total_price: cleanPrice(cart.total_price),
                 currency: cart.currency || 'INR',
                 items: (cart.items || []).map(function(it) {
                   return {
                     title: it.title || it.product_title,
                     quantity: it.quantity,
-                    price: it.price ? (it.price / 100) : 0,
+                    price: cleanPrice(it.price),
                     image: it.image || (it.featured_image ? it.featured_image.url : ''),
                     variant_title: it.variant_title || null,
                     url: it.url ? (window.location.origin + it.url) : null

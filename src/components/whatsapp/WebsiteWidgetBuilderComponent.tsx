@@ -66,6 +66,16 @@ const COLOR_PRESETS = [
   { name: "Pitch Charcoal", hex: "#0F172A" },
 ];
 
+/** Format a cart price to a clean integer rupee string, recovering stale bad DB data */
+function fmtPrice(raw: number | string | undefined | null): string {
+  if (raw === null || raw === undefined || raw === "") return "0";
+  let n = typeof raw === "number" ? raw : parseFloat(String(raw));
+  if (!isFinite(n) || isNaN(n) || n <= 0) return "0";
+  if (n < 1) return "0";  // Corrupt value (e.g. 7.6e-148) → discard
+  if (n > 999999) return "0";  // Sanity cap
+  return Math.round(n).toLocaleString("en-IN");
+}
+
 interface Department {
   id: string;
   title: string;
@@ -1783,7 +1793,7 @@ export default function WebsiteWidgetBuilderComponent() {
                                     </span>
                                     {hasCart && (
                                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-                                        <ShoppingCart size={11} /> {cartCount} items (₹{cartTotal})
+                                        <ShoppingCart size={11} /> {cartCount} items (₹{fmtPrice(cartTotal)})
                                       </span>
                                     )}
                                   </div>
@@ -1947,7 +1957,7 @@ export default function WebsiteWidgetBuilderComponent() {
                                 className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-1 self-start cursor-pointer"
                               >
                                 <ShoppingCart size={12} />
-                                <span>{s.cart.item_count} items (₹{s.cart.total_price})</span>
+                                <span>{s.cart.item_count} items (₹{fmtPrice(s.cart.total_price)})</span>
                                 <ChevronRight size={12} className={`transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                               </button>
                             )}
@@ -2057,7 +2067,7 @@ export default function WebsiteWidgetBuilderComponent() {
                           {hasCart && isExpanded && (
                             <div className="mt-2 p-3 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 flex flex-col gap-2">
                               <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                                Shopping Cart Breakdown ({s.cart.item_count} items • Total: ₹{s.cart.total_price})
+                                Shopping Cart Breakdown ({s.cart.item_count} items • Total: ₹{fmtPrice(s.cart.total_price)})
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {s.cart.items.map((item: any, idx: number) => (
@@ -2077,7 +2087,7 @@ export default function WebsiteWidgetBuilderComponent() {
                                         {item.title}
                                       </div>
                                       <div className="text-[11px] text-gray-500">
-                                        Qty: {item.quantity} • ₹{item.price}
+                                        Qty: {item.quantity} • ₹{fmtPrice(item.price)}
                                       </div>
                                     </div>
                                   </div>

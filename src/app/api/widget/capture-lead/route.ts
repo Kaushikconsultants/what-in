@@ -22,6 +22,26 @@ export async function OPTIONS() {
 }
 
 /**
+ * Sanitize a raw price value to a clean integer rupee amount.
+ * - Values < 1 (e.g. 7.6e-148 from repeated /100 divisions) → 0
+ * - Integer values assumed to be paise → divide by 100
+ * - Float values in a sane rupee range → round to integer
+ * - Anything > 999999 or invalid → 0
+ */
+function sanitizeRupeePrice(raw: any): number {
+  if (raw === null || raw === undefined) return 0;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw));
+  if (!isFinite(n) || isNaN(n)) return 0;
+  // Anything unreasonably tiny (e.g. 7.6e-148) → corrupt value, discard
+  if (n > 0 && n < 1) return 0;
+  // Negative or zero
+  if (n <= 0) return 0;
+  // Sanity cap: no product costs more than ₹9,99,999
+  if (n > 999999) return 0;
+  return Math.round(n);
+}
+
+/**
  * POST /api/widget/capture-lead
  * Captures visitor clicks, browsing context, active cart items, and optional form leads before launching WhatsApp.
  */
@@ -87,12 +107,56 @@ export async function POST(req: NextRequest) {
     const effectivePlatform = platform || "Website";
     const source = utmSource || `${effectivePlatform} Widget`;
 
+    // Helper: Recursively unwrap nested proxy URLs to guarantee clean store URLs
+    function cleanActualStoreUrl(rawUrl: string | null | undefined): string {
+      if (!rawUrl || typeof rawUrl !== "string") return "";
+      let url = rawUrl.trim();
+      let maxDepth = 15;
+      while (maxDepth > 0 && (url.includes("/api/cobrowse/proxy?url=") || url.includes("/api/cobrowse/proxy?"))) {
+        maxDepth--;
+        try {
+          const match = url.match(/[?&]url=([^&]+)/);
+          if (match && match[1]) {
+            url = decodeURIComponent(match[1]);
+          } else {
+            break;
+          }
+        } catch {
+          break;
+        }
+      }
+      url = url.replace(/([?&])device=[^&]+/gi, '');
+      url = url.replace(/([?&])cb_ts=[^&]+/gi, '');
+      url = url.replace(/\?$/, '');
+      if (url.includes("/api/cobrowse/proxy")) return "https://esponsports.com";
+      return url;
+    }
+
+    const effectivePageUrl = cleanActualStoreUrl(pageUrl);
+
+    let cleanedCart = cart ? { ...cart } : null;
+    if (cleanedCart) {
+      cleanedCart.total_price = sanitizeRupeePrice(cleanedCart.total_price);
+      if (Array.isArray(cleanedCart.items)) {
+        cleanedCart.items = cleanedCart.items.map((it: any) => ({
+          ...it,
+          price: sanitizeRupeePrice(it.price)
+        }));
+      }
+    }
+
+    const cleanedJourney = (Array.isArray(pageJourney) ? pageJourney : []).map((step: any) => ({
+      ...step,
+      url: cleanActualStoreUrl(step.url || step.path),
+      path: cleanActualStoreUrl(step.path || step.url)
+    }));
+
     // Persist visitor session context for chatbox attribution (Meta Ad style referral)
     if (refId) {
       const isAddToCart = eventType === "ADD_TO_CART";
-      const cartSummaryText = cart && cart.item_count ? ` (${cart.item_count} items - ₹${cart.total_price || 0})` : "";
+      const cartSummaryText = cleanedCart && cleanedCart.item_count ? ` (${cleanedCart.item_count} items - ₹${cleanedCart.total_price || 0})` : "";
       
-      let actionDesc = `Website context: ${pageTitle || pageUrl || "Storefront"}${cartSummaryText}`;
+      let actionDesc = `Website context: ${pageTitle || effectivePageUrl || "Storefront"}${cartSummaryText}`;
       if (isAddToCart) {
         actionDesc = `Live Add-To-Cart: ${pageTitle || "Product"}${cartSummaryText}`;
       } else if (categoryInsights && categoryInsights.category === "EDUCATION" && categoryInsights.courses?.length) {
@@ -113,15 +177,15 @@ export async function POST(req: NextRequest) {
           payload: {
             refId: refId.toString().toUpperCase(),
             eventType: eventType || "VISITOR_CLICK",
-            pageUrl: pageUrl || "",
+            pageUrl: effectivePageUrl,
             pageTitle: pageTitle || "",
             platform: effectivePlatform,
             detectedProduct: detectedProduct || null,
-            cart: cart || null,
+            cart: cleanedCart,
             customMessage: customMessage || null,
             name: leadName !== "Website Visitor" ? leadName : null,
             phone: cleanPhone || null,
-            pageJourney: Array.isArray(pageJourney) ? pageJourney : [],
+            pageJourney: cleanedJourney,
             searches: Array.isArray(searches) ? searches : [],
             categoryInsights: categoryInsights || null,
             sessionStats: sessionStats || null,
