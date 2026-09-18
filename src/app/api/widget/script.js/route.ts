@@ -991,7 +991,7 @@ export async function GET(req: NextRequest) {
     window.addEventListener('touchmove', trackPointer, { passive: true });
   } catch (e) {}
 
-  // 1e. Live Element Clicks & Interactions
+  // 1e. Universal Live Element Clicks, Menus & Interactions
   try {
     document.addEventListener('click', function(e) {
       try {
@@ -1004,20 +1004,92 @@ export async function GET(req: NextRequest) {
 
         var target = e.target;
         if (!target) return;
-        var actionEl = target.closest('button, a, .product-form__submit, [name="add"], .btn, select, [data-action], input[type="submit"]');
-        if (actionEl && !actionEl.closest('#whatin-widget-container')) {
-          var txt = (actionEl.innerText || actionEl.getAttribute('aria-label') || actionEl.title || actionEl.name || actionEl.tagName || '').trim().slice(0, 45);
-          if (txt) {
-            recordTimelineEvent('CLICK', 'Clicked: ' + txt, { x: currentCursorX, y: currentCursorY });
-            sendLiveTelemetry('INTERACTION', {
-              cursorX: currentCursorX,
-              cursorY: currentCursorY,
-              clickX: currentCursorX,
-              clickY: currentCursorY,
-              lastInteraction: 'Clicked: ' + txt,
-              screenTimeline: screenTimeline
-            });
-          }
+        if (target.closest && target.closest('#whatin-widget-container')) return;
+
+        // Universal interactive element matcher (supports summary, details, buttons, carts, menus, accordions, links)
+        var actionEl = target.closest(
+          'summary, details, button, a, [role="button"], [aria-label], .header__icon, [class*="menu"], [class*="drawer"], [class*="cart"], .product-form__submit, [name="add"], .btn, select, [data-action], input[type="submit"], input[type="button"]'
+        ) || target;
+
+        var ariaLabel = (actionEl.getAttribute && actionEl.getAttribute('aria-label')) || '';
+        var rawText = (actionEl.innerText || actionEl.title || actionEl.name || actionEl.id || '').trim();
+        var className = typeof actionEl.className === 'string' ? actionEl.className : '';
+
+        var isMenuAction = /menu|drawer|hamburger|nav-toggle/i.test(ariaLabel) ||
+                           /menu|drawer|hamburger/i.test(className) ||
+                           actionEl.tagName === 'SUMMARY' ||
+                           Boolean(actionEl.closest('#Details-menu-drawer-container, header-drawer, [class*="menu-drawer"]'));
+
+        var isCartAction = /cart/i.test(ariaLabel) ||
+                           (actionEl.href && actionEl.href.indexOf('/cart') !== -1) ||
+                           /cart/i.test(className) ||
+                           Boolean(actionEl.closest('[href*="/cart"], cart-icon, .action__cart, [data-testid="cart-icon"]'));
+
+        var label = '';
+        var eventType = 'CLICK';
+
+        if (isMenuAction) {
+          eventType = 'MENU';
+          label = 'Opened: Navigation Menu';
+        } else if (isCartAction) {
+          eventType = 'CART';
+          var count = (detectedCart && detectedCart.item_count) || 0;
+          label = 'Opened Cart (' + count + ' items)';
+        } else {
+          var displayTxt = (ariaLabel || rawText || actionEl.tagName || 'Element').slice(0, 45);
+          label = 'Clicked: ' + displayTxt;
+        }
+
+        // Determine specific CSS selector for iframe replay
+        var selector = '';
+        if (actionEl.id) {
+          selector = '#' + actionEl.id;
+        } else if (ariaLabel) {
+          selector = actionEl.tagName.toLowerCase() + '[aria-label="' + ariaLabel + '"]';
+        } else if (className) {
+          var firstC = className.trim().split(/\s+/)[0];
+          if (firstC) selector = actionEl.tagName.toLowerCase() + '.' + firstC;
+        }
+
+        recordTimelineEvent(eventType, label, {
+          x: currentCursorX,
+          y: currentCursorY,
+          menuOpen: isMenuAction ? true : undefined,
+          cartOpen: isCartAction ? true : undefined,
+          selector: selector
+        });
+
+        sendLiveTelemetry('INTERACTION', {
+          cursorX: currentCursorX,
+          cursorY: currentCursorY,
+          clickX: currentCursorX,
+          clickY: currentCursorY,
+          clickSelector: selector,
+          isMenu: isMenuAction,
+          menuOpen: isMenuAction ? true : undefined,
+          isCart: isCartAction,
+          cartOpen: isCartAction ? true : undefined,
+          lastInteraction: label,
+          screenTimeline: screenTimeline
+        });
+      } catch (err) {}
+    }, true);
+
+    // Global HTML5 <details> toggle tracker (Native Shopify & modern web drawers)
+    document.addEventListener('toggle', function(e) {
+      try {
+        var details = e.target;
+        if (!details || details.tagName !== 'DETAILS') return;
+        var isMenuDrawer = details.id === 'Details-menu-drawer-container' || /menu|drawer|nav/i.test(details.id || details.className || '');
+        if (isMenuDrawer) {
+          var isOpen = Boolean(details.open);
+          var mLabel = isOpen ? 'Opened Navigation Menu' : 'Closed Navigation Menu';
+          recordTimelineEvent('MENU', mLabel, { menuOpen: isOpen, x: currentCursorX, y: currentCursorY });
+          sendLiveTelemetry('MENU_TOGGLE', {
+            menuOpen: isOpen,
+            lastInteraction: mLabel,
+            screenTimeline: screenTimeline
+          });
         }
       } catch (err) {}
     }, true);

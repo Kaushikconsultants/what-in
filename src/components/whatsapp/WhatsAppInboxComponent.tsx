@@ -865,29 +865,59 @@ export default function WhatsAppInboxComponent() {
     return activeWebsiteTrackingData.scrollDepth ?? 0;
   }, [coBrowseReplayIndex, activeWebsiteTrackingData.screenTimeline, activeWebsiteTrackingData.scrollDepth]);
 
+  // Universal real-time broadcaster for Live Co-Browsing and Session Replay
   useEffect(() => {
-    const sendScroll = (iframeEl: HTMLIFrameElement | null) => {
+    const broadcastToIframes = (data: any) => {
       try {
-        if (iframeEl && iframeEl.contentWindow) {
-          iframeEl.contentWindow.postMessage({
-            type: "COBROWSE_SCROLL",
-            depth: activeCoBrowseDepth
-          }, "*");
+        if (cobrowseIframeRef.current?.contentWindow) {
+          cobrowseIframeRef.current.contentWindow.postMessage(data, "*");
+        }
+        if (cobrowseMiniIframeRef.current?.contentWindow) {
+          cobrowseMiniIframeRef.current.contentWindow.postMessage(data, "*");
         }
       } catch (_) {}
     };
-    sendScroll(cobrowseIframeRef.current);
-    sendScroll(cobrowseMiniIframeRef.current);
+
+    // 1. Sync Scroll
+    broadcastToIframes({
+      type: "COBROWSE_SCROLL",
+      depth: activeCoBrowseDepth
+    });
+
+    // 2. Sync Customer Real Cart Count & Items
+    if (activeWebsiteTrackingData.cart) {
+      broadcastToIframes({
+        type: "COBROWSE_SYNC_CART",
+        cart: activeWebsiteTrackingData.cart
+      });
+    }
+
+    // 3. Sync Menu Drawer State during timeline replay or live interactions
+    const currentStep = coBrowseReplayIndex !== null ? activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex] : null;
+    if (currentStep?.menuOpen !== undefined) {
+      broadcastToIframes({
+        type: "COBROWSE_TOGGLE_MENU",
+        open: currentStep.menuOpen
+      });
+    }
 
     const handleReady = (e: MessageEvent) => {
       if (e.data?.type === "COBROWSE_IFRAME_READY") {
-        sendScroll(cobrowseIframeRef.current);
-        sendScroll(cobrowseMiniIframeRef.current);
+        broadcastToIframes({
+          type: "COBROWSE_SCROLL",
+          depth: activeCoBrowseDepth
+        });
+        if (activeWebsiteTrackingData.cart) {
+          broadcastToIframes({
+            type: "COBROWSE_SYNC_CART",
+            cart: activeWebsiteTrackingData.cart
+          });
+        }
       }
     };
     window.addEventListener("message", handleReady);
     return () => window.removeEventListener("message", handleReady);
-  }, [activeCoBrowseDepth]);
+  }, [activeCoBrowseDepth, activeWebsiteTrackingData.cart, coBrowseReplayIndex, activeWebsiteTrackingData.screenTimeline]);
 
   // Quote Form State
   const [quoteItems, setQuoteItems] = useState([
@@ -6086,6 +6116,12 @@ export default function WhatsAppInboxComponent() {
                               type: "COBROWSE_SCROLL",
                               depth: activeCoBrowseDepth
                             }, "*");
+                            if (activeWebsiteTrackingData.cart) {
+                              cobrowseMiniIframeRef.current.contentWindow.postMessage({
+                                type: "COBROWSE_SYNC_CART",
+                                cart: activeWebsiteTrackingData.cart
+                              }, "*");
+                            }
                           }
                         } catch (_) {}
                       }}
@@ -6625,6 +6661,48 @@ export default function WhatsAppInboxComponent() {
                 <button
                   type="button"
                   onClick={() => {
+                    cobrowseIframeRef.current?.contentWindow?.postMessage({
+                      type: "COBROWSE_TOGGLE_MENU"
+                    }, "*");
+                  }}
+                  style={{
+                    background: "rgba(255,255,255,0.1)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    borderRadius: "8px",
+                    padding: "6px 12px",
+                    color: "#f8fafc",
+                    fontSize: "11.5px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                  title="Toggle Store Navigation Menu Drawer"
+                >
+                  <span>☰ Store Menu</span>
+                </button>
+
+                {activeWebsiteTrackingData.cart && (activeWebsiteTrackingData.cart.item_count > 0 || (activeWebsiteTrackingData.cart.items && activeWebsiteTrackingData.cart.items.length > 0)) && (
+                  <span style={{
+                    background: "rgba(16, 185, 129, 0.2)",
+                    color: "#34d399",
+                    border: "1px solid rgba(52, 211, 153, 0.4)",
+                    borderRadius: "8px",
+                    padding: "6px 10px",
+                    fontSize: "11.5px",
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px"
+                  }}>
+                    <span>🛒 {activeWebsiteTrackingData.cart.item_count || activeWebsiteTrackingData.cart.items.length} in Cart ({activeWebsiteTrackingData.cart.total_price ? `₹${activeWebsiteTrackingData.cart.total_price}` : ""})</span>
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
                     setShowLiveCoBrowseModal(false);
                     setIsAutoReplaying(false);
                     setCoBrowseReplayIndex(null);
@@ -6672,7 +6750,7 @@ export default function WhatsAppInboxComponent() {
                     </div>
                   )}
 
-                  {/* Screen Content: Real Website Live Embedded View */}
+                  {/* Screen Content: Real Website Live Embedded View (Locked strictly to view-only mirror) */}
                   <div className="cobrowse-screen-viewport">
                     {/* Synchronized Scroll Bar on side */}
                     <div className="cobrowse-scroll-track">
@@ -6694,7 +6772,9 @@ export default function WhatsAppInboxComponent() {
                         height: "100%",
                         border: "none",
                         background: "#ffffff",
-                        display: "block"
+                        display: "block",
+                        pointerEvents: "none",
+                        userSelect: "none"
                       }}
                       onLoad={() => {
                         try {
@@ -6703,6 +6783,12 @@ export default function WhatsAppInboxComponent() {
                               type: "COBROWSE_SCROLL",
                               depth: activeCoBrowseDepth
                             }, "*");
+                            if (activeWebsiteTrackingData.cart) {
+                              cobrowseIframeRef.current.contentWindow.postMessage({
+                                type: "COBROWSE_SYNC_CART",
+                                cart: activeWebsiteTrackingData.cart
+                              }, "*");
+                            }
                           }
                         } catch (_) {}
                       }}
