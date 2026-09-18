@@ -894,10 +894,16 @@ export default function WhatsAppInboxComponent() {
 
     // 3. Sync Menu Drawer State during timeline replay or live interactions
     const currentStep = coBrowseReplayIndex !== null ? activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex] : null;
-    if (currentStep?.menuOpen !== undefined) {
+    const isTargetMenuOpen = coBrowseReplayIndex !== null
+      ? currentStep?.menuOpen
+      : (activeWebsiteTrackingData.screenTimeline.length > 0
+          ? activeWebsiteTrackingData.screenTimeline[activeWebsiteTrackingData.screenTimeline.length - 1]?.menuOpen
+          : undefined);
+
+    if (isTargetMenuOpen !== undefined) {
       broadcastToIframes({
         type: "COBROWSE_TOGGLE_MENU",
-        open: currentStep.menuOpen
+        open: isTargetMenuOpen
       });
     }
 
@@ -911,6 +917,12 @@ export default function WhatsAppInboxComponent() {
           broadcastToIframes({
             type: "COBROWSE_SYNC_CART",
             cart: activeWebsiteTrackingData.cart
+          });
+        }
+        if (isTargetMenuOpen !== undefined) {
+          broadcastToIframes({
+            type: "COBROWSE_TOGGLE_MENU",
+            open: isTargetMenuOpen
           });
         }
       }

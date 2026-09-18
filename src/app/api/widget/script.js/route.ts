@@ -1075,7 +1075,7 @@ export async function GET(req: NextRequest) {
       } catch (err) {}
     }, true);
 
-    // Global HTML5 <details> toggle tracker (Native Shopify & modern web drawers)
+    // Global HTML5 <details> toggle tracker (Shopify Dawn & modern web drawers)
     document.addEventListener('toggle', function(e) {
       try {
         var details = e.target;
@@ -1093,126 +1093,248 @@ export async function GET(req: NextRequest) {
         }
       } catch (err) {}
     }, true);
+
+    // Universal Navigation & Drawer Mutation Observer (WooCommerce, Bootstrap, Tailwind, Custom stores)
+    try {
+      if (typeof MutationObserver !== 'undefined') {
+        var lastMenuClassState = false;
+        var menuObserver = new MutationObserver(function() {
+          try {
+            var bodyClasses = (document.body ? document.body.className : '') + ' ' + (document.documentElement ? document.documentElement.className : '');
+            var isMenuOpen = /\b(menu-open|nav-open|is-menu-open|offcanvas-open|drawer-open|mobile-menu-active|show-menu|side-menu-open|navigation--open)\b/i.test(bodyClasses);
+            if (isMenuOpen !== lastMenuClassState) {
+              lastMenuClassState = isMenuOpen;
+              var mLabel = isMenuOpen ? 'Opened Navigation Menu' : 'Closed Navigation Menu';
+              recordTimelineEvent('MENU', mLabel, { menuOpen: isMenuOpen, x: currentCursorX, y: currentCursorY });
+              sendLiveTelemetry('MENU_TOGGLE', {
+                menuOpen: isMenuOpen,
+                lastInteraction: mLabel,
+                screenTimeline: screenTimeline
+              });
+            }
+          } catch (_) {}
+        });
+        if (document.body) menuObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        if (document.documentElement) menuObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      }
+    } catch (_) {}
   } catch (e) {}
 
-  // 2. Auto-capture visitor phone from any form input on website (e.g. checkout, contact forms)
+  // 2. Auto-capture visitor phone from any form input on website (checkout, contact forms, lead popups)
   try {
-    document.addEventListener('blur', function(e) {
-      var target = e.target;
-      if (!target || target.tagName !== 'INPUT') return;
-      var isPhoneInput = target.type === 'tel' || target.name === 'phone' || target.id === 'phone' || /phone|mobile/i.test(target.placeholder || target.name || '');
-      if (isPhoneInput && target.value) {
-        var clean = target.value.replace(/\D/g, '');
+    function inspectInputForPhone(input) {
+      if (!input || input.tagName !== 'INPUT') return;
+      var isPhoneInput = input.type === 'tel' || 
+        /phone|mobile|whatsapp|contact/i.test(input.name || '') || 
+        /phone|mobile|whatsapp|contact/i.test(input.id || '') || 
+        /phone|mobile|whatsapp|contact/i.test(input.placeholder || '') ||
+        input.getAttribute('autocomplete') === 'tel';
+      if (isPhoneInput && input.value) {
+        var clean = input.value.replace(/\D/g, '');
         if (clean.length >= 10) {
           setIdentifiedPhone(clean);
           sendLiveTelemetry('IDENTIFIED', { identifiedPhone: clean });
         }
       }
+    }
+
+    document.addEventListener('blur', function(e) {
+      inspectInputForPhone(e.target);
+    }, true);
+
+    document.addEventListener('change', function(e) {
+      inspectInputForPhone(e.target);
+    }, true);
+
+    document.addEventListener('submit', function(e) {
+      try {
+        var f = e.target;
+        if (!f || !f.querySelectorAll) return;
+        var inputs = f.querySelectorAll('input');
+        for (var fi = 0; fi < inputs.length; fi++) {
+          inspectInputForPhone(inputs[fi]);
+        }
+      } catch (_) {}
     }, true);
   } catch (e) {}
 
-
-  // Cart Recovery & Active Cart Inspection for Shopify
+  // Universal Cart Recovery & Active Cart Inspection (Shopify, WooCommerce, Magento, BigCommerce, Custom)
   var cartBox = null;
 
-  function updateAndSyncCart(shouldFireBackend) {
-    if (platform === 'Shopify') {
-      fetch('/cart.js')
-        .then(function(r) { return r.json(); })
-        .then(function(cart) {
-          if (cart && typeof cart.item_count === 'number') {
-            detectedCart = {
-              item_count: cart.item_count,
-              total_price: cart.total_price ? (cart.total_price / 100) : 0,
-              currency: cart.currency || 'INR',
-              items: (cart.items || []).map(function(it) {
-                return {
-                  title: it.title || it.product_title,
-                  quantity: it.quantity,
-                  price: it.price ? (it.price / 100) : 0,
-                  image: it.image || (it.featured_image ? it.featured_image.url : ''),
-                  variant_title: it.variant_title || null,
-                  url: it.url ? (window.location.origin + it.url) : null
-                };
-              })
-            };
+  function handleDetectedCartData(cartObj, shouldFireBackend) {
+    if (!cartObj || typeof cartObj.item_count !== 'number') return;
+    detectedCart = cartObj;
 
-            if (config.enableCartRecovery && cart.item_count > 0) {
-              var itemTitles = cart.items.map(function(it) { return it.title; }).slice(0, 2).join(', ');
-              if (cart.items.length > 2) itemTitles += ' +' + (cart.items.length - 2) + ' more';
+    if (config.enableCartRecovery && cartObj.item_count > 0) {
+      var itemTitles = (cartObj.items || []).map(function(it) { return it.title; }).slice(0, 2).join(', ');
+      if (cartObj.items && cartObj.items.length > 2) itemTitles += ' +' + (cartObj.items.length - 2) + ' more';
 
-              if (!cartBox) {
-                cartBox = document.createElement('div');
-                cartBox.id = 'whatin-cart-box';
-                cartBox.style.backgroundColor = '#ecfdf5';
-                cartBox.style.border = '1px solid #a7f3d0';
-                cartBox.style.padding = '10px';
-                cartBox.style.borderRadius = '10px';
-                cartBox.style.fontSize = '12px';
-                cartBox.style.color = '#065f46';
+      if (!cartBox) {
+        cartBox = document.createElement('div');
+        cartBox.id = 'whatin-cart-box';
+        cartBox.style.backgroundColor = '#ecfdf5';
+        cartBox.style.border = '1px solid #a7f3d0';
+        cartBox.style.padding = '10px';
+        cartBox.style.borderRadius = '10px';
+        cartBox.style.fontSize = '12px';
+        cartBox.style.color = '#065f46';
 
-                var cartAction = document.createElement('button');
-                cartAction.innerText = 'Ask for Cart Help / Discount ➔';
-                cartAction.style.width = '100%';
-                cartAction.style.marginTop = '6px';
-                cartAction.style.padding = '6px';
-                cartAction.style.backgroundColor = '#059669';
-                cartAction.style.color = '#ffffff';
-                cartAction.style.border = 'none';
-                cartAction.style.borderRadius = '6px';
-                cartAction.style.fontWeight = '600';
-                cartAction.style.fontSize = '11.5px';
-                cartAction.style.cursor = 'pointer';
+        var cartAction = document.createElement('button');
+        cartAction.innerText = 'Ask for Cart Help / Discount ➔';
+        cartAction.style.width = '100%';
+        cartAction.style.marginTop = '6px';
+        cartAction.style.padding = '6px';
+        cartAction.style.backgroundColor = '#059669';
+        cartAction.style.color = '#ffffff';
+        cartAction.style.border = 'none';
+        cartAction.style.borderRadius = '6px';
+        cartAction.style.fontWeight = '600';
+        cartAction.style.fontSize = '11.5px';
+        cartAction.style.cursor = 'pointer';
 
-                cartAction.onclick = function() {
-                  openWhatsAppWithSession('Hi! Can you assist with my order / available offers?');
-                };
+        cartAction.onclick = function() {
+          openWhatsAppWithSession('Hi! Can you assist with my order / available offers?');
+        };
 
-                cartBox.appendChild(cartAction);
-                body.insertBefore(cartBox, body.firstChild);
-              }
+        cartBox.appendChild(cartAction);
+        body.insertBefore(cartBox, body.firstChild);
+      }
 
-              var summarySpan = cartBox.querySelector('strong');
-              if (summarySpan) {
-                summarySpan.innerText = '🛒 ' + cart.item_count + ' items in your cart';
-              }
-            } else if (cartBox && cart.item_count === 0) {
-              cartBox.remove();
-              cartBox = null;
-            }
-
-            // Immediately fire live Add to Cart event to our software backend with full journey!
-            if (shouldFireBackend && cart.item_count > 0) {
-              try {
-                recordTimelineEvent('CART', 'Cart Updated: ' + cart.item_count + ' items (₹' + (cart.total_price || 0) + ')', { count: cart.item_count, total: cart.total_price });
-                var cartPayload = JSON.stringify(buildPayload({
-                  eventType: 'ADD_TO_CART',
-                  utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' AddToCart')
-                }));
-
-                if (navigator.sendBeacon) {
-                  navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([cartPayload], { type: 'text/plain;charset=UTF-8' }));
-                } else {
-                  fetch(appUrl + '/api/widget/capture-lead', {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-                    body: cartPayload,
-                    keepalive: true
-                  }).catch(function() {});
-                }
-              } catch (_) {}
-            }
-          }
-        })
-        .catch(function() {});
+      var summarySpan = cartBox.querySelector('strong');
+      if (summarySpan) {
+        summarySpan.innerText = '🛒 ' + cartObj.item_count + ' items in your cart';
+      }
+    } else if (cartBox && cartObj.item_count === 0) {
+      cartBox.remove();
+      cartBox = null;
     }
+
+    if (shouldFireBackend && cartObj.item_count > 0) {
+      try {
+        recordTimelineEvent('CART', 'Cart Updated: ' + cartObj.item_count + ' items (₹' + (cartObj.total_price || 0) + ')', { count: cartObj.item_count, total: cartObj.total_price });
+        var cartPayload = JSON.stringify(buildPayload({
+          eventType: 'ADD_TO_CART',
+          isLiveActivity: true,
+          cart: cartObj,
+          utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' AddToCart')
+        }));
+
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(appUrl + '/api/widget/capture-lead', new Blob([cartPayload], { type: 'text/plain;charset=UTF-8' }));
+        } else {
+          fetch(appUrl + '/api/widget/capture-lead', {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+            body: cartPayload,
+            keepalive: true
+          }).catch(function() {});
+        }
+      } catch (_) {}
+    }
+  }
+
+  function updateAndSyncCart(shouldFireBackend) {
+    try {
+      // 1. Shopify Cart Detection
+      if (platform === 'Shopify' || window.Shopify) {
+        fetch('/cart.js')
+          .then(function(r) { return r.json(); })
+          .then(function(cart) {
+            if (cart && typeof cart.item_count === 'number') {
+              var formattedCart = {
+                item_count: cart.item_count,
+                total_price: cart.total_price ? (cart.total_price / 100) : 0,
+                currency: cart.currency || 'INR',
+                items: (cart.items || []).map(function(it) {
+                  return {
+                    title: it.title || it.product_title,
+                    quantity: it.quantity,
+                    price: it.price ? (it.price / 100) : 0,
+                    image: it.image || (it.featured_image ? it.featured_image.url : ''),
+                    variant_title: it.variant_title || null,
+                    url: it.url ? (window.location.origin + it.url) : null
+                  };
+                })
+              };
+              handleDetectedCartData(formattedCart, shouldFireBackend);
+            }
+          })
+          .catch(function() {
+            fallbackDomCartCheck(shouldFireBackend);
+          });
+        return;
+      }
+
+      // 2. WooCommerce Cart API Detection
+      if (platform === 'WooCommerce' || (document.body && document.body.classList.contains('woocommerce'))) {
+        fetch('/wp-json/wc/store/v1/cart')
+          .then(function(r) { return r.json(); })
+          .then(function(wcCart) {
+            if (wcCart && typeof wcCart.items_count === 'number') {
+              var formattedWc = {
+                item_count: wcCart.items_count,
+                total_price: wcCart.totals && wcCart.totals.total_price ? (parseInt(wcCart.totals.total_price, 10) / 100) : 0,
+                currency: wcCart.totals && wcCart.totals.currency_code ? wcCart.totals.currency_code : 'INR',
+                items: (wcCart.items || []).map(function(it) {
+                  return {
+                    title: it.name || '',
+                    quantity: it.quantity || 1,
+                    price: it.prices && it.prices.price ? (parseInt(it.prices.price, 10) / 100) : 0,
+                    image: (it.images && it.images[0] ? it.images[0].src : ''),
+                    variant_title: null,
+                    url: it.permalink || null
+                  };
+                })
+              };
+              handleDetectedCartData(formattedWc, shouldFireBackend);
+            } else {
+              fallbackDomCartCheck(shouldFireBackend);
+            }
+          })
+          .catch(function() {
+            fallbackDomCartCheck(shouldFireBackend);
+          });
+        return;
+      }
+
+      // 3. Universal DOM Cart Counter Scraper (BigCommerce, Magento, Webflow, Custom HTML/React)
+      fallbackDomCartCheck(shouldFireBackend);
+    } catch (e) {
+      fallbackDomCartCheck(shouldFireBackend);
+    }
+  }
+
+  function fallbackDomCartCheck(shouldFireBackend) {
+    try {
+      var countEls = document.querySelectorAll(
+        '[data-cart-count], .cart-count, .cart-bubble__text-count, .cart-items-count, .cart-counter, .badge-cart, .shopping-cart-badge, .mini-cart-count, .header-cart-count, .cart__count, .cart-quantity, .count, .wc-cart-count, .cart-contents-count, [data-cart-item-count], [data-cart-items]'
+      );
+      var parsedCount = 0;
+      for (var ci = 0; ci < countEls.length; ci++) {
+        var num = parseInt(countEls[ci].innerText.replace(/\\D/g, ''), 10);
+        if (!isNaN(num) && num > 0) {
+          parsedCount = num;
+          break;
+        }
+      }
+
+      if (parsedCount > 0) {
+        var cartObj = {
+          item_count: parsedCount,
+          total_price: detectedCart && detectedCart.total_price ? detectedCart.total_price : 0,
+          currency: 'INR',
+          items: detectedCart && detectedCart.items && detectedCart.items.length > 0 ? detectedCart.items : []
+        };
+        handleDetectedCartData(cartObj, shouldFireBackend);
+      }
+    } catch (_) {}
   }
 
   // Initial cart fetch on page load
   updateAndSyncCart(false);
 
-  // Real-Time AJAX Interceptor for Add-To-Cart actions (Shopify & WooCommerce)
+  // Real-Time AJAX Interceptor for Add-To-Cart actions across ANY platform
   try {
     if (window.fetch) {
       var originalFetch = window.fetch;
@@ -1220,15 +1342,17 @@ export async function GET(req: NextRequest) {
         var args = arguments;
         var url = args[0];
         var isCartApi = typeof url === 'string' && (
-          url.indexOf('/cart/add') !== -1 ||
-          url.indexOf('/cart/change') !== -1 ||
-          url.indexOf('/cart/update') !== -1 ||
-          url.indexOf('/cart/clear') !== -1
+          url.indexOf('/cart') !== -1 ||
+          url.indexOf('wc-ajax') !== -1 ||
+          url.indexOf('/basket') !== -1 ||
+          url.indexOf('/bag') !== -1 ||
+          url.indexOf('/checkout') !== -1
         );
 
         return originalFetch.apply(this, args).then(function(response) {
           if (isCartApi) {
             setTimeout(function() { updateAndSyncCart(true); }, 350);
+            setTimeout(function() { updateAndSyncCart(true); }, 1200);
           }
           return response;
         });
@@ -1239,9 +1363,10 @@ export async function GET(req: NextRequest) {
       var originalOpen = XMLHttpRequest.prototype.open;
       XMLHttpRequest.prototype.open = function(method, url) {
         this.__whatin_is_cart = typeof url === 'string' && (
-          url.indexOf('/cart/add') !== -1 ||
-          url.indexOf('/cart/change') !== -1 ||
-          url.indexOf('/cart/update') !== -1
+          url.indexOf('/cart') !== -1 ||
+          url.indexOf('wc-ajax') !== -1 ||
+          url.indexOf('/basket') !== -1 ||
+          url.indexOf('/bag') !== -1
         );
         return originalOpen.apply(this, arguments);
       };
@@ -1251,22 +1376,31 @@ export async function GET(req: NextRequest) {
         if (this.__whatin_is_cart) {
           this.addEventListener('load', function() {
             setTimeout(function() { updateAndSyncCart(true); }, 350);
+            setTimeout(function() { updateAndSyncCart(true); }, 1200);
           });
         }
         return originalSend.apply(this, arguments);
       };
     }
 
+    // Standard Theme Events
     document.addEventListener('cart:updated', function() { updateAndSyncCart(true); });
     document.addEventListener('cart:build', function() { updateAndSyncCart(true); });
+    document.addEventListener('cart:refresh', function() { updateAndSyncCart(true); });
     document.addEventListener('ajaxCart.afterCartLoad', function() { updateAndSyncCart(true); });
+    document.addEventListener('rebuy:cart:change', function() { updateAndSyncCart(true); });
+    document.addEventListener('theme:cart:change', function() { updateAndSyncCart(true); });
 
+    // Universal Add to Cart click listener (matches buttons on Shopify, WooCommerce, Magento, etc.)
     document.addEventListener('click', function(e) {
       var target = e.target;
       if (!target) return;
-      var btn = target.closest('button[name="add"], .btn-add-to-cart, [data-add-to-cart], .product-form__submit, .single_add_to_cart_button');
+      var btn = target.closest(
+        'button[name="add"], .btn-add-to-cart, [data-add-to-cart], .product-form__submit, .single_add_to_cart_button, [data-action="add-to-cart"], .add-to-cart, .ajax-add-to-cart, [class*="add-to-cart"], [id*="add-to-cart"], [class*="add_to_cart"]'
+      );
       if (btn) {
         setTimeout(function() { updateAndSyncCart(true); }, 750);
+        setTimeout(function() { updateAndSyncCart(true); }, 1800);
       }
     }, true);
   } catch (err) {}

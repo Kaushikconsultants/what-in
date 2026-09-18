@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Live Activity Telemetry (Silent future website activity automatically updating customer profile)
-      if (isLiveActivity) {
+      if (isLiveActivity || isAddToCart) {
         if (cleanPhone.length >= 10) {
           const existingCustomer = await prisma.customer.findFirst({
             where: {
@@ -184,9 +184,17 @@ export async function POST(req: NextRequest) {
                 categoryInsights: categoryInsights || null,
                 pageJourney: Array.isArray(pageJourney) ? pageJourney : [],
                 sessionStats: sessionStats || null,
+                cart: cart || body.cart || null,
+                detectedProduct: detectedProduct || body.detectedProduct || null,
+                platform: effectivePlatform,
                 scrollDepth: body.scrollDepth !== undefined ? Number(body.scrollDepth) : undefined,
                 viewport: body.viewport || undefined,
                 lastInteraction: body.lastInteraction || undefined,
+                menuOpen: body.menuOpen !== undefined ? Boolean(body.menuOpen) : undefined,
+                isMenu: body.isMenu !== undefined ? Boolean(body.isMenu) : undefined,
+                cartOpen: body.cartOpen !== undefined ? Boolean(body.cartOpen) : undefined,
+                isCart: body.isCart !== undefined ? Boolean(body.isCart) : undefined,
+                clickSelector: body.clickSelector || undefined,
                 cursorX: body.cursorX !== undefined ? Number(body.cursorX) : undefined,
                 cursorY: body.cursorY !== undefined ? Number(body.cursorY) : undefined,
                 clickX: body.clickX !== undefined ? Number(body.clickX) : undefined,
