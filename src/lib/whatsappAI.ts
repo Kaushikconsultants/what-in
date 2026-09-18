@@ -170,18 +170,24 @@ function extractProductKeyword(text: string) {
   return terms.join(' ');
 }
 
-export async function searchProducts(userText: string) {
+export async function searchProducts(userText: string, domainOverride?: string) {
   const isComboSearch = /combo|trio|pack|offer|deal|discount/i.test(userText);
   const dbCombos = await prisma.shopifyCombo.findMany({ where: { is_active: true } });
 
   // Get active settings to find the store domain
-  let activeDomain = SHOPIFY_STORE_URL;
-  try {
-    const settings = await prisma.companySettings.findFirst();
-    if (settings && settings.shopifyStoreDomain) {
-      activeDomain = settings.shopifyStoreDomain;
-    }
-  } catch (_) {}
+  let activeDomain = domainOverride || "www.esponesports.com";
+  if (!domainOverride) {
+    try {
+      const settings = await prisma.companySettings.findFirst();
+      if (settings?.website) {
+        activeDomain = settings.website.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+      } else if (settings?.shopifyStoreDomain) {
+        activeDomain = settings.shopifyStoreDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+      } else if (SHOPIFY_STORE_URL) {
+        activeDomain = SHOPIFY_STORE_URL;
+      }
+    } catch (_) {}
+  }
 
   // 1. Fetch all unique collection titles from database
   let matchedCollection = "";
@@ -460,11 +466,11 @@ export async function handleIncomingAILogic(
   conversationId?: string,
   clientId?: string | null
 ) {
-  let brandName = "Espon Clothing";
-  let brandDomain = "www.espon.in";
+  let brandName = "Espon Clothing Private Limited";
+  let brandDomain = "www.esponesports.com";
   let brandPhone = "+91 7206066678";
   let brandEmail = "clothingespon@gmail.com";
-  let brandAddress = "Rohtak, Haryana, India";
+  let brandAddress = "Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road, Rohtak, Haryana 124001, India";
   let gstin = "06AAHCE7721Q1Z4";
 
   let settings: any = null;
@@ -496,26 +502,49 @@ export async function handleIncomingAILogic(
     legacySetting = legacy;
     activeCombos = combos;
 
-    if (clientRecord?.businessName) {
-      brandName = clientRecord.businessName;
-      if (clientRecord.phoneNumber) brandPhone = clientRecord.phoneNumber;
-      if (clientRecord.contactEmail) brandEmail = clientRecord.contactEmail;
-      if (clientRecord.brandSlug) brandDomain = `${clientRecord.brandSlug}.what-in.tinkal.in`;
-    } else if (company?.companyName) {
-      brandName = company.companyName;
-      if (company?.shopifyStoreDomain) {
-        brandDomain = company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-      } else if (company?.website) {
-        brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-      }
-      if (company?.mobile) brandPhone = company.mobile;
-      if (company?.email) brandEmail = company.email;
-      if (company?.address) brandAddress = `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim();
-      if (company?.gstin) gstin = company.gstin;
-    } else if (acc?.name) {
-      brandName = acc.name;
-      if (acc?.phoneNumber) brandPhone = acc.phoneNumber;
+    // Helper to sanitize domain
+    const cleanDomain = (d?: string | null) => {
+      if (!d) return null;
+      return d.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+    };
+
+    // 1. Dynamic Brand Name
+    brandName = clientRecord?.businessName || company?.companyName || acc?.name || "Espon Clothing Private Limited";
+
+    // 2. Dynamic Brand Domain
+    // Direct website (e.g. www.esponesports.com) set in Settings takes top precedence,
+    // followed by tenant shopify domain, custom brand slug, shopifyStoreDomain, and fallback.
+    const resolvedDomain = 
+      cleanDomain(company?.website) ||
+      cleanDomain(clientRecord?.shopifyDomain) ||
+      (clientRecord?.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : null) ||
+      cleanDomain(company?.shopifyStoreDomain) ||
+      "www.esponesports.com";
+    if (resolvedDomain) brandDomain = resolvedDomain;
+
+    // 3. Dynamic Support Phone (Support & Sales Contact Phone)
+    // CRITICAL: Prioritize human support contactPhone / mobile over the WABA Meta sending number!
+    const rawPhone = 
+      clientRecord?.contactPhone || 
+      company?.mobile || 
+      clientRecord?.phoneNumber || 
+      acc?.phoneNumber || 
+      "+91 7206066678";
+    if (rawPhone) {
+      const trimmed = String(rawPhone).trim();
+      brandPhone = trimmed.startsWith('+') || trimmed.startsWith('91') || trimmed.length > 10 
+        ? (trimmed.startsWith('+') ? trimmed : `+${trimmed}`) 
+        : `+91 ${trimmed}`;
     }
+
+    // 4. Dynamic Email
+    brandEmail = clientRecord?.contactEmail || company?.email || "clothingespon@gmail.com";
+
+    // 5. Dynamic Address & GSTIN
+    if (company?.address) {
+      brandAddress = `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim();
+    }
+    if (company?.gstin) gstin = company.gstin;
   } catch (_) {}
 
   const history = historyLines.join('\n');
@@ -543,7 +572,7 @@ export async function handleIncomingAILogic(
 
   const productKeywords = /short|combo|trio|pack|t\-?shirt|shirt|oversize|tee|pant|track|lower|trouser|clothes|dikhao|price|offer|deal|discount|buy|link|item|product|collection|catalog|sell|shop|store|show/i;
   if (productKeywords.test(userText)) {
-    const productsInfo = await searchProducts(userText);
+    const productsInfo = await searchProducts(userText, brandDomain);
     if (productsInfo && productsInfo.textLines) {
       toolContext += `\n[SHOPIFY GRAPHQL PRODUCTS RESULT]: ${JSON.stringify(productsInfo.textLines)}`;
       carouselCards = productsInfo.carouselCards || [];
@@ -555,8 +584,9 @@ export async function handleIncomingAILogic(
     toolContext += `\n${sizeInfo}`;
   }
 
-  const systemRules = settings?.aiSystemPrompt || "You are an elite sales, customer service, and stylist assistant.";
+  const systemRules = clientRecord?.aiSystemPrompt || settings?.aiSystemPrompt || "You are an elite sales, customer service, and stylist assistant.";
   const kbPieces: string[] = [];
+  if (clientRecord?.aiKnowledgeBase) kbPieces.push(clientRecord.aiKnowledgeBase);
   if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
   if (legacySetting?.knowledge_base) kbPieces.push(legacySetting.knowledge_base);
   if (legacySetting?.inst_brand_policies) kbPieces.push(`Policies: ${legacySetting.inst_brand_policies}`);

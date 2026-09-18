@@ -238,7 +238,7 @@ export const INDUSTRY_CHATBOT_PRESETS: IndustryChatbotPreset[] = [
           title: "✅ VIP Tour Confirmed",
           position: { x: 1200, y: 100 },
           data: {
-            text: "✅ *VIP Site Visit Scheduled!*\n\nOur relationship manager *Mr. Rohit Sharma* will contact you shortly with driver details.\n📥 *Download Full E-Brochure:* https://espon.in/brochure.pdf"
+            text: "✅ *VIP Site Visit Scheduled!*\n\nOur relationship manager *Mr. Rohit Sharma* will contact you shortly with driver details.\n📥 *Download Full E-Brochure:* https://esponesports.com/brochure.pdf"
           }
         }
       ],

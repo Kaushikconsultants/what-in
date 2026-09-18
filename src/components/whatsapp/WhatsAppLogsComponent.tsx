@@ -538,7 +538,7 @@ export default function WhatsAppLogsComponent() {
                                 </div>
                                 <div>
                                   <strong style={{ fontSize: '13px', color: '#0f172a', display: 'block' }}>{log.actorName || 'System / Admin'}</strong>
-                                  <span style={{ fontSize: '11px', color: '#64748b' }}>{log.actorEmail || 'system@espon.in'}</span>
+                                  <span style={{ fontSize: '11px', color: '#64748b' }}>{log.actorEmail || 'system@esponesports.com'}</span>
                                 </div>
                               </div>
                             </td>
@@ -644,7 +644,7 @@ export default function WhatsAppLogsComponent() {
                   </div>
                   <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px' }}>
                     <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, display: 'block' }}>Actor Email</span>
-                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>{selectedAuditLog.actorEmail || 'system@espon.in'}</strong>
+                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>{selectedAuditLog.actorEmail || 'system@esponesports.com'}</strong>
                   </div>
                 </div>
 

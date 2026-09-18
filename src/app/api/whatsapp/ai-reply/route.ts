@@ -29,13 +29,28 @@ export async function POST(req: NextRequest) {
       clientRecord = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } }).catch(() => null);
     }
 
-    let brandName = clientRecord?.businessName || company?.companyName || account?.name || "Espon Clothing";
-    let brandDomain = clientRecord?.brandSlug 
-      ? `${clientRecord.brandSlug}.what-in.tinkal.in`
-      : (company?.shopifyStoreDomain 
-        ? company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '') 
-        : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : "www.espon.in"));
-    let brandPhone = clientRecord?.phoneNumber || company?.mobile || account?.phoneNumber || "+91 7206066678";
+    const cleanDomain = (d?: string | null) => {
+      if (!d) return null;
+      return d.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+    };
+
+    let brandName = clientRecord?.businessName || company?.companyName || account?.name || "Espon Clothing Private Limited";
+    let brandDomain = 
+      cleanDomain(company?.website) ||
+      cleanDomain(clientRecord?.shopifyDomain) ||
+      (clientRecord?.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : null) ||
+      cleanDomain(company?.shopifyStoreDomain) ||
+      "www.esponesports.com";
+
+    const rawPhone = clientRecord?.contactPhone || company?.mobile || clientRecord?.phoneNumber || account?.phoneNumber || "+91 7206066678";
+    let brandPhone = "+91 7206066678";
+    if (rawPhone) {
+      const trimmed = String(rawPhone).trim();
+      brandPhone = trimmed.startsWith('+') || trimmed.startsWith('91') || trimmed.length > 10 
+        ? (trimmed.startsWith('+') ? trimmed : `+${trimmed}`) 
+        : `+91 ${trimmed}`;
+    }
+
     let brandEmail = clientRecord?.contactEmail || company?.email || `clothingespon@gmail.com`;
 
     const aiKnowledgeBase = clientRecord?.aiKnowledgeBase || settings?.aiKnowledgeBase || "";

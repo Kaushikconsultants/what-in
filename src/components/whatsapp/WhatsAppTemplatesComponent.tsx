@@ -153,7 +153,7 @@ export default function WhatsAppTemplatesComponent() {
   // Dynamic Brand Details & Intelligence from Database
   const [brandName, setBrandName] = useState("Espon Clothing Private Limited");
   const [whatsAppDisplayName, setWhatsAppDisplayName] = useState("Espon");
-  const [brandDomain, setBrandDomain] = useState("www.espon.in");
+  const [brandDomain, setBrandDomain] = useState("www.esponesports.com");
   const [brandPhone, setBrandPhone] = useState("+91 7206066678");
   const [brandEmail, setBrandEmail] = useState("clothingespon@gmail.com");
   const [hasAiKnowledge, setHasAiKnowledge] = useState(true);

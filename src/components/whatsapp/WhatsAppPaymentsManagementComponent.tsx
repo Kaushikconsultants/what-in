@@ -1623,7 +1623,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
 
                     <div className="pt-1 text-[11px]">
                       <span>Click here to complete payment: </span>
-                      <span className="text-blue-600 dark:text-blue-400 underline font-mono">https://pay.espon.in/link_1042</span>
+                      <span className="text-blue-600 dark:text-blue-400 underline font-mono">https://pay.esponesports.com/link_1042</span>
                     </div>
 
                     <span className="text-[9px] text-slate-400 text-right self-end mt-1 font-mono">

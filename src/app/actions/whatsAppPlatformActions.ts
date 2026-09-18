@@ -456,7 +456,7 @@ export async function sendWhatsAppMessageAction(data: {
           ? data.mediaUrl 
           : data.mediaUrl?.startsWith('data:') 
           ? data.mediaUrl // Handled below or via pre-upload
-          : `https://espon.in${data.mediaUrl}`;
+          : `https://www.esponesports.com${data.mediaUrl}`;
 
         // If mediaUrl is just a Meta Media ID (doesn't start with http/data:/)
         const isMediaId = data.mediaUrl && !data.mediaUrl.includes('://') && !data.mediaUrl.startsWith('/');
@@ -890,7 +890,7 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
       const isMediaId = !existing.mediaUrl.includes('://') && !existing.mediaUrl.startsWith('/');
       const mediaField = isMediaId 
         ? { id: existing.mediaUrl.replace('/api/whatsapp/media/', '') } 
-        : { link: existing.mediaUrl.startsWith('http') ? existing.mediaUrl : `https://espon.in${existing.mediaUrl}` };
+        : { link: existing.mediaUrl.startsWith('http') ? existing.mediaUrl : `https://www.esponesports.com${existing.mediaUrl}` };
       const mType = existing.messageType.toLowerCase();
       payload.type = mType;
       payload[mType] = { ...mediaField, caption: existing.content && !existing.content.startsWith('[') ? existing.content : undefined };
@@ -9762,13 +9762,13 @@ export async function getWhatsAppBrandDetailsAction() {
     } catch {}
     
     // Resolve public storefront domain (prioritize direct website over internal myshopify domain)
-    let brandDomain = "www.espon.in";
+    let brandDomain = "www.esponesports.com";
     if (company?.website) {
-      brandDomain = company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+      brandDomain = company.website.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     } else if (client?.shopifyDomain) {
-      brandDomain = client.shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+      brandDomain = client.shopifyDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     } else if (company?.shopifyStoreDomain) {
-      const rawDomain = company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+      const rawDomain = company.shopifyStoreDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
       brandDomain = rawDomain.includes("esponsports") ? "esponsports.com" : rawDomain;
     }
 
@@ -9823,7 +9823,7 @@ export async function getWhatsAppBrandDetailsAction() {
     return { 
       success: false, 
       brandName: "Espon Clothing Private Limited", 
-      brandDomain: "www.espon.in", 
+      brandDomain: "www.esponesports.com", 
       phoneNumber: "+91 7206066678", 
       brandPhone: "+91 7206066678",
       brandEmail: "clothingespon@gmail.com",
@@ -9942,6 +9942,9 @@ export async function saveWhatsAppBrandDetailsAction(data: {
       if (data.brandName) clientData.businessName = data.brandName.trim();
       if (data.brandEmail) clientData.contactEmail = data.brandEmail.trim();
       if (data.brandPhone) clientData.contactPhone = data.brandPhone.trim();
+      if (data.brandDomain) {
+        clientData.shopifyDomain = data.brandDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+      }
       if (data.aiKnowledgeBase !== undefined) clientData.aiKnowledgeBase = data.aiKnowledgeBase;
       if (data.aiSystemPrompt !== undefined) clientData.aiSystemPrompt = data.aiSystemPrompt;
       if (data.welcomeMessage !== undefined) clientData.welcomeMessage = data.welcomeMessage;
