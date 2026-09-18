@@ -70,7 +70,10 @@ import {
   Globe,
   Compass,
   Eye,
-  Monitor
+  Monitor,
+  Smartphone,
+  Play,
+  RotateCcw
 } from "lucide-react";
 import {
   getWhatsAppConversations,
@@ -303,6 +306,11 @@ export default function WhatsAppInboxComponent() {
   const [liveCustomerActivityMap, setLiveCustomerActivityMap] = useState<Record<string, any>>({});
   const [customerWebSessions, setCustomerWebSessions] = useState<any[]>([]);
   const [loadingWebSessions, setLoadingWebSessions] = useState<boolean>(false);
+
+  // Native In-App Live Screen Co-Browsing & Replay States
+  const [showLiveCoBrowseModal, setShowLiveCoBrowseModal] = useState<boolean>(false);
+  const [coBrowseReplayIndex, setCoBrowseReplayIndex] = useState<number | null>(null);
+  const [isAutoReplaying, setIsAutoReplaying] = useState<boolean>(false);
 
   // Active customer normalized phone number
   const activeCustomerPhone = useMemo(() => {
@@ -730,6 +738,24 @@ export default function WhatsAppInboxComponent() {
     const scrollDepth = typeof live?.scrollDepth === "number" ? live.scrollDepth : null;
     const viewport = live?.viewport || null;
     const lastInteraction = live?.lastInteraction || null;
+    const cursorX = typeof live?.cursorX === "number" ? live.cursorX : 50;
+    const cursorY = typeof live?.cursorY === "number" ? live.cursorY : 45;
+    const clickX = typeof live?.clickX === "number" ? live.clickX : null;
+    const clickY = typeof live?.clickY === "number" ? live.clickY : null;
+    const screenTimeline: any[] = Array.isArray(live?.screenTimeline) && live.screenTimeline.length > 0
+      ? live.screenTimeline
+      : (
+        pageJourney.length > 0
+          ? pageJourney.map((p: any, idx: number) => ({
+              time: p.time ? new Date(p.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently",
+              type: "PAGE",
+              label: "Visited: " + (p.title || p.path || "Page"),
+              depth: 20 + ((idx * 25) % 80),
+              x: 50,
+              y: 40
+            }))
+          : []
+      );
 
     const hasAnyData = Boolean(
       live ||
@@ -747,6 +773,11 @@ export default function WhatsAppInboxComponent() {
       scrollDepth,
       viewport,
       lastInteraction,
+      cursorX,
+      cursorY,
+      clickX,
+      clickY,
+      screenTimeline,
       lastActivityTime,
       pageTitle,
       pageUrl,
@@ -759,6 +790,27 @@ export default function WhatsAppInboxComponent() {
       liveEventLog: Array.isArray(live?.eventLog) ? live.eventLog : [],
     };
   }, [activeCustomerPhone, liveCustomerActivityMap, customerWebSessions, latestWebsiteContext]);
+
+  // Auto-replay player timer for Native Co-Browsing Theater
+  useEffect(() => {
+    if (!isAutoReplaying) return;
+    const timeline = activeWebsiteTrackingData.screenTimeline;
+    if (!timeline || timeline.length === 0) {
+      setIsAutoReplaying(false);
+      return;
+    }
+    const timer = setInterval(() => {
+      setCoBrowseReplayIndex((prev) => {
+        const next = prev === null ? 0 : prev + 1;
+        if (next >= timeline.length) {
+          setIsAutoReplaying(false);
+          return null;
+        }
+        return next;
+      });
+    }, 1600);
+    return () => clearInterval(timer);
+  }, [isAutoReplaying, activeWebsiteTrackingData.screenTimeline]);
 
   // Quote Form State
   const [quoteItems, setQuoteItems] = useState([
@@ -1317,6 +1369,13 @@ export default function WhatsAppInboxComponent() {
                       scrollDepth: incoming.scrollDepth !== undefined ? incoming.scrollDepth : (existing.scrollDepth ?? null),
                       viewport: incoming.viewport || existing.viewport || null,
                       lastInteraction: incoming.lastInteraction || existing.lastInteraction || null,
+                      cursorX: incoming.cursorX !== undefined ? incoming.cursorX : (existing.cursorX ?? 50),
+                      cursorY: incoming.cursorY !== undefined ? incoming.cursorY : (existing.cursorY ?? 45),
+                      clickX: incoming.clickX !== undefined ? incoming.clickX : (existing.clickX ?? null),
+                      clickY: incoming.clickY !== undefined ? incoming.clickY : (existing.clickY ?? null),
+                      screenTimeline: Array.isArray(incoming.screenTimeline) && incoming.screenTimeline.length > 0
+                        ? incoming.screenTimeline
+                        : (existing.screenTimeline || []),
                       eventLog: [newLogEntry, ...existingLogs].slice(0, 30),
                     },
                   };
@@ -5815,27 +5874,29 @@ export default function WhatsAppInboxComponent() {
                 </div>
               )}
 
-              {/* Live Screen & Visual Co-Browsing (Clarity Replay) */}
-              <div className="tracking-section-card" style={{
-                background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-                border: "1px solid #cbd5e1",
-                borderRadius: "12px",
-                padding: "14px",
-                boxShadow: "0 2px 5px rgba(0,0,0,0.03)"
+              {/* Native In-App Live Screen Co-Browsing & Replay Card */}
+              <div className="tracking-section-card cobrowse-card" style={{
+                background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                border: "1px solid #334155",
+                borderRadius: "14px",
+                padding: "16px",
+                color: "#f8fafc",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.25)"
               }}>
+                {/* Header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "7px", fontWeight: 700, fontSize: "13px", color: "#1e293b" }}>
-                    <Monitor size={16} color="#4f46e5" />
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, fontSize: "13px", color: "#ffffff" }}>
+                    <Monitor size={17} color="#38bdf8" />
                     <span>Live Screen Co-Browsing</span>
                   </div>
                   <span style={{
                     fontSize: "10.5px",
                     fontWeight: 700,
-                    padding: "2px 8px",
+                    padding: "3px 9px",
                     borderRadius: "12px",
-                    background: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#dcfce7" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#fef9c3" : "#f1f5f9",
-                    color: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#166534" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#854d0e" : "#64748b",
-                    border: `1px solid ${activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#bbf7d0" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#fde047" : "#e2e8f0"}`,
+                    background: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "rgba(34, 197, 94, 0.2)" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "rgba(234, 179, 8, 0.2)" : "rgba(148, 163, 184, 0.15)",
+                    color: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#4ade80" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#facc15" : "#94a3b8",
+                    border: `1px solid ${activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "rgba(74, 222, 128, 0.4)" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "rgba(250, 204, 21, 0.4)" : "rgba(148, 163, 184, 0.3)"}`,
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "5px"
@@ -5843,89 +5904,212 @@ export default function WhatsAppInboxComponent() {
                     {activeWebsiteTrackingData.presenceStatus === "ONLINE" ? (
                       <>
                         <span className="live-dot" style={{ width: 6, height: 6 }} />
-                        <span>Live Sync</span>
+                        <span>Live Stream</span>
                       </>
                     ) : activeWebsiteTrackingData.presenceStatus === "AWAY" ? (
                       <>
                         <span className="away-dot" style={{ width: 6, height: 6 }} />
-                        <span>Tab Paused</span>
+                        <span>Tab Away</span>
                       </>
                     ) : (
                       <>
                         <Clock size={10} />
-                        <span>Session Ended</span>
+                        <span>Session Recorded</span>
                       </>
                     )}
                   </span>
                 </div>
 
-                {/* Live Scroll Depth Meter */}
-                <div style={{ marginBottom: "12px", background: "#ffffff", padding: "10px 12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px", marginBottom: "6px" }}>
-                    <span style={{ color: "#64748b", display: "flex", alignItems: "center", gap: "5px", fontWeight: 600 }}>
-                      <Eye size={13} color="#6366f1" />
-                      <span>Live Screen Scroll Depth</span>
-                    </span>
-                    <span style={{ fontWeight: 700, color: "#0f172a", fontSize: "11.5px" }}>
-                      {activeWebsiteTrackingData.scrollDepth !== null ? `${activeWebsiteTrackingData.scrollDepth}% of page` : "Top of Page (0%)"}
+                {/* Simulated Mini Screen Mirror Viewport */}
+                <div style={{
+                  position: "relative",
+                  background: "#020617",
+                  borderRadius: "10px",
+                  border: "1px solid #334155",
+                  overflow: "hidden",
+                  marginBottom: "12px",
+                  boxShadow: "inset 0 2px 4px rgba(0,0,0,0.5)"
+                }}>
+                  {/* Browser / Device Address Bar */}
+                  <div style={{
+                    background: "#1e293b",
+                    padding: "6px 10px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    borderBottom: "1px solid #334155",
+                    fontSize: "10.5px"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "80%" }}>
+                      <Lock size={10} color="#10b981" />
+                      <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{activeWebsiteTrackingData.pageTitle || "Online Store"}</span>
+                    </div>
+                    <span style={{ fontSize: "9.5px", color: "#94a3b8", fontWeight: 700 }}>
+                      {activeWebsiteTrackingData.viewport?.device || "Screen"}
                     </span>
                   </div>
-                  <div style={{ width: "100%", height: "7px", background: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
+
+                  {/* Simulated Screen Content Canvas */}
+                  <div style={{
+                    position: "relative",
+                    height: "160px",
+                    background: "radial-gradient(ellipse at top, #1e293b 0%, #090d16 100%)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    padding: "12px",
+                    overflow: "hidden"
+                  }}>
+                    {/* Synchronized Scroll Ruler on right edge */}
                     <div style={{
-                      width: `${activeWebsiteTrackingData.scrollDepth ?? 0}%`,
-                      height: "100%",
-                      background: "linear-gradient(90deg, #6366f1 0%, #10b981 100%)",
-                      borderRadius: "4px",
-                      transition: "width 0.35s ease"
-                    }} />
+                      position: "absolute",
+                      right: 3,
+                      top: 6,
+                      bottom: 6,
+                      width: 4,
+                      background: "rgba(255,255,255,0.1)",
+                      borderRadius: 2
+                    }}>
+                      <div style={{
+                        position: "absolute",
+                        top: `${activeWebsiteTrackingData.scrollDepth ?? 0}%`,
+                        width: "100%",
+                        height: "20px",
+                        background: "#38bdf8",
+                        borderRadius: 2,
+                        transform: "translateY(-50%)",
+                        transition: "top 0.3s ease",
+                        boxShadow: "0 0 6px #38bdf8"
+                      }} />
+                    </div>
+
+                    {/* Page mockup info inside canvas */}
+                    <div style={{ zIndex: 1 }}>
+                      <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "2px" }}>
+                        {activeWebsiteTrackingData.platform || "Website"} • {activeWebsiteTrackingData.pageUrl ? (new URL(activeWebsiteTrackingData.pageUrl).pathname || "/") : "/"}
+                      </div>
+                      <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#ffffff" }}>
+                        {activeWebsiteTrackingData.detectedProduct?.title || activeWebsiteTrackingData.pageTitle || "Browsing Website"}
+                      </div>
+                      {activeWebsiteTrackingData.cart && activeWebsiteTrackingData.cart.item_count > 0 && (
+                        <span style={{
+                          display: "inline-block",
+                          marginTop: "6px",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          background: "#065f46",
+                          color: "#a7f3d0",
+                          padding: "2px 6px",
+                          borderRadius: "4px"
+                        }}>
+                          🛒 Cart: {activeWebsiteTrackingData.cart.item_count} items (₹{activeWebsiteTrackingData.cart.total_price})
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Live Laser Cursor Pointer */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${activeWebsiteTrackingData.cursorX}%`,
+                        top: `${activeWebsiteTrackingData.cursorY}%`,
+                        transform: "translate(-50%, -50%)",
+                        pointerEvents: "none",
+                        transition: "left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                        zIndex: 10
+                      }}
+                    >
+                      <div style={{
+                        width: "12px",
+                        height: "12px",
+                        borderRadius: "50%",
+                        background: "#f43f5e",
+                        border: "2px solid #ffffff",
+                        boxShadow: "0 0 10px #f43f5e"
+                      }} />
+                      <div style={{
+                        position: "absolute",
+                        left: "14px",
+                        top: "-4px",
+                        background: "#f43f5e",
+                        color: "#ffffff",
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        padding: "1px 5px",
+                        borderRadius: "4px",
+                        whiteSpace: "nowrap",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.3)"
+                      }}>
+                        Visitor
+                      </div>
+                    </div>
+
+                    {/* Bottom Status Overlay */}
+                    <div style={{
+                      zIndex: 1,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      fontSize: "10.5px",
+                      color: "#94a3b8",
+                      background: "rgba(15, 23, 42, 0.85)",
+                      backdropFilter: "blur(4px)",
+                      padding: "4px 8px",
+                      borderRadius: "6px"
+                    }}>
+                      <span style={{ color: "#38bdf8", fontWeight: 600 }}>
+                        ↕ Scroll: {activeWebsiteTrackingData.scrollDepth !== null ? `${activeWebsiteTrackingData.scrollDepth}%` : "0%"}
+                      </span>
+                      <span style={{ color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "65%" }}>
+                        {activeWebsiteTrackingData.lastInteraction || "Viewing screen"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Viewport & Device + Last Interaction */}
+                {/* Device & Resolution Badges */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-                  <div style={{ background: "#ffffff", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Device / Screen</div>
-                    <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#1e293b", marginTop: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ background: "#1e293b", padding: "8px 10px", borderRadius: "8px", border: "1px solid #334155" }}>
+                    <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600 }}>DEVICE & RESOLUTION</div>
+                    <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#f8fafc", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {activeWebsiteTrackingData.viewport 
                         ? `${activeWebsiteTrackingData.viewport.device || 'Desktop'} (${activeWebsiteTrackingData.viewport.width}x${activeWebsiteTrackingData.viewport.height})`
                         : "Detecting..."}
                     </div>
                   </div>
-                  <div style={{ background: "#ffffff", padding: "8px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                    <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Last User Action</div>
-                    <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#1e293b", marginTop: "3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={activeWebsiteTrackingData.lastInteraction || "Browsing"}>
-                      {activeWebsiteTrackingData.lastInteraction || "Viewing page"}
+                  <div style={{ background: "#1e293b", padding: "8px 10px", borderRadius: "8px", border: "1px solid #334155" }}>
+                    <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600 }}>RECORDED ACTIONS</div>
+                    <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#f8fafc", marginTop: "2px" }}>
+                      {activeWebsiteTrackingData.screenTimeline.length} events logged
                     </div>
                   </div>
                 </div>
 
-                {/* Clarity Screen Recording Replay Action Button */}
-                <a
-                  href="https://clarity.microsoft.com/projects"
-                  target="_blank"
-                  rel="noreferrer"
+                {/* Primary Action Button: Open Live Co-Browse Theater */}
+                <button
+                  type="button"
+                  onClick={() => setShowLiveCoBrowseModal(true)}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: "7px",
+                    gap: "8px",
                     width: "100%",
-                    padding: "8px 14px",
-                    background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                    padding: "10px 14px",
+                    background: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
                     color: "#ffffff",
-                    borderRadius: "7px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    textDecoration: "none",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
-                    transition: "all 0.2s ease",
-                    cursor: "pointer"
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "12.5px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)",
+                    transition: "all 0.2s ease"
                   }}
                 >
-                  <Video size={14} color="#38bdf8" />
-                  <span>Watch Video Screen Replay (Clarity)</span>
-                  <ExternalLink size={12} color="#94a3b8" />
-                </a>
+                  <Maximize2 size={15} color="#ffffff" />
+                  <span>Launch Live Co-Browse Theater & Replay</span>
+                </button>
               </div>
 
               {/* Active Webpage Card */}
@@ -6255,6 +6439,365 @@ export default function WhatsAppInboxComponent() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* NATIVE LIVE SCREEN CO-BROWSING THEATER & SESSION REPLAY MODAL    */}
+      {/* ================================================================= */}
+      {showLiveCoBrowseModal && activeConvDetail && (
+        <div 
+          className="cobrowse-modal-backdrop"
+          onClick={() => {
+            setShowLiveCoBrowseModal(false);
+            setIsAutoReplaying(false);
+            setCoBrowseReplayIndex(null);
+          }}
+        >
+          <div 
+            className="cobrowse-modal-container"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="cobrowse-modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  background: "linear-gradient(135deg, #4f46e5, #06b6d4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 10px rgba(79, 70, 229, 0.3)"
+                }}>
+                  <Monitor size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#ffffff", margin: 0 }}>
+                    Live Screen Co-Browsing & Session Replay
+                  </h3>
+                  <div style={{ fontSize: "11.5px", color: "#94a3b8", display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                    <span>{activeConvDetail.customer?.contactPerson || activeConvDetail.customer?.businessName || "Visitor"} (+{activeCustomerPhone})</span>
+                    <span>•</span>
+                    <span>{activeWebsiteTrackingData.platform || "Storefront"}</span>
+                    <span>•</span>
+                    <span>{activeWebsiteTrackingData.viewport ? `${activeWebsiteTrackingData.viewport.device} (${activeWebsiteTrackingData.viewport.width}x${activeWebsiteTrackingData.viewport.height})` : "Screen Synced"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{
+                  padding: "5px 12px",
+                  borderRadius: "20px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "rgba(34, 197, 94, 0.2)" : "rgba(148, 163, 184, 0.2)",
+                  color: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#4ade80" : "#94a3b8",
+                  border: `1px solid ${activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "rgba(74, 222, 128, 0.4)" : "rgba(148, 163, 184, 0.3)"}`
+                }}>
+                  {activeWebsiteTrackingData.presenceStatus === "ONLINE" ? (
+                    <>
+                      <span className="live-dot" style={{ width: 7, height: 7 }} />
+                      <span>LIVE BROADCASTING</span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock size={12} />
+                      <span>RECORDED REPLAY</span>
+                    </>
+                  )}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLiveCoBrowseModal(false);
+                    setIsAutoReplaying(false);
+                    setCoBrowseReplayIndex(null);
+                  }}
+                  style={{
+                    background: "rgba(255,255,255,0.1)",
+                    border: "none",
+                    color: "#ffffff",
+                    borderRadius: "8px",
+                    padding: "6px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="cobrowse-modal-body">
+              {/* Left Column: Simulated Device Frame Screen Mirror */}
+              <div className="cobrowse-screen-column">
+                {/* Device Frame */}
+                <div className={`cobrowse-device-bezel ${activeWebsiteTrackingData.viewport?.device === "Mobile" ? "mobile-bezel" : "desktop-bezel"}`}>
+                  {/* Notch / Browser Bar */}
+                  {activeWebsiteTrackingData.viewport?.device === "Mobile" ? (
+                    <div className="cobrowse-mobile-notch">
+                      <div className="cobrowse-dynamic-island" />
+                    </div>
+                  ) : (
+                    <div className="cobrowse-desktop-titlebar">
+                      <div className="cobrowse-window-dots">
+                        <span className="dot red" />
+                        <span className="dot yellow" />
+                        <span className="dot green" />
+                      </div>
+                      <div className="cobrowse-url-bar">
+                        <Lock size={11} color="#10b981" />
+                        <span>{activeWebsiteTrackingData.pageUrl || "https://yourwebsite.com"}</span>
+                      </div>
+                      <div style={{ width: 40 }} />
+                    </div>
+                  )}
+
+                  {/* Screen Content */}
+                  <div className="cobrowse-screen-viewport">
+                    {/* Synchronized Scroll Bar on side */}
+                    <div className="cobrowse-scroll-track">
+                      <div 
+                        className="cobrowse-scroll-thumb"
+                        style={{
+                          top: `${coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex] 
+                            ? (activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].depth ?? activeWebsiteTrackingData.scrollDepth ?? 0)
+                            : (activeWebsiteTrackingData.scrollDepth ?? 0)}%`
+                        }}
+                      />
+                    </div>
+
+                    {/* Page Content Simulation */}
+                    <div className="cobrowse-page-render" style={{
+                      transform: `translateY(-${Math.min(60, (coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex] 
+                        ? (activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].depth ?? activeWebsiteTrackingData.scrollDepth ?? 0)
+                        : (activeWebsiteTrackingData.scrollDepth ?? 0)) * 0.5)}%)`,
+                      transition: "transform 0.4s ease"
+                    }}>
+                      {/* Header bar of target site */}
+                      <div className="cobrowse-mock-header">
+                        <div style={{ fontWeight: 800, fontSize: "14px", color: "#0f172a" }}>
+                          {activeWebsiteTrackingData.platform === "Shopify" ? "🛍️ STORE" : "🌐 " + (activeConvDetail.customer?.businessName || "ONLINE STORE")}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#64748b" }}>
+                          Cart ({activeWebsiteTrackingData.cart?.item_count || 0})
+                        </div>
+                      </div>
+
+                      {/* Hero / Active Product Card */}
+                      <div className="cobrowse-mock-card">
+                        <div style={{ fontSize: "11px", color: "#6366f1", fontWeight: 700, textTransform: "uppercase" }}>
+                          Active Page View
+                        </div>
+                        <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#0f172a", margin: "6px 0 10px 0" }}>
+                          {activeWebsiteTrackingData.detectedProduct?.title || activeWebsiteTrackingData.pageTitle || "Homepage & Product Catalog"}
+                        </h2>
+                        {activeWebsiteTrackingData.pageUrl && (
+                          <div style={{ fontSize: "12px", color: "#2563eb", marginBottom: "12px", wordBreak: "break-all" }}>
+                            {activeWebsiteTrackingData.pageUrl}
+                          </div>
+                        )}
+
+                        {activeWebsiteTrackingData.detectedProduct?.price && (
+                          <div style={{ fontSize: "20px", fontWeight: 800, color: "#059669", marginBottom: "12px" }}>
+                            ₹{activeWebsiteTrackingData.detectedProduct.price}
+                          </div>
+                        )}
+
+                        {activeWebsiteTrackingData.cart && activeWebsiteTrackingData.cart.item_count > 0 && (
+                          <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "10px", borderRadius: "8px", marginBottom: "12px" }}>
+                            <div style={{ fontWeight: 700, fontSize: "12px", color: "#065f46" }}>
+                              🛒 Active Cart: {activeWebsiteTrackingData.cart.item_count} items (₹{activeWebsiteTrackingData.cart.total_price || 0})
+                            </div>
+                            <div style={{ fontSize: "11px", color: "#047857", marginTop: "2px" }}>
+                              Customer has products waiting in cart
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <div style={{ padding: "8px 16px", background: "#4f46e5", color: "#ffffff", borderRadius: "6px", fontSize: "12px", fontWeight: 600 }}>
+                            Add to Cart
+                          </div>
+                          <div style={{ padding: "8px 16px", background: "#e2e8f0", color: "#334155", borderRadius: "6px", fontSize: "12px", fontWeight: 600 }}>
+                            View Details
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mock content blocks to visualize scroll */}
+                      <div className="cobrowse-mock-section">
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#1e293b", marginBottom: "8px" }}>Product Specifications & Reviews</div>
+                        <p style={{ fontSize: "12px", color: "#64748b", lineHeight: "1.6" }}>
+                          Premium quality materials, engineered for durability and style. Customer reviews rated 4.8/5 based on verified buyers.
+                        </p>
+                      </div>
+                      <div className="cobrowse-mock-section">
+                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#1e293b", marginBottom: "8px" }}>Related Recommendations</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                          <div style={{ height: "60px", background: "#f1f5f9", borderRadius: "6px" }} />
+                          <div style={{ height: "60px", background: "#f1f5f9", borderRadius: "6px" }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Live Laser Cursor with Radar Ring */}
+                    <div
+                      className="cobrowse-live-cursor"
+                      style={{
+                        left: `${coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex]
+                          ? (activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].x ?? 50)
+                          : activeWebsiteTrackingData.cursorX}%`,
+                        top: `${coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex]
+                          ? (activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].y ?? 45)
+                          : activeWebsiteTrackingData.cursorY}%`,
+                        transition: "left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)"
+                      }}
+                    >
+                      <div className="cobrowse-cursor-ping" />
+                      <div className="cobrowse-cursor-pointer" />
+                      <div className="cobrowse-cursor-badge">
+                        <span>{activeConvDetail.customer?.contactPerson?.split(" ")[0] || "Customer"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Bar: Live Metrics */}
+                  <div className="cobrowse-device-footer">
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span className="live-dot" style={{ width: 6, height: 6 }} />
+                      <span style={{ color: "#38bdf8", fontWeight: 700 }}>
+                        {coBrowseReplayIndex !== null ? `Step ${coBrowseReplayIndex + 1} of ${activeWebsiteTrackingData.screenTimeline.length}` : "Live Synchronized"}
+                      </span>
+                    </div>
+                    <div>
+                      {coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex]
+                        ? activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].label
+                        : (activeWebsiteTrackingData.lastInteraction || "Browsing page")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Session Replay Controls & Event Timeline */}
+              <div className="cobrowse-controls-column">
+                {/* Replay Controls Header */}
+                <div style={{ background: "#1e293b", padding: "14px", borderRadius: "10px", border: "1px solid #334155", marginBottom: "14px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
+                    Session Replay Player
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsAutoReplaying(!isAutoReplaying)}
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        padding: "9px 12px",
+                        background: isAutoReplaying ? "#e11d48" : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer"
+                      }}
+                    >
+                      {isAutoReplaying ? <Pause size={14} /> : <Play size={14} />}
+                      <span>{isAutoReplaying ? "Pause Replay" : "Play Session Replay"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAutoReplaying(false);
+                        setCoBrowseReplayIndex(null);
+                      }}
+                      title="Reset to Live View"
+                      style={{
+                        padding: "9px 12px",
+                        background: "rgba(255,255,255,0.08)",
+                        color: "#ffffff",
+                        border: "1px solid #475569",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                    >
+                      <RotateCcw size={13} />
+                      <span>Live</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Timeline Step List */}
+                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Action Timeline ({activeWebsiteTrackingData.screenTimeline.length})
+                  </div>
+
+                  {activeWebsiteTrackingData.screenTimeline.length === 0 ? (
+                    <div style={{ padding: "20px", textAlign: "center", color: "#64748b", fontSize: "12px", background: "#1e293b", borderRadius: "8px" }}>
+                      Waiting for visitor events...
+                    </div>
+                  ) : (
+                    activeWebsiteTrackingData.screenTimeline.map((item: any, idx: number) => {
+                      const isSelected = coBrowseReplayIndex === idx;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setIsAutoReplaying(false);
+                            setCoBrowseReplayIndex(idx);
+                          }}
+                          style={{
+                            padding: "9px 12px",
+                            background: isSelected ? "rgba(99, 102, 241, 0.25)" : "#1e293b",
+                            border: `1px solid ${isSelected ? "#6366f1" : "#334155"}`,
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease"
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
+                            <span style={{
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              color: item.type === "CART" ? "#34d399" : item.type === "CLICK" ? "#f43f5e" : "#38bdf8",
+                              textTransform: "uppercase"
+                            }}>
+                              {item.type === "CART" ? "🛒 Cart" : item.type === "CLICK" ? "👆 Click" : item.type === "SCROLL" ? "↕ Scroll" : "🌐 Page"}
+                            </span>
+                            <span style={{ fontSize: "10px", color: "#64748b" }}>{item.time}</span>
+                          </div>
+                          <div style={{ fontSize: "12px", fontWeight: 600, color: isSelected ? "#ffffff" : "#cbd5e1" }}>
+                            {item.label}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

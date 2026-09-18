@@ -187,14 +187,19 @@ export async function POST(req: NextRequest) {
                 scrollDepth: body.scrollDepth !== undefined ? Number(body.scrollDepth) : undefined,
                 viewport: body.viewport || undefined,
                 lastInteraction: body.lastInteraction || undefined,
+                cursorX: body.cursorX !== undefined ? Number(body.cursorX) : undefined,
+                cursorY: body.cursorY !== undefined ? Number(body.cursorY) : undefined,
+                clickX: body.clickX !== undefined ? Number(body.clickX) : undefined,
+                clickY: body.clickY !== undefined ? Number(body.clickY) : undefined,
+                screenTimeline: Array.isArray(body.screenTimeline) ? body.screenTimeline : undefined,
                 isOnline,
                 presenceState,
                 timestamp: new Date().toISOString()
               }
             });
 
-            // Append live activity entry to CRM customer notes (skip for heartbeats & small scrolls)
-            if (eventType !== "HEARTBEAT" && eventType !== "TAB_AWAY" && eventType !== "SCROLL") {
+            // Append live activity entry to CRM customer notes (skip for heartbeats, pointer moves & small scrolls)
+            if (eventType !== "HEARTBEAT" && eventType !== "TAB_AWAY" && eventType !== "SCROLL" && eventType !== "POINTER") {
               const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
               let liveLogEntry = `\n[${timeStr}] 🌐 Browsing: "${pageTitle || pageUrl}"`;
               if (eventType === "SEARCH" && searchQuery) {

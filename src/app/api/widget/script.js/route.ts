@@ -116,19 +116,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Check for Microsoft Clarity integration
-  let clarityProjectId = "";
-  try {
-    const clarityInteg = await prisma.whatsAppIntegration.findFirst({
-      where: { clientId: client.id, type: "CLARITY", isActive: true }
-    });
-    if (clarityInteg?.token) clarityProjectId = clarityInteg.token.trim();
-  } catch {}
-  if (!clarityProjectId && process.env.CLARITY_PROJECT_ID) {
-    clarityProjectId = process.env.CLARITY_PROJECT_ID.trim();
-  }
-  widgetConfig.clarityProjectId = clarityProjectId;
-
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://whatsapp.esponsports.com";
 
   // Generate lightweight vanilla JS bundle
@@ -779,32 +766,37 @@ export async function GET(req: NextRequest) {
     return visitorSessionId || ('W' + Math.random().toString(36).substring(2, 6).toUpperCase());
   }
 
-  // Microsoft Clarity Screen Recording Integration
-  try {
-    if (config.clarityProjectId && !window.clarity) {
-      (function(c,l,a,r,i,t,y){
-        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-      })(window, document, "clarity", "script", config.clarityProjectId);
-    }
-  } catch (e) {}
+  // ⚡ Native In-App Live Screen Co-Browsing Engine (Zero external tools, 100% native)
+  var currentCursorX = 50;
+  var currentCursorY = 50;
+  var lastSentCursorX = 50;
+  var lastSentCursorY = 50;
+  var screenTimeline = [];
 
-  function syncClarityIdentification(phoneToSync) {
+  function recordTimelineEvent(type, label, extra) {
     try {
-      if (window.clarity) {
-        var identVal = phoneToSync || identifiedPhone || generateRefCode();
-        var friendlyName = phoneToSync ? ('+' + phoneToSync) : ('Store Visitor ' + generateRefCode());
-        window.clarity('identify', identVal, null, null, friendlyName);
-        if (phoneToSync) window.clarity('set', 'phone', phoneToSync);
-        if (detectedCart && detectedCart.item_count) {
-          window.clarity('set', 'cart_items', detectedCart.item_count);
-          window.clarity('set', 'cart_total', detectedCart.total_price);
+      var item = {
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        type: type,
+        label: label,
+        depth: getScrollDepth(),
+        x: currentCursorX,
+        y: currentCursorY
+      };
+      if (extra) {
+        for (var k in extra) {
+          if (extra.hasOwnProperty(k)) item[k] = extra[k];
         }
+      }
+      screenTimeline.push(item);
+      if (screenTimeline.length > 25) {
+        screenTimeline.shift();
       }
     } catch (e) {}
   }
-  setTimeout(function() { syncClarityIdentification(); }, 1500);
+
+  // Record initial page view in session timeline
+  recordTimelineEvent('PAGE', 'Landed on: ' + (detectedProduct ? detectedProduct.title : (document.title || 'Storefront')), { url: window.location.href });
 
   // Centralized Payload Generator
   function buildPayload(extra) {
@@ -830,6 +822,9 @@ export async function GET(req: NextRequest) {
       },
       scrollDepth: getScrollDepth(),
       viewport: getViewportInfo(),
+      cursorX: currentCursorX,
+      cursorY: currentCursorY,
+      screenTimeline: screenTimeline,
       isOnline: document.visibilityState !== 'hidden',
       presenceState: document.visibilityState === 'hidden' ? 'AWAY' : 'ONLINE',
       utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' Widget')
@@ -867,7 +862,6 @@ export async function GET(req: NextRequest) {
       }).then(function(data) {
         if (data && data.identifiedPhone) {
           setIdentifiedPhone(data.identifiedPhone);
-          syncClarityIdentification(data.identifiedPhone);
         }
       }).catch(function() {});
     } catch (e) {}
@@ -940,35 +934,82 @@ export async function GET(req: NextRequest) {
     }
   } catch (e) {}
 
-  // 1c. Live Scroll Depth Meter (Throttled)
+  // 1c. Live Scroll Depth Meter & Timeline (Throttled)
   try {
     var maxScrollSent = 0;
     var scrollThrottle = null;
     window.addEventListener('scroll', function() {
       var current = getScrollDepth();
-      if (current > maxScrollSent + 15) {
+      if (Math.abs(current - maxScrollSent) >= 15) {
         maxScrollSent = current;
+        recordTimelineEvent('SCROLL', 'Scrolled to ' + current + '% of page', { depth: current });
         if (!scrollThrottle) {
           scrollThrottle = setTimeout(function() {
             scrollThrottle = null;
-            sendLiveTelemetry('SCROLL', { scrollDepth: maxScrollSent });
+            sendLiveTelemetry('SCROLL', { scrollDepth: maxScrollSent, screenTimeline: screenTimeline });
           }, 1500);
         }
       }
     }, { passive: true });
   } catch (e) {}
 
-  // 1d. Live Element Clicks & Interactions
+  // 1d. Live Mouse & Touch Movement Tracking (Smooth, throttled)
+  try {
+    var pointerThrottle = null;
+    function trackPointer(e) {
+      try {
+        var clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+        var clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : null);
+        if (typeof clientX !== 'number' || typeof clientY !== 'number') return;
+
+        currentCursorX = Math.max(0, Math.min(100, Math.round((clientX / window.innerWidth) * 100)));
+        currentCursorY = Math.max(0, Math.min(100, Math.round((clientY / window.innerHeight) * 100)));
+
+        if (!pointerThrottle) {
+          pointerThrottle = setTimeout(function() {
+            pointerThrottle = null;
+            if (Math.abs(currentCursorX - lastSentCursorX) > 4 || Math.abs(currentCursorY - lastSentCursorY) > 4) {
+              lastSentCursorX = currentCursorX;
+              lastSentCursorY = currentCursorY;
+              sendLiveTelemetry('POINTER', {
+                cursorX: currentCursorX,
+                cursorY: currentCursorY
+              });
+            }
+          }, 1200);
+        }
+      } catch (err) {}
+    }
+    window.addEventListener('mousemove', trackPointer, { passive: true });
+    window.addEventListener('touchmove', trackPointer, { passive: true });
+  } catch (e) {}
+
+  // 1e. Live Element Clicks & Interactions
   try {
     document.addEventListener('click', function(e) {
       try {
+        var clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+        var clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : null);
+        if (typeof clientX === 'number' && typeof clientY === 'number') {
+          currentCursorX = Math.max(0, Math.min(100, Math.round((clientX / window.innerWidth) * 100)));
+          currentCursorY = Math.max(0, Math.min(100, Math.round((clientY / window.innerHeight) * 100)));
+        }
+
         var target = e.target;
         if (!target) return;
-        var actionEl = target.closest('button, a, .product-form__submit, [name="add"], .btn, select, [data-action]');
+        var actionEl = target.closest('button, a, .product-form__submit, [name="add"], .btn, select, [data-action], input[type="submit"]');
         if (actionEl && !actionEl.closest('#whatin-widget-container')) {
           var txt = (actionEl.innerText || actionEl.getAttribute('aria-label') || actionEl.title || actionEl.name || actionEl.tagName || '').trim().slice(0, 45);
           if (txt) {
-            sendLiveTelemetry('INTERACTION', { lastInteraction: 'Clicked: ' + txt });
+            recordTimelineEvent('CLICK', 'Clicked: ' + txt, { x: currentCursorX, y: currentCursorY });
+            sendLiveTelemetry('INTERACTION', {
+              cursorX: currentCursorX,
+              cursorY: currentCursorY,
+              clickX: currentCursorX,
+              clickY: currentCursorY,
+              lastInteraction: 'Clicked: ' + txt,
+              screenTimeline: screenTimeline
+            });
           }
         }
       } catch (err) {}
@@ -1064,6 +1105,7 @@ export async function GET(req: NextRequest) {
             // Immediately fire live Add to Cart event to our software backend with full journey!
             if (shouldFireBackend && cart.item_count > 0) {
               try {
+                recordTimelineEvent('CART', 'Cart Updated: ' + cart.item_count + ' items (₹' + (cart.total_price || 0) + ')', { count: cart.item_count, total: cart.total_price });
                 var cartPayload = JSON.stringify(buildPayload({
                   eventType: 'ADD_TO_CART',
                   utmSource: new URLSearchParams(window.location.search).get('utm_source') || (platform + ' AddToCart')
