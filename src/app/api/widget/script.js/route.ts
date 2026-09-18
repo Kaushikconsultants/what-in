@@ -757,8 +757,15 @@ export async function GET(req: NextRequest) {
       var w = window.innerWidth;
       var h = window.innerHeight;
       var dev = w <= 768 ? 'Mobile' : (w <= 1024 ? 'Tablet' : 'Desktop');
-      return w + 'x' + h + ' (' + dev + ')';
-    } catch (e) { return 'Unknown'; }
+      return {
+        width: w,
+        height: h,
+        device: dev,
+        formatted: w + 'x' + h + ' (' + dev + ')'
+      };
+    } catch (e) {
+      return { width: 1440, height: 900, device: 'Desktop', formatted: '1440x900 (Desktop)' };
+    }
   }
 
   // Helper to generate or reuse visitor reference token
@@ -934,20 +941,20 @@ export async function GET(req: NextRequest) {
     }
   } catch (e) {}
 
-  // 1c. Live Scroll Depth Meter & Timeline (Throttled)
+  // 1c. Live Scroll Depth Meter & Timeline (Fast & smooth)
   try {
     var maxScrollSent = 0;
     var scrollThrottle = null;
     window.addEventListener('scroll', function() {
       var current = getScrollDepth();
-      if (Math.abs(current - maxScrollSent) >= 15) {
+      if (Math.abs(current - maxScrollSent) >= 6) {
         maxScrollSent = current;
         recordTimelineEvent('SCROLL', 'Scrolled to ' + current + '% of page', { depth: current });
         if (!scrollThrottle) {
           scrollThrottle = setTimeout(function() {
             scrollThrottle = null;
             sendLiveTelemetry('SCROLL', { scrollDepth: maxScrollSent, screenTimeline: screenTimeline });
-          }, 1500);
+          }, 600);
         }
       }
     }, { passive: true });

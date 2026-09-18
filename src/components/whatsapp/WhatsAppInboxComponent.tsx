@@ -812,6 +812,76 @@ export default function WhatsAppInboxComponent() {
     return () => clearInterval(timer);
   }, [isAutoReplaying, activeWebsiteTrackingData.screenTimeline]);
 
+  // Robust Viewport Parser (Fixes undefined x undefined)
+  const parsedViewport = useMemo(() => {
+    const vp = activeWebsiteTrackingData.viewport;
+    if (!vp) return { device: "Desktop", width: 1440, height: 900, formatted: "Desktop (1440x900)" };
+    if (typeof vp === "object" && vp.device) {
+      return {
+        device: vp.device || "Desktop",
+        width: vp.width || 1440,
+        height: vp.height || 900,
+        formatted: vp.formatted || `${vp.device || "Desktop"} (${vp.width || 1440}x${vp.height || 900})`
+      };
+    }
+    if (typeof vp === "string") {
+      const match = vp.match(/(\d+)x(\d+)\s*\(([^)]+)\)/);
+      if (match) {
+        return { width: Number(match[1]), height: Number(match[2]), device: match[3], formatted: `${match[3]} (${match[1]}x${match[2]})` };
+      }
+      return { device: vp.includes("Mobile") ? "Mobile" : "Desktop", width: 1440, height: 900, formatted: vp };
+    }
+    return { device: "Desktop", width: 1440, height: 900, formatted: "Desktop (1440x900)" };
+  }, [activeWebsiteTrackingData.viewport]);
+
+  // Real Website Co-Browse Iframe references
+  const cobrowseIframeRef = useRef<HTMLIFrameElement>(null);
+  const cobrowseMiniIframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Active URL for real website co-browsing and session replay
+  const activeCoBrowseUrl = useMemo(() => {
+    if (coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex]) {
+      const step = activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex];
+      if (step.url && typeof step.url === "string" && step.url.startsWith("http")) return step.url;
+    }
+    if (activeWebsiteTrackingData.pageUrl && typeof activeWebsiteTrackingData.pageUrl === "string" && activeWebsiteTrackingData.pageUrl.startsWith("http")) {
+      return activeWebsiteTrackingData.pageUrl;
+    }
+    return "https://esponsports.com";
+  }, [coBrowseReplayIndex, activeWebsiteTrackingData.screenTimeline, activeWebsiteTrackingData.pageUrl]);
+
+  // Synchronized scroll depth for live co-browsing and session replay
+  const activeCoBrowseDepth = useMemo(() => {
+    if (coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex]) {
+      return activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].depth ?? activeWebsiteTrackingData.scrollDepth ?? 0;
+    }
+    return activeWebsiteTrackingData.scrollDepth ?? 0;
+  }, [coBrowseReplayIndex, activeWebsiteTrackingData.screenTimeline, activeWebsiteTrackingData.scrollDepth]);
+
+  useEffect(() => {
+    const sendScroll = (iframeEl: HTMLIFrameElement | null) => {
+      try {
+        if (iframeEl && iframeEl.contentWindow) {
+          iframeEl.contentWindow.postMessage({
+            type: "COBROWSE_SCROLL",
+            depth: activeCoBrowseDepth
+          }, "*");
+        }
+      } catch (_) {}
+    };
+    sendScroll(cobrowseIframeRef.current);
+    sendScroll(cobrowseMiniIframeRef.current);
+
+    const handleReady = (e: MessageEvent) => {
+      if (e.data?.type === "COBROWSE_IFRAME_READY") {
+        sendScroll(cobrowseIframeRef.current);
+        sendScroll(cobrowseMiniIframeRef.current);
+      }
+    };
+    window.addEventListener("message", handleReady);
+    return () => window.removeEventListener("message", handleReady);
+  }, [activeCoBrowseDepth]);
+
   // Quote Form State
   const [quoteItems, setQuoteItems] = useState([
     { name: "Cotton Polo T-Shirt (ESP-902)", quantity: 200, rate: 290 },
@@ -5920,7 +5990,7 @@ export default function WhatsAppInboxComponent() {
                   </span>
                 </div>
 
-                {/* Simulated Mini Screen Mirror Viewport */}
+                {/* Simulated Mini Screen Mirror Viewport (Real Website Embedded via Reverse Proxy) */}
                 <div style={{
                   position: "relative",
                   background: "#020617",
@@ -5945,67 +6015,42 @@ export default function WhatsAppInboxComponent() {
                       <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{activeWebsiteTrackingData.pageTitle || "Online Store"}</span>
                     </div>
                     <span style={{ fontSize: "9.5px", color: "#94a3b8", fontWeight: 700 }}>
-                      {activeWebsiteTrackingData.viewport?.device || "Screen"}
+                      {parsedViewport.device}
                     </span>
                   </div>
 
-                  {/* Simulated Screen Content Canvas */}
+                  {/* Real Website Iframe Preview with Live Synchronized Scroll */}
                   <div style={{
                     position: "relative",
-                    height: "160px",
-                    background: "radial-gradient(ellipse at top, #1e293b 0%, #090d16 100%)",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between",
-                    padding: "12px",
+                    height: "180px",
+                    background: "#ffffff",
                     overflow: "hidden"
                   }}>
-                    {/* Synchronized Scroll Ruler on right edge */}
-                    <div style={{
-                      position: "absolute",
-                      right: 3,
-                      top: 6,
-                      bottom: 6,
-                      width: 4,
-                      background: "rgba(255,255,255,0.1)",
-                      borderRadius: 2
-                    }}>
-                      <div style={{
-                        position: "absolute",
-                        top: `${activeWebsiteTrackingData.scrollDepth ?? 0}%`,
-                        width: "100%",
-                        height: "20px",
-                        background: "#38bdf8",
-                        borderRadius: 2,
-                        transform: "translateY(-50%)",
-                        transition: "top 0.3s ease",
-                        boxShadow: "0 0 6px #38bdf8"
-                      }} />
-                    </div>
-
-                    {/* Page mockup info inside canvas */}
-                    <div style={{ zIndex: 1 }}>
-                      <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "2px" }}>
-                        {activeWebsiteTrackingData.platform || "Website"} • {activeWebsiteTrackingData.pageUrl ? (new URL(activeWebsiteTrackingData.pageUrl).pathname || "/") : "/"}
-                      </div>
-                      <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#ffffff" }}>
-                        {activeWebsiteTrackingData.detectedProduct?.title || activeWebsiteTrackingData.pageTitle || "Browsing Website"}
-                      </div>
-                      {activeWebsiteTrackingData.cart && activeWebsiteTrackingData.cart.item_count > 0 && (
-                        <span style={{
-                          display: "inline-block",
-                          marginTop: "6px",
-                          fontSize: "10px",
-                          fontWeight: 700,
-                          background: "#065f46",
-                          color: "#a7f3d0",
-                          padding: "2px 6px",
-                          borderRadius: "4px"
-                        }}>
-                          🛒 Cart: {activeWebsiteTrackingData.cart.item_count} items (₹{activeWebsiteTrackingData.cart.total_price})
-                        </span>
-                      )}
-                    </div>
+                    {/* Embedded Real Website through our reverse proxy */}
+                    <iframe
+                      ref={cobrowseMiniIframeRef}
+                      src={`/api/cobrowse/proxy?url=${encodeURIComponent(activeCoBrowseUrl)}`}
+                      title="Mini Screen Preview"
+                      style={{
+                        width: "200%",
+                        height: "200%",
+                        border: "none",
+                        transform: "scale(0.5)",
+                        transformOrigin: "top left",
+                        pointerEvents: "none",
+                        background: "#ffffff"
+                      }}
+                      onLoad={() => {
+                        try {
+                          if (cobrowseMiniIframeRef.current?.contentWindow) {
+                            cobrowseMiniIframeRef.current.contentWindow.postMessage({
+                              type: "COBROWSE_SCROLL",
+                              depth: activeCoBrowseDepth
+                            }, "*");
+                          }
+                        } catch (_) {}
+                      }}
+                    />
 
                     {/* Live Laser Cursor Pointer */}
                     <div
@@ -6016,7 +6061,7 @@ export default function WhatsAppInboxComponent() {
                         transform: "translate(-50%, -50%)",
                         pointerEvents: "none",
                         transition: "left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
-                        zIndex: 10
+                        zIndex: 20
                       }}
                     >
                       <div style={{
@@ -6046,16 +6091,20 @@ export default function WhatsAppInboxComponent() {
 
                     {/* Bottom Status Overlay */}
                     <div style={{
-                      zIndex: 1,
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      zIndex: 25,
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
                       fontSize: "10.5px",
                       color: "#94a3b8",
-                      background: "rgba(15, 23, 42, 0.85)",
+                      background: "rgba(15, 23, 42, 0.90)",
                       backdropFilter: "blur(4px)",
                       padding: "4px 8px",
-                      borderRadius: "6px"
+                      borderTop: "1px solid rgba(255,255,255,0.1)"
                     }}>
                       <span style={{ color: "#38bdf8", fontWeight: 600 }}>
                         ↕ Scroll: {activeWebsiteTrackingData.scrollDepth !== null ? `${activeWebsiteTrackingData.scrollDepth}%` : "0%"}
@@ -6072,9 +6121,7 @@ export default function WhatsAppInboxComponent() {
                   <div style={{ background: "#1e293b", padding: "8px 10px", borderRadius: "8px", border: "1px solid #334155" }}>
                     <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600 }}>DEVICE & RESOLUTION</div>
                     <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#f8fafc", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {activeWebsiteTrackingData.viewport 
-                        ? `${activeWebsiteTrackingData.viewport.device || 'Desktop'} (${activeWebsiteTrackingData.viewport.width}x${activeWebsiteTrackingData.viewport.height})`
-                        : "Detecting..."}
+                      {parsedViewport.formatted}
                     </div>
                   </div>
                   <div style={{ background: "#1e293b", padding: "8px 10px", borderRadius: "8px", border: "1px solid #334155" }}>
@@ -6484,7 +6531,7 @@ export default function WhatsAppInboxComponent() {
                     <span>•</span>
                     <span>{activeWebsiteTrackingData.platform || "Storefront"}</span>
                     <span>•</span>
-                    <span>{activeWebsiteTrackingData.viewport ? `${activeWebsiteTrackingData.viewport.device} (${activeWebsiteTrackingData.viewport.width}x${activeWebsiteTrackingData.viewport.height})` : "Screen Synced"}</span>
+                    <span>{parsedViewport.formatted}</span>
                   </div>
                 </div>
               </div>
@@ -6544,9 +6591,9 @@ export default function WhatsAppInboxComponent() {
               {/* Left Column: Simulated Device Frame Screen Mirror */}
               <div className="cobrowse-screen-column">
                 {/* Device Frame */}
-                <div className={`cobrowse-device-bezel ${activeWebsiteTrackingData.viewport?.device === "Mobile" ? "mobile-bezel" : "desktop-bezel"}`}>
+                <div className={`cobrowse-device-bezel ${parsedViewport.device === "Mobile" ? "mobile-bezel" : "desktop-bezel"}`}>
                   {/* Notch / Browser Bar */}
-                  {activeWebsiteTrackingData.viewport?.device === "Mobile" ? (
+                  {parsedViewport.device === "Mobile" ? (
                     <div className="cobrowse-mobile-notch">
                       <div className="cobrowse-dynamic-island" />
                     </div>
@@ -6559,99 +6606,47 @@ export default function WhatsAppInboxComponent() {
                       </div>
                       <div className="cobrowse-url-bar">
                         <Lock size={11} color="#10b981" />
-                        <span>{activeWebsiteTrackingData.pageUrl || "https://yourwebsite.com"}</span>
+                        <span>{activeCoBrowseUrl}</span>
                       </div>
                       <div style={{ width: 40 }} />
                     </div>
                   )}
 
-                  {/* Screen Content */}
+                  {/* Screen Content: Real Website Live Embedded View */}
                   <div className="cobrowse-screen-viewport">
                     {/* Synchronized Scroll Bar on side */}
                     <div className="cobrowse-scroll-track">
                       <div 
                         className="cobrowse-scroll-thumb"
                         style={{
-                          top: `${coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex] 
-                            ? (activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].depth ?? activeWebsiteTrackingData.scrollDepth ?? 0)
-                            : (activeWebsiteTrackingData.scrollDepth ?? 0)}%`
+                          top: `${activeCoBrowseDepth}%`
                         }}
                       />
                     </div>
 
-                    {/* Page Content Simulation */}
-                    <div className="cobrowse-page-render" style={{
-                      transform: `translateY(-${Math.min(60, (coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex] 
-                        ? (activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].depth ?? activeWebsiteTrackingData.scrollDepth ?? 0)
-                        : (activeWebsiteTrackingData.scrollDepth ?? 0)) * 0.5)}%)`,
-                      transition: "transform 0.4s ease"
-                    }}>
-                      {/* Header bar of target site */}
-                      <div className="cobrowse-mock-header">
-                        <div style={{ fontWeight: 800, fontSize: "14px", color: "#0f172a" }}>
-                          {activeWebsiteTrackingData.platform === "Shopify" ? "🛍️ STORE" : "🌐 " + (activeConvDetail.customer?.businessName || "ONLINE STORE")}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "#64748b" }}>
-                          Cart ({activeWebsiteTrackingData.cart?.item_count || 0})
-                        </div>
-                      </div>
-
-                      {/* Hero / Active Product Card */}
-                      <div className="cobrowse-mock-card">
-                        <div style={{ fontSize: "11px", color: "#6366f1", fontWeight: 700, textTransform: "uppercase" }}>
-                          Active Page View
-                        </div>
-                        <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#0f172a", margin: "6px 0 10px 0" }}>
-                          {activeWebsiteTrackingData.detectedProduct?.title || activeWebsiteTrackingData.pageTitle || "Homepage & Product Catalog"}
-                        </h2>
-                        {activeWebsiteTrackingData.pageUrl && (
-                          <div style={{ fontSize: "12px", color: "#2563eb", marginBottom: "12px", wordBreak: "break-all" }}>
-                            {activeWebsiteTrackingData.pageUrl}
-                          </div>
-                        )}
-
-                        {activeWebsiteTrackingData.detectedProduct?.price && (
-                          <div style={{ fontSize: "20px", fontWeight: 800, color: "#059669", marginBottom: "12px" }}>
-                            ₹{activeWebsiteTrackingData.detectedProduct.price}
-                          </div>
-                        )}
-
-                        {activeWebsiteTrackingData.cart && activeWebsiteTrackingData.cart.item_count > 0 && (
-                          <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "10px", borderRadius: "8px", marginBottom: "12px" }}>
-                            <div style={{ fontWeight: 700, fontSize: "12px", color: "#065f46" }}>
-                              🛒 Active Cart: {activeWebsiteTrackingData.cart.item_count} items (₹{activeWebsiteTrackingData.cart.total_price || 0})
-                            </div>
-                            <div style={{ fontSize: "11px", color: "#047857", marginTop: "2px" }}>
-                              Customer has products waiting in cart
-                            </div>
-                          </div>
-                        )}
-
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <div style={{ padding: "8px 16px", background: "#4f46e5", color: "#ffffff", borderRadius: "6px", fontSize: "12px", fontWeight: 600 }}>
-                            Add to Cart
-                          </div>
-                          <div style={{ padding: "8px 16px", background: "#e2e8f0", color: "#334155", borderRadius: "6px", fontSize: "12px", fontWeight: 600 }}>
-                            View Details
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Mock content blocks to visualize scroll */}
-                      <div className="cobrowse-mock-section">
-                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#1e293b", marginBottom: "8px" }}>Product Specifications & Reviews</div>
-                        <p style={{ fontSize: "12px", color: "#64748b", lineHeight: "1.6" }}>
-                          Premium quality materials, engineered for durability and style. Customer reviews rated 4.8/5 based on verified buyers.
-                        </p>
-                      </div>
-                      <div className="cobrowse-mock-section">
-                        <div style={{ fontWeight: 700, fontSize: "13px", color: "#1e293b", marginBottom: "8px" }}>Related Recommendations</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                          <div style={{ height: "60px", background: "#f1f5f9", borderRadius: "6px" }} />
-                          <div style={{ height: "60px", background: "#f1f5f9", borderRadius: "6px" }} />
-                        </div>
-                      </div>
-                    </div>
+                    {/* Real Website Embedded View via Reverse Proxy */}
+                    <iframe
+                      ref={cobrowseIframeRef}
+                      src={`/api/cobrowse/proxy?url=${encodeURIComponent(activeCoBrowseUrl)}`}
+                      title="Live Co-Browsing Real Website View"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        border: "none",
+                        background: "#ffffff",
+                        display: "block"
+                      }}
+                      onLoad={() => {
+                        try {
+                          if (cobrowseIframeRef.current?.contentWindow) {
+                            cobrowseIframeRef.current.contentWindow.postMessage({
+                              type: "COBROWSE_SCROLL",
+                              depth: activeCoBrowseDepth
+                            }, "*");
+                          }
+                        } catch (_) {}
+                      }}
+                    />
 
                     {/* Live Laser Cursor with Radar Ring */}
                     <div
@@ -6663,7 +6658,9 @@ export default function WhatsAppInboxComponent() {
                         top: `${coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex]
                           ? (activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex].y ?? 45)
                           : activeWebsiteTrackingData.cursorY}%`,
-                        transition: "left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)"
+                        transition: "left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.45s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                        pointerEvents: "none",
+                        zIndex: 35
                       }}
                     >
                       <div className="cobrowse-cursor-ping" />
