@@ -850,6 +850,13 @@ export default function WhatsAppInboxComponent() {
     return "https://esponsports.com";
   }, [coBrowseReplayIndex, activeWebsiteTrackingData.screenTimeline, activeWebsiteTrackingData.pageUrl]);
 
+  // User device override toggle (auto by default based on visitor screen)
+  const [coBrowseDeviceMode, setCoBrowseDeviceMode] = useState<"auto" | "Mobile" | "Desktop">("auto");
+  const effectiveCoBrowseDevice = useMemo(() => {
+    if (coBrowseDeviceMode !== "auto") return coBrowseDeviceMode;
+    return parsedViewport.device === "Mobile" ? "Mobile" : "Desktop";
+  }, [coBrowseDeviceMode, parsedViewport.device]);
+
   // Synchronized scroll depth for live co-browsing and session replay
   const activeCoBrowseDepth = useMemo(() => {
     if (coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex]) {
@@ -6014,31 +6021,63 @@ export default function WhatsAppInboxComponent() {
                       <Lock size={10} color="#10b981" />
                       <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{activeWebsiteTrackingData.pageTitle || "Online Store"}</span>
                     </div>
-                    <span style={{ fontSize: "9.5px", color: "#94a3b8", fontWeight: 700 }}>
-                      {parsedViewport.device}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <button
+                        type="button"
+                        onClick={() => setCoBrowseDeviceMode(effectiveCoBrowseDevice === "Mobile" ? "Desktop" : "Mobile")}
+                        style={{
+                          background: "rgba(255,255,255,0.12)",
+                          border: "1px solid rgba(255,255,255,0.2)",
+                          borderRadius: "4px",
+                          padding: "2px 7px",
+                          fontSize: "9.5px",
+                          color: effectiveCoBrowseDevice === "Mobile" ? "#38bdf8" : "#a78bfa",
+                          cursor: "pointer",
+                          fontWeight: 700,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px"
+                        }}
+                        title={`Currently showing ${effectiveCoBrowseDevice} view. Click to switch.`}
+                      >
+                        {effectiveCoBrowseDevice === "Mobile" ? "📱 Mobile" : "💻 Desktop"}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Real Website Iframe Preview with Live Synchronized Scroll */}
                   <div style={{
                     position: "relative",
-                    height: "180px",
+                    height: effectiveCoBrowseDevice === "Mobile" ? "280px" : "190px",
                     background: "#ffffff",
-                    overflow: "hidden"
+                    overflow: "hidden",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "flex-start",
+                    transition: "height 0.25s ease"
                   }}>
                     {/* Embedded Real Website through our reverse proxy */}
                     <iframe
                       ref={cobrowseMiniIframeRef}
-                      src={`/api/cobrowse/proxy?url=${encodeURIComponent(activeCoBrowseUrl)}`}
+                      src={`/api/cobrowse/proxy?url=${encodeURIComponent(activeCoBrowseUrl)}&device=${effectiveCoBrowseDevice.toLowerCase()}`}
                       title="Mini Screen Preview"
-                      style={{
-                        width: "200%",
-                        height: "200%",
+                      style={effectiveCoBrowseDevice === "Mobile" ? {
+                        width: "100%",
+                        maxWidth: "360px",
+                        height: "100%",
                         border: "none",
-                        transform: "scale(0.5)",
+                        pointerEvents: "none",
+                        background: "#ffffff",
+                        display: "block"
+                      } : {
+                        width: "1280px",
+                        height: "720px",
+                        border: "none",
+                        transform: "scale(0.26)",
                         transformOrigin: "top left",
                         pointerEvents: "none",
-                        background: "#ffffff"
+                        background: "#ffffff",
+                        display: "block"
                       }}
                       onLoad={() => {
                         try {
@@ -6564,6 +6603,27 @@ export default function WhatsAppInboxComponent() {
 
                 <button
                   type="button"
+                  onClick={() => setCoBrowseDeviceMode(effectiveCoBrowseDevice === "Mobile" ? "Desktop" : "Mobile")}
+                  style={{
+                    background: "rgba(255,255,255,0.1)",
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    borderRadius: "8px",
+                    padding: "6px 12px",
+                    color: effectiveCoBrowseDevice === "Mobile" ? "#38bdf8" : "#a78bfa",
+                    fontSize: "11.5px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }}
+                  title="Switch between Mobile and Desktop viewport"
+                >
+                  <span>{effectiveCoBrowseDevice === "Mobile" ? "📱 Mobile View" : "💻 PC View"}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => {
                     setShowLiveCoBrowseModal(false);
                     setIsAutoReplaying(false);
@@ -6591,9 +6651,9 @@ export default function WhatsAppInboxComponent() {
               {/* Left Column: Simulated Device Frame Screen Mirror */}
               <div className="cobrowse-screen-column">
                 {/* Device Frame */}
-                <div className={`cobrowse-device-bezel ${parsedViewport.device === "Mobile" ? "mobile-bezel" : "desktop-bezel"}`}>
+                <div className={`cobrowse-device-bezel ${effectiveCoBrowseDevice === "Mobile" ? "mobile-bezel" : "desktop-bezel"}`}>
                   {/* Notch / Browser Bar */}
-                  {parsedViewport.device === "Mobile" ? (
+                  {effectiveCoBrowseDevice === "Mobile" ? (
                     <div className="cobrowse-mobile-notch">
                       <div className="cobrowse-dynamic-island" />
                     </div>
@@ -6627,7 +6687,7 @@ export default function WhatsAppInboxComponent() {
                     {/* Real Website Embedded View via Reverse Proxy */}
                     <iframe
                       ref={cobrowseIframeRef}
-                      src={`/api/cobrowse/proxy?url=${encodeURIComponent(activeCoBrowseUrl)}`}
+                      src={`/api/cobrowse/proxy?url=${encodeURIComponent(activeCoBrowseUrl)}&device=${effectiveCoBrowseDevice.toLowerCase()}`}
                       title="Live Co-Browsing Real Website View"
                       style={{
                         width: "100%",

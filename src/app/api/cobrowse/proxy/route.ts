@@ -16,15 +16,21 @@ export async function GET(req: NextRequest) {
 
     const urlObj = new URL(targetUrl);
     const origin = urlObj.origin;
+    const deviceParam = searchParams.get("device") || "desktop";
+    const isMobile = deviceParam.toLowerCase() === "mobile";
 
-    // Fetch the target website with a standard desktop browser User-Agent
+    const userAgent = isMobile
+      ? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+      : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+    // Fetch the target website with the matching device User-Agent
     const response = await fetch(targetUrl, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent": userAgent,
         Accept:
           "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Ch-Ua-Mobile": isMobile ? "?1" : "?0",
       },
       cache: "no-store",
     });
@@ -43,10 +49,12 @@ export async function GET(req: NextRequest) {
 
     // Prepare injection script:
     // 1. <base> tag so all assets, CSS, images, and fonts load from target origin
-    // 2. Co-browsing sync script to receive SCROLL commands from parent window
-    // 3. Disable internal navigation clicks so agent browsing doesn't redirect
+    // 2. Viewport meta to enforce mobile device scale when isMobile
+    // 3. Co-browsing sync script to receive SCROLL commands from parent window
+    // 4. Disable internal navigation clicks so agent browsing doesn't redirect
     const injection = `
       <base href="${origin}/">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
       <script>
         (function() {
           // Disable clicking links inside the co-browse view
