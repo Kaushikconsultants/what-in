@@ -281,20 +281,47 @@ export function cleanActualStoreUrl(rawUrl: string | null | undefined): string {
   while (maxDepth > 0 && (url.includes("/api/cobrowse/proxy?url=") || url.includes("/api/cobrowse/proxy?"))) {
     maxDepth--;
     try {
-      const match = url.match(/[?&]url=([^&]+)/);
+      const match = url.match(/[?&]url=([^&]+)/i);
       if (match && match[1]) {
         url = decodeURIComponent(match[1]);
       } else {
+        try {
+          const parsed = new URL(url.startsWith("http") ? url : `http://dummy.com${url.startsWith("/") ? "" : "/"}${url}`);
+          const target = parsed.searchParams.get("url");
+          if (target) {
+            url = target;
+            continue;
+          }
+        } catch (_) {}
         break;
       }
     } catch {
       break;
     }
   }
-  url = url.replace(/([?&])device=[^&]+/gi, '');
-  url = url.replace(/([?&])cb_ts=[^&]+/gi, '');
-  url = url.replace(/\?$/, '');
-  if (url.includes("/api/cobrowse/proxy")) return "https://esponsports.com";
+
+  // Remove tracking / internal proxy params
+  try {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      const parsed = new URL(url);
+      parsed.searchParams.delete("device");
+      parsed.searchParams.delete("cb_ts");
+      parsed.searchParams.delete("cb_session");
+      if (parsed.pathname.includes("/api/cobrowse/proxy")) {
+        return "https://esponsports.com";
+      }
+      url = parsed.toString();
+    } else {
+      url = url.replace(/([?&])(device|cb_ts|cb_session)=[^&]*(&|$)/gi, '');
+      if (url.includes("/api/cobrowse/proxy")) {
+        return "https://esponsports.com";
+      }
+    }
+  } catch {
+    if (url.includes("/api/cobrowse/proxy")) return "https://esponsports.com";
+  }
+
+  url = url.replace(/[?&]$/, "");
   return url;
 }
 
@@ -734,7 +761,18 @@ export default function WhatsAppInboxComponent() {
     );
     if (!ctxMsg) return null;
     try {
-      return typeof ctxMsg.metadata === "string" ? JSON.parse(ctxMsg.metadata) : ctxMsg.metadata;
+      const parsed = typeof ctxMsg.metadata === "string" ? JSON.parse(ctxMsg.metadata) : ctxMsg.metadata;
+      if (parsed && typeof parsed === "object") {
+        if (parsed.pageUrl) parsed.pageUrl = cleanActualStoreUrl(parsed.pageUrl);
+        if (Array.isArray(parsed.pageJourney)) {
+          parsed.pageJourney = parsed.pageJourney.map((step: any) => ({
+            ...step,
+            url: cleanActualStoreUrl(step.url || step.path || ""),
+            path: cleanActualStoreUrl(step.path || step.url || "")
+          }));
+        }
+      }
+      return parsed;
     } catch (_) {
       return null;
     }
@@ -752,11 +790,16 @@ export default function WhatsAppInboxComponent() {
     // If an explicit historical session is selected for replay/inspection
     if (selectedDbSession) {
       const pageTitle = selectedDbSession.pageTitle || "Online Store";
-      const pageUrl = selectedDbSession.pageUrl || "";
+      const pageUrl = cleanActualStoreUrl(selectedDbSession.pageUrl || "");
       const platform = selectedDbSession.platform || "Website";
       const categoryInsights = selectedDbSession.categoryInsights || null;
       const allSearches = (Array.isArray(selectedDbSession.searches) ? selectedDbSession.searches : []) as string[];
-      const pageJourney = Array.isArray(selectedDbSession.pageJourney) ? selectedDbSession.pageJourney : [];
+      const rawSessionJourney = Array.isArray(selectedDbSession.pageJourney) ? selectedDbSession.pageJourney : [];
+      const pageJourney = rawSessionJourney.map((p: any) => ({
+        ...p,
+        url: cleanActualStoreUrl(p.url || p.path || ""),
+        path: cleanActualStoreUrl(p.path || p.url || "")
+      }));
       const cart = selectedDbSession.cart || null;
       const detectedProduct = selectedDbSession.detectedProduct || null;
       const lastActivityTime = selectedDbSession.lastActivityAt || selectedDbSession.createdAt || null;
@@ -813,7 +856,7 @@ export default function WhatsAppInboxComponent() {
     }
 
     const pageTitle = live?.pageTitle || latestDbSession?.pageTitle || msgCtx?.pageTitle || "Online Store";
-    const pageUrl = live?.pageUrl || latestDbSession?.pageUrl || msgCtx?.pageUrl || "";
+    const pageUrl = cleanActualStoreUrl(live?.pageUrl || latestDbSession?.pageUrl || msgCtx?.pageUrl || "");
     const platform = live?.platform || latestDbSession?.platform || msgCtx?.platform || "Website";
     const categoryInsights = live?.categoryInsights || latestDbSession?.categoryInsights || msgCtx?.categoryInsights || null;
 
@@ -833,10 +876,16 @@ export default function WhatsAppInboxComponent() {
     const seenPaths = new Set<string>();
     const pageJourney: any[] = [];
     for (const step of rawJourney) {
-      const key = (step.path || step.url || "") + "_" + (step.timestamp || step.time || "");
+      const cleanPath = cleanActualStoreUrl(step.path || step.url || "");
+      const cleanUrl = cleanActualStoreUrl(step.url || step.path || "");
+      const key = (cleanPath || cleanUrl) + "_" + (step.timestamp || step.time || "");
       if (!seenPaths.has(key)) {
         seenPaths.add(key);
-        pageJourney.push(step);
+        pageJourney.push({
+          ...step,
+          path: cleanPath,
+          url: cleanUrl
+        });
       }
     }
 
@@ -1006,10 +1055,13 @@ export default function WhatsAppInboxComponent() {
   const activeCoBrowseUrl = useMemo(() => {
     if (coBrowseReplayIndex !== null && activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex]) {
       const step = activeWebsiteTrackingData.screenTimeline[coBrowseReplayIndex];
-      if (step.url && typeof step.url === "string" && step.url.startsWith("http")) return step.url;
+      if (step.url && typeof step.url === "string" && (step.url.startsWith("http") || step.url.includes("/api/cobrowse/proxy"))) {
+        return cleanActualStoreUrl(step.url);
+      }
     }
-    if (activeWebsiteTrackingData.pageUrl && typeof activeWebsiteTrackingData.pageUrl === "string" && activeWebsiteTrackingData.pageUrl.startsWith("http")) {
-      return activeWebsiteTrackingData.pageUrl;
+    if (activeWebsiteTrackingData.pageUrl && typeof activeWebsiteTrackingData.pageUrl === "string") {
+      const cleaned = cleanActualStoreUrl(activeWebsiteTrackingData.pageUrl);
+      if (cleaned.startsWith("http")) return cleaned;
     }
     return "https://esponsports.com";
   }, [coBrowseReplayIndex, activeWebsiteTrackingData.screenTimeline, activeWebsiteTrackingData.pageUrl]);
@@ -1608,10 +1660,16 @@ export default function WhatsAppInboxComponent() {
                   const seen = new Set();
                   const uniqueJourney = [];
                   for (const step of combinedJourney) {
-                    const key = (step.path || step.url || "") + (step.timestamp || "");
+                    const cleanPath = cleanActualStoreUrl(step.path || step.url || "");
+                    const cleanUrl = cleanActualStoreUrl(step.url || step.path || "");
+                    const key = (cleanPath || cleanUrl) + (step.timestamp || "");
                     if (!seen.has(key)) {
                       seen.add(key);
-                      uniqueJourney.push(step);
+                      uniqueJourney.push({
+                        ...step,
+                        path: cleanPath,
+                        url: cleanUrl
+                      });
                     }
                   }
 
@@ -1623,12 +1681,13 @@ export default function WhatsAppInboxComponent() {
                     ])
                   ).filter(Boolean);
 
+                  const cleanedIncomingPageUrl = cleanActualStoreUrl(incoming.pageUrl || "");
                   const existingLogs = Array.isArray(existing.eventLog) ? existing.eventLog : [];
                   const newLogEntry = {
                     id: Date.now() + Math.random().toString(),
                     eventType: incoming.eventType || "PAGE_VIEW",
                     pageTitle: incoming.pageTitle,
-                    pageUrl: incoming.pageUrl,
+                    pageUrl: cleanedIncomingPageUrl,
                     searchQuery: incoming.searchQuery,
                     timestamp: incoming.timestamp || new Date().toISOString(),
                   };
@@ -1643,6 +1702,7 @@ export default function WhatsAppInboxComponent() {
                     [incomingPhone]: {
                       ...existing,
                       ...incoming,
+                      pageUrl: cleanedIncomingPageUrl,
                       searches: mergedSearches,
                       pageJourney: uniqueJourney.slice(0, 25),
                       categoryInsights: incoming.categoryInsights || existing.categoryInsights || null,
@@ -3257,7 +3317,7 @@ export default function WhatsAppInboxComponent() {
                   } catch (_) {}
 
                   const pageTitle = contextObj.pageTitle || "Website Storefront";
-                  const pageUrl = contextObj.pageUrl || "";
+                  const pageUrl = cleanActualStoreUrl(contextObj.pageUrl || "");
                   const platform = contextObj.platform || "Website";
                   const product = contextObj.detectedProduct;
                   const cart = contextObj.cart;
@@ -5209,7 +5269,7 @@ export default function WhatsAppInboxComponent() {
                   <div style={{ fontWeight: 700, marginTop: "2px", lineHeight: "1.3" }}>{latestWebsiteContext.pageTitle || "Online Store"}</div>
                   {latestWebsiteContext.pageUrl && (
                     <a
-                      href={latestWebsiteContext.pageUrl}
+                      href={cleanActualStoreUrl(latestWebsiteContext.pageUrl)}
                       target="_blank"
                       rel="noreferrer"
                       style={{ fontSize: "11px", color: "#4f46e5", textDecoration: "underline", display: "inline-block", marginTop: "4px" }}
@@ -5275,14 +5335,14 @@ export default function WhatsAppInboxComponent() {
                         {latestWebsiteContext.pageJourney.map((step: any, sIdx: number) => (
                           <div key={sIdx} style={{ fontSize: "10.5px", color: "#334155", background: "white", padding: "4px 6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                             <span style={{ fontWeight: 700, color: "#64748b" }}>{sIdx + 1}. </span>
-                            <span style={{ fontWeight: 600 }}>{step.title || step.path}</span>
+                            <span style={{ fontWeight: 600 }}>{step.title || cleanActualStoreUrl(step.path || step.url || "Page")}</span>
                             {step.dwellSec > 0 && <span style={{ color: "#94a3b8" }}> ({step.dwellSec}s)</span>}
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div style={{ fontSize: "10px", color: "#64748b", marginTop: "3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {latestWebsiteContext.pageJourney.map((p: any) => p.path).slice(-2).join(" ➔ ")}
+                        {latestWebsiteContext.pageJourney.map((p: any) => cleanActualStoreUrl(p.path || p.url || "")).slice(-2).join(" ➔ ")}
                       </div>
                     )}
                   </div>
@@ -6704,7 +6764,7 @@ export default function WhatsAppInboxComponent() {
                 </div>
                 {activeWebsiteTrackingData.pageUrl ? (
                   <a
-                    href={activeWebsiteTrackingData.pageUrl}
+                    href={cleanActualStoreUrl(activeWebsiteTrackingData.pageUrl)}
                     target="_blank"
                     rel="noreferrer"
                     style={{
@@ -6717,7 +6777,7 @@ export default function WhatsAppInboxComponent() {
                       wordBreak: "break-all",
                     }}
                   >
-                    <span>{activeWebsiteTrackingData.pageUrl}</span>
+                    <span>{cleanActualStoreUrl(activeWebsiteTrackingData.pageUrl)}</span>
                     <ExternalLink size={11} />
                   </a>
                 ) : (
@@ -6939,6 +6999,7 @@ export default function WhatsAppInboxComponent() {
                   <div className="tracking-timeline">
                     {activeWebsiteTrackingData.pageJourney.map((step: any, sIdx: number) => {
                       const isLast = sIdx === activeWebsiteTrackingData.pageJourney.length - 1;
+                      const displayPath = cleanActualStoreUrl(step.path || step.url || "/");
                       return (
                         <div key={sIdx} className="tracking-timeline-step">
                           <div className={`tracking-timeline-node ${isLast ? "active" : ""}`}>
@@ -6946,11 +7007,11 @@ export default function WhatsAppInboxComponent() {
                           </div>
                           <div>
                             <div style={{ fontWeight: 600, color: "#0f172a", fontSize: "12px" }}>
-                              {step.title || step.path || "Page"}
+                              {step.title || displayPath}
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px", flexWrap: "wrap" }}>
                               <span style={{ fontSize: "11px", color: "#64748b", fontFamily: "monospace" }}>
-                                {step.path || "/"}
+                                {displayPath}
                               </span>
                               {step.dwellSeconds && (
                                 <span className="tracking-dwell-badge">
@@ -6985,7 +7046,7 @@ export default function WhatsAppInboxComponent() {
                     {activeWebsiteTrackingData.liveEventLog.map((logItem: any, lIdx: number) => (
                       <div key={lIdx} style={{ fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: "5px 8px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
                         <span style={{ color: "#334155" }}>
-                          {logItem.eventType === "SEARCH" ? `🔍 Searched: "${logItem.searchQuery}"` : `📄 Viewed: ${logItem.pageTitle || logItem.pageUrl}`}
+                          {logItem.eventType === "SEARCH" ? `🔍 Searched: "${logItem.searchQuery}"` : `📄 Viewed: ${logItem.pageTitle || cleanActualStoreUrl(logItem.pageUrl)}`}
                         </span>
                         <span style={{ fontSize: "10px", color: "#94a3b8" }}>
                           {new Date(logItem.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -7249,7 +7310,7 @@ export default function WhatsAppInboxComponent() {
                       </div>
                       <div className="cobrowse-url-bar">
                         <Lock size={11} color="#10b981" />
-                        <span>{activeCoBrowseUrl}</span>
+                        <span>{cleanActualStoreUrl(activeCoBrowseUrl)}</span>
                       </div>
                       <div style={{ width: 40 }} />
                     </div>
