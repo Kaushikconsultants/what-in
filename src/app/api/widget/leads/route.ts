@@ -64,10 +64,22 @@ export async function GET(req: NextRequest) {
     const queryPhone = searchParams.get("phone")?.trim() || "";
     const cleanQueryPhone = queryPhone.replace(/\D/g, "");
 
-    // 2. Fetch recent Storefront Widget Clicks & Add-To-Cart Sessions
+    // 2. Fetch recent Storefront Widget Clicks & Add-To-Cart Sessions (Strict 7-Day Window)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    // Auto-delete recordings older than 7 days to optimize DB memory & performance
+    prisma.whatsAppChatbotLog.deleteMany({
+      where: {
+        clientId: client.id,
+        nodeType: "WIDGET_SESSION_REF",
+        createdAt: { lt: sevenDaysAgo }
+      }
+    }).catch((e) => console.warn("[Leads Route] 7-day session auto-purge skipped:", e.message));
+
     const sessionWhere: any = {
       clientId: client.id,
       nodeType: "WIDGET_SESSION_REF",
+      createdAt: { gte: sevenDaysAgo },
     };
     if (cleanQueryPhone.length >= 6) {
       const last10 = cleanQueryPhone.slice(-10);
@@ -79,40 +91,187 @@ export async function GET(req: NextRequest) {
       ];
     }
 
+    function formatSessionDate(d: Date): { formattedDate: string; formattedTime: string; dateCategory: string } {
+      const now = new Date();
+      const sessionDate = new Date(d);
+
+      const isToday = now.toDateString() === sessionDate.toDateString();
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const isYesterday = yesterday.toDateString() === sessionDate.toDateString();
+
+      const diffDays = Math.round((now.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24));
+      let dateCategory = "OLDER";
+      let formattedDate = sessionDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+      if (isToday) {
+        dateCategory = "TODAY";
+        formattedDate = `Today, ${sessionDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+      } else if (isYesterday) {
+        dateCategory = "YESTERDAY";
+        formattedDate = `Yesterday, ${sessionDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+      } else if (diffDays <= 7) {
+        dateCategory = "LAST_7_DAYS";
+      }
+
+      const formattedTime = sessionDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+      return { formattedDate, formattedTime, dateCategory };
+    }
+
     const rawSessions = await prisma.whatsAppChatbotLog.findMany({
       where: sessionWhere,
       orderBy: { createdAt: "desc" },
-      take: cleanQueryPhone ? 100 : 50,
+      take: cleanQueryPhone ? 150 : 50,
     });
 
-    const parsedSessions = rawSessions.map((s) => {
-      let payload: any = {};
+    // Group raw telemetry logs into discrete user browsing sessions
+    const sessionGroups: Record<string, any[]> = {};
+    for (const log of rawSessions) {
+      let p: any = {};
       try {
-        payload = typeof s.payload === "string" ? JSON.parse(s.payload) : s.payload || {};
+        p = typeof log.payload === "string" ? JSON.parse(log.payload) : (log.payload || {});
       } catch {
-        payload = {};
+        p = {};
       }
 
+      // Group key: refId or 30-minute session window
+      const timeWindowKey = new Date(log.createdAt).toISOString().slice(0, 13);
+      const refKey = (log.nodeId && log.nodeId !== "WIDGET_SESSION_REF" && log.nodeId !== "WIDGET_SESSION")
+        ? log.nodeId
+        : (p.refId || `SESSION_${timeWindowKey}`);
+
+      if (!sessionGroups[refKey]) {
+        sessionGroups[refKey] = [];
+      }
+      sessionGroups[refKey].push({ log, payload: p });
+    }
+
+    const parsedSessions = Object.keys(sessionGroups).map((refKey) => {
+      const group = sessionGroups[refKey];
+      // Sort chronologically ascending within session to compile sequential timeline
+      group.sort((a, b) => new Date(a.log.createdAt).getTime() - new Date(b.log.createdAt).getTime());
+
+      const firstItem = group[0];
+      const lastItem = group[group.length - 1];
+      const startTime = new Date(firstItem.log.createdAt);
+      const endTime = new Date(lastItem.log.createdAt);
+
+      // Find cart from any entry that had cart items in this session
+      let finalCart: any = null;
+      for (let i = group.length - 1; i >= 0; i--) {
+        if (group[i].payload.cart && (group[i].payload.cart.item_count > 0 || group[i].payload.cart.items?.length > 0)) {
+          finalCart = group[i].payload.cart;
+          break;
+        }
+      }
+      if (!finalCart) {
+        finalCart = lastItem.payload.cart || firstItem.payload.cart || null;
+      }
+
+      // Merge unique page journey
+      const seenUrls = new Set<string>();
+      const mergedJourney: any[] = [];
+      for (const item of group) {
+        const j = Array.isArray(item.payload.pageJourney) ? item.payload.pageJourney : [];
+        for (const step of j) {
+          const key = (step.path || step.url || "") + "_" + (step.title || "");
+          if (!seenUrls.has(key)) {
+            seenUrls.add(key);
+            mergedJourney.push(step);
+          }
+        }
+      }
+
+      // Merge unique searches
+      const searchSet = new Set<string>();
+      for (const item of group) {
+        const s = Array.isArray(item.payload.searches) ? item.payload.searches : [];
+        s.forEach((term: string) => term && searchSet.add(term));
+        if (item.payload.searchQuery) searchSet.add(item.payload.searchQuery);
+      }
+
+      // Merge screen timeline events
+      const mergedTimeline: any[] = [];
+      const seenTimelineKeys = new Set<string>();
+      for (const item of group) {
+        const t = Array.isArray(item.payload.screenTimeline) ? item.payload.screenTimeline : [];
+        for (const ev of t) {
+          const evKey = (ev.time || "") + "_" + (ev.type || "") + "_" + (ev.label || "");
+          if (!seenTimelineKeys.has(evKey)) {
+            seenTimelineKeys.add(evKey);
+            mergedTimeline.push(ev);
+          }
+        }
+      }
+
+      // Fallback timeline from journey if empty
+      if (mergedTimeline.length === 0 && mergedJourney.length > 0) {
+        mergedJourney.forEach((p, idx) => {
+          mergedTimeline.push({
+            time: p.time || "Recently",
+            type: "PAGE",
+            label: "Visited: " + (p.title || p.path || "Storefront"),
+            depth: 20 + ((idx * 25) % 80),
+            x: 50,
+            y: 40
+          });
+        });
+      }
+
+      // Viewport & device detection (Default to authentic Mobile for WhatsApp storefront visitors)
+      const vp = lastItem.payload.viewport || firstItem.payload.viewport || null;
+      const dev = (vp && vp.device) ? vp.device : "Mobile";
+
+      const { formattedDate, formattedTime, dateCategory } = formatSessionDate(startTime);
+      const endFormattedTime = endTime.getTime() !== startTime.getTime()
+        ? new Date(endTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+        : null;
+
+      const durationSec = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 1000));
+      const durMinutes = Math.floor(durationSec / 60);
+      const durSeconds = durationSec % 60;
+      const durationFormatted = durMinutes > 0 ? `${durMinutes}m ${durSeconds}s` : `${durSeconds}s`;
+
       return {
-        id: s.id,
-        refId: s.nodeId || payload.refId || "",
-        phone: s.phone !== "WIDGET_SESSION" ? s.phone : payload.phone || null,
-        name: payload.name || null,
-        eventType: payload.eventType || "VISITOR_CLICK",
-        actionDesc: s.actionDesc || payload.pageTitle || "Website Visit",
-        pageUrl: payload.pageUrl || "",
-        pageTitle: payload.pageTitle || "Online Store",
-        platform: payload.platform || "Shopify",
-        detectedProduct: payload.detectedProduct || null,
-        cart: payload.cart || null,
-        customMessage: payload.customMessage || null,
-        pageJourney: Array.isArray(payload.pageJourney) ? payload.pageJourney : [],
-        searches: Array.isArray(payload.searches) ? payload.searches : [],
-        categoryInsights: payload.categoryInsights || null,
-        sessionStats: payload.sessionStats || null,
-        createdAt: s.createdAt,
+        id: lastItem.log.id,
+        refId: refKey,
+        phone: lastItem.log.phone !== "WIDGET_SESSION" ? lastItem.log.phone : (lastItem.payload.phone || null),
+        name: lastItem.payload.name || firstItem.payload.name || null,
+        eventType: lastItem.payload.eventType || "VISITOR_SESSION",
+        actionDesc: lastItem.log.actionDesc || lastItem.payload.pageTitle || "Website Visit",
+        pageUrl: lastItem.payload.pageUrl || firstItem.payload.pageUrl || "",
+        pageTitle: lastItem.payload.pageTitle || firstItem.payload.pageTitle || "Online Store",
+        platform: lastItem.payload.platform || "Shopify",
+        detectedProduct: lastItem.payload.detectedProduct || firstItem.payload.detectedProduct || null,
+        cart: finalCart,
+        pageJourney: mergedJourney,
+        searches: Array.from(searchSet),
+        categoryInsights: lastItem.payload.categoryInsights || firstItem.payload.categoryInsights || null,
+        sessionStats: lastItem.payload.sessionStats || firstItem.payload.sessionStats || { pageViews: mergedJourney.length || 1, totalDurationSec: durationSec },
+        viewport: vp || { device: dev, width: 390, height: 844, formatted: `${dev} (390x844)` },
+        scrollDepth: lastItem.payload.scrollDepth !== undefined ? lastItem.payload.scrollDepth : (firstItem.payload.scrollDepth || 0),
+        screenTimeline: mergedTimeline,
+        cursorX: lastItem.payload.cursorX ?? 50,
+        cursorY: lastItem.payload.cursorY ?? 45,
+        clickX: lastItem.payload.clickX ?? null,
+        clickY: lastItem.payload.clickY ?? null,
+        lastInteraction: lastItem.payload.lastInteraction || null,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        formattedDate,
+        formattedTime: endFormattedTime ? `${formattedTime} - ${endFormattedTime}` : formattedTime,
+        dateCategory,
+        durationSec,
+        durationFormatted,
+        pageCount: mergedJourney.length || 1,
+        actionCount: mergedTimeline.length,
+        isWithCart: Boolean(finalCart && (finalCart.item_count > 0 || finalCart.items?.length > 0)),
+        createdAt: lastItem.log.createdAt,
       };
     });
+
+    // Sort aggregated sessions newest first
+    parsedSessions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // 3. Match customers with their latest session if available
     const leads = customers.map((c) => {

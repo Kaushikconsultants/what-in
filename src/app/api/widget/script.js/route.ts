@@ -754,9 +754,11 @@ export async function GET(req: NextRequest) {
 
   function getViewportInfo() {
     try {
-      var w = window.innerWidth;
-      var h = window.innerHeight;
-      var dev = w <= 768 ? 'Mobile' : (w <= 1024 ? 'Tablet' : 'Desktop');
+      var w = window.innerWidth || (document.documentElement ? document.documentElement.clientWidth : 390);
+      var h = window.innerHeight || (document.documentElement ? document.documentElement.clientHeight : 844);
+      var ua = navigator.userAgent || '';
+      var isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile/i.test(ua) || (navigator.maxTouchPoints > 1 && w <= 1024);
+      var dev = (isMobileUA || w <= 820) ? 'Mobile' : (w <= 1024 ? 'Tablet' : 'Desktop');
       return {
         width: w,
         height: h,
@@ -764,7 +766,7 @@ export async function GET(req: NextRequest) {
         formatted: w + 'x' + h + ' (' + dev + ')'
       };
     } catch (e) {
-      return { width: 1440, height: 900, device: 'Desktop', formatted: '1440x900 (Desktop)' };
+      return { width: 390, height: 844, device: 'Mobile', formatted: '390x844 (Mobile)' };
     }
   }
 

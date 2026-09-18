@@ -306,6 +306,7 @@ export default function WhatsAppInboxComponent() {
   const [liveCustomerActivityMap, setLiveCustomerActivityMap] = useState<Record<string, any>>({});
   const [customerWebSessions, setCustomerWebSessions] = useState<any[]>([]);
   const [loadingWebSessions, setLoadingWebSessions] = useState<boolean>(false);
+  const [selectedWebSessionId, setSelectedWebSessionId] = useState<string | null>(null);
 
   // Native In-App Live Screen Co-Browsing & Replay States
   const [showLiveCoBrowseModal, setShowLiveCoBrowseModal] = useState<boolean>(false);
@@ -340,12 +341,36 @@ export default function WhatsAppInboxComponent() {
   };
 
   useEffect(() => {
+    setSelectedWebSessionId(null);
+    setCoBrowseReplayIndex(null);
+    setIsAutoReplaying(false);
     if (activeCustomerPhone) {
       fetchCustomerWebSessions(activeCustomerPhone);
     } else {
       setCustomerWebSessions([]);
     }
   }, [activeCustomerPhone]);
+
+  // Group customer web sessions date-wise & time-wise (Retained for last 7 days to optimize memory)
+  const groupedCustomerSessions = useMemo(() => {
+    if (!customerWebSessions || customerWebSessions.length === 0) return [];
+    const groups: { dateLabel: string; sessions: any[] }[] = [];
+    const map = new Map<string, any[]>();
+
+    for (const s of customerWebSessions) {
+      const label = s.formattedDate || "Past Visits";
+      if (!map.has(label)) {
+        map.set(label, []);
+      }
+      map.get(label)!.push(s);
+    }
+
+    map.forEach((sessions, dateLabel) => {
+      groups.push({ dateLabel, sessions });
+    });
+
+    return groups;
+  }, [customerWebSessions]);
 
 
 
@@ -660,11 +685,77 @@ export default function WhatsAppInboxComponent() {
     }
   }, [activeConvDetail?.messages]);
 
-  // Consolidated Website Tracking Data
+  // Consolidated Website Tracking Data (Live or Historical Session Replay)
   const activeWebsiteTrackingData = useMemo(() => {
     const live = activeCustomerPhone ? liveCustomerActivityMap[activeCustomerPhone] : null;
-    const latestDbSession = customerWebSessions[0] || null;
+    const selectedDbSession = selectedWebSessionId 
+      ? customerWebSessions.find((s: any) => s.id === selectedWebSessionId || s.refId === selectedWebSessionId)
+      : null;
+    const latestDbSession = selectedDbSession || customerWebSessions[0] || null;
     const msgCtx = latestWebsiteContext;
+
+    // If an explicit historical session is selected for replay/inspection
+    if (selectedDbSession) {
+      const pageTitle = selectedDbSession.pageTitle || "Online Store";
+      const pageUrl = selectedDbSession.pageUrl || "";
+      const platform = selectedDbSession.platform || "Website";
+      const categoryInsights = selectedDbSession.categoryInsights || null;
+      const allSearches = (Array.isArray(selectedDbSession.searches) ? selectedDbSession.searches : []) as string[];
+      const pageJourney = Array.isArray(selectedDbSession.pageJourney) ? selectedDbSession.pageJourney : [];
+      const cart = selectedDbSession.cart || null;
+      const detectedProduct = selectedDbSession.detectedProduct || null;
+      const lastActivityTime = selectedDbSession.lastActivityAt || selectedDbSession.createdAt || null;
+      const scrollDepth = typeof selectedDbSession.scrollDepth === "number" ? selectedDbSession.scrollDepth : null;
+      const viewport = selectedDbSession.viewport || null;
+      const lastInteraction = selectedDbSession.lastInteraction || "Recorded browsing";
+      const cursorX = typeof selectedDbSession.cursorX === "number" ? selectedDbSession.cursorX : 50;
+      const cursorY = typeof selectedDbSession.cursorY === "number" ? selectedDbSession.cursorY : 45;
+      const clickX = typeof selectedDbSession.clickX === "number" ? selectedDbSession.clickX : null;
+      const clickY = typeof selectedDbSession.clickY === "number" ? selectedDbSession.clickY : null;
+      const screenTimeline: any[] = Array.isArray(selectedDbSession.screenTimeline) && selectedDbSession.screenTimeline.length > 0
+        ? selectedDbSession.screenTimeline
+        : (
+          pageJourney.length > 0
+            ? pageJourney.map((p: any, idx: number) => ({
+                time: p.time ? new Date(p.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Step",
+                type: "PAGE",
+                label: "Visited: " + (p.title || p.path || "Page"),
+                depth: 20 + ((idx * 25) % 80),
+                x: 50,
+                y: 40
+              }))
+            : []
+        );
+
+      return {
+        hasAnyData: true,
+        isOnlineNow: false,
+        presenceStatus: "OFFLINE" as const,
+        isHistoricalReplay: true,
+        selectedSessionId: selectedDbSession.id,
+        sessionDate: selectedDbSession.formattedDate || null,
+        sessionTime: selectedDbSession.formattedTime || null,
+        sessionDuration: selectedDbSession.durationFormatted || null,
+        scrollDepth,
+        viewport,
+        lastInteraction,
+        cursorX,
+        cursorY,
+        clickX,
+        clickY,
+        screenTimeline,
+        lastActivityTime,
+        pageTitle,
+        pageUrl,
+        platform,
+        categoryInsights,
+        searches: allSearches,
+        pageJourney,
+        cart,
+        detectedProduct,
+        liveEventLog: [],
+      };
+    }
 
     const pageTitle = live?.pageTitle || latestDbSession?.pageTitle || msgCtx?.pageTitle || "Online Store";
     const pageUrl = live?.pageUrl || latestDbSession?.pageUrl || msgCtx?.pageUrl || "";
@@ -735,26 +826,30 @@ export default function WhatsAppInboxComponent() {
     }
 
     const isOnlineNow = presenceStatus === "ONLINE";
-    const scrollDepth = typeof live?.scrollDepth === "number" ? live.scrollDepth : null;
-    const viewport = live?.viewport || null;
-    const lastInteraction = live?.lastInteraction || null;
-    const cursorX = typeof live?.cursorX === "number" ? live.cursorX : 50;
-    const cursorY = typeof live?.cursorY === "number" ? live.cursorY : 45;
-    const clickX = typeof live?.clickX === "number" ? live.clickX : null;
-    const clickY = typeof live?.clickY === "number" ? live.clickY : null;
+    const scrollDepth = typeof live?.scrollDepth === "number" ? live.scrollDepth : (typeof latestDbSession?.scrollDepth === "number" ? latestDbSession.scrollDepth : null);
+    const viewport = live?.viewport || latestDbSession?.viewport || msgCtx?.viewport || null;
+    const lastInteraction = live?.lastInteraction || latestDbSession?.lastInteraction || null;
+    const cursorX = typeof live?.cursorX === "number" ? live.cursorX : (typeof latestDbSession?.cursorX === "number" ? latestDbSession.cursorX : 50);
+    const cursorY = typeof live?.cursorY === "number" ? live.cursorY : (typeof latestDbSession?.cursorY === "number" ? latestDbSession.cursorY : 45);
+    const clickX = typeof live?.clickX === "number" ? live.clickX : (typeof latestDbSession?.clickX === "number" ? latestDbSession.clickX : null);
+    const clickY = typeof live?.clickY === "number" ? live.clickY : (typeof latestDbSession?.clickY === "number" ? latestDbSession.clickY : null);
     const screenTimeline: any[] = Array.isArray(live?.screenTimeline) && live.screenTimeline.length > 0
       ? live.screenTimeline
       : (
-        pageJourney.length > 0
-          ? pageJourney.map((p: any, idx: number) => ({
-              time: p.time ? new Date(p.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently",
-              type: "PAGE",
-              label: "Visited: " + (p.title || p.path || "Page"),
-              depth: 20 + ((idx * 25) % 80),
-              x: 50,
-              y: 40
-            }))
-          : []
+        Array.isArray(latestDbSession?.screenTimeline) && latestDbSession.screenTimeline.length > 0
+          ? latestDbSession.screenTimeline
+          : (
+            pageJourney.length > 0
+              ? pageJourney.map((p: any, idx: number) => ({
+                  time: p.time ? new Date(p.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Recently",
+                  type: "PAGE",
+                  label: "Visited: " + (p.title || p.path || "Page"),
+                  depth: 20 + ((idx * 25) % 80),
+                  x: 50,
+                  y: 40
+                }))
+              : []
+          )
       );
 
     const hasAnyData = Boolean(
@@ -770,6 +865,11 @@ export default function WhatsAppInboxComponent() {
       hasAnyData,
       isOnlineNow,
       presenceStatus,
+      isHistoricalReplay: false,
+      selectedSessionId: latestDbSession?.id || null,
+      sessionDate: latestDbSession?.formattedDate || null,
+      sessionTime: latestDbSession?.formattedTime || null,
+      sessionDuration: latestDbSession?.durationFormatted || null,
       scrollDepth,
       viewport,
       lastInteraction,
@@ -789,16 +889,17 @@ export default function WhatsAppInboxComponent() {
       detectedProduct,
       liveEventLog: Array.isArray(live?.eventLog) ? live.eventLog : [],
     };
-  }, [activeCustomerPhone, liveCustomerActivityMap, customerWebSessions, latestWebsiteContext]);
+  }, [activeCustomerPhone, liveCustomerActivityMap, customerWebSessions, latestWebsiteContext, selectedWebSessionId]);
 
-  // Auto-replay player timer for Native Co-Browsing Theater
+  // Screen Replay Auto-Playback Engine
   useEffect(() => {
     if (!isAutoReplaying) return;
     const timeline = activeWebsiteTrackingData.screenTimeline;
-    if (!timeline || timeline.length === 0) {
+    if (!timeline || timeline.length <= 1) {
       setIsAutoReplaying(false);
       return;
     }
+
     const timer = setInterval(() => {
       setCoBrowseReplayIndex((prev) => {
         const next = prev === null ? 0 : prev + 1;
@@ -812,26 +913,34 @@ export default function WhatsAppInboxComponent() {
     return () => clearInterval(timer);
   }, [isAutoReplaying, activeWebsiteTrackingData.screenTimeline]);
 
-  // Robust Viewport Parser (Fixes undefined x undefined)
+  // Robust Viewport Parser (Defaults to Mobile for WhatsApp storefront visitors)
   const parsedViewport = useMemo(() => {
     const vp = activeWebsiteTrackingData.viewport;
-    if (!vp) return { device: "Desktop", width: 1440, height: 900, formatted: "Desktop (1440x900)" };
+    if (!vp) {
+      // Default to Mobile because 95%+ of WhatsApp visitors browse from mobile phones
+      return { device: "Mobile", width: 390, height: 844, formatted: "Mobile (390x844)" };
+    }
     if (typeof vp === "object" && vp.device) {
+      const isMob = /mobile/i.test(vp.device) || (typeof vp.width === "number" && vp.width <= 820);
+      const dev = isMob ? "Mobile" : (/tablet/i.test(vp.device) ? "Tablet" : "Desktop");
       return {
-        device: vp.device || "Desktop",
-        width: vp.width || 1440,
-        height: vp.height || 900,
-        formatted: vp.formatted || `${vp.device || "Desktop"} (${vp.width || 1440}x${vp.height || 900})`
+        device: dev,
+        width: vp.width || (dev === "Mobile" ? 390 : 1440),
+        height: vp.height || (dev === "Mobile" ? 844 : 900),
+        formatted: vp.formatted || `${dev} (${vp.width || (dev === "Mobile" ? 390 : 1440)}x${vp.height || (dev === "Mobile" ? 844 : 900)})`
       };
     }
     if (typeof vp === "string") {
       const match = vp.match(/(\d+)x(\d+)\s*\(([^)]+)\)/);
       if (match) {
-        return { width: Number(match[1]), height: Number(match[2]), device: match[3], formatted: `${match[3]} (${match[1]}x${match[2]})` };
+        const w = Number(match[1]);
+        const dev = /mobile/i.test(match[3]) || w <= 820 ? "Mobile" : "Desktop";
+        return { width: w, height: Number(match[2]), device: dev, formatted: `${dev} (${match[1]}x${match[2]})` };
       }
-      return { device: vp.includes("Mobile") ? "Mobile" : "Desktop", width: 1440, height: 900, formatted: vp };
+      const isMob = /mobile/i.test(vp);
+      return { device: isMob ? "Mobile" : "Desktop", width: isMob ? 390 : 1440, height: isMob ? 844 : 900, formatted: vp };
     }
-    return { device: "Desktop", width: 1440, height: 900, formatted: "Desktop (1440x900)" };
+    return { device: "Mobile", width: 390, height: 844, formatted: "Mobile (390x844)" };
   }, [activeWebsiteTrackingData.viewport]);
 
   // Real Website Co-Browse Iframe references
@@ -854,7 +963,8 @@ export default function WhatsAppInboxComponent() {
   const [coBrowseDeviceMode, setCoBrowseDeviceMode] = useState<"auto" | "Mobile" | "Desktop">("auto");
   const effectiveCoBrowseDevice = useMemo(() => {
     if (coBrowseDeviceMode !== "auto") return coBrowseDeviceMode;
-    return parsedViewport.device === "Mobile" ? "Mobile" : "Desktop";
+    // Default to Mobile unless explicitly verified as Desktop
+    return parsedViewport.device === "Desktop" ? "Desktop" : "Mobile";
   }, [coBrowseDeviceMode, parsedViewport.device]);
 
   // Synchronized scroll depth for live co-browsing and session replay
@@ -6246,6 +6356,283 @@ export default function WhatsAppInboxComponent() {
                 </button>
               </div>
 
+              {/* ================================================================= */}
+              {/* DATE-WISE & TIME-WISE RECORDINGS & PAST BEHAVIOR (LAST 7 DAYS)    */}
+              {/* ================================================================= */}
+              <div style={{
+                background: "#0f172a",
+                borderRadius: "12px",
+                border: "1px solid #334155",
+                padding: "14px",
+                marginBottom: "16px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.25)"
+              }}>
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "7px", fontWeight: 700, fontSize: "13px", color: "#ffffff" }}>
+                    <Calendar size={16} color="#38bdf8" />
+                    <span>Past Website Visits & Recordings</span>
+                  </div>
+                  <span style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: "10px",
+                    background: "rgba(56, 189, 248, 0.15)",
+                    color: "#38bdf8",
+                    border: "1px solid rgba(56, 189, 248, 0.3)"
+                  }}>
+                    {customerWebSessions.length} {customerWebSessions.length === 1 ? "Session" : "Sessions"}
+                  </span>
+                </div>
+
+                <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span>Auto-saved last 7 days • Date & time wise replay</span>
+                  <span style={{ fontSize: "9.5px", color: "#64748b", background: "rgba(255,255,255,0.05)", padding: "1px 5px", borderRadius: "3px" }}>7-Day Auto Purge</span>
+                </div>
+
+                {/* Return to Live banner if currently inspecting a past session */}
+                {selectedWebSessionId && (
+                  <div style={{
+                    background: "linear-gradient(135deg, rgba(30, 58, 138, 0.6) 0%, rgba(15, 23, 42, 0.9) 100%)",
+                    border: "1px solid #3b82f6",
+                    borderRadius: "8px",
+                    padding: "8px 10px",
+                    marginBottom: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "8px"
+                  }}>
+                    <div style={{ fontSize: "11px", color: "#bfdbfe" }}>
+                      <span style={{ fontWeight: 700, color: "#60a5fa" }}>Viewing Past Session:</span>{" "}
+                      {activeWebsiteTrackingData.sessionDate} at {activeWebsiteTrackingData.sessionTime}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedWebSessionId(null);
+                        setCoBrowseReplayIndex(null);
+                        setIsAutoReplaying(false);
+                      }}
+                      style={{
+                        background: "#2563eb",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "5px",
+                        padding: "3px 8px",
+                        fontSize: "10.5px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      Return to Live
+                    </button>
+                  </div>
+                )}
+
+                {loadingWebSessions && (
+                  <div style={{ padding: "16px", textAlign: "center", color: "#94a3b8", fontSize: "12px" }}>
+                    <RefreshCw size={14} className="spin" style={{ display: "inline-block", marginRight: "6px" }} />
+                    <span>Loading past session recordings...</span>
+                  </div>
+                )}
+
+                {!loadingWebSessions && customerWebSessions.length === 0 && (
+                  <div style={{
+                    padding: "14px",
+                    textAlign: "center",
+                    background: "rgba(15, 23, 42, 0.6)",
+                    borderRadius: "8px",
+                    border: "1px dashed #334155",
+                    color: "#94a3b8",
+                    fontSize: "11.5px"
+                  }}>
+                    No website visits recorded in the last 7 days for this customer. Any visits from your website widget will automatically appear here with full screen replay.
+                  </div>
+                )}
+
+                {/* Grouped Date-wise Sessions */}
+                {!loadingWebSessions && groupedCustomerSessions.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "380px", overflowY: "auto", paddingRight: "4px" }}>
+                    {groupedCustomerSessions.map((group) => (
+                      <div key={group.dateLabel}>
+                        {/* Date Header Pill */}
+                        <div style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: "#38bdf8",
+                          marginBottom: "6px",
+                          padding: "2px 6px",
+                          background: "rgba(56, 189, 248, 0.08)",
+                          borderRadius: "4px",
+                          width: "fit-content"
+                        }}>
+                          <Calendar size={11} />
+                          <span>{group.dateLabel}</span>
+                        </div>
+
+                        {/* Sessions under this date */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {group.sessions.map((sess: any) => {
+                            const isSelected = selectedWebSessionId === sess.id;
+                            const isMob = sess.viewport?.device === "Mobile" || (sess.viewport?.width && sess.viewport.width <= 820);
+                            const cartCount = sess.cart?.item_count || sess.cart?.items?.length || 0;
+                            const cartTotal = sess.cart?.total_price || 0;
+                            const actionCount = sess.actionCount || (Array.isArray(sess.screenTimeline) ? sess.screenTimeline.length : 0);
+                            const pageCount = sess.pageCount || (Array.isArray(sess.pageJourney) ? sess.pageJourney.length : 1);
+
+                            return (
+                              <div
+                                key={sess.id}
+                                style={{
+                                  background: isSelected ? "#1e3a5f" : "#1e293b",
+                                  borderRadius: "8px",
+                                  border: isSelected ? "1.5px solid #38bdf8" : "1px solid #334155",
+                                  padding: "9px 11px",
+                                  transition: "all 0.2s ease"
+                                }}
+                              >
+                                {/* Top Row: Time, Duration, Device */}
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5px" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <Clock size={11} color="#94a3b8" />
+                                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#f8fafc" }}>
+                                      {sess.formattedTime}
+                                    </span>
+                                    {sess.durationFormatted && (
+                                      <span style={{
+                                        fontSize: "9.5px",
+                                        fontWeight: 600,
+                                        background: "rgba(255,255,255,0.1)",
+                                        color: "#cbd5e1",
+                                        padding: "1px 5px",
+                                        borderRadius: "4px"
+                                      }}>
+                                        {sess.durationFormatted}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <span style={{
+                                    fontSize: "9.5px",
+                                    fontWeight: 700,
+                                    padding: "1px 6px",
+                                    borderRadius: "4px",
+                                    background: isMob ? "rgba(56, 189, 248, 0.15)" : "rgba(168, 85, 247, 0.15)",
+                                    color: isMob ? "#38bdf8" : "#c084fc",
+                                    border: `1px solid ${isMob ? "rgba(56, 189, 248, 0.3)" : "rgba(168, 85, 247, 0.3)"}`
+                                  }}>
+                                    {isMob ? "📱 Mobile" : "💻 Desktop"}
+                                  </span>
+                                </div>
+
+                                {/* Middle Row: Visited Page Title & Path */}
+                                <div style={{
+                                  fontSize: "11.5px",
+                                  fontWeight: 600,
+                                  color: "#e2e8f0",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  marginBottom: "4px"
+                                }}>
+                                  {sess.pageTitle || "Online Storefront"}
+                                </div>
+
+                                {/* Action metrics & Cart preview */}
+                                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", fontSize: "10px", color: "#94a3b8", marginBottom: "8px" }}>
+                                  <span>⚡ {actionCount} events</span>
+                                  <span>•</span>
+                                  <span>📖 {pageCount} {pageCount === 1 ? "page" : "pages"}</span>
+                                  {sess.scrollDepth !== null && (
+                                    <>
+                                      <span>•</span>
+                                      <span>↕ {sess.scrollDepth}% depth</span>
+                                    </>
+                                  )}
+                                  {cartCount > 0 && (
+                                    <span style={{
+                                      marginLeft: "auto",
+                                      fontWeight: 700,
+                                      color: "#34d399",
+                                      background: "rgba(16, 185, 129, 0.15)",
+                                      padding: "1px 6px",
+                                      borderRadius: "4px",
+                                      border: "1px solid rgba(52, 211, 153, 0.3)"
+                                    }}>
+                                      🛒 {cartCount} in cart (₹{cartTotal})
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedWebSessionId(sess.id);
+                                      setShowLiveCoBrowseModal(true);
+                                      setCoBrowseReplayIndex(0);
+                                      setIsAutoReplaying(true);
+                                    }}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "4px",
+                                      padding: "5px 8px",
+                                      background: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
+                                      color: "#ffffff",
+                                      border: "none",
+                                      borderRadius: "5px",
+                                      fontSize: "10.5px",
+                                      fontWeight: 700,
+                                      cursor: "pointer"
+                                    }}
+                                  >
+                                    <Play size={11} />
+                                    <span>Replay Theater</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedWebSessionId(sess.id);
+                                    }}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "4px",
+                                      padding: "5px 8px",
+                                      background: isSelected ? "rgba(56, 189, 248, 0.2)" : "rgba(255, 255, 255, 0.08)",
+                                      color: isSelected ? "#38bdf8" : "#cbd5e1",
+                                      border: isSelected ? "1px solid #38bdf8" : "1px solid rgba(255, 255, 255, 0.15)",
+                                      borderRadius: "5px",
+                                      fontSize: "10.5px",
+                                      fontWeight: 700,
+                                      cursor: "pointer"
+                                    }}
+                                  >
+                                    <Eye size={11} />
+                                    <span>{isSelected ? "Inspecting" : "Quick View"}</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Active Webpage Card */}
               <div className="tracking-section-card highlight">
                 <div className="tracking-card-header">
@@ -6619,11 +7006,62 @@ export default function WhatsAppInboxComponent() {
                     <span>{activeWebsiteTrackingData.platform || "Storefront"}</span>
                     <span>•</span>
                     <span>{parsedViewport.formatted}</span>
+                    {activeWebsiteTrackingData.sessionDate && (
+                      <>
+                        <span>•</span>
+                        <span style={{ color: "#38bdf8", fontWeight: 600 }}>
+                          📅 {activeWebsiteTrackingData.sessionDate} at {activeWebsiteTrackingData.sessionTime}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {/* Past Sessions Replay Dropdown (Last 7 Days) */}
+                {customerWebSessions.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <Calendar size={13} color="#94a3b8" />
+                    <select
+                      value={selectedWebSessionId || "LIVE"}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "LIVE") {
+                          setSelectedWebSessionId(null);
+                          setCoBrowseReplayIndex(null);
+                          setIsAutoReplaying(false);
+                        } else {
+                          setSelectedWebSessionId(val);
+                          setCoBrowseReplayIndex(0);
+                          setIsAutoReplaying(true);
+                        }
+                      }}
+                      style={{
+                        background: "#0f172a",
+                        color: "#f8fafc",
+                        border: "1px solid #475569",
+                        borderRadius: "8px",
+                        padding: "6px 10px",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        outline: "none",
+                        maxWidth: "240px"
+                      }}
+                      title="Select session recording to replay (Last 7 Days)"
+                    >
+                      <option value="LIVE">
+                        {activeWebsiteTrackingData.isOnlineNow ? "🟢 Current Live Stream" : "🕒 Latest Recorded Visit"}
+                      </option>
+                      {customerWebSessions.map((s: any) => (
+                        <option key={s.id} value={s.id}>
+                          📅 {s.formattedDate} • {s.formattedTime} ({s.durationFormatted || "Active"}){s.isWithCart ? " 🛒" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <span style={{
                   padding: "5px 12px",
                   borderRadius: "20px",

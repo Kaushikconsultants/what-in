@@ -125,10 +125,28 @@ export async function POST(req: NextRequest) {
             searches: Array.isArray(searches) ? searches : [],
             categoryInsights: categoryInsights || null,
             sessionStats: sessionStats || null,
+            viewport: body.viewport || null,
+            scrollDepth: body.scrollDepth !== undefined ? Number(body.scrollDepth) : null,
+            screenTimeline: Array.isArray(body.screenTimeline) ? body.screenTimeline : [],
+            cursorX: body.cursorX !== undefined ? Number(body.cursorX) : null,
+            cursorY: body.cursorY !== undefined ? Number(body.cursorY) : null,
+            clickX: body.clickX !== undefined ? Number(body.clickX) : null,
+            clickY: body.clickY !== undefined ? Number(body.clickY) : null,
+            lastInteraction: body.lastInteraction || null,
             createdAt: new Date().toISOString(),
           },
         },
       }).catch((e) => console.warn("[Capture Lead] Ref Log save skipped:", e.message));
+
+      // Auto-purge session recordings older than 7 days to optimize DB memory & performance
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      prisma.whatsAppChatbotLog.deleteMany({
+        where: {
+          clientId: client.id,
+          nodeType: "WIDGET_SESSION_REF",
+          createdAt: { lt: sevenDaysAgo }
+        }
+      }).catch((e) => console.warn("[Capture Lead] 7-day session auto-purge skipped:", e.message));
 
       // Fast exit for background add-to-cart beacon without phone
       if (isAddToCart && (!cleanPhone || cleanPhone.length < 10)) {
