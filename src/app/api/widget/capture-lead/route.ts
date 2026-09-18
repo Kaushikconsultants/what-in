@@ -343,10 +343,12 @@ export async function POST(req: NextRequest) {
     if (cleanPhone.length >= 10) {
       customer = await prisma.customer.findFirst({
         where: {
+          clientId: client.id,
           OR: [
             { whatsappNumber: cleanPhone },
             { mobile: cleanPhone },
             { mobile: cleanPhone.slice(-10) },
+            { whatsappNumber: cleanPhone.slice(-10) },
           ],
         },
       });
@@ -399,6 +401,7 @@ export async function POST(req: NextRequest) {
       } else {
         customer = await prisma.customer.create({
           data: {
+            clientId: client.id,
             businessName: `Website Lead ${cleanPhone}`,
             contactPerson: leadName,
             mobile: cleanPhone,
@@ -408,6 +411,7 @@ export async function POST(req: NextRequest) {
             leadStage: "Contacted",
             tags: "Website Lead",
             notes: noteContent,
+            source,
           },
         });
       }
