@@ -560,7 +560,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
           }`}
         >
           <Sliders size={15} />
-          <span>AI Recovery & Discounts</span>
+          <span>Flow Checkout, COD Rules & Recovery</span>
           {recoverySettings.enabled && (
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
           )}
@@ -1438,10 +1438,10 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
               <div>
                 <h3 className="text-lg font-extrabold text-slate-900 dark:text-white m-0 flex items-center gap-2">
                   <Sliders size={20} className="text-indigo-600 dark:text-indigo-400" />
-                  <span>Conversational Payment Recovery Agent</span>
+                  <span>Flow Checkout, Partial COD & Payment Recovery Policy</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-1">
-                  Automated AI follow-up for pending payment links. Strictly respects your discount policy.
+                  Configure WhatsApp Flow in-chat checkout, partial advance COD rules, pincode auto-fill, and automated AI payment recovery.
                 </p>
               </div>
 
