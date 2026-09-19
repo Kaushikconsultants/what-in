@@ -1266,11 +1266,91 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         try {
           const recSettings = await getRecoveryAgentSettings(clientId || undefined);
           const orderInfo = orderMetadata.order;
+          const orderTotal = Number(orderInfo.totalAmount);
           const itemSummary = (orderInfo.items || []).map((it: any) => `${it.quantity}x ${it.name}`).join(", ");
-          const desc = `Catalog Order (${orderInfo.totalQuantity} items: ${itemSummary})`.slice(0, 150);
+          const desc = `Catalog Order (${orderInfo.totalQuantity || orderInfo.items?.length || 1} items: ${itemSummary})`.slice(0, 150);
+          const cleanPhone = fromPhone.replace(/\D/g, "").slice(-10);
 
+          const hasSavedAddress = Boolean(
+            customer?.shippingAddress &&
+            customer.shippingAddress.length > 8
+          );
+
+          // 1. Returning Customer Check: If delivery address is already saved from previous orders, don't ask again!
+          if (hasSavedAddress && recSettings.flowCheckoutEnabled !== false) {
+            let finalPrepaid = orderTotal;
+            let discountNotice = "";
+            if (recSettings.prepaidDiscountPercent > 0) {
+              const disc = Math.round((orderTotal * recSettings.prepaidDiscountPercent) / 100);
+              finalPrepaid = Math.max(1, orderTotal - disc);
+              discountNotice = `\n🎁 *Prepaid Offer:* Saved ₹${disc} (${recSettings.prepaidDiscountPercent}% OFF applied)`;
+            }
+
+            let advanceAmount = 0;
+            let codBalance = orderTotal;
+            if (recSettings.allowedPaymentModes?.includes("PARTIAL_COD")) {
+              if (recSettings.partialCodMode === "FIXED") {
+                advanceAmount = Math.min(orderTotal, recSettings.partialCodValue || 200);
+              } else {
+                advanceAmount = Math.round((orderTotal * (recSettings.partialCodValue || 10)) / 100);
+              }
+              codBalance = Math.max(0, orderTotal - advanceAmount);
+            }
+
+            const modes = recSettings.allowedPaymentModes || ['PREPAID', 'PARTIAL_COD', 'FULL_COD'];
+
+            // If tenant configured Full COD only
+            if (modes.length === 1 && modes.includes("FULL_COD")) {
+              await sendWhatsAppMessageAction({
+                conversationId: conversation.id,
+                senderId: "system",
+                senderType: "SYSTEM",
+                messageType: "TEXT",
+                content: `🛍️ *Order Placed on Cash on Delivery (100% COD)!*\n\n` +
+                  `• Total: *₹${orderTotal.toLocaleString('en-IN')}* (${orderInfo.totalQuantity} items: ${itemSummary})\n` +
+                  `📍 *Delivering to Saved Address:*\n🏠 ${customer.shippingAddress}\n\n` +
+                  `Aapka order receive ho gaya hai aur dispatch ke liye prepare ho raha hai. Agar naye address par mangwana hai toh *"Change Address"* reply karein.`,
+                senderName: "Order System"
+              });
+              return;
+            }
+
+            const isPartialCod = modes.includes("PARTIAL_COD");
+            const chargeAmount = isPartialCod && advanceAmount > 0 ? advanceAmount : finalPrepaid;
+            const modeSummary = isPartialCod && advanceAmount > 0
+              ? `• Advance Token (to confirm dispatch): *₹${advanceAmount.toLocaleString('en-IN')}*\n• Balance on COD: *₹${codBalance.toLocaleString('en-IN')}*`
+              : `• Total Payable: *₹${finalPrepaid.toLocaleString('en-IN')}*${discountNotice}`;
+
+            const notice = `🛍️ *Order Received!* (Total: ₹${orderTotal.toLocaleString('en-IN')})\n` +
+              `• Items: ${itemSummary}\n\n` +
+              `📍 *Delivering to your Saved Address:*\n` +
+              `🏠 ${customer.shippingAddress}\n\n` +
+              `${modeSummary}\n\n` +
+              `Kripya order dispatch confirm karne ke liye niche diye gaye UPI QR / payment link se payment complete karein:\n_(Agar naye address par delivery chahiye toh *"Change Address"* reply karein)_`;
+
+            await sendWhatsAppMessageAction({
+              conversationId: conversation.id,
+              senderId: "system",
+              senderType: "SYSTEM",
+              messageType: "TEXT",
+              content: notice,
+              senderName: "Order System"
+            });
+
+            await generateWhatsAppPaymentLinkAction({
+              conversationId: conversation.id,
+              customerId: customer.id,
+              amount: chargeAmount,
+              description: isPartialCod && advanceAmount > 0
+                ? `Token Advance (₹${advanceAmount}) for ${desc}. Balance ₹${codBalance} on COD`
+                : desc,
+              deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both"
+            });
+            return;
+          }
+
+          // 2. New Customer or No Saved Address: Send In-WhatsApp Flow with pre-filled phone number
           if (recSettings.flowCheckoutEnabled !== false) {
-            // Send Interactive WhatsApp Flow for Address & Payment Preference
             const flowIdToUse = recSettings.metaFlowId || "flow_catalog_checkout_v1";
             const flowRes = await sendWhatsAppFlowMessageAction(
               fromPhone,
@@ -1280,38 +1360,43 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
               {
                 flowId: recSettings.metaFlowId,
                 headerTitle: recSettings.flowHeaderTitle || "Confirm Delivery & Payment",
-                bodyText: `Thank you for your order! 🛍️\n• Total: ₹${orderInfo.totalAmount.toLocaleString('en-IN')} (${orderInfo.totalQuantity} items)\n\n📍 Please tap below to enter your delivery address & choose your payment preference (Prepaid, Partial COD, or Full COD):`,
+                bodyText: `Thank you for your order! 🛍️\n• Total: ₹${orderTotal.toLocaleString('en-IN')} (${orderInfo.totalQuantity} items)\n\n📍 Please tap below to enter your delivery address & choose your payment preference (Prepaid, Partial COD, or Full COD):`,
                 ctaText: recSettings.flowCtaText || "Enter Delivery Address 📍",
-                flowToken: `order_${conversation.id}_${orderInfo.totalAmount}_${Date.now()}`,
+                flowToken: `order_${conversation.id}_${orderTotal}_${Date.now()}`,
                 screenName: "PINCODE_SCREEN",
+                flowActionPayload: {
+                  data: {
+                    phone: cleanPhone,
+                    full_name: customer?.contactPerson || customer?.businessName || "",
+                    pincode: (customer as any)?.pincode || ""
+                  }
+                },
                 clientId: clientId || undefined
               }
             );
 
             if (!flowRes.success) {
               console.warn("[WhatsApp Webhook] Flow delivery fallback to conversational chat:", flowRes.error);
-              // Graceful Conversational Fallback with Pincode Prompt
               await sendWhatsAppMessageAction({
                 conversationId: conversation.id,
                 senderId: "system",
                 senderType: "SYSTEM",
                 messageType: "TEXT",
-                content: `Shukriya aapke order ke liye! 🛍️ Total: ₹${orderInfo.totalAmount.toLocaleString('en-IN')}\n\n📍 Delivery address confirm karne ke liye, kripya apna **6-Digit Delivery Pincode** yahan reply karein:`,
+                content: `Shukriya aapke order ke liye! 🛍️ Total: ₹${orderTotal.toLocaleString('en-IN')}\n\n📍 Delivery address confirm karne ke liye, kripya apna **6-Digit Delivery Pincode** yahan reply karein:`,
                 senderName: "Order System"
               });
             } else {
-              console.log(`[WhatsApp Webhook] Sent checkout Flow to ${fromPhone} for Order Total: ₹${orderInfo.totalAmount}`);
+              console.log(`[WhatsApp Webhook] Sent checkout Flow to ${fromPhone} with prefilled phone for Order Total: ₹${orderTotal}`);
             }
           } else if (recSettings.autoCatalogPaymentEnabled !== false) {
-            // Direct Payment Link fallback if Flow checkout is toggled off by tenant admin
             await generateWhatsAppPaymentLinkAction({
               conversationId: conversation.id,
               customerId: customer.id,
-              amount: orderInfo.totalAmount,
+              amount: orderTotal,
               description: desc,
               deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both"
             });
-            console.log(`[WhatsApp Webhook] Auto-sent payment link + QR for catalog order to ${customer.contactPerson} (Amount: ₹${orderInfo.totalAmount})`);
+            console.log(`[WhatsApp Webhook] Auto-sent payment link + QR for catalog order to ${customer.contactPerson} (Amount: ₹${orderTotal})`);
           }
         } catch (catOrderErr) {
           console.error("[WhatsApp Webhook] Error in catalog order handling:", catOrderErr);
@@ -1320,10 +1405,49 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
     }
 
     // ══════════════════════════════════════════════════════
-    // CONVERSATIONAL PINCODE AUTO-FILL & ADDRESS CONFIRMATION
+    // CHANGE ADDRESS / CONVERSATIONAL PINCODE AUTO-FILL
     // ══════════════════════════════════════════════════════
     let addressStepHandled = false;
     const isTextMessage = msg.type === "text";
+    const lowerText = textContent.toLowerCase().trim();
+    const isChangeAddressPrompt = lowerText.includes("change address") ||
+                                  lowerText.includes("new address") ||
+                                  lowerText.includes("update address") ||
+                                  lowerText.includes("address change");
+
+    if (isTextMessage && isChangeAddressPrompt && conversation) {
+      try {
+        const recSettings = await getRecoveryAgentSettings(clientId || undefined);
+        const flowIdToUse = recSettings.metaFlowId || "flow_catalog_checkout_v1";
+        const cleanPhone = fromPhone.replace(/\D/g, "").slice(-10);
+
+        await sendWhatsAppFlowMessageAction(
+          fromPhone,
+          flowIdToUse,
+          conversation.id,
+          "Order System",
+          {
+            flowId: recSettings.metaFlowId,
+            headerTitle: "Update Delivery Address",
+            bodyText: "📍 Please enter your new delivery address below:",
+            ctaText: "Update Address 📍",
+            flowToken: `order_${conversation.id}_0_${Date.now()}`,
+            screenName: "PINCODE_SCREEN",
+            flowActionPayload: {
+              data: {
+                phone: cleanPhone,
+                full_name: customer?.contactPerson || customer?.businessName || "",
+                pincode: ""
+              }
+            },
+            clientId: clientId || undefined
+          }
+        );
+        return NextResponse.json({ status: "success", handled: "change_address_flow" });
+      } catch (flowChangeErr) {
+        console.error("[Webhook Change Address Error]:", flowChangeErr);
+      }
+    }
     const pinRegex = /\b\d{6}\b/;
     const pinMatch = textContent.match(pinRegex);
 

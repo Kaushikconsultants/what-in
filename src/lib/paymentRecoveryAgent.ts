@@ -235,6 +235,9 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
         id: "PINCODE_SCREEN",
         title: "Step 1: Contact & Pincode",
         data: {
+          full_name: { type: "string", __example__: "Customer" },
+          phone: { type: "string", __example__: "9306817689" },
+          pincode: { type: "string", __example__: "124021" },
           pincode_error: { type: "string", __example__: "" }
         },
         layout: {
@@ -248,25 +251,28 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
               type: "TextInput",
               name: "full_name",
               label: "Full Name",
-              required: true
+              required: true,
+              "init-value": "${data.full_name}"
             },
             {
               type: "TextInput",
               name: "phone",
               label: "Contact Mobile Number",
               "input-type": "phone",
-              required: true
+              required: true,
+              "init-value": "${data.phone}"
             },
             {
               type: "TextInput",
               name: "pincode",
               label: "6-Digit Postal Pincode",
               "input-type": "number",
-              required: true
+              required: true,
+              "init-value": "${data.pincode}"
             },
             {
               type: "TextCaption",
-              text: "Enter your 6-digit pincode to automatically verify State, District & Local Areas."
+              text: "Mobile number is prefilled. You can edit it if delivering for someone else."
             },
             {
               type: "Footer",
@@ -290,11 +296,12 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
         terminal: true,
         data: {
           full_name: { type: "string", __example__: "Customer" },
-          phone: { type: "string", __example__: "9896507407" },
+          phone: { type: "string", __example__: "9306817689" },
           pincode: { type: "string", __example__: "124021" },
           state: { type: "string", __example__: "Haryana" },
           district: { type: "string", __example__: "Rohtak" },
           region_summary: { type: "string", __example__: "📍 Rohtak, Haryana (PIN: 124021)" },
+          order_total_text: { type: "string", __example__: "🛍️ Total Order Amount: ₹2,000" },
           cities: {
             type: "array",
             items: {
@@ -308,6 +315,17 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
               { id: "Rohtak H.O", title: "Rohtak H.O" },
               { id: "DLF Colony", title: "DLF Colony" }
             ]
+          },
+          payment_options: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                title: { type: "string" }
+              }
+            },
+            __example__: paymentOptions
           }
         },
         layout: {
@@ -345,11 +363,15 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
               text: "💳 Payment Method"
             },
             {
+              type: "TextSubheading",
+              text: "${data.order_total_text}"
+            },
+            {
               type: "RadioButtonsGroup",
               name: "payment_mode",
               label: "Choose Payment Method",
               required: true,
-              "data-source": paymentOptions
+              "data-source": "${data.payment_options}"
             },
             {
               type: "Footer",
