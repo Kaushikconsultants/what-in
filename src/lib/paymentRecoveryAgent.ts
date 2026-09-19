@@ -294,6 +294,7 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
           pincode: { type: "string", __example__: "124021" },
           state: { type: "string", __example__: "Haryana" },
           district: { type: "string", __example__: "Rohtak" },
+          region_summary: { type: "string", __example__: "📍 Rohtak, Haryana (PIN: 124021)" },
           cities: {
             type: "array",
             items: {
@@ -318,7 +319,7 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
             },
             {
               type: "TextSubheading",
-              text: "📍 ${data.district}, ${data.state} (PIN: ${data.pincode})"
+              text: "${data.region_summary}"
             },
             {
               type: "Dropdown",

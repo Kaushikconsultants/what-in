@@ -152,6 +152,43 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
 
     const flowJson = generateMetaCheckoutFlowJson(settings);
 
+    // Auto-configure 2048-bit RSA Business Encryption for client phoneId if not already set
+    const phoneId = client?.phoneId;
+    if (phoneId && accessToken) {
+      try {
+        let kb: any = {};
+        try { kb = JSON.parse(client.aiKnowledgeBase || "{}"); } catch (_) {}
+
+        if (!kb.metaFlowPrivateKey) {
+          const crypto = await import("crypto");
+          const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
+            modulusLength: 2048,
+            publicKeyEncoding: { type: "spki", format: "pem" },
+            privateKeyEncoding: { type: "pkcs8", format: "pem" }
+          });
+
+          const encRes = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/whatsapp_business_encryption`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ business_public_key: publicKey })
+          });
+          const encData = await encRes.json();
+          if (encData.success) {
+            kb.metaFlowPrivateKey = privateKey;
+            await prisma.whatsAppClient.update({
+              where: { id: client.id },
+              data: { aiKnowledgeBase: JSON.stringify(kb) }
+            });
+          }
+        }
+      } catch (keyErr: any) {
+        console.warn("[Auto Flow Key Pair Setup Notice]:", keyErr?.message);
+      }
+    }
+
     // 1. Create or query flow on Meta Graph API
     const createUrl = `https://graph.facebook.com/v21.0/${wabaId}/flows`;
     const createRes = await fetch(createUrl, {
@@ -210,7 +247,7 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
       update: {
         flowId: String(flowId),
         name: "Catalog Delivery Address & Payment",
-        screenName: "CHECKOUT_SCREEN",
+        screenName: "PINCODE_SCREEN",
         formSchema: JSON.stringify(flowJson)
       },
       create: {
@@ -219,7 +256,7 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
         flowId: String(flowId),
         name: "Catalog Delivery Address & Payment",
         description: "Official Meta Checkout Flow for address collection, pincode auto-fill, and payment preference.",
-        screenName: "CHECKOUT_SCREEN",
+        screenName: "PINCODE_SCREEN",
         ctaText: settings.flowCtaText || "Enter Delivery Address 📍",
         formSchema: JSON.stringify(flowJson)
       }

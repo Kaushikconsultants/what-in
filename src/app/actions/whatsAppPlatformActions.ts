@@ -35,13 +35,14 @@ async function ensureSeeded() {
   }
 }
 
-export async function getMetaApiCredentials() {
+export async function getMetaApiCredentials(clientIdOverride?: string) {
   try {
-    const user = await getAuthenticatedUser();
+    const user = await getAuthenticatedUser().catch(() => null);
     let client: any = null;
 
-    if (user?.clientId) {
-      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    const targetClientId = clientIdOverride || user?.clientId;
+    if (targetClientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId } });
     } else if (user?.email) {
       client = await prisma.whatsAppClient.findFirst({
         where: {
@@ -7570,6 +7571,7 @@ export async function sendWhatsAppFlowMessageAction(
   conversationId?: string,
   senderName?: string,
   customOptions?: {
+    clientId?: string;
     flowId?: string;
     headerTitle?: string;
     bodyText?: string;
@@ -7581,7 +7583,7 @@ export async function sendWhatsAppFlowMessageAction(
   }
 ) {
   try {
-    const creds = await getMetaApiCredentials();
+    const creds = await getMetaApiCredentials(customOptions?.clientId);
     const cleanPhone = toPhone.replace(/\D/g, "");
     if (!creds?.isConnected) return { success: false, error: "WhatsApp API not connected." };
 
@@ -7621,7 +7623,7 @@ export async function sendWhatsAppFlowMessageAction(
       };
     }
 
-    const screenName = customOptions?.screenName || flowConfig?.screenName || "CHECKOUT_SCREEN";
+    const screenName = customOptions?.screenName || flowConfig?.screenName || "PINCODE_SCREEN";
     const headerTitle = customOptions?.headerTitle || flowConfig?.name || "Order Confirmation";
     const bodyText = customOptions?.bodyText || flowConfig?.description || "Please enter your delivery address.";
     const ctaText = customOptions?.ctaText || flowConfig?.ctaText || "Enter Delivery Address 📍";

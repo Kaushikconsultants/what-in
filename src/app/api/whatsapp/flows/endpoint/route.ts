@@ -179,6 +179,7 @@ export async function POST(req: NextRequest) {
               pincode: pincode,
               state: pinLookup.state || "",
               district: pinLookup.district || pinLookup.city || "",
+              region_summary: `📍 ${pinLookup.district}, ${pinLookup.state} (PIN: ${pincode})`,
               city: citiesList[0]?.id || "",
               cities: citiesList,
               is_cities_available: true,

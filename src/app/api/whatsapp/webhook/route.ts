@@ -886,6 +886,7 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       } catch (err) {
         console.error("Failed to process form submission in webhook:", err);
       }
+      return NextResponse.json({ status: "success", handled: "flow_nfm_reply" });
     }
 
     let wasClosed = false;
@@ -1282,7 +1283,8 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
                 bodyText: `Thank you for your order! 🛍️\n• Total: ₹${orderInfo.totalAmount.toLocaleString('en-IN')} (${orderInfo.totalQuantity} items)\n\n📍 Please tap below to enter your delivery address & choose your payment preference (Prepaid, Partial COD, or Full COD):`,
                 ctaText: recSettings.flowCtaText || "Enter Delivery Address 📍",
                 flowToken: `order_${conversation.id}_${orderInfo.totalAmount}_${Date.now()}`,
-                screenName: "CHECKOUT_SCREEN"
+                screenName: "PINCODE_SCREEN",
+                clientId: clientId || undefined
               }
             );
 
@@ -1321,7 +1323,7 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
     // CONVERSATIONAL PINCODE AUTO-FILL & ADDRESS CONFIRMATION
     // ══════════════════════════════════════════════════════
     let addressStepHandled = false;
-    const isTextMessage = msg.type === "text" || msg.type === "interactive";
+    const isTextMessage = msg.type === "text";
     const pinRegex = /\b\d{6}\b/;
     const pinMatch = textContent.match(pinRegex);
 
