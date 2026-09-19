@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  MessageSquare, LayoutDashboard, Bot, ShoppingBag, Key, Activity, Box, GitBranch, FileCode, Zap, Bell, Sun, Moon, LogOut, CreditCard
+  MessageSquare, LayoutDashboard, Bot, ShoppingBag, ShoppingCart, Key, Activity, Box, GitBranch, FileCode, Zap, Bell, Sun, Moon, LogOut, CreditCard
 } from "lucide-react";
 import "./WhatsAppHeaderNav.css";
 import { getWhatsAppDashboardMetrics, syncSessionRoleAction } from "@/app/actions/whatsAppPlatformActions";
@@ -24,6 +24,7 @@ function urlBase64ToUint8Array(base64String: string) {
 
 const subNavItems = [
   { name: "Dashboard", path: "/whatsapp/dashboard", icon: LayoutDashboard },
+  { name: "Orders", path: "/whatsapp/orders", icon: ShoppingCart },
   { name: "Inbox", path: "/whatsapp/inbox", icon: MessageSquare },
   { name: "Shopify", path: "/whatsapp/shopify", icon: ShoppingBag },
   { name: "WhatsApp", path: "/whatsapp/templates", icon: Bot },

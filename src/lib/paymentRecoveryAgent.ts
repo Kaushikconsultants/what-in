@@ -12,6 +12,7 @@ export interface RecoveryAgentSettings {
 
   // NEW: In-WhatsApp Flow Address Collection & Customizable Partial COD
   flowCheckoutEnabled: boolean; // default: true (ask address via Flow before payment)
+  metaFlowId?: string; // Real Meta Flow ID (e.g. 104829103948192)
   allowedPaymentModes: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[]; // e.g. ['PREPAID', 'PARTIAL_COD']
   partialCodMode: 'PERCENTAGE' | 'FIXED'; // e.g. 'PERCENTAGE' (10%) or 'FIXED' (₹200)
   partialCodValue: number; // e.g. 10 (%) or 200 (₹)
@@ -37,6 +38,7 @@ const DEFAULT_SETTINGS: RecoveryAgentSettings = {
   autoCatalogDeliveryMethod: "both",
 
   flowCheckoutEnabled: true,
+  metaFlowId: "",
   allowedPaymentModes: ['PREPAID', 'PARTIAL_COD', 'FULL_COD'],
   partialCodMode: 'PERCENTAGE',
   partialCodValue: 10,

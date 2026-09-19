@@ -7,6 +7,7 @@ import { formatWhatsAppPhone, getPhoneLookupKeys, normalizePhoneKey, resolveWhat
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 import { emitInboxEvent } from "@/lib/inboxEvents";
+import { getRecoveryAgentSettings } from "@/lib/paymentRecoveryAgent";
 
 export async function getWhatsAppChatbotLogsAction(phone: string) {
   try {
@@ -7569,6 +7570,7 @@ export async function sendWhatsAppFlowMessageAction(
   conversationId?: string,
   senderName?: string,
   customOptions?: {
+    flowId?: string;
     headerTitle?: string;
     bodyText?: string;
     ctaText?: string;
@@ -7587,34 +7589,42 @@ export async function sendWhatsAppFlowMessageAction(
       where: { flowId: flowId }
     });
 
-    if (!flowConfig && flowId === "flow_catalog_checkout_v1") {
-      flowConfig = await prisma.whatsAppMetaFlow.create({
-        data: {
-          name: "Catalog Delivery Address & Payment",
-          flowId: "flow_catalog_checkout_v1",
-          description: "Collect delivery address with pincode auto-fill and payment preference (Prepaid, Partial COD, or Full COD).",
-          screenName: "CHECKOUT_SCREEN",
-          ctaText: "Enter Delivery Address 📍",
-          formSchema: JSON.stringify([
-            { id: "full_name", type: "text", label: "Full Name", required: true },
-            { id: "phone", type: "phone", label: "Phone Number", required: true },
-            { id: "pincode", type: "number", label: "Delivery Pincode (6-Digits)", placeholder: "e.g. 124001", required: true },
-            { id: "house_flat", type: "text", label: "House / Flat No., Building", required: true },
-            { id: "street_landmark", type: "text", label: "Street, Area, Landmark", required: true },
-            { id: "city", type: "text", label: "City", required: false },
-            { id: "state", type: "text", label: "State", required: false },
-            { id: "payment_mode", type: "radio", label: "Payment Preference", options: ["Pay Online (UPI / Card / NetBanking)", "Partial COD (Pay Token Advance Now, Rest on Delivery)", "Cash on Delivery (Full COD)"], required: true }
-          ])
-        }
-      }).catch(() => null);
+    // 1. Resolve numeric Flow ID
+    let targetNumericFlowId: string | null = null;
+    if (customOptions?.flowId && !isNaN(Number(customOptions.flowId))) {
+      targetNumericFlowId = customOptions.flowId;
+    } else if (flowConfig?.flowId && !isNaN(Number(flowConfig.flowId))) {
+      targetNumericFlowId = flowConfig.flowId;
+    } else {
+      const recSettings = await getRecoveryAgentSettings().catch(() => null);
+      if (recSettings?.metaFlowId && !isNaN(Number(recSettings.metaFlowId))) {
+        targetNumericFlowId = recSettings.metaFlowId;
+      }
     }
 
-    if (!flowConfig) return { success: false, error: "Flow configuration not found." };
+    if (!targetNumericFlowId) {
+      const anyNumericFlow = await prisma.whatsAppMetaFlow.findFirst({
+        where: {
+          flowId: { not: { startsWith: "flow_" } }
+        },
+        orderBy: { updatedAt: "desc" }
+      });
+      if (anyNumericFlow?.flowId && !isNaN(Number(anyNumericFlow.flowId))) {
+        targetNumericFlowId = anyNumericFlow.flowId;
+      }
+    }
 
-    const screenName = customOptions?.screenName || flowConfig.screenName || "SCREEN_NAME";
-    const headerTitle = customOptions?.headerTitle || flowConfig.name || "Order Confirmation";
-    const bodyText = customOptions?.bodyText || flowConfig.description || "Please fill out the form.";
-    const ctaText = customOptions?.ctaText || flowConfig.ctaText || "Open Form";
+    if (!targetNumericFlowId) {
+      return {
+        success: false,
+        error: "Meta Flow ID is not configured. Meta requires a numeric Flow ID published in Meta Business Suite."
+      };
+    }
+
+    const screenName = customOptions?.screenName || flowConfig?.screenName || "CHECKOUT_SCREEN";
+    const headerTitle = customOptions?.headerTitle || flowConfig?.name || "Order Confirmation";
+    const bodyText = customOptions?.bodyText || flowConfig?.description || "Please enter your delivery address.";
+    const ctaText = customOptions?.ctaText || flowConfig?.ctaText || "Enter Delivery Address 📍";
     const flowToken = customOptions?.flowToken || `token_${Date.now()}`;
     const footerText = customOptions?.footerText || "Fast & Secure Checkout";
 
@@ -7640,7 +7650,7 @@ export async function sendWhatsAppFlowMessageAction(
           parameters: {
             flow_message_version: "3",
             flow_token: flowToken,
-            flow_id: flowConfig.flowId,
+            flow_id: targetNumericFlowId,
             flow_cta: ctaText,
             flow_action: "navigate",
             flow_action_payload: {
@@ -7665,7 +7675,11 @@ export async function sendWhatsAppFlowMessageAction(
     if (data.error) throw new Error(data.error.message);
     const metaMessageId = data.messages?.[0]?.id;
 
-    console.log(`[WhatsApp Flow Sent] Sent flow "${flowConfig.name}" to ${cleanPhone} (WAMID: ${metaMessageId})`);
+    const flowName = flowConfig?.name || headerTitle || "Interactive Form";
+    const flowDesc = flowConfig?.description || bodyText || "Please complete the interactive form.";
+    const flowCta = flowConfig?.ctaText || ctaText || "Open Form";
+
+    console.log(`[WhatsApp Flow Sent] Sent flow "${flowName}" to ${cleanPhone} (WAMID: ${metaMessageId})`);
 
     // Auto-resolve conversation if not provided
     let targetConvId = conversationId;
@@ -7683,7 +7697,7 @@ export async function sendWhatsAppFlowMessageAction(
     }
 
     if (targetConvId) {
-      const flowContent = `📋 *${flowConfig.name}*\n${flowConfig.description || 'Please complete the interactive form.'}\n👉 Button: ${flowConfig.ctaText}`;
+      const flowContent = `📋 *${flowName}*\n${flowDesc}\n👉 Button: ${flowCta}`;
       await prisma.whatsAppMessage.create({
         data: {
           conversationId: targetConvId,
@@ -7691,7 +7705,7 @@ export async function sendWhatsAppFlowMessageAction(
           senderName: senderName || 'Sales Agent',
           messageType: 'FLOW',
           content: flowContent,
-          metadata: JSON.stringify({ flowId: flowConfig.flowId, flowName: flowConfig.name, metaMessageId }),
+          metadata: JSON.stringify({ flowId: targetNumericFlowId, flowName, metaMessageId }),
           status: 'SENT',
           metaMessageId: metaMessageId,
           sentAt: new Date()
@@ -7701,7 +7715,7 @@ export async function sendWhatsAppFlowMessageAction(
       await prisma.whatsAppConversation.update({
         where: { id: targetConvId },
         data: {
-          lastMessageText: `📋 Flow: ${flowConfig.name}`,
+          lastMessageText: `📋 Flow: ${flowName}`,
           lastMessageAt: new Date()
         }
       });

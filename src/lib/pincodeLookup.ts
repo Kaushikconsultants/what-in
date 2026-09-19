@@ -1,10 +1,11 @@
-interface PincodeResult {
+export interface PincodeResult {
   valid: boolean;
   pincode: string;
   city?: string;
   district?: string;
   state?: string;
   country?: string;
+  cities?: Array<{ id: string; title: string }>;
   error?: string;
 }
 
@@ -12,20 +13,61 @@ interface PincodeResult {
 const pincodeCache = new Map<string, PincodeResult>();
 
 // Pre-populate popular hub pincodes for instant hit
-pincodeCache.set('124001', { valid: true, pincode: '124001', city: 'Rohtak', district: 'Rohtak', state: 'Haryana', country: 'India' });
-pincodeCache.set('110001', { valid: true, pincode: '110001', city: 'New Delhi', district: 'Central Delhi', state: 'Delhi', country: 'India' });
-pincodeCache.set('400001', { valid: true, pincode: '400001', city: 'Mumbai', district: 'Mumbai', state: 'Maharashtra', country: 'India' });
-pincodeCache.set('560001', { valid: true, pincode: '560001', city: 'Bengaluru', district: 'Bangalore', state: 'Karnataka', country: 'India' });
-pincodeCache.set('700001', { valid: true, pincode: '700001', city: 'Kolkata', district: 'Kolkata', state: 'West Bengal', country: 'India' });
-pincodeCache.set('600001', { valid: true, pincode: '600001', city: 'Chennai', district: 'Chennai', state: 'Tamil Nadu', country: 'India' });
-pincodeCache.set('500001', { valid: true, pincode: '500001', city: 'Hyderabad', district: 'Hyderabad', state: 'Telangana', country: 'India' });
-pincodeCache.set('380001', { valid: true, pincode: '380001', city: 'Ahmedabad', district: 'Ahmedabad', state: 'Gujarat', country: 'India' });
-pincodeCache.set('302001', { valid: true, pincode: '302001', city: 'Jaipur', district: 'Jaipur', state: 'Rajasthan', country: 'India' });
-pincodeCache.set('226001', { valid: true, pincode: '226001', city: 'Lucknow', district: 'Lucknow', state: 'Uttar Pradesh', country: 'India' });
-pincodeCache.set('160017', { valid: true, pincode: '160017', city: 'Chandigarh', district: 'Chandigarh', state: 'Chandigarh', country: 'India' });
-pincodeCache.set('141001', { valid: true, pincode: '141001', city: 'Ludhiana', district: 'Ludhiana', state: 'Punjab', country: 'India' });
-pincodeCache.set('201301', { valid: true, pincode: '201301', city: 'Noida', district: 'Gautam Buddha Nagar', state: 'Uttar Pradesh', country: 'India' });
-pincodeCache.set('122001', { valid: true, pincode: '122001', city: 'Gurugram', district: 'Gurgaon', state: 'Haryana', country: 'India' });
+pincodeCache.set('124001', {
+  valid: true,
+  pincode: '124001',
+  city: 'Rohtak',
+  district: 'Rohtak',
+  state: 'Haryana',
+  country: 'India',
+  cities: [
+    { id: 'Rohtak H.O', title: 'Rohtak H.O' },
+    { id: 'DLF Colony', title: 'DLF Colony' },
+    { id: 'Model Town', title: 'Model Town' },
+    { id: 'Medical College', title: 'Medical College' },
+    { id: 'Janta Colony', title: 'Janta Colony' }
+  ]
+});
+pincodeCache.set('110001', {
+  valid: true,
+  pincode: '110001',
+  city: 'New Delhi',
+  district: 'Central Delhi',
+  state: 'Delhi',
+  country: 'India',
+  cities: [
+    { id: 'Connaught Place', title: 'Connaught Place' },
+    { id: 'Janpath', title: 'Janpath' },
+    { id: 'Barakhamba Road', title: 'Barakhamba Road' },
+    { id: 'Bengali Market', title: 'Bengali Market' }
+  ]
+});
+pincodeCache.set('400001', {
+  valid: true,
+  pincode: '400001',
+  city: 'Mumbai',
+  district: 'Mumbai',
+  state: 'Maharashtra',
+  country: 'India',
+  cities: [
+    { id: 'Fort', title: 'Fort' },
+    { id: 'Bazargate', title: 'Bazargate' },
+    { id: 'Marine Lines', title: 'Marine Lines' }
+  ]
+});
+pincodeCache.set('560001', {
+  valid: true,
+  pincode: '560001',
+  city: 'Bengaluru',
+  district: 'Bangalore',
+  state: 'Karnataka',
+  country: 'India',
+  cities: [
+    { id: 'MG Road', title: 'MG Road' },
+    { id: 'Brigade Road', title: 'Brigade Road' },
+    { id: 'Cubbon Park', title: 'Cubbon Park' }
+  ]
+});
 
 export async function lookupPincode(rawCode: string | number): Promise<PincodeResult> {
   const code = String(rawCode || '').replace(/\D/g, '').trim();
@@ -58,10 +100,17 @@ export async function lookupPincode(rawCode: string | number): Promise<PincodeRe
 
     const data = await res.json();
     if (Array.isArray(data) && data[0]?.Status === 'Success' && data[0]?.PostOffice?.length > 0) {
-      const po = data[0].PostOffice[0];
+      const postOffices = data[0].PostOffice as any[];
+      const po = postOffices[0];
       const city = po.District || po.Division || po.Block || po.Name;
       const district = po.District || city;
       const state = po.State;
+
+      const rawCities = postOffices.map((p: any) => ({
+        id: p.Name,
+        title: p.Name
+      }));
+      const uniqueCities = Array.from(new Map(rawCities.map((c: any) => [c.title, c])).values());
 
       const result: PincodeResult = {
         valid: true,
@@ -69,7 +118,8 @@ export async function lookupPincode(rawCode: string | number): Promise<PincodeRe
         city: city || 'Unknown City',
         district: district || city || 'Unknown District',
         state: state || 'Unknown State',
-        country: 'India'
+        country: 'India',
+        cities: uniqueCities
       };
 
       pincodeCache.set(code, result);

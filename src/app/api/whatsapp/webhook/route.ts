@@ -1270,12 +1270,14 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
 
           if (recSettings.flowCheckoutEnabled !== false) {
             // Send Interactive WhatsApp Flow for Address & Payment Preference
+            const flowIdToUse = recSettings.metaFlowId || "flow_catalog_checkout_v1";
             const flowRes = await sendWhatsAppFlowMessageAction(
               fromPhone,
-              "flow_catalog_checkout_v1",
+              flowIdToUse,
               conversation.id,
               "Order System",
               {
+                flowId: recSettings.metaFlowId,
                 headerTitle: recSettings.flowHeaderTitle || "Confirm Delivery & Payment",
                 bodyText: `Thank you for your order! 🛍️\n• Total: ₹${orderInfo.totalAmount.toLocaleString('en-IN')} (${orderInfo.totalQuantity} items)\n\n📍 Please tap below to enter your delivery address & choose your payment preference (Prepaid, Partial COD, or Full COD):`,
                 ctaText: recSettings.flowCtaText || "Enter Delivery Address 📍",
@@ -1286,7 +1288,7 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
 
             if (!flowRes.success) {
               console.warn("[WhatsApp Webhook] Flow delivery fallback to conversational chat:", flowRes.error);
-              // Graceful Conversational Fallback
+              // Graceful Conversational Fallback with Pincode Prompt
               await sendWhatsAppMessageAction({
                 conversationId: conversation.id,
                 senderId: "system",
@@ -1315,9 +1317,187 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       })();
     }
 
-    // Chatbot Flow Engine Execution (Client Scoped)
+    // ══════════════════════════════════════════════════════
+    // CONVERSATIONAL PINCODE AUTO-FILL & ADDRESS CONFIRMATION
+    // ══════════════════════════════════════════════════════
+    let addressStepHandled = false;
     const isTextMessage = msg.type === "text" || msg.type === "interactive";
-    if (isTextMessage) {
+    const pinRegex = /\b\d{6}\b/;
+    const pinMatch = textContent.match(pinRegex);
+
+    if (isTextMessage && conversation) {
+      try {
+        const pendingCatalogOrder = await prisma.whatsAppMessage.findFirst({
+          where: {
+            conversationId: conversation.id,
+            messageType: "ORDER",
+            sentAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+          },
+          orderBy: { sentAt: "desc" }
+        });
+
+        if (pendingCatalogOrder) {
+          let pendingTotal = 0;
+          let pendingDesc = "Catalog Order";
+          try {
+            const meta = JSON.parse(pendingCatalogOrder.metadata || "{}");
+            if (meta?.order?.totalAmount) pendingTotal = Number(meta.order.totalAmount);
+            if (meta?.order?.items) {
+              const itemSummary = meta.order.items.map((it: any) => `${it.quantity}x ${it.name}`).join(", ");
+              pendingDesc = `Catalog Order (${meta.order.totalQuantity || meta.order.items.length} items: ${itemSummary})`;
+            }
+          } catch (_) {}
+
+          // Case 1: Customer sent 6-digit Pincode
+          if (pinMatch && (!customer.shippingAddress || !customer.notes?.includes("Verified Delivery Address"))) {
+            const enteredPincode = pinMatch[0];
+            const pinData = await lookupPincode(enteredPincode);
+
+            if (pinData.valid) {
+              addressStepHandled = true;
+              const state = pinData.state || "";
+              const district = pinData.district || pinData.city || "";
+              const citiesList = (pinData.cities || []).slice(0, 5);
+
+              await prisma.customer.update({
+                where: { id: customer.id },
+                data: {
+                  landmark: district,
+                  notes: `Pincode: ${enteredPincode}, District: ${district}, State: ${state}`
+                }
+              }).catch(() => {});
+
+              const cityOptionsText = citiesList.length > 0
+                ? `\n🏙️ *Selectable Areas/Post Offices on ${enteredPincode}:*\n` + citiesList.map((c: any) => `• ${c.title}`).join("\n") + "\n"
+                : "";
+
+              const replyMsg = `✅ *Pincode ${enteredPincode} Verified!*\n` +
+                `📍 *State:* ${state}\n` +
+                `🏙️ *District:* ${district}\n` +
+                cityOptionsText +
+                `\nKripya apna **House / Flat No., Colony / Street** aur payment preference (Prepaid ya Partial COD) yahan reply karein:`;
+
+              await sendWhatsAppMessageAction({
+                conversationId: conversation.id,
+                senderId: "system",
+                senderType: "SYSTEM",
+                messageType: "TEXT",
+                content: replyMsg,
+                senderName: "Order System"
+              });
+            }
+          } else if (customer.notes?.includes("Pincode:") && !customer.notes?.includes("Verified Delivery Address")) {
+            // Case 2: Customer already provided pincode, now providing house/street details
+            const houseStreet = textContent.trim();
+            const upperInput = houseStreet.toUpperCase();
+            if (houseStreet.length >= 5 && !upperInput.includes("HELP") && !upperInput.includes("CATALOG") && !upperInput.includes("PRICE")) {
+              addressStepHandled = true;
+              const existingNotes = customer.notes || "";
+              const fullDeliveryAddress = `${houseStreet}, ${existingNotes.replace(/Pincode:\s*/, 'PIN: ')}`;
+
+              await prisma.customer.update({
+                where: { id: customer.id },
+                data: {
+                  shippingAddress: fullDeliveryAddress,
+                  billingAddress: fullDeliveryAddress,
+                  notes: `Verified Delivery Address: ${fullDeliveryAddress}`
+                }
+              }).catch(() => {});
+
+              if (pendingTotal > 0) {
+                const recSettings = await getRecoveryAgentSettings(clientId || undefined);
+                const isFullCod = (upperInput.includes("COD") && !upperInput.includes("PARTIAL") && !upperInput.includes("TOKEN") && !upperInput.includes("ADVANCE"));
+                const isPartialCod = upperInput.includes("PARTIAL") || upperInput.includes("TOKEN") || upperInput.includes("ADVANCE") || 
+                  (recSettings.allowedPaymentModes || []).includes("PARTIAL_COD");
+
+                if (isFullCod && (recSettings.allowedPaymentModes || []).includes("FULL_COD")) {
+                  // Full COD
+                  await sendWhatsAppMessageAction({
+                    conversationId: conversation.id,
+                    senderId: "system",
+                    senderType: "SYSTEM",
+                    messageType: "TEXT",
+                    content: `🎉 *Order Confirmed (Cash on Delivery)!*\n\n📦 *Items:* ${pendingDesc}\n💵 *Total Payable on Delivery:* ₹${pendingTotal.toLocaleString('en-IN')}\n\n📍 *Delivery Address:*\n${fullDeliveryAddress}\n\n🚚 Our dispatch team is packaging your order. Live tracking will be shared upon courier pickup!`,
+                    senderName: "Order System"
+                  });
+                } else if (isPartialCod && (recSettings.allowedPaymentModes || []).includes("PARTIAL_COD")) {
+                  // Partial COD Advance Token
+                  let advanceAmount = 0;
+                  if (recSettings.partialCodMode === 'FIXED') {
+                    advanceAmount = Math.min(pendingTotal, recSettings.partialCodValue || 200);
+                  } else {
+                    advanceAmount = Math.max(1, Math.round((pendingTotal * (recSettings.partialCodValue || 10)) / 100));
+                  }
+                  const codBalance = Math.max(0, pendingTotal - advanceAmount);
+
+                  const summaryNotice = `✅ *Delivery Address Confirmed!*\n` +
+                    `📍 ${fullDeliveryAddress}\n\n` +
+                    `🪙 *Payment Preference: Partial COD*\n` +
+                    `• Total Order Value: *₹${pendingTotal.toLocaleString('en-IN')}*\n` +
+                    `• Advance Token (to confirm dispatch): *₹${advanceAmount.toLocaleString('en-IN')}*\n` +
+                    `• Balance on Delivery: *₹${codBalance.toLocaleString('en-IN')}*\n\n` +
+                    `Kripya apna order dispatch confirm karne ke liye niche diye gaye UPI QR / payment link se ₹${advanceAmount} token advance pay karein:`;
+
+                  await sendWhatsAppMessageAction({
+                    conversationId: conversation.id,
+                    senderId: "system",
+                    senderType: "SYSTEM",
+                    messageType: "TEXT",
+                    content: summaryNotice,
+                    senderName: "Order System"
+                  });
+
+                  await generateWhatsAppPaymentLinkAction({
+                    conversationId: conversation.id,
+                    customerId: customer.id,
+                    amount: advanceAmount,
+                    description: `Token Advance (₹${advanceAmount}) for ${pendingDesc}. Balance ₹${codBalance} on COD`,
+                    deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both"
+                  });
+                } else {
+                  // Full Online Prepaid
+                  let finalAmount = pendingTotal;
+                  let discountNotice = "";
+                  if (recSettings.prepaidDiscountPercent && recSettings.prepaidDiscountPercent > 0) {
+                    const discount = Math.round((pendingTotal * recSettings.prepaidDiscountPercent) / 100);
+                    finalAmount = Math.max(1, pendingTotal - discount);
+                    discountNotice = `\n🎁 *Prepaid Discount Applied (${recSettings.prepaidDiscountPercent}%):* -₹${discount.toLocaleString('en-IN')}\n• Net Payable: *₹${finalAmount.toLocaleString('en-IN')}*`;
+                  }
+
+                  const summaryNotice = `✅ *Delivery Address Confirmed!*\n` +
+                    `📍 ${fullDeliveryAddress}\n\n` +
+                    `💳 *Payment Preference: Online Prepaid*` +
+                    discountNotice +
+                    `\n\nKripya niche diye gaye UPI QR / payment link se instant payment complete karein:`;
+
+                  await sendWhatsAppMessageAction({
+                    conversationId: conversation.id,
+                    senderId: "system",
+                    senderType: "SYSTEM",
+                    messageType: "TEXT",
+                    content: summaryNotice,
+                    senderName: "Order System"
+                  });
+
+                  await generateWhatsAppPaymentLinkAction({
+                    conversationId: conversation.id,
+                    customerId: customer.id,
+                    amount: finalAmount,
+                    description: pendingDesc,
+                    deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both"
+                  });
+                }
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        console.error("[Webhook Conversational Address Handler Error]:", e.message);
+      }
+    }
+
+    // Chatbot Flow Engine Execution (Client Scoped)
+    if (isTextMessage && !addressStepHandled) {
       const flowHandled = await executeFlowEngine(fromPhone, textContent, conversation.id, wasClosed, clientId);
 
       if (!flowHandled && conversation.aiHandled) {

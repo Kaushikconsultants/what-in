@@ -21,7 +21,10 @@ import {
 import { 
   getPaymentRecoverySettingsAction, 
   savePaymentRecoverySettingsAction, 
-  sendConversationalPaymentRecoveryAction 
+  sendConversationalPaymentRecoveryAction,
+  createOrPublishMetaCheckoutFlowAction,
+  getCheckoutFlowDetailsAction,
+  generateMetaCheckoutFlowJson
 } from "@/app/actions/paymentRecoveryActions";
 import { formatWhatsAppPhone, getCustomerDisplayName } from "@/lib/phoneUtils";
 
@@ -82,6 +85,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
     autoCatalogPaymentEnabled: boolean;
     autoCatalogDeliveryMethod: 'both' | 'qr' | 'link';
     flowCheckoutEnabled?: boolean;
+    metaFlowId?: string;
     allowedPaymentModes?: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[];
     partialCodMode?: 'PERCENTAGE' | 'FIXED';
     partialCodValue?: number;
@@ -99,6 +103,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
     autoCatalogPaymentEnabled: true,
     autoCatalogDeliveryMethod: "both",
     flowCheckoutEnabled: true,
+    metaFlowId: "",
     allowedPaymentModes: ['PREPAID', 'PARTIAL_COD', 'FULL_COD'],
     partialCodMode: 'PERCENTAGE',
     partialCodValue: 10,
@@ -109,6 +114,14 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
   });
   const [savingRecovery, setSavingRecovery] = useState(false);
   const [sendingRecoveryForId, setSendingRecoveryForId] = useState<string | null>(null);
+
+  // Meta Flow Sync & JSON Modal States
+  const [syncingMetaFlow, setSyncingMetaFlow] = useState(false);
+  const [metaFlowSyncMsg, setMetaFlowSyncMsg] = useState<{ success: boolean; text: string } | null>(null);
+  const [showFlowJsonModal, setShowFlowJsonModal] = useState(false);
+  const [flowJsonContent, setFlowJsonContent] = useState("");
+  const [copiedFlowJson, setCopiedFlowJson] = useState(false);
+  const [copiedFlowEndpoint, setCopiedFlowEndpoint] = useState(false);
 
   // Verification Modal State
   const [verifyingLink, setVerifyingLink] = useState<any | null>(null);
@@ -364,6 +377,43 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
     } finally {
       setSavingRecovery(false);
     }
+  };
+
+  const handleSyncMetaFlow = async () => {
+    setSyncingMetaFlow(true);
+    setMetaFlowSyncMsg(null);
+    try {
+      const res = await createOrPublishMetaCheckoutFlowAction();
+      if (res.success && res.flowId) {
+        setRecoverySettings(prev => ({ ...prev, metaFlowId: res.flowId }));
+        setMetaFlowSyncMsg({ success: true, text: res.message || `Meta Flow created & published! Flow ID: ${res.flowId}` });
+        showToast(`Meta Flow published successfully! ID: ${res.flowId}`, "success");
+      } else {
+        setMetaFlowSyncMsg({ success: false, text: res.error || "Failed to publish Flow on Meta." });
+        showToast(res.error || "Failed to publish Flow to Meta.", "error");
+      }
+    } catch (e: any) {
+      setMetaFlowSyncMsg({ success: false, text: e.message });
+      showToast(e.message, "error");
+    } finally {
+      setSyncingMetaFlow(false);
+    }
+  };
+
+  const handleOpenFlowJsonModal = async () => {
+    try {
+      const res = await getCheckoutFlowDetailsAction();
+      if (res.success && res.flowJson) {
+        setFlowJsonContent(res.flowJson);
+      } else {
+        const fallback = generateMetaCheckoutFlowJson(recoverySettings);
+        setFlowJsonContent(JSON.stringify(fallback, null, 2));
+      }
+    } catch (_) {
+      const fallback = generateMetaCheckoutFlowJson(recoverySettings);
+      setFlowJsonContent(JSON.stringify(fallback, null, 2));
+    }
+    setShowFlowJsonModal(true);
   };
 
   const handleSimulatePing = async (provider: "RAZORPAY" | "CASHFREE") => {
@@ -1738,6 +1788,104 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                           />
                         </div>
                       </div>
+
+                      {/* Meta Flow ID & 1-Click Deployment Card */}
+                      <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col gap-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                              <Code2 size={13} className="text-indigo-600 dark:text-indigo-400" />
+                              Meta Flow ID (Required for In-WhatsApp Modal)
+                            </label>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                              Numeric Flow ID published in Meta Business Suite (e.g. 104829103948192).
+                            </span>
+                          </div>
+
+                          <span className={`self-start sm:self-auto text-[10.5px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                            recoverySettings.metaFlowId && !isNaN(Number(recoverySettings.metaFlowId))
+                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                              : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              recoverySettings.metaFlowId && !isNaN(Number(recoverySettings.metaFlowId))
+                                ? "bg-emerald-500"
+                                : "bg-amber-500"
+                            }`}></span>
+                            {recoverySettings.metaFlowId && !isNaN(Number(recoverySettings.metaFlowId))
+                              ? `Active on Meta (${recoverySettings.metaFlowId})`
+                              : "Setup Needed"}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                          <input
+                            type="text"
+                            value={recoverySettings.metaFlowId || ""}
+                            onChange={(e) => setRecoverySettings({ ...recoverySettings, metaFlowId: e.target.value.trim() })}
+                            placeholder="e.g. 104829103948192"
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={handleSyncMetaFlow}
+                            disabled={syncingMetaFlow}
+                            className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-xs"
+                          >
+                            {syncingMetaFlow ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                            <span>{syncingMetaFlow ? "Deploying..." : "🚀 1-Click Sync to Meta"}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleOpenFlowJsonModal}
+                            className="px-3 py-2 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                          >
+                            <FileText size={13} />
+                            <span>View Flow JSON</span>
+                          </button>
+                        </div>
+
+                        {metaFlowSyncMsg && (
+                          <div className={`p-2.5 rounded-lg text-[11px] font-medium flex items-center gap-1.5 ${
+                            metaFlowSyncMsg.success
+                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800"
+                              : "bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800"
+                          }`}>
+                            {metaFlowSyncMsg.success ? <CheckCircle2 size={13} className="shrink-0" /> : <AlertCircle size={13} className="shrink-0" />}
+                            <span>{metaFlowSyncMsg.text}</span>
+                          </div>
+                        )}
+
+                        {/* Flow Endpoint & Pincode Auto-Fill Info */}
+                        <div className="pt-2.5 border-t border-slate-200/80 dark:border-slate-700/80 flex flex-col gap-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                              <Zap size={12} className="text-amber-500" />
+                              Pincode Auto-Fill Endpoint (State & District Auto-Fill + City Selectable):
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText("https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint");
+                                setCopiedFlowEndpoint(true);
+                                setTimeout(() => setCopiedFlowEndpoint(false), 2000);
+                              }}
+                              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedFlowEndpoint ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                              <span>{copiedFlowEndpoint ? "Copied!" : "Copy Endpoint"}</span>
+                            </button>
+                          </div>
+                          <code className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-900 font-mono text-[10.5px] text-slate-800 dark:text-slate-300 select-all overflow-x-auto">
+                            https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint
+                          </code>
+                          <p className="m-0 text-[10.5px] text-slate-500 dark:text-slate-400">
+                            When customer inputs 6-digit Pincode, Meta Flow calls this endpoint to automatically populate <strong>State</strong> &amp; <strong>District</strong> and return a selectable dropdown list of <strong>Cities / Post Offices</strong>.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2101,6 +2249,67 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Meta WhatsApp Flow JSON Modal */}
+      {showFlowJsonModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2">
+                <Code2 size={16} className="text-indigo-600 dark:text-indigo-400" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">
+                  Meta WhatsApp Flow JSON Specification (v3.1)
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFlowJsonModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-4 flex flex-col gap-3">
+              <p className="text-xs text-slate-600 dark:text-slate-400 m-0">
+                You can copy this exact JSON and paste it into <strong>Meta WhatsApp Business Manager &gt; Flows &gt; JSON Editor</strong> to create or update your Flow directly on Meta!
+              </p>
+
+              <div className="bg-slate-950 rounded-xl p-3.5 border border-slate-800 text-[11px] font-mono text-emerald-400 overflow-y-auto max-h-96 select-all">
+                <pre>{flowJsonContent}</pre>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-[11px] text-slate-500 font-mono">
+                  Endpoint: https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(flowJsonContent);
+                      setCopiedFlowJson(true);
+                      showToast("Flow JSON copied to clipboard!", "success");
+                      setTimeout(() => setCopiedFlowJson(false), 2000);
+                    }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {copiedFlowJson ? <Check size={12} /> : <Copy size={12} />}
+                    <span>{copiedFlowJson ? "Copied!" : "Copy Flow JSON"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowFlowJsonModal(false)}
+                    className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
