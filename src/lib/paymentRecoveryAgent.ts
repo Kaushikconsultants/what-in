@@ -192,7 +192,7 @@ export async function generateRecoveryReply(params: {
 }
 
 /**
- * Generate official Meta Flow JSON (v3.1) with Pincode auto-fill (State & District),
+ * Generate official Meta Flow JSON (v7.3) with Pincode auto-fill (State & District),
  * selectable city dropdown, full address fields, and customizable payment modes.
  */
 export function generateMetaCheckoutFlowJson(settings?: any) {
@@ -225,15 +225,75 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
   }
 
   return {
-    version: "3.1",
+    version: "7.3",
+    data_api_version: "3.0",
+    routing_model: {
+      PINCODE_SCREEN: ["ADDRESS_PAYMENT_SCREEN"]
+    },
     screens: [
       {
-        id: "CHECKOUT_SCREEN",
-        title: settings?.flowHeaderTitle || "Delivery & Payment",
+        id: "PINCODE_SCREEN",
+        title: "Step 1: Contact & Pincode",
         data: {
+          pincode_error: { type: "string", __example__: "" }
+        },
+        layout: {
+          type: "SingleColumnLayout",
+          children: [
+            {
+              type: "TextHeading",
+              text: "📍 Contact & Delivery Pincode"
+            },
+            {
+              type: "TextInput",
+              name: "full_name",
+              label: "Full Name",
+              required: true
+            },
+            {
+              type: "TextInput",
+              name: "phone",
+              label: "Contact Mobile Number",
+              "input-type": "phone",
+              required: true
+            },
+            {
+              type: "TextInput",
+              name: "pincode",
+              label: "6-Digit Postal Pincode",
+              "input-type": "number",
+              required: true
+            },
+            {
+              type: "TextCaption",
+              text: "Enter your 6-digit pincode to automatically verify State, District & Local Areas."
+            },
+            {
+              type: "Footer",
+              label: "Verify Pincode & Continue ➡️",
+              "on-click-action": {
+                name: "data_exchange",
+                payload: {
+                  action: "pincode_lookup",
+                  pincode: "${form.pincode}",
+                  full_name: "${form.full_name}",
+                  phone: "${form.phone}"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        id: "ADDRESS_PAYMENT_SCREEN",
+        title: "Step 2: Delivery & Payment",
+        terminal: true,
+        data: {
+          full_name: { type: "string", __example__: "Customer" },
+          phone: { type: "string", __example__: "9896507407" },
+          pincode: { type: "string", __example__: "124021" },
           state: { type: "string", __example__: "Haryana" },
           district: { type: "string", __example__: "Rohtak" },
-          city: { type: "string", __example__: "Rohtak" },
           cities: {
             type: "array",
             items: {
@@ -247,72 +307,25 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
               { id: "Rohtak H.O", title: "Rohtak H.O" },
               { id: "DLF Colony", title: "DLF Colony" }
             ]
-          },
-          is_cities_available: { type: "boolean", __example__: true },
-          pincode_status: { type: "string", __example__: "Enter 6-digit Pincode" }
+          }
         },
         layout: {
-          type: "Form",
+          type: "SingleColumnLayout",
           children: [
             {
               type: "TextHeading",
-              text: "📍 Delivery Address"
+              text: "🏠 Verified Region"
             },
             {
-              type: "TextInput",
-              name: "full_name",
-              label: "Full Name",
-              required: true
-            },
-            {
-              type: "TextInput",
-              name: "phone",
-              label: "Contact Mobile Number",
-              input_type: "phone",
-              required: true
-            },
-            {
-              type: "TextInput",
-              name: "pincode",
-              label: "6-Digit Postal Pincode",
-              input_type: "number",
-              required: true
-            },
-            {
-              type: "TextCaption",
-              text: "${data.pincode_status}"
-            },
-            {
-              type: "Button",
-              label: "⚡ Auto-Fill State, District & City",
-              "on-click-action": {
-                name: "data_exchange",
-                payload: {
-                  action: "data_exchange",
-                  pincode: "${form.pincode}"
-                }
-              }
-            },
-            {
-              type: "TextInput",
-              name: "state",
-              label: "State",
-              required: true,
-              init_value: "${data.state}"
-            },
-            {
-              type: "TextInput",
-              name: "district",
-              label: "District",
-              required: true,
-              init_value: "${data.district}"
+              type: "TextSubheading",
+              text: "📍 ${data.district}, ${data.state} (PIN: ${data.pincode})"
             },
             {
               type: "Dropdown",
               name: "city",
-              label: "Select City / Post Office",
+              label: "Select Local Area / Post Office",
               required: true,
-              data_source: "${data.cities}"
+              "data-source": "${data.cities}"
             },
             {
               type: "TextInput",
@@ -335,7 +348,7 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
               name: "payment_mode",
               label: "Choose Payment Method",
               required: true,
-              data_source: paymentOptions
+              "data-source": paymentOptions
             },
             {
               type: "Footer",
@@ -343,11 +356,11 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
               "on-click-action": {
                 name: "complete",
                 payload: {
-                  full_name: "${form.full_name}",
-                  phone: "${form.phone}",
-                  pincode: "${form.pincode}",
-                  state: "${form.state}",
-                  district: "${form.district}",
+                  full_name: "${data.full_name}",
+                  phone: "${data.phone}",
+                  pincode: "${data.pincode}",
+                  state: "${data.state}",
+                  district: "${data.district}",
                   city: "${form.city}",
                   house_flat: "${form.house_flat}",
                   street_landmark: "${form.street_landmark}",

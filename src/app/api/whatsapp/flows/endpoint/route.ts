@@ -89,11 +89,14 @@ export async function POST(req: NextRequest) {
     // Check if private key exists in DB or environment
     let privateKeyPem = process.env.META_FLOWS_PRIVATE_KEY;
     if (!privateKeyPem) {
-      const storedKey = await prisma.companySettings.findFirst({
-        select: { metaFlowPrivateKey: true } as any
+      const clientWithKey = await prisma.whatsAppClient.findFirst({
+        where: { aiKnowledgeBase: { contains: "metaFlowPrivateKey" } }
       }).catch(() => null);
-      if (storedKey && (storedKey as any).metaFlowPrivateKey) {
-        privateKeyPem = (storedKey as any).metaFlowPrivateKey;
+      if (clientWithKey?.aiKnowledgeBase) {
+        try {
+          const parsed = JSON.parse(clientWithKey.aiKnowledgeBase);
+          if (parsed.metaFlowPrivateKey) privateKeyPem = parsed.metaFlowPrivateKey;
+        } catch (_) {}
       }
     }
 
@@ -129,14 +132,20 @@ export async function POST(req: NextRequest) {
 
     // 2. Screen Initial Load (INIT)
     if (action === "INIT") {
+      const targetScreen = screen || "PINCODE_SCREEN";
       const response = {
-        version: "3.1",
-        screen: "CHECKOUT_SCREEN",
+        version: "7.3",
+        screen: targetScreen,
         data: {
+          full_name: "",
+          phone: "",
+          pincode: "",
           state: "",
           district: "",
           city: "",
-          cities: [],
+          cities: [
+            { id: "DEFAULT", title: "Select Local Area / Post Office" }
+          ],
           is_cities_available: false,
           pincode_status: "Enter 6-digit Pincode to auto-fill State & District"
         }
@@ -150,21 +159,29 @@ export async function POST(req: NextRequest) {
     if (action === "data_exchange") {
       const rawPincode = data?.pincode || data?.pin_code || data?.postal_code || "";
       const pincode = String(rawPincode).replace(/\D/g, "").slice(0, 6);
+      const targetScreen = screen === "CHECKOUT_SCREEN" ? "CHECKOUT_SCREEN" : "ADDRESS_PAYMENT_SCREEN";
 
       if (pincode.length === 6) {
         const pinLookup = await lookupPincode(pincode);
 
         if (pinLookup.valid) {
-          const citiesList = (pinLookup.cities || []).slice(0, 20);
+          const rawCities = (pinLookup.cities || []).slice(0, 30);
+          const citiesList = rawCities.length > 0
+            ? rawCities
+            : [{ id: pinLookup.city || pinLookup.district || "LOCAL", title: pinLookup.city || pinLookup.district || "Local Area" }];
+
           const response = {
-            version: "3.1",
-            screen: "CHECKOUT_SCREEN",
+            version: "7.3",
+            screen: targetScreen,
             data: {
+              full_name: data?.full_name || "",
+              phone: data?.phone || "",
+              pincode: pincode,
               state: pinLookup.state || "",
               district: pinLookup.district || pinLookup.city || "",
-              city: citiesList[0]?.id || pinLookup.city || "",
+              city: citiesList[0]?.id || "",
               cities: citiesList,
-              is_cities_available: citiesList.length > 0,
+              is_cities_available: true,
               pincode_status: `✅ ${pinLookup.district}, ${pinLookup.state}`
             }
           };
@@ -174,13 +191,16 @@ export async function POST(req: NextRequest) {
             : NextResponse.json(response);
         } else {
           const response = {
-            version: "3.1",
-            screen: "CHECKOUT_SCREEN",
+            version: "7.3",
+            screen: targetScreen,
             data: {
+              full_name: data?.full_name || "",
+              phone: data?.phone || "",
+              pincode: pincode,
               state: "",
               district: "",
               city: "",
-              cities: [],
+              cities: [{ id: "DEFAULT", title: "Pincode Not Found" }],
               is_cities_available: false,
               pincode_status: "❌ Pincode not found. Please verify."
             }
@@ -193,13 +213,16 @@ export async function POST(req: NextRequest) {
 
       // Default fallback if pincode not 6 digits yet
       const response = {
-        version: "3.1",
-        screen: "CHECKOUT_SCREEN",
+        version: "7.3",
+        screen: targetScreen,
         data: {
+          full_name: data?.full_name || "",
+          phone: data?.phone || "",
+          pincode: pincode,
           state: data?.state || "",
           district: data?.district || "",
           city: data?.city || "",
-          cities: data?.cities || [],
+          cities: data?.cities || [{ id: "DEFAULT", title: "Enter Pincode First" }],
           is_cities_available: Boolean(data?.cities?.length),
           pincode_status: "Please enter a valid 6-digit Pincode"
         }

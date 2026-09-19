@@ -187,8 +187,11 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
       body: formData
     });
     const assetData = await assetRes.json();
-    if (assetData.error) {
-      console.warn("[Meta Flow Asset Warning]:", assetData.error.message);
+    if (assetData.error || (assetData.validation_errors && assetData.validation_errors.length > 0)) {
+      const errDetail = assetData.validation_errors
+        ? assetData.validation_errors.map((e: any) => `${e.error}: ${e.message}`).join(" | ")
+        : assetData.error?.message;
+      throw new Error(`Meta Flow JSON validation rejected: ${errDetail}`);
     }
 
     // 3. Publish Flow
@@ -198,7 +201,7 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
     });
     const pubData = await pubRes.json();
     if (pubData.error) {
-      console.warn("[Meta Flow Publish Warning]:", pubData.error.message);
+      throw new Error(`Meta Flow publish rejected: ${pubData.error.message || pubData.error.error_user_msg}`);
     }
 
     // 4. Save to Database & Settings
