@@ -4,6 +4,7 @@ import {
   getRecoveryAgentSettings, 
   saveRecoveryAgentSettings, 
   generateRecoveryReply, 
+  generateMetaCheckoutFlowJson as generateMetaCheckoutFlowJsonLib,
   RecoveryAgentSettings 
 } from "@/lib/paymentRecoveryAgent";
 import { prisma } from "@/lib/prisma";
@@ -94,174 +95,10 @@ export async function sendConversationalPaymentRecoveryAction(params: {
 }
 
 /**
- * Generate official Meta Flow JSON (v3.1) with Pincode auto-fill (State & District),
- * selectable city dropdown, full address fields, and customizable payment modes.
+ * Server Action: Generate official Meta Flow JSON (v3.1) with Pincode auto-fill
  */
-export function generateMetaCheckoutFlowJson(settings?: any) {
-  const modes = settings?.allowedPaymentModes || ['PREPAID', 'PARTIAL_COD', 'FULL_COD'];
-  const paymentOptions: Array<{ id: string; title: string }> = [];
-
-  if (modes.includes('PREPAID')) {
-    paymentOptions.push({
-      id: "PREPAID",
-      title: `100% Online Payment${settings?.prepaidDiscountPercent ? ` (${settings.prepaidDiscountPercent}% Instant Discount)` : ''}`
-    });
-  }
-  if (modes.includes('PARTIAL_COD')) {
-    const advDesc = settings?.partialCodMode === 'FIXED'
-      ? `₹${settings.partialCodValue || 200} Advance`
-      : `${settings?.partialCodValue || 10}% Advance`;
-    paymentOptions.push({
-      id: "PARTIAL_COD",
-      title: `Partial COD (${advDesc} Now, Balance on Delivery)`
-    });
-  }
-  if (modes.includes('FULL_COD')) {
-    paymentOptions.push({
-      id: "FULL_COD",
-      title: "Full Cash on Delivery (100% COD)"
-    });
-  }
-  if (paymentOptions.length === 0) {
-    paymentOptions.push({ id: "PREPAID", title: "Pay Online" });
-  }
-
-  return {
-    version: "3.1",
-    screens: [
-      {
-        id: "CHECKOUT_SCREEN",
-        title: settings?.flowHeaderTitle || "Delivery & Payment",
-        data: {
-          state: { type: "string", __example__: "Haryana" },
-          district: { type: "string", __example__: "Rohtak" },
-          city: { type: "string", __example__: "Rohtak" },
-          cities: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                id: { type: "string" },
-                title: { type: "string" }
-              }
-            },
-            __example__: [
-              { id: "Rohtak H.O", title: "Rohtak H.O" },
-              { id: "DLF Colony", title: "DLF Colony" }
-            ]
-          },
-          is_cities_available: { type: "boolean", __example__: true },
-          pincode_status: { type: "string", __example__: "Enter 6-digit Pincode" }
-        },
-        layout: {
-          type: "Form",
-          children: [
-            {
-              type: "TextHeading",
-              text: "📍 Delivery Address"
-            },
-            {
-              type: "TextInput",
-              name: "full_name",
-              label: "Full Name",
-              required: true
-            },
-            {
-              type: "TextInput",
-              name: "phone",
-              label: "Contact Mobile Number",
-              input_type: "phone",
-              required: true
-            },
-            {
-              type: "TextInput",
-              name: "pincode",
-              label: "6-Digit Postal Pincode",
-              input_type: "number",
-              required: true
-            },
-            {
-              type: "TextCaption",
-              text: "${data.pincode_status}"
-            },
-            {
-              type: "Button",
-              label: "⚡ Auto-Fill State, District & City",
-              "on-click-action": {
-                name: "data_exchange",
-                payload: {
-                  action: "data_exchange",
-                  pincode: "${form.pincode}"
-                }
-              }
-            },
-            {
-              type: "TextInput",
-              name: "state",
-              label: "State",
-              required: true,
-              init_value: "${data.state}"
-            },
-            {
-              type: "TextInput",
-              name: "district",
-              label: "District",
-              required: true,
-              init_value: "${data.district}"
-            },
-            {
-              type: "Dropdown",
-              name: "city",
-              label: "Select City / Post Office",
-              required: true,
-              data_source: "${data.cities}"
-            },
-            {
-              type: "TextInput",
-              name: "house_flat",
-              label: "House / Flat / Floor No., Building",
-              required: true
-            },
-            {
-              type: "TextInput",
-              name: "street_landmark",
-              label: "Street / Colony / Landmark",
-              required: true
-            },
-            {
-              type: "TextHeading",
-              text: "💳 Payment Method"
-            },
-            {
-              type: "RadioButtonsGroup",
-              name: "payment_mode",
-              label: "Choose Payment Method",
-              required: true,
-              data_source: paymentOptions
-            },
-            {
-              type: "Footer",
-              label: "Confirm & Place Order",
-              "on-click-action": {
-                name: "complete",
-                payload: {
-                  full_name: "${form.full_name}",
-                  phone: "${form.phone}",
-                  pincode: "${form.pincode}",
-                  state: "${form.state}",
-                  district: "${form.district}",
-                  city: "${form.city}",
-                  house_flat: "${form.house_flat}",
-                  street_landmark: "${form.street_landmark}",
-                  payment_mode: "${form.payment_mode}"
-                }
-              }
-            }
-          ]
-        }
-      }
-    ]
-  };
+export async function generateMetaCheckoutFlowJson(settings?: any) {
+  return generateMetaCheckoutFlowJsonLib(settings);
 }
 
 export async function getCheckoutFlowDetailsAction(clientOverrideId?: string) {

@@ -23,9 +23,9 @@ import {
   savePaymentRecoverySettingsAction, 
   sendConversationalPaymentRecoveryAction,
   createOrPublishMetaCheckoutFlowAction,
-  getCheckoutFlowDetailsAction,
-  generateMetaCheckoutFlowJson
+  getCheckoutFlowDetailsAction
 } from "@/app/actions/paymentRecoveryActions";
+import { generateMetaCheckoutFlowJson } from "@/lib/paymentRecoveryAgent";
 import { formatWhatsAppPhone, getCustomerDisplayName } from "@/lib/phoneUtils";
 
 interface WhatsAppPaymentsManagementComponentProps {

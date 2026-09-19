@@ -44,9 +44,9 @@ import {
   getPaymentRecoverySettingsAction,
   savePaymentRecoverySettingsAction,
   createOrPublishMetaCheckoutFlowAction,
-  getCheckoutFlowDetailsAction,
-  generateMetaCheckoutFlowJson
+  getCheckoutFlowDetailsAction
 } from "@/app/actions/paymentRecoveryActions";
+import { generateMetaCheckoutFlowJson } from "@/lib/paymentRecoveryAgent";
 
 export default function WhatsAppOrdersComponent() {
   const [activeTab, setActiveTab] = useState<"orders" | "settings" | "shipments">("orders");
