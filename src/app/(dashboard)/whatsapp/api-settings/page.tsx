@@ -36,7 +36,7 @@ export default function WhatsAppAPISettingsPage() {
 
   // Dynamic Brand Profile & AI Intelligence State
   const [brandName, setBrandName] = useState("Espon Clothing Private Limited");
-  const [brandDomain, setBrandDomain] = useState("www.esponesports.com");
+  const [brandDomain, setBrandDomain] = useState("www.esponsports.com");
   const [brandPhone, setBrandPhone] = useState("+91 7206066678");
   const [brandEmail, setBrandEmail] = useState("clothingespon@gmail.com");
   const [brandAddress, setBrandAddress] = useState("Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road");
@@ -674,7 +674,7 @@ export default function WhatsAppAPISettingsPage() {
                     required
                     value={brandDomain}
                     onChange={(e) => setBrandDomain(e.target.value)}
-                    placeholder="e.g. www.esponesports.com"
+                    placeholder="e.g. www.esponsports.com"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                   <span className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 block">

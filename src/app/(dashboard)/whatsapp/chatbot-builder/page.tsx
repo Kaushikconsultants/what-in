@@ -254,7 +254,7 @@ const BOT_TEMPLATES = [
         y: 360,
         text: "For personal use, visit our online retail store directly:",
         buttonText: "Visit Online Store 🛍️",
-        url: "https://esponesports.com/shop"
+        url: "https://esponsports.com/shop"
       },
       {
         id: "node_end_b2b",
@@ -265,7 +265,7 @@ const BOT_TEMPLATES = [
         y: 120,
         text: "Thank you! Our wholesale specialist will call you shortly with catalog & pricing details.",
         buttonText: "View Catalog 📄",
-        url: "https://esponesports.com/catalog.pdf"
+        url: "https://esponsports.com/catalog.pdf"
       }
     ]
   },
@@ -1322,7 +1322,7 @@ export default function WhatsAppChatbotBuilderPage() {
         newNode = { ...newNode, category: "choice", youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", caption: "Espon Factory Tour & Manufacturing Demo" };
         break;
       case "file":
-        newNode = { ...newNode, category: "choice", fileUrl: "https://esponesports.com/catalog.pdf", filename: "Espon_Apparel_Catalog_2026.pdf" };
+        newNode = { ...newNode, category: "choice", fileUrl: "https://esponsports.com/catalog.pdf", filename: "Espon_Apparel_Catalog_2026.pdf" };
         break;
       case "audio":
         newNode = { ...newNode, category: "choice", audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", isVoiceNote: true, text: "Audio Note: Welcome message from Ikra Sales Manager" };
@@ -1334,7 +1334,7 @@ export default function WhatsAppChatbotBuilderPage() {
         newNode = { ...newNode, category: "choice", contactName: "Ikra Sales Manager", contactPhone: "+91 7206066678", contactOrg: "Espon Apparel Direct" };
         break;
       case "link":
-        newNode = { ...newNode, category: "choice", text: "Click below to visit our B2B wholesale store:", buttonText: "Visit Portal 🌐", url: "https://esponesports.com" };
+        newNode = { ...newNode, category: "choice", text: "Click below to visit our B2B wholesale store:", buttonText: "Visit Portal 🌐", url: "https://esponsports.com" };
         break;
       case "carousel":
         newNode = {
@@ -1404,7 +1404,7 @@ export default function WhatsAppChatbotBuilderPage() {
         newNode = { ...newNode, category: "logic", title: "Jump to Block", targetNodeId: null };
         break;
       case "pay_link":
-        newNode = { ...newNode, category: "payment", title: "Send Payment Link", amount: 1500, currency: "INR", paymentDescription: "Order Deposit Payment", paymentUrl: "https://pay.esponesports.com/dep1092" };
+        newNode = { ...newNode, category: "payment", title: "Send Payment Link", amount: 1500, currency: "INR", paymentDescription: "Order Deposit Payment", paymentUrl: "https://pay.esponsports.com/dep1092" };
         break;
       case "pay_qr":
         newNode = { ...newNode, category: "payment", title: "UPI QR Code", amount: 2500, upiId: "7206066678@OKBIZAXIS", payeeName: "Espon Clothing Pvt Ltd", text: "Scan QR via GPay / PhonePe / Paytm:" };
@@ -1419,7 +1419,7 @@ export default function WhatsAppChatbotBuilderPage() {
         newNode = { ...newNode, category: "choice", title: "Multi-Item Order", text: "Order Summary: 100 pcs Polo T-Shirts (₹29,000)" };
         break;
       case "webhook":
-        newNode = { ...newNode, category: "api", title: "Webhook Fetch (API)", webhookUrl: "https://api.esponesports.com/v1/inventory", method: "POST", headers: "Content-Type: application/json", requestBody: '{"sku": "ESP-902"}' };
+        newNode = { ...newNode, category: "api", title: "Webhook Fetch (API)", webhookUrl: "https://api.esponsports.com/v1/inventory", method: "POST", headers: "Content-Type: application/json", requestBody: '{"sku": "ESP-902"}' };
         break;
       case "crm_contact":
         newNode = { ...newNode, category: "crm", title: "Update CRM Contact", leadStage: "Qualified Lead", temperature: "HOT", tags: "Hot Lead, Wholesale" };

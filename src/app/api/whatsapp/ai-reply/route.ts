@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       cleanDomain(clientRecord?.shopifyDomain) ||
       (clientRecord?.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : null) ||
       cleanDomain(company?.shopifyStoreDomain) ||
-      "www.esponesports.com";
+      "www.esponsports.com";
 
     const rawPhone = clientRecord?.contactPhone || company?.mobile || clientRecord?.phoneNumber || account?.phoneNumber || "+91 7206066678";
     let brandPhone = "+91 7206066678";

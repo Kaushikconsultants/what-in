@@ -3,13 +3,19 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { handleIncomingAILogic } from "@/lib/whatsappAI";
 import { executeFlowEngine } from "@/lib/whatsappFlowEngine";
-import { assignWhatsAppLeadAction, generateWhatsAppPaymentLinkAction } from "@/app/actions/whatsAppPlatformActions";
+import { 
+  assignWhatsAppLeadAction, 
+  generateWhatsAppPaymentLinkAction, 
+  sendWhatsAppFlowMessageAction, 
+  sendWhatsAppMessageAction 
+} from "@/app/actions/whatsAppPlatformActions";
 import { formatWhatsAppPhone } from "@/lib/phoneUtils";
 import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
 import { emitInboxEvent } from "@/lib/inboxEvents";
 import { processUpiScreenshotAction } from "@/app/actions/upiScreenshotActions";
 import { getRecoveryAgentSettings } from "@/lib/paymentRecoveryAgent";
 import { dispatchOutboundWebhook } from "@/lib/outboundWebhookDispatcher";
+import { lookupPincode } from "@/lib/pincodeLookup";
 
 const MAX_DEDUP_SIZE = 2000;
 const dedupQueue: string[] = [];
@@ -703,7 +709,7 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
 
     const messageTimestamp = new Date(parseInt(msg.timestamp) * 1000 || Date.now());
     
-    // Log Meta Flow submissions in database
+    // Log Meta Flow submissions & Process Checkout Delivery Address
     if (msg.type === "interactive" && msg.interactive?.type === "nfm_reply") {
       try {
         const flowReply = msg.interactive.nfm_reply;
@@ -728,9 +734,157 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
               dataJson: flowReply.response_json || "{}"
             }
           });
+
+          // Intelligent Address & Partial COD Processing
+          let answers: any = {};
+          try { answers = JSON.parse(flowReply.response_json || "{}"); } catch (_) {}
+          const rawPincode = answers.pincode || answers.pin_code || answers.postal_code;
+          const hasAddressData = Boolean(rawPincode || answers.house_flat || answers.address);
+
+          if (hasAddressData) {
+            let city = answers.city || "";
+            let state = answers.state || "";
+            let pincode = String(rawPincode || "").replace(/\D/g, "");
+
+            if (pincode.length === 6 && (!city || !state)) {
+              const pinData = await lookupPincode(pincode);
+              if (pinData.valid) {
+                if (!city) city = pinData.city || "";
+                if (!state) state = pinData.state || "";
+              }
+            }
+
+            const housePart = answers.house_flat || answers.house || answers.flat || "";
+            const streetPart = answers.street_landmark || answers.street || answers.landmark || answers.area || "";
+            const fullAddress = [housePart, streetPart].filter(Boolean).join(", ") || answers.address || "";
+            const formattedAddress = [fullAddress, city, state, pincode ? `PIN: ${pincode}` : ""].filter(Boolean).join(", ");
+
+            // Update Customer record with verified delivery address
+            await prisma.customer.update({
+              where: { id: customer.id },
+              data: {
+                shippingAddress: formattedAddress || undefined,
+                billingAddress: formattedAddress || undefined,
+                contactPerson: answers.full_name || customer.contactPerson,
+                landmark: streetPart || undefined,
+                notes: pincode ? `Pincode: ${pincode}, City: ${city}, State: ${state}` : customer.notes
+              }
+            }).catch((e: any) => console.error("[Webhook Address Save Error]:", e.message));
+
+            // Look up pending order from recent messages
+            const recentOrderMsg = await prisma.whatsAppMessage.findFirst({
+              where: { conversationId: conversation.id, messageType: "ORDER" },
+              orderBy: { sentAt: "desc" }
+            });
+
+            let orderTotal = 0;
+            let orderDesc = "Catalog Order";
+            if (recentOrderMsg?.metadata) {
+              try {
+                const meta = JSON.parse(recentOrderMsg.metadata);
+                if (meta?.order?.totalAmount) orderTotal = Number(meta.order.totalAmount);
+                if (meta?.order?.items) {
+                  const itemSummary = meta.order.items.map((it: any) => `${it.quantity}x ${it.name}`).join(", ");
+                  orderDesc = `Catalog Order (${meta.order.totalQuantity || meta.order.items.length} items: ${itemSummary})`;
+                }
+              } catch (_) {}
+            }
+
+            if (orderTotal > 0) {
+              const recSettings = await getRecoveryAgentSettings(clientId || undefined);
+              const chosenMode = String(answers.payment_mode || answers.payment_preference || "").toUpperCase();
+              const isFullCod = (chosenMode.includes("COD") && !chosenMode.includes("PARTIAL") && !chosenMode.includes("TOKEN") && !chosenMode.includes("ADVANCE")) || chosenMode === "CASH ON DELIVERY (FULL COD)";
+              const isPartialCod = chosenMode.includes("PARTIAL") || chosenMode.includes("TOKEN") || chosenMode.includes("ADVANCE");
+
+              if (isFullCod) {
+                // 1. Full COD: No advance required. Immediate Order Confirmation.
+                const confirmText = `🎉 *Order Confirmed (Cash on Delivery)!*\n\n` +
+                  `📦 *Items:* ${orderDesc}\n` +
+                  `💵 *Total Payable on Delivery:* ₹${orderTotal.toLocaleString('en-IN')}\n\n` +
+                  `📍 *Delivery Address:*\n${fullAddress}${city ? ', ' + city : ''}${state ? ', ' + state : ''} - ${pincode}\n` +
+                  `📞 *Contact Phone:* ${customer.mobile || fromPhone}\n\n` +
+                  `🚚 Our dispatch team is packaging your order. You will receive live courier tracking as soon as it ships!`;
+
+                await sendWhatsAppMessageAction({
+                  conversationId: conversation.id,
+                  senderId: "system",
+                  senderType: "SYSTEM",
+                  messageType: "TEXT",
+                  content: confirmText,
+                  senderName: "Order System"
+                });
+              } else if (isPartialCod) {
+                // 2. Partial COD: Calculate advance token based on tenant admin setting
+                let advanceAmount = 0;
+                if (recSettings.partialCodMode === 'FIXED') {
+                  advanceAmount = Math.min(orderTotal, recSettings.partialCodValue || 200);
+                } else {
+                  advanceAmount = Math.max(1, Math.round((orderTotal * (recSettings.partialCodValue || 10)) / 100));
+                }
+                const codBalance = Math.max(0, orderTotal - advanceAmount);
+
+                const summaryNotice = `✅ *Delivery Address Confirmed!*\n` +
+                  `📍 ${fullAddress}${city ? ', ' + city : ''}${state ? ', ' + state : ''} - ${pincode}\n\n` +
+                  `🪙 *Payment Preference: Partial COD*\n` +
+                  `• Total Order Value: *₹${orderTotal.toLocaleString('en-IN')}*\n` +
+                  `• Advance Token (to confirm dispatch): *₹${advanceAmount.toLocaleString('en-IN')}*\n` +
+                  `• Balance COD (payable on delivery): *₹${codBalance.toLocaleString('en-IN')}*\n\n` +
+                  `Kripya apna order dispatch confirm karne ke liye niche diye gaye UPI QR / payment link se ₹${advanceAmount} token advance pay karein:`;
+
+                await sendWhatsAppMessageAction({
+                  conversationId: conversation.id,
+                  senderId: "system",
+                  senderType: "SYSTEM",
+                  messageType: "TEXT",
+                  content: summaryNotice,
+                  senderName: "Order System"
+                });
+
+                // Generate payment link for the advance token amount
+                await generateWhatsAppPaymentLinkAction({
+                  conversationId: conversation.id,
+                  customerId: customer.id,
+                  amount: advanceAmount,
+                  description: `Token Advance (₹${advanceAmount}) for ${orderDesc}. Balance ₹${codBalance} on COD`,
+                  deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both"
+                });
+              } else {
+                // 3. Full Prepaid: Apply optional prepaid discount if configured
+                let finalAmount = orderTotal;
+                let discountNotice = "";
+                if (recSettings.prepaidDiscountPercent > 0) {
+                  const discount = Math.round((orderTotal * recSettings.prepaidDiscountPercent) / 100);
+                  finalAmount = Math.max(1, orderTotal - discount);
+                  discountNotice = `\n🎁 *Prepaid Privilege Offer:* Saved ₹${discount} (${recSettings.prepaidDiscountPercent}% OFF applied!)`;
+                }
+
+                const summaryNotice = `✅ *Delivery Address Confirmed!*\n` +
+                  `📍 ${fullAddress}${city ? ', ' + city : ''}${state ? ', ' + state : ''} - ${pincode}${discountNotice}\n` +
+                  `• Total Payable: *₹${finalAmount.toLocaleString('en-IN')}*\n\n` +
+                  `Kripya niche diye gaye UPI QR / payment link se secure online payment complete karein:`;
+
+                await sendWhatsAppMessageAction({
+                  conversationId: conversation.id,
+                  senderId: "system",
+                  senderType: "SYSTEM",
+                  messageType: "TEXT",
+                  content: summaryNotice,
+                  senderName: "Order System"
+                });
+
+                await generateWhatsAppPaymentLinkAction({
+                  conversationId: conversation.id,
+                  customerId: customer.id,
+                  amount: finalAmount,
+                  description: orderDesc,
+                  deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both"
+                });
+              }
+            }
+          }
         }
       } catch (err) {
-        console.error("Failed to log form submission in webhook:", err);
+        console.error("Failed to process form submission in webhook:", err);
       }
     }
 
@@ -1104,17 +1258,48 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
     }
 
     // ══════════════════════════════════════════════════════
-    // AUTO-SEND PAYMENT LINK WITH QR ON CATALOG ORDERS
+    // IN-WHATSAPP FLOW CHECKOUT & ADDRESS COLLECTION ON CATALOG ORDERS
     // ══════════════════════════════════════════════════════
     if (msg.type === "order" && orderMetadata?.order && orderMetadata.order.totalAmount > 0) {
       (async () => {
         try {
-          const recSettings = await getRecoveryAgentSettings();
-          if (recSettings.autoCatalogPaymentEnabled !== false) {
-            const orderInfo = orderMetadata.order;
-            const itemSummary = (orderInfo.items || []).map((it: any) => `${it.quantity}x ${it.name}`).join(", ");
-            const desc = `Catalog Order (${orderInfo.totalQuantity} items: ${itemSummary})`.slice(0, 150);
+          const recSettings = await getRecoveryAgentSettings(clientId || undefined);
+          const orderInfo = orderMetadata.order;
+          const itemSummary = (orderInfo.items || []).map((it: any) => `${it.quantity}x ${it.name}`).join(", ");
+          const desc = `Catalog Order (${orderInfo.totalQuantity} items: ${itemSummary})`.slice(0, 150);
 
+          if (recSettings.flowCheckoutEnabled !== false) {
+            // Send Interactive WhatsApp Flow for Address & Payment Preference
+            const flowRes = await sendWhatsAppFlowMessageAction(
+              fromPhone,
+              "flow_catalog_checkout_v1",
+              conversation.id,
+              "Order System",
+              {
+                headerTitle: recSettings.flowHeaderTitle || "Confirm Delivery & Payment",
+                bodyText: `Thank you for your order! 🛍️\n• Total: ₹${orderInfo.totalAmount.toLocaleString('en-IN')} (${orderInfo.totalQuantity} items)\n\n📍 Please tap below to enter your delivery address & choose your payment preference (Prepaid, Partial COD, or Full COD):`,
+                ctaText: recSettings.flowCtaText || "Enter Delivery Address 📍",
+                flowToken: `order_${conversation.id}_${orderInfo.totalAmount}_${Date.now()}`,
+                screenName: "CHECKOUT_SCREEN"
+              }
+            );
+
+            if (!flowRes.success) {
+              console.warn("[WhatsApp Webhook] Flow delivery fallback to conversational chat:", flowRes.error);
+              // Graceful Conversational Fallback
+              await sendWhatsAppMessageAction({
+                conversationId: conversation.id,
+                senderId: "system",
+                senderType: "SYSTEM",
+                messageType: "TEXT",
+                content: `Shukriya aapke order ke liye! 🛍️ Total: ₹${orderInfo.totalAmount.toLocaleString('en-IN')}\n\n📍 Delivery address confirm karne ke liye, kripya apna **6-Digit Delivery Pincode** yahan reply karein:`,
+                senderName: "Order System"
+              });
+            } else {
+              console.log(`[WhatsApp Webhook] Sent checkout Flow to ${fromPhone} for Order Total: ₹${orderInfo.totalAmount}`);
+            }
+          } else if (recSettings.autoCatalogPaymentEnabled !== false) {
+            // Direct Payment Link fallback if Flow checkout is toggled off by tenant admin
             await generateWhatsAppPaymentLinkAction({
               conversationId: conversation.id,
               customerId: customer.id,
@@ -1122,13 +1307,10 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
               description: desc,
               deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both"
             });
-
             console.log(`[WhatsApp Webhook] Auto-sent payment link + QR for catalog order to ${customer.contactPerson} (Amount: ₹${orderInfo.totalAmount})`);
-          } else {
-            console.log(`[WhatsApp Webhook] Auto-send catalog payment link skipped (disabled by admin setting)`);
           }
         } catch (catOrderErr) {
-          console.error("[WhatsApp Webhook] Error auto-sending payment link on catalog order:", catOrderErr);
+          console.error("[WhatsApp Webhook] Error in catalog order handling:", catOrderErr);
         }
       })();
     }

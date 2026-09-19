@@ -8,23 +8,28 @@ import {
 } from "@/lib/paymentRecoveryAgent";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessageAction } from "@/app/actions/whatsAppPlatformActions";
+import { getAuthenticatedUser } from "@/lib/authSession";
 
-export async function getPaymentRecoverySettingsAction() {
+export async function getPaymentRecoverySettingsAction(clientOverrideId?: string) {
   try {
-    const settings = await getRecoveryAgentSettings();
+    const user = await getAuthenticatedUser().catch(() => null);
+    const clientId = clientOverrideId || user?.clientId;
+    const settings = await getRecoveryAgentSettings(clientId);
     return { success: true, settings };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
 }
 
-export async function savePaymentRecoverySettingsAction(settings: Partial<RecoveryAgentSettings>) {
+export async function savePaymentRecoverySettingsAction(settings: Partial<RecoveryAgentSettings>, clientOverrideId?: string) {
   try {
-    const updated = await saveRecoveryAgentSettings(settings);
+    const user = await getAuthenticatedUser().catch(() => null);
+    const clientId = clientOverrideId || user?.clientId;
+    const updated = await saveRecoveryAgentSettings(settings, clientId);
     return { 
       success: true, 
       settings: updated,
-      message: "Recovery agent settings saved successfully." 
+      message: "Recovery agent & checkout flow settings saved successfully." 
     };
   } catch (err: any) {
     return { success: false, error: err.message };

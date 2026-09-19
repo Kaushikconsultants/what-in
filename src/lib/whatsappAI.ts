@@ -175,7 +175,7 @@ export async function searchProducts(userText: string, domainOverride?: string) 
   const dbCombos = await prisma.shopifyCombo.findMany({ where: { is_active: true } });
 
   // Get active settings to find the store domain
-  let activeDomain = domainOverride || "www.esponesports.com";
+  let activeDomain = domainOverride || "www.esponsports.com";
   if (!domainOverride) {
     try {
       const settings = await prisma.companySettings.findFirst();
@@ -467,7 +467,7 @@ export async function handleIncomingAILogic(
   clientId?: string | null
 ) {
   let brandName = "Espon Clothing Private Limited";
-  let brandDomain = "www.esponesports.com";
+  let brandDomain = "www.esponsports.com";
   let brandPhone = "+91 7206066678";
   let brandEmail = "clothingespon@gmail.com";
   let brandAddress = "Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road, Rohtak, Haryana 124001, India";
@@ -512,14 +512,14 @@ export async function handleIncomingAILogic(
     brandName = clientRecord?.businessName || company?.companyName || acc?.name || "Espon Clothing Private Limited";
 
     // 2. Dynamic Brand Domain
-    // Direct website (e.g. www.esponesports.com) set in Settings takes top precedence,
+    // Direct website (e.g. www.esponsports.com) set in Settings takes top precedence,
     // followed by tenant shopify domain, custom brand slug, shopifyStoreDomain, and fallback.
     const resolvedDomain = 
       cleanDomain(company?.website) ||
       cleanDomain(clientRecord?.shopifyDomain) ||
       (clientRecord?.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : null) ||
       cleanDomain(company?.shopifyStoreDomain) ||
-      "www.esponesports.com";
+      "www.esponsports.com";
     if (resolvedDomain) brandDomain = resolvedDomain;
 
     // 3. Dynamic Support Phone (Support & Sales Contact Phone)

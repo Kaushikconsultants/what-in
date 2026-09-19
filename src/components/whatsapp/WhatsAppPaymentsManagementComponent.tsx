@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { 
   CreditCard, CheckCircle2, Clock, Plus, RefreshCw, Link as LinkIcon, 
   Copy, Check, ShieldCheck, QrCode, AlertTriangle, ExternalLink, ChevronDown, ChevronUp, FileText, Send, X, Save, Eye, EyeOff, Zap,
-  TrendingUp, Smartphone, Webhook, AlertCircle, Activity, Sliders, Sparkles, Code2, Terminal
+  TrendingUp, Smartphone, Webhook, AlertCircle, Activity, Sliders, Sparkles, Code2, Terminal,
+  MapPin, DollarSign, Percent, CheckSquare, Square
 } from "lucide-react";
 import { 
   getWhatsAppPaymentLinks, 
@@ -80,6 +81,14 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
     productValuePitch: string;
     autoCatalogPaymentEnabled: boolean;
     autoCatalogDeliveryMethod: 'both' | 'qr' | 'link';
+    flowCheckoutEnabled?: boolean;
+    allowedPaymentModes?: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[];
+    partialCodMode?: 'PERCENTAGE' | 'FIXED';
+    partialCodValue?: number;
+    minOrderValueForCod?: number;
+    prepaidDiscountPercent?: number;
+    flowCtaText?: string;
+    flowHeaderTitle?: string;
   }>({
     enabled: false,
     delayHours: 2,
@@ -88,7 +97,15 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
     discountCode: "SPECIAL5",
     productValuePitch: "Each piece is crafted from 100% premium combed cotton with heavy GSM durability, reinforced stitching, and a 7-day hassle-free exchange promise.",
     autoCatalogPaymentEnabled: true,
-    autoCatalogDeliveryMethod: "both"
+    autoCatalogDeliveryMethod: "both",
+    flowCheckoutEnabled: true,
+    allowedPaymentModes: ['PREPAID', 'PARTIAL_COD', 'FULL_COD'],
+    partialCodMode: 'PERCENTAGE',
+    partialCodValue: 10,
+    minOrderValueForCod: 0,
+    prepaidDiscountPercent: 5,
+    flowCtaText: "Enter Delivery Address 📍",
+    flowHeaderTitle: "Confirm Delivery & Payment"
   });
   const [savingRecovery, setSavingRecovery] = useState(false);
   const [sendingRecoveryForId, setSendingRecoveryForId] = useState<string | null>(null);
@@ -1517,22 +1534,228 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                   )}
                 </div>
 
-                {/* Auto-Send Payment Link with QR on Catalog Orders */}
+                {/* 1. In-WhatsApp Flow Checkout & Address Collection */}
                 <div className={`p-4 rounded-xl border transition-all ${
-                  recoverySettings.autoCatalogPaymentEnabled
-                    ? "bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60"
+                  recoverySettings.flowCheckoutEnabled !== false
+                    ? "bg-indigo-50/40 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/60"
                     : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700"
                 }`}>
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <QrCode size={14} className="text-emerald-600 dark:text-emerald-400" />
-                        Auto-Send Payment Links & QR on Catalog Orders
+                        <MapPin size={14} className="text-indigo-600 dark:text-indigo-400" />
+                        In-WhatsApp Flow Checkout & Address Collection
                       </span>
                       <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
-                        {recoverySettings.autoCatalogPaymentEnabled
-                          ? "Active: When a customer submits a WhatsApp Catalog order, system immediately sends a dynamic payment link & UPI QR code."
-                          : "Disabled: Catalog orders are received in inbox for manual salesperson response."}
+                        {recoverySettings.flowCheckoutEnabled !== false
+                          ? "Active: When a customer sends a catalog order, WhatsApp opens an interactive Flow form to collect address with Pincode auto-fill (City & State) before payment."
+                          : "Disabled: Skips address collection flow and sends immediate payment link or manual confirmation."}
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={recoverySettings.flowCheckoutEnabled !== false}
+                      onChange={(e) => setRecoverySettings({ ...recoverySettings, flowCheckoutEnabled: e.target.checked })}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                    />
+                  </div>
+
+                  {recoverySettings.flowCheckoutEnabled !== false && (
+                    <div className="mt-4 pt-4 border-t border-indigo-100 dark:border-indigo-900/60 flex flex-col gap-4">
+                      {/* Payment Options Allowed */}
+                      <div>
+                        <label className="text-[11.5px] font-bold text-slate-800 dark:text-slate-200 block mb-2">
+                          Allowed Payment Modes in Checkout Flow
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          {/* 1. Prepaid */}
+                          <label className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all ${
+                            (recoverySettings.allowedPaymentModes || []).includes('PREPAID')
+                              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                          }`}>
+                            <input
+                              type="checkbox"
+                              checked={(recoverySettings.allowedPaymentModes || []).includes('PREPAID')}
+                              onChange={(e) => {
+                                const current = recoverySettings.allowedPaymentModes || ['PREPAID', 'PARTIAL_COD'];
+                                const updated: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[] = e.target.checked ? [...current, 'PREPAID'] : current.filter(m => m !== 'PREPAID');
+                                setRecoverySettings({ ...recoverySettings, allowedPaymentModes: updated });
+                              }}
+                              className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                            />
+                            <span>100% Online Prepaid</span>
+                          </label>
+
+                          {/* 2. Partial COD */}
+                          <label className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all ${
+                            (recoverySettings.allowedPaymentModes || []).includes('PARTIAL_COD')
+                              ? "bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                          }`}>
+                            <input
+                              type="checkbox"
+                              checked={(recoverySettings.allowedPaymentModes || []).includes('PARTIAL_COD')}
+                              onChange={(e) => {
+                                const current = recoverySettings.allowedPaymentModes || ['PREPAID', 'PARTIAL_COD'];
+                                const updated: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[] = e.target.checked ? [...current, 'PARTIAL_COD'] : current.filter(m => m !== 'PARTIAL_COD');
+                                setRecoverySettings({ ...recoverySettings, allowedPaymentModes: updated });
+                              }}
+                              className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                            />
+                            <span>Partial Advance COD</span>
+                          </label>
+
+                          {/* 3. Full COD */}
+                          <label className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all ${
+                            (recoverySettings.allowedPaymentModes || []).includes('FULL_COD')
+                              ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                          }`}>
+                            <input
+                              type="checkbox"
+                              checked={(recoverySettings.allowedPaymentModes || []).includes('FULL_COD')}
+                              onChange={(e) => {
+                                const current = recoverySettings.allowedPaymentModes || [];
+                                const updated: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[] = e.target.checked ? [...current, 'FULL_COD'] : current.filter(m => m !== 'FULL_COD');
+                                setRecoverySettings({ ...recoverySettings, allowedPaymentModes: updated });
+                              }}
+                              className="rounded text-amber-600 focus:ring-amber-500 w-3.5 h-3.5"
+                            />
+                            <span>Full Cash on Delivery</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Partial COD Advance Rule Configurator */}
+                      {(recoverySettings.allowedPaymentModes || []).includes('PARTIAL_COD') && (
+                        <div className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-indigo-200/80 dark:border-indigo-800/60 flex flex-col gap-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                              <Zap size={13} className="text-indigo-600 dark:text-indigo-400" />
+                              Partial COD Token Advance Policy
+                            </span>
+                            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                              <button
+                                type="button"
+                                onClick={() => setRecoverySettings({ ...recoverySettings, partialCodMode: 'PERCENTAGE' })}
+                                className={`px-2.5 py-1 rounded-md text-[10.5px] font-bold transition-all cursor-pointer ${
+                                  (recoverySettings.partialCodMode || 'PERCENTAGE') === 'PERCENTAGE'
+                                    ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                }`}
+                              >
+                                Percentage (%)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRecoverySettings({ ...recoverySettings, partialCodMode: 'FIXED' })}
+                                className={`px-2.5 py-1 rounded-md text-[10.5px] font-bold transition-all cursor-pointer ${
+                                  recoverySettings.partialCodMode === 'FIXED'
+                                    ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                }`}
+                              >
+                                Fixed Token (₹)
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">
+                                {recoverySettings.partialCodMode === 'FIXED' ? "Fixed Advance Token Amount (₹)" : "Advance Token Percentage (%)"}
+                              </label>
+                              <input
+                                type="number"
+                                min={1}
+                                value={recoverySettings.partialCodValue !== undefined ? recoverySettings.partialCodValue : 10}
+                                onChange={(e) => setRecoverySettings({ ...recoverySettings, partialCodValue: Number(e.target.value) || 0 })}
+                                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">
+                                Full Prepaid Discount Incentive (%)
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={50}
+                                value={recoverySettings.prepaidDiscountPercent !== undefined ? recoverySettings.prepaidDiscountPercent : 5}
+                                onChange={(e) => setRecoverySettings({ ...recoverySettings, prepaidDiscountPercent: Number(e.target.value) || 0 })}
+                                placeholder="e.g. 5"
+                                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Live Math Simulation Pill */}
+                          <div className="p-2.5 rounded-lg bg-indigo-50/70 dark:bg-indigo-950/50 text-[11px] text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
+                            <Sparkles size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                            <span>
+                              <strong>Live Example:</strong> For a <strong>₹1,500</strong> order, customer pays{" "}
+                              <strong className="text-emerald-700 dark:text-emerald-300">
+                                ₹{recoverySettings.partialCodMode === 'FIXED'
+                                  ? (recoverySettings.partialCodValue || 200)
+                                  : Math.round((1500 * (recoverySettings.partialCodValue || 10)) / 100)}
+                              </strong>{" "}
+                              token advance online to confirm dispatch, and the remaining{" "}
+                              <strong>
+                                ₹{1500 - (recoverySettings.partialCodMode === 'FIXED'
+                                  ? (recoverySettings.partialCodValue || 200)
+                                  : Math.round((1500 * (recoverySettings.partialCodValue || 10)) / 100))}
+                              </strong>{" "}
+                              as COD upon delivery.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Custom Flow Button CTA Text */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                            Flow Button Label (WhatsApp CTA)
+                          </label>
+                          <input
+                            type="text"
+                            value={recoverySettings.flowCtaText || "Enter Delivery Address 📍"}
+                            onChange={(e) => setRecoverySettings({ ...recoverySettings, flowCtaText: e.target.value })}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                            Flow Card Header Title
+                          </label>
+                          <input
+                            type="text"
+                            value={recoverySettings.flowHeaderTitle || "Confirm Delivery & Payment"}
+                            onChange={(e) => setRecoverySettings({ ...recoverySettings, flowHeaderTitle: e.target.value })}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Auto-Send Direct Payment Link Fallback */}
+                <div className={`p-4 rounded-xl border transition-all ${
+                  recoverySettings.autoCatalogPaymentEnabled
+                    ? "bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700"
+                    : "bg-slate-50 dark:bg-slate-800/20 border-slate-200/60 dark:border-slate-700/60 opacity-80"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <QrCode size={14} className="text-emerald-600 dark:text-emerald-400" />
+                        Direct Payment Link & QR Fallback
+                      </span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        Fallback payment format used when Flow is disabled or for direct checkout links.
                       </span>
                     </div>
                     <input
@@ -1544,7 +1767,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                   </div>
 
                   {recoverySettings.autoCatalogPaymentEnabled && (
-                    <div className="mt-3 pt-3 border-t border-emerald-200/60 dark:border-emerald-800/40">
+                    <div className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
                       <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                         Catalog Payment Delivery Format
                       </label>
@@ -1623,7 +1846,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
 
                     <div className="pt-1 text-[11px]">
                       <span>Click here to complete payment: </span>
-                      <span className="text-blue-600 dark:text-blue-400 underline font-mono">https://pay.esponesports.com/link_1042</span>
+                      <span className="text-blue-600 dark:text-blue-400 underline font-mono">https://pay.esponsports.com/link_1042</span>
                     </div>
 
                     <span className="text-[9px] text-slate-400 text-right self-end mt-1 font-mono">

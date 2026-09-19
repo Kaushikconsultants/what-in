@@ -456,7 +456,7 @@ export async function sendWhatsAppMessageAction(data: {
           ? data.mediaUrl 
           : data.mediaUrl?.startsWith('data:') 
           ? data.mediaUrl // Handled below or via pre-upload
-          : `https://www.esponesports.com${data.mediaUrl}`;
+          : `https://www.esponsports.com${data.mediaUrl}`;
 
         // If mediaUrl is just a Meta Media ID (doesn't start with http/data:/)
         const isMediaId = data.mediaUrl && !data.mediaUrl.includes('://') && !data.mediaUrl.startsWith('/');
@@ -890,7 +890,7 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
       const isMediaId = !existing.mediaUrl.includes('://') && !existing.mediaUrl.startsWith('/');
       const mediaField = isMediaId 
         ? { id: existing.mediaUrl.replace('/api/whatsapp/media/', '') } 
-        : { link: existing.mediaUrl.startsWith('http') ? existing.mediaUrl : `https://www.esponesports.com${existing.mediaUrl}` };
+        : { link: existing.mediaUrl.startsWith('http') ? existing.mediaUrl : `https://www.esponsports.com${existing.mediaUrl}` };
       const mType = existing.messageType.toLowerCase();
       payload.type = mType;
       payload[mType] = { ...mediaField, caption: existing.content && !existing.content.startsWith('[') ? existing.content : undefined };
@@ -7418,6 +7418,23 @@ export async function getWhatsAppMetaFlows() {
     if (!flows || flows.length === 0) {
       const defaultFlows = [
         {
+          name: "Catalog Delivery Address & Payment",
+          flowId: "flow_catalog_checkout_v1",
+          description: "Collect verified delivery address with pincode auto-fill and payment preference (Prepaid, Partial COD, or Full COD).",
+          screenName: "CHECKOUT_SCREEN",
+          ctaText: "Enter Delivery Address 📍",
+          formSchema: JSON.stringify([
+            { id: "full_name", type: "text", label: "Full Name", required: true },
+            { id: "phone", type: "phone", label: "Phone Number", required: true },
+            { id: "pincode", type: "number", label: "Delivery Pincode (6-Digits)", placeholder: "e.g. 124001", required: true },
+            { id: "house_flat", type: "text", label: "House / Flat No., Building", required: true },
+            { id: "street_landmark", type: "text", label: "Street, Area, Landmark", required: true },
+            { id: "city", type: "text", label: "City", required: false },
+            { id: "state", type: "text", label: "State", required: false },
+            { id: "payment_mode", type: "radio", label: "Payment Preference", options: ["Pay Online (UPI / Card / NetBanking)", "Partial COD (Pay Token Advance Now, Rest on Delivery)", "Cash on Delivery (Full COD)"], required: true }
+          ])
+        },
+        {
           name: "Customer Lead & Inquiry Form",
           flowId: "flow_lead_qualification_v1",
           description: "Collect customer requirement, budget range, and preferred contact method.",
@@ -7550,18 +7567,56 @@ export async function sendWhatsAppFlowMessageAction(
   toPhone: string, 
   flowId: string,
   conversationId?: string,
-  senderName?: string
+  senderName?: string,
+  customOptions?: {
+    headerTitle?: string;
+    bodyText?: string;
+    ctaText?: string;
+    flowToken?: string;
+    screenName?: string;
+    flowActionPayload?: any;
+    footerText?: string;
+  }
 ) {
   try {
     const creds = await getMetaApiCredentials();
     const cleanPhone = toPhone.replace(/\D/g, "");
     if (!creds?.isConnected) return { success: false, error: "WhatsApp API not connected." };
 
-    const flowConfig = await prisma.whatsAppMetaFlow.findFirst({
+    let flowConfig = await prisma.whatsAppMetaFlow.findFirst({
       where: { flowId: flowId }
     });
 
+    if (!flowConfig && flowId === "flow_catalog_checkout_v1") {
+      flowConfig = await prisma.whatsAppMetaFlow.create({
+        data: {
+          name: "Catalog Delivery Address & Payment",
+          flowId: "flow_catalog_checkout_v1",
+          description: "Collect delivery address with pincode auto-fill and payment preference (Prepaid, Partial COD, or Full COD).",
+          screenName: "CHECKOUT_SCREEN",
+          ctaText: "Enter Delivery Address 📍",
+          formSchema: JSON.stringify([
+            { id: "full_name", type: "text", label: "Full Name", required: true },
+            { id: "phone", type: "phone", label: "Phone Number", required: true },
+            { id: "pincode", type: "number", label: "Delivery Pincode (6-Digits)", placeholder: "e.g. 124001", required: true },
+            { id: "house_flat", type: "text", label: "House / Flat No., Building", required: true },
+            { id: "street_landmark", type: "text", label: "Street, Area, Landmark", required: true },
+            { id: "city", type: "text", label: "City", required: false },
+            { id: "state", type: "text", label: "State", required: false },
+            { id: "payment_mode", type: "radio", label: "Payment Preference", options: ["Pay Online (UPI / Card / NetBanking)", "Partial COD (Pay Token Advance Now, Rest on Delivery)", "Cash on Delivery (Full COD)"], required: true }
+          ])
+        }
+      }).catch(() => null);
+    }
+
     if (!flowConfig) return { success: false, error: "Flow configuration not found." };
+
+    const screenName = customOptions?.screenName || flowConfig.screenName || "SCREEN_NAME";
+    const headerTitle = customOptions?.headerTitle || flowConfig.name || "Order Confirmation";
+    const bodyText = customOptions?.bodyText || flowConfig.description || "Please fill out the form.";
+    const ctaText = customOptions?.ctaText || flowConfig.ctaText || "Open Form";
+    const flowToken = customOptions?.flowToken || `token_${Date.now()}`;
+    const footerText = customOptions?.footerText || "Fast & Secure Checkout";
 
     const payload = {
       messaging_product: "whatsapp",
@@ -7572,24 +7627,25 @@ export async function sendWhatsAppFlowMessageAction(
         type: "flow",
         header: {
           type: "text",
-          text: flowConfig.name
+          text: headerTitle
         },
         body: {
-          text: flowConfig.description || "Please fill out the form."
+          text: bodyText
         },
         footer: {
-          text: "Powered by Whatmore"
+          text: footerText
         },
         action: {
           name: "flow",
           parameters: {
             flow_message_version: "3",
-            flow_token: `token_${Date.now()}`,
+            flow_token: flowToken,
             flow_id: flowConfig.flowId,
-            flow_cta: flowConfig.ctaText,
+            flow_cta: ctaText,
             flow_action: "navigate",
             flow_action_payload: {
-              screen: flowConfig.screenName
+              screen: screenName,
+              ...(customOptions?.flowActionPayload ? { data: customOptions.flowActionPayload } : {})
             }
           }
         }
@@ -9762,7 +9818,7 @@ export async function getWhatsAppBrandDetailsAction() {
     } catch {}
     
     // Resolve public storefront domain (prioritize direct website over internal myshopify domain)
-    let brandDomain = "www.esponesports.com";
+    let brandDomain = "www.esponsports.com";
     if (company?.website) {
       brandDomain = company.website.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     } else if (client?.shopifyDomain) {
@@ -9823,7 +9879,7 @@ export async function getWhatsAppBrandDetailsAction() {
     return { 
       success: false, 
       brandName: "Espon Clothing Private Limited", 
-      brandDomain: "www.esponesports.com", 
+      brandDomain: "www.esponsports.com", 
       phoneNumber: "+91 7206066678", 
       brandPhone: "+91 7206066678",
       brandEmail: "clothingespon@gmail.com",

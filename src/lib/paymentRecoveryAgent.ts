@@ -9,6 +9,16 @@ export interface RecoveryAgentSettings {
   productValuePitch: string;
   autoCatalogPaymentEnabled: boolean; // Auto-send payment link + QR on catalog orders
   autoCatalogDeliveryMethod: 'both' | 'qr' | 'link'; // Delivery format: both, qr, or link
+
+  // NEW: In-WhatsApp Flow Address Collection & Customizable Partial COD
+  flowCheckoutEnabled: boolean; // default: true (ask address via Flow before payment)
+  allowedPaymentModes: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[]; // e.g. ['PREPAID', 'PARTIAL_COD']
+  partialCodMode: 'PERCENTAGE' | 'FIXED'; // e.g. 'PERCENTAGE' (10%) or 'FIXED' (₹200)
+  partialCodValue: number; // e.g. 10 (%) or 200 (₹)
+  minOrderValueForCod: number; // default: 0
+  prepaidDiscountPercent: number; // default: 5 (incentive for full online payment)
+  flowCtaText: string; // CTA button text in WhatsApp
+  flowHeaderTitle: string; // Header title on Flow message
 }
 
 // In-memory fallback / cache with sensible defaults
@@ -24,39 +34,84 @@ const DEFAULT_SETTINGS: RecoveryAgentSettings = {
   discountCode: "SPECIAL5",
   productValuePitch: "Each piece is crafted from 100% premium combed cotton with heavy GSM durability, reinforced stitching, and a 7-day hassle-free exchange promise. Our limited-edition batches sell out quickly, ensuring exclusivity.",
   autoCatalogPaymentEnabled: true, // Enabled by default
-  autoCatalogDeliveryMethod: "both"
+  autoCatalogDeliveryMethod: "both",
+
+  flowCheckoutEnabled: true,
+  allowedPaymentModes: ['PREPAID', 'PARTIAL_COD', 'FULL_COD'],
+  partialCodMode: 'PERCENTAGE',
+  partialCodValue: 10,
+  minOrderValueForCod: 0,
+  prepaidDiscountPercent: 5,
+  flowCtaText: "Enter Delivery Address 📍",
+  flowHeaderTitle: "Confirm Delivery & Payment"
 };
 
-export async function getRecoveryAgentSettings(): Promise<RecoveryAgentSettings> {
+export async function getRecoveryAgentSettings(clientId?: string): Promise<RecoveryAgentSettings> {
   try {
-    const dbSettings = await prisma.whatsAppSettings.findFirst();
-    if (dbSettings && (dbSettings as any).aiKnowledgeBase) {
-      const parsed = JSON.parse((dbSettings as any).aiKnowledgeBase || "{}");
-      if (parsed.recoverySettings) {
-        return { ...DEFAULT_SETTINGS, ...parsed.recoverySettings };
+    if (clientId) {
+      const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } }).catch(() => null);
+      if (client?.aiKnowledgeBase) {
+        try {
+          const parsed = JSON.parse(client.aiKnowledgeBase);
+          if (parsed.recoverySettings) {
+            return { ...DEFAULT_SETTINGS, ...parsed.recoverySettings };
+          }
+        } catch (_) {}
       }
+    }
+
+    const dbSettings = await prisma.whatsAppSettings.findFirst().catch(() => null);
+    if (dbSettings && (dbSettings as any).aiKnowledgeBase) {
+      try {
+        const parsed = JSON.parse((dbSettings as any).aiKnowledgeBase || "{}");
+        if (parsed.recoverySettings) {
+          return { ...DEFAULT_SETTINGS, ...parsed.recoverySettings };
+        }
+      } catch (_) {}
     }
   } catch (_) {}
 
   return globalThis.__recoverySettings || DEFAULT_SETTINGS;
 }
 
-export async function saveRecoveryAgentSettings(settings: Partial<RecoveryAgentSettings>): Promise<RecoveryAgentSettings> {
-  const current = await getRecoveryAgentSettings();
+export async function saveRecoveryAgentSettings(settings: Partial<RecoveryAgentSettings>, clientId?: string): Promise<RecoveryAgentSettings> {
+  const current = await getRecoveryAgentSettings(clientId);
   const updated: RecoveryAgentSettings = {
     ...current,
     ...settings,
     allowDiscount: settings.allowDiscount !== undefined ? Boolean(settings.allowDiscount) : current.allowDiscount,
     autoCatalogPaymentEnabled: settings.autoCatalogPaymentEnabled !== undefined ? Boolean(settings.autoCatalogPaymentEnabled) : current.autoCatalogPaymentEnabled,
-    autoCatalogDeliveryMethod: settings.autoCatalogDeliveryMethod || current.autoCatalogDeliveryMethod || 'both'
+    autoCatalogDeliveryMethod: settings.autoCatalogDeliveryMethod || current.autoCatalogDeliveryMethod || 'both',
+    flowCheckoutEnabled: settings.flowCheckoutEnabled !== undefined ? Boolean(settings.flowCheckoutEnabled) : current.flowCheckoutEnabled,
+    allowedPaymentModes: settings.allowedPaymentModes || current.allowedPaymentModes || ['PREPAID', 'PARTIAL_COD', 'FULL_COD'],
+    partialCodMode: settings.partialCodMode || current.partialCodMode || 'PERCENTAGE',
+    partialCodValue: settings.partialCodValue !== undefined ? Number(settings.partialCodValue) : current.partialCodValue,
+    minOrderValueForCod: settings.minOrderValueForCod !== undefined ? Number(settings.minOrderValueForCod) : current.minOrderValueForCod,
+    prepaidDiscountPercent: settings.prepaidDiscountPercent !== undefined ? Number(settings.prepaidDiscountPercent) : current.prepaidDiscountPercent,
+    flowCtaText: settings.flowCtaText || current.flowCtaText || "Enter Delivery Address 📍",
+    flowHeaderTitle: settings.flowHeaderTitle || current.flowHeaderTitle || "Confirm Delivery & Payment"
   };
 
   globalThis.__recoverySettings = updated;
 
   try {
+    if (clientId) {
+      const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+      if (client) {
+        let existingObj: any = {};
+        try { existingObj = JSON.parse(client.aiKnowledgeBase || "{}"); } catch (_) {}
+        await prisma.whatsAppClient.update({
+          where: { id: clientId },
+          data: {
+            aiKnowledgeBase: JSON.stringify({ ...existingObj, recoverySettings: updated })
+          }
+        });
+      }
+    }
+
     const dbSettings = await prisma.whatsAppSettings.findFirst();
     if (dbSettings) {
-      let existingObj = {};
+      let existingObj: any = {};
       try {
         existingObj = JSON.parse((dbSettings as any).aiKnowledgeBase || "{}");
       } catch (_) {}
