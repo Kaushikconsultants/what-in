@@ -65,9 +65,14 @@ export async function GET(req: NextRequest) {
       monthlyMessageQuota: client.monthlyMessageQuota || 5000,
       monthlyAiQuota: client.monthlyAiQuota || 500,
       messagesUsedCount: client.messagesUsedCount || 0,
-      aiRepliesUsedCount: client.aiRepliesUsedCount || 0
+      aiRepliesUsedCount: client.aiRepliesUsedCount || 0,
+      subscriptionPlan: client.subscriptionPlan || "STARTER",
+      enabledModules: client.enabledModules ? JSON.parse(client.enabledModules) : [
+        "INBOX", "CHATBOT", "AI_AGENT", "COMMERCE", "PAYMENTS", "BROADCASTS",
+        "WIDGET", "COBROWSE", "INVOICING", "HRMS", "RECRUITMENT", "CRM", "DEVELOPER_API"
+      ]
     });
   } catch {
-    return NextResponse.json({ pastDue: false, blocked: false, daysLeft: 0, maxAgents: 3 });
+    return NextResponse.json({ pastDue: false, blocked: false, daysLeft: 0, maxAgents: 3, enabledModules: [] });
   }
 }

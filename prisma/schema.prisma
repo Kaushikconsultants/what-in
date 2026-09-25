@@ -2002,6 +2002,8 @@ model WhatsAppClient {
   maxAgents       Int      @default(3)
   isActive        Boolean  @default(true)
   notes           String?
+  enabledModules  String?  // JSON array of enabled ModuleKey strings e.g. ["INBOX","CHATBOT","AI_AGENT"]
+  customLimitsJson String? // Overrides for specific module quotas
 
   // Monthly quotas & usage limits
   monthlyMessageQuota Int     @default(5000)

@@ -10,10 +10,10 @@ import {
 } from "@/app/actions/ownerPortalActions";
 
 const TYPE_CONFIG: Record<string, { label: string; icon: string; bg: string; border: string; text: string }> = {
-  INFO:        { label: "General Info", icon: "📢", bg: "#eff6ff", border: "#bfdbfe", text: "#1e40af" },
-  WARNING:     { label: "Warning Alert", icon: "⚠️", bg: "#fffbeb", border: "#fde68a", text: "#92400e" },
-  MAINTENANCE: { label: "Maintenance", icon: "🛠️", bg: "#fef2f2", border: "#fecaca", text: "#991b1b" },
-  SUCCESS:     { label: "Update / Feature", icon: "🎉", bg: "#f0fdf4", border: "#bbf7d0", text: "#166534" },
+  INFO:        { label: "General Info", icon: "📢", bg: "rgba(59, 130, 246, 0.15)", border: "rgba(59, 130, 246, 0.3)", text: "#60a5fa" },
+  WARNING:     { label: "Warning Alert", icon: "⚠️", bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)", text: "#fbbf24" },
+  MAINTENANCE: { label: "Maintenance", icon: "🛠️", bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.3)", text: "#f87171" },
+  SUCCESS:     { label: "Update / Feature", icon: "🎉", bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)", text: "#34d399" },
 };
 
 export default function OwnerAnnouncementsPage() {
@@ -85,150 +85,153 @@ export default function OwnerAnnouncementsPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Top Sticky Header */}
-      <header style={{ background: "#ffffff", borderBottom: "1px solid #e2e8f0", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+    <div style={{ minHeight: "100vh", background: "#0b0f19", color: "#f1f5f9", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      {/* Top Header */}
+      <header style={{ background: "rgba(15, 23, 42, 0.8)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, backdropFilter: "blur(16px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(79,70,229,0.25)" }}>👑</div>
+          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #6366f1, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: "white", boxShadow: "0 0 20px rgba(99, 102, 241, 0.4)" }}>👑</div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>Owner Console</h1>
-            <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>What-In SaaS Management</p>
+            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.2px" }}>WhatMore Super-Admin Console</h1>
+            <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>In-App Announcements & Broadcasts</p>
           </div>
         </div>
-        <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           {[
             { label: "Dashboard", href: "/owner", icon: "📊" },
-            { label: "Clients", href: "/owner/clients", icon: "🏢" },
+            { label: "Clients & Modules", href: "/owner/clients", icon: "🏢" },
             { label: "Announcements", href: "/owner/announcements", icon: "📢" },
-            { label: "Plans", href: "/owner/plans", icon: "💎" },
+            { label: "Plans & Matrix", href: "/owner/plans", icon: "💎" },
           ].map(item => {
             const active = item.href === "/owner/announcements";
             return (
-              <Link key={item.href} href={item.href} style={{ padding: "7px 12px", borderRadius: "8px", background: active ? "#eef2ff" : "transparent", border: active ? "1px solid #c7d2fe" : "1px solid transparent", color: active ? "#4f46e5" : "#64748b", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+              <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: active ? "rgba(99, 102, 241, 0.2)" : "transparent", border: active ? "1px solid #6366f1" : "1px solid transparent", color: active ? "#818cf8" : "#94a3b8", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", transition: "all 0.15s ease" }}>
                 <span>{item.icon}</span> {item.label}
               </Link>
             );
           })}
-          <button onClick={handleLogout} style={{ marginLeft: "8px", padding: "7px 12px", borderRadius: "8px", background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={handleLogout} style={{ marginLeft: "12px", padding: "8px 14px", borderRadius: "10px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#f87171", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
             Sign Out
           </button>
         </nav>
       </header>
 
-      <main style={{ padding: "28px", maxWidth: "1200px", margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "14px" }}>
+      <main style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
           <div>
-            <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: "0 0 2px 0", letterSpacing: "-0.4px" }}>📢 Global In-App Announcements</h2>
-            <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>Broadcast maintenance alerts, system notices, and new feature updates live across all client dashboards.</p>
+            <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#ffffff", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>📢 Tenant In-App Broadcasts</h2>
+            <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>Publish alerts, feature update notes, and maintenance marquee notices across all client dashboards</p>
           </div>
-          <button onClick={() => setShowAdd(true)} style={{ padding: "10px 20px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
-            <span>➕</span> Broadcast Announcement
+          <button onClick={() => setShowAdd(true)} style={{ padding: "10px 20px", background: "linear-gradient(135deg, #6366f1, #a855f7)", border: "none", borderRadius: "12px", color: "white", fontWeight: 800, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 20px rgba(99, 102, 241, 0.35)" }}>
+            <span>➕</span> Create New Broadcast
           </button>
         </div>
 
         {/* Announcements List */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+        <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", overflow: "hidden", backdropFilter: "blur(12px)" }}>
           {loading ? (
-            <div style={{ padding: "50px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>Loading announcements...</div>
+            <div style={{ padding: "60px", textAlign: "center", color: "#94a3b8" }}>Loading broadcasts...</div>
           ) : announcements.length === 0 ? (
-            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "48px", textAlign: "center", color: "#64748b" }}>
-              <div style={{ fontSize: "36px", marginBottom: "10px" }}>📢</div>
-              <h3 style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a", margin: "0 0 4px 0" }}>No Active Announcements</h3>
-              <p style={{ fontSize: "13px", margin: 0 }}>Click <b>Broadcast Announcement</b> to publish a notice across all client accounts.</p>
+            <div style={{ padding: "60px", textAlign: "center", color: "#94a3b8" }}>
+              <div style={{ fontSize: "36px", marginBottom: "12px" }}>📢</div>
+              <h3 style={{ fontSize: "16px", color: "#ffffff", margin: "0 0 6px 0" }}>No broadcasts published yet</h3>
+              <p style={{ fontSize: "13px", margin: 0 }}>Click Create New Broadcast above to post your first system notification.</p>
             </div>
           ) : (
-            announcements.map(a => {
-              const typeCfg = TYPE_CONFIG[a.type] || TYPE_CONFIG.INFO;
-              return (
-                <div key={a.id} style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", flex: 1, minWidth: "300px" }}>
-                    <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: typeCfg.bg, border: `1px solid ${typeCfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", flexShrink: 0 }}>
-                      {typeCfg.icon}
-                    </div>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a" }}>{a.title}</span>
-                        <span style={{ padding: "2px 8px", background: typeCfg.bg, border: `1px solid ${typeCfg.border}`, color: typeCfg.text, borderRadius: "6px", fontSize: "11px", fontWeight: 800, textTransform: "uppercase" }}>
-                          {typeCfg.label}
-                        </span>
-                        <span style={{ padding: "2px 8px", background: a.isActive ? "#dcfce7" : "#f1f5f9", color: a.isActive ? "#15803d" : "#64748b", borderRadius: "6px", fontSize: "11px", fontWeight: 700 }}>
-                          {a.isActive ? "● LIVE ACTIVE" : "○ INACTIVE"}
-                        </span>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {announcements.map((a, idx) => {
+                const conf = TYPE_CONFIG[a.type] || TYPE_CONFIG.INFO;
+                return (
+                  <div key={a.id} style={{ padding: "20px 24px", borderBottom: idx === announcements.length - 1 ? "none" : "1px solid rgba(255, 255, 255, 0.04)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px" }}>
+                    <div style={{ display: "flex", gap: "14px", flex: 1 }}>
+                      <span style={{ fontSize: "24px", width: "42px", height: "42px", borderRadius: "12px", background: conf.bg, border: `1px solid ${conf.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {conf.icon}
+                      </span>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <span style={{ fontWeight: 800, fontSize: "15px", color: "#ffffff" }}>{a.title}</span>
+                          <span style={{ padding: "2px 8px", background: conf.bg, border: `1px solid ${conf.border}`, borderRadius: "6px", fontSize: "10px", fontWeight: 800, color: conf.text }}>
+                            {conf.label}
+                          </span>
+                          <span style={{ fontSize: "11px", color: a.isActive ? "#34d399" : "#f87171", fontWeight: 700 }}>
+                            {a.isActive ? "● LIVE" : "○ PAUSED"}
+                          </span>
+                        </div>
+                        <p style={{ margin: "0 0 8px 0", fontSize: "13px", color: "#94a3b8", lineHeight: 1.5 }}>{a.message}</p>
+                        <div style={{ fontSize: "11px", color: "#64748b" }}>
+                          Target: <b style={{ color: "#cbd5e1" }}>{a.targetPlan}</b> • Created {new Date(a.createdAt).toLocaleDateString()}
+                        </div>
                       </div>
-                      <p style={{ fontSize: "13px", color: "#475569", margin: "0 0 6px 0", lineHeight: 1.5 }}>{a.message}</p>
-                      <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-                        📅 Created: {new Date(a.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </div>
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <button onClick={() => handleToggle(a)} style={{ padding: "7px 12px", background: a.isActive ? "#fffbeb" : "#f0fdf4", border: a.isActive ? "1px solid #fde68a" : "1px solid #bbf7d0", borderRadius: "8px", color: a.isActive ? "#92400e" : "#166534", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-                      {a.isActive ? "Pause Notice" : "Activate Notice"}
-                    </button>
-                    <button onClick={() => handleDelete(a.id)} style={{ padding: "7px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", color: "#dc2626", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-                      🗑️
-                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => handleToggle(a)} style={{ padding: "6px 12px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "8px", color: a.isActive ? "#fbbf24" : "#34d399", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
+                        {a.isActive ? "Pause" : "Resume"}
+                      </button>
+                      <button onClick={() => handleDelete(a.id)} style={{ padding: "6px 12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "8px", color: "#f87171", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
-      </main>
 
-      {/* Modal: Add Announcement */}
-      {showAdd && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "520px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <div>
-                <h3 style={{ color: "#0f172a", fontWeight: 800, fontSize: "20px", margin: 0 }}>📢 Broadcast In-App Notice</h3>
-                <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>This message will display at the top of all client dashboards.</p>
+        {/* Modal */}
+        {showAdd && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(10px)" }}>
+            <div style={{ background: "#0f172a", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: "24px", padding: "30px", width: "100%", maxWidth: "560px", boxShadow: "0 25px 60px rgba(0,0,0,0.6)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "14px" }}>
+                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "#ffffff" }}>📢 Post Tenant Broadcast</h3>
+                <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
               </div>
-              <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
-            </div>
 
-            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Notice Type</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
-                  {[
-                    { type: "INFO", label: "General Update", icon: "📢" },
-                    { type: "MAINTENANCE", label: "Maintenance Notice", icon: "🛠️" },
-                    { type: "WARNING", label: "Urgent Warning", icon: "⚠️" },
-                    { type: "SUCCESS", label: "New Feature / Launch", icon: "🎉" },
-                  ].map(t => (
-                    <button key={t.type} type="button" onClick={() => setForm({ ...form, type: t.type })} style={{ padding: "10px 12px", background: form.type === t.type ? "#eef2ff" : "#f8fafc", border: form.type === t.type ? "1px solid #6366f1" : "1px solid #e2e8f0", borderRadius: "8px", color: form.type === t.type ? "#4f46e5" : "#475569", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span>{t.icon}</span> {t.label}
-                    </button>
-                  ))}
+              <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Title *</label>
+                  <input type="text" required placeholder="e.g. Scheduled Meta API Upgrade" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
                 </div>
-              </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Notice Title *</label>
-                <input type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Scheduled System Upgrade Tonight" required style={{ width: "100%", padding: "11px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-              </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Message *</label>
+                  <textarea rows={3} required placeholder="Describe the announcement or notice..." value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
+                </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Message Body *</label>
-                <textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="e.g. What-In will undergo scheduled server optimization at 11:30 PM IST for ~15 minutes. WhatsApp automated webhooks will continue processing uninterrupted." required style={{ width: "100%", padding: "11px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", minHeight: "80px", resize: "vertical", boxSizing: "border-box" }} />
-              </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Type</label>
+                    <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={{ width: "100%", padding: "10px", background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }}>
+                      <option value="INFO">General Info</option>
+                      <option value="WARNING">Warning Alert</option>
+                      <option value="MAINTENANCE">Maintenance</option>
+                      <option value="SUCCESS">Feature Update</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Target Plan</label>
+                    <select value={form.targetPlan} onChange={e => setForm({ ...form, targetPlan: e.target.value })} style={{ width: "100%", padding: "10px", background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }}>
+                      <option value="ALL">All Clients (Universal)</option>
+                      <option value="STARTER">Starter Tier Only</option>
+                      <option value="GROWTH">Growth Tier Only</option>
+                      <option value="ENTERPRISE">Enterprise Tier Only</option>
+                    </select>
+                  </div>
+                </div>
 
-              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
-                <button type="submit" disabled={submitting} style={{ flex: 1, padding: "13px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", fontSize: "14px" }}>
-                  {submitting ? "Broadcasting..." : "🚀 Publish Announcement Live"}
-                </button>
-                <button type="button" onClick={() => setShowAdd(false)} style={{ padding: "13px 20px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", color: "#64748b", cursor: "pointer", fontSize: "14px" }}>
-                  Cancel
-                </button>
-              </div>
-            </form>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+                  <button type="button" onClick={() => setShowAdd(false)} style={{ padding: "10px 18px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "10px", color: "#94a3b8", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={submitting} style={{ padding: "10px 24px", background: "linear-gradient(135deg, #6366f1, #a855f7)", border: "none", borderRadius: "10px", color: "#ffffff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>
+                    {submitting ? "Publishing..." : "🚀 Publish Broadcast"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }

@@ -14,17 +14,27 @@ import {
   deleteClientAction,
   syncSubscriptionStatusesAction,
   registerWebhookForClientAction,
-  loginAsClientAction
+  loginAsClientAction,
+  updateClientModulesAction,
+  updateClientPlanTierAction
 } from "@/app/actions/ownerPortalActions";
+import {
+  MASTER_MODULES,
+  DEFAULT_PLAN_TIERS,
+  INDUSTRY_MODULE_PRESETS,
+  ALL_MODULE_KEYS,
+  ModuleKey,
+  parseEnabledModules
+} from "@/lib/moduleRegistry";
 import { useRouter } from "next/navigation";
 
-const PLANS = ["TRIAL", "STARTER", "GROWTH", "ENTERPRISE", "CUSTOM"];
+const PLANS = ["TRIAL", "STARTER", "GROWTH", "BUSINESS", "ENTERPRISE", "CUSTOM"];
 
 const STATUS_CONFIG: Record<string, { bg: string; border: string; color: string; dot: string; label: string }> = {
-  ACTIVE:   { bg: "#f0fdf4", border: "#bbf7d0", color: "#166534", dot: "#22c55e", label: "Active" },
-  TRIAL:    { bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af", dot: "#3b82f6", label: "Trial" },
-  PAST_DUE: { bg: "#fffbeb", border: "#fde68a", color: "#92400e", dot: "#f59e0b", label: "Past Due" },
-  BLOCKED:  { bg: "#fef2f2", border: "#fecaca", color: "#991b1b", dot: "#ef4444", label: "Blocked" },
+  ACTIVE:   { bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)", color: "#34d399", dot: "#10b981", label: "Active" },
+  TRIAL:    { bg: "rgba(59, 130, 246, 0.15)", border: "rgba(59, 130, 246, 0.3)", color: "#60a5fa", dot: "#3b82f6", label: "Trial" },
+  PAST_DUE: { bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)", color: "#fbbf24", dot: "#f59e0b", label: "Past Due" },
+  BLOCKED:  { bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.3)", color: "#f87171", dot: "#ef4444", label: "Blocked" },
 };
 
 const PAYMENT_METHODS = [
@@ -58,6 +68,11 @@ export default function OwnerClientsPage() {
   const [editMsgQuota, setEditMsgQuota] = useState(5000);
   const [editAiQuota, setEditAiQuota] = useState(500);
   const [showEditMeta, setShowEditMeta] = useState(false);
+
+  // MODULES MANAGEMENT MODAL (Feature Gating)
+  const [modulesClient, setModulesClient] = useState<any | null>(null);
+  const [activeClientModules, setActiveClientModules] = useState<ModuleKey[]>([]);
+  const [isSavingModules, setIsSavingModules] = useState(false);
 
   // Payment Recording Modal
   const [paymentClient, setPaymentClient] = useState<any | null>(null);
@@ -105,7 +120,8 @@ export default function OwnerClientsPage() {
     webhookVerifyToken: "",
     phoneNumber: "",
     shopifyDomain: "",
-    shopifyToken: ""
+    shopifyToken: "",
+    enabledModules: DEFAULT_PLAN_TIERS[0].modules as ModuleKey[]
   });
   const [showMetaFields, setShowMetaFields] = useState(false);
 
@@ -119,31 +135,25 @@ export default function OwnerClientsPage() {
         else { sessionStorage.setItem("owner_authed", "1"); load(); }
       }).catch(() => router.push("/owner/login"));
     }
-
-    const handleClickOutside = () => setOpenActionMenuId(null);
-    window.addEventListener("click", handleClickOutside);
-    return () => window.removeEventListener("click", handleClickOutside);
   }, []);
 
   const load = async () => {
     setLoading(true);
     await syncSubscriptionStatusesAction();
     const res = await getOwnerClientsAction();
-    if (res.success) setClients(res.clients);
+    if (res.success && res.clients) {
+      setClients(res.clients);
+    }
     setLoading(false);
   };
 
-  const generateRandomPassword = () => {
-    const pass = "WhatIn@" + Math.floor(100000 + Math.random() * 900000);
-    setForm(p => ({ ...p, adminPassword: pass }));
-  };
-
   const handleOpenAdd = () => {
-    const defaultPass = "WhatIn@" + Math.floor(100000 + Math.random() * 900000);
+    const defaultPassword = "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
+    const starterPlan = DEFAULT_PLAN_TIERS[0];
     setForm({
       businessName: "",
       contactEmail: "",
-      adminPassword: defaultPass,
+      adminPassword: defaultPassword,
       contactPhone: "",
       subscriptionPlan: "STARTER",
       monthlyFee: 999,
@@ -159,25 +169,93 @@ export default function OwnerClientsPage() {
       webhookVerifyToken: "",
       phoneNumber: "",
       shopifyDomain: "",
-      shopifyToken: ""
+      shopifyToken: "",
+      enabledModules: starterPlan.modules
     });
+    setShowMetaFields(false);
     setShowAdd(true);
   };
 
-  const handleAddClient = async (e: React.FormEvent) => {
+  const handlePlanSelectInAdd = (planId: string) => {
+    const plan = DEFAULT_PLAN_TIERS.find(p => p.id === planId);
+    if (plan) {
+      setForm(prev => ({
+        ...prev,
+        subscriptionPlan: plan.id,
+        monthlyFee: plan.monthlyFee,
+        maxAgents: plan.maxAgents,
+        monthlyMessageQuota: plan.monthlyMessageQuota,
+        monthlyAiQuota: plan.monthlyAiQuota,
+        enabledModules: plan.modules
+      }));
+    } else {
+      setForm(prev => ({ ...prev, subscriptionPlan: planId }));
+    }
+  };
+
+  const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await createClientAction(form);
-    if (res.success) {
+    if (!form.businessName || !form.contactEmail) {
+      alert("Business Name and Admin Contact Email are required.");
+      return;
+    }
+
+    const res = await createClientAction({
+      ...form,
+      monthlyFee: Number(form.monthlyFee),
+      maxAgents: Number(form.maxAgents),
+      monthlyMessageQuota: Number(form.monthlyMessageQuota),
+      monthlyAiQuota: Number(form.monthlyAiQuota),
+    } as any);
+
+    if (res.success && res.client) {
       setShowAdd(false);
       setAddSuccessInfo({
         businessName: form.businessName,
         email: form.contactEmail,
-        password: form.adminPassword || res.defaultPassword,
-        loginUrl: "https://what-in.tinkal.in/login"
+        password: form.adminPassword,
+        plan: form.subscriptionPlan,
+        loginUrl: `${window.location.origin}/login`,
+        webhookClientId: res.client.webhookClientId,
+        webhookUrl: `${window.location.origin}/api/whatsapp/webhook/${res.client.webhookClientId}`,
+        verifyToken: res.client.webhookVerifyToken
       });
       load();
     } else {
-      alert("Error: " + res.error);
+      alert("Error creating client: " + (res.error || "Unknown error"));
+    }
+  };
+
+  // MODULES MANAGEMENT MODAL HANDLERS
+  const handleOpenModules = (client: any) => {
+    setModulesClient(client);
+    const parsed = parseEnabledModules(client.enabledModules);
+    setActiveClientModules(parsed);
+  };
+
+  const handleToggleModule = (modKey: ModuleKey) => {
+    setActiveClientModules(prev =>
+      prev.includes(modKey) ? prev.filter(k => k !== modKey) : [...prev, modKey]
+    );
+  };
+
+  const handleApplyPreset = (presetModules: ModuleKey[]) => {
+    setActiveClientModules(presetModules);
+  };
+
+  const handleSaveModules = async () => {
+    if (!modulesClient) return;
+    setIsSavingModules(true);
+    const res = await updateClientModulesAction(modulesClient.id, activeClientModules);
+    setIsSavingModules(false);
+    if (res.success) {
+      // Optimistic update local state
+      setClients(prev =>
+        prev.map(c => (c.id === modulesClient.id ? { ...c, enabledModules: JSON.stringify(activeClientModules) } : c))
+      );
+      setModulesClient(null);
+    } else {
+      alert("Error updating modules: " + res.error);
     }
   };
 
@@ -187,43 +265,27 @@ export default function OwnerClientsPage() {
     setPayMethod("UPI (GPay / PhonePe / Paytm)");
     setPayRef("");
     setPayCycleMonths(1);
+    setPayCustomDueDate("");
     setPayNotes("");
-
-    const base = client.currentPeriodEnd && new Date(client.currentPeriodEnd) > new Date()
-      ? new Date(client.currentPeriodEnd)
-      : new Date();
-    const nextDate = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000);
-    setPayCustomDueDate(nextDate.toISOString().split("T")[0]);
   };
 
-  const handleCycleChange = (months: number) => {
-    setPayCycleMonths(months);
-    if (paymentClient) {
-      setPayAmount((paymentClient.monthlyFee || 0) * months);
-      const base = paymentClient.currentPeriodEnd && new Date(paymentClient.currentPeriodEnd) > new Date()
-        ? new Date(paymentClient.currentPeriodEnd)
-        : new Date();
-      const nextDate = new Date(base.getTime() + months * 30 * 24 * 60 * 60 * 1000);
-      setPayCustomDueDate(nextDate.toISOString().split("T")[0]);
-    }
-  };
-
-  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+  const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!paymentClient) return;
     setIsSubmittingPay(true);
-
-    const targetDueDate = payCustomDueDate ? new Date(payCustomDueDate) : new Date(Date.now() + payCycleMonths * 30 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const targetPeriodEnd = payCustomDueDate 
+      ? new Date(payCustomDueDate) 
+      : new Date(now.getTime() + (Number(payCycleMonths) || 1) * 30 * 24 * 60 * 60 * 1000);
 
     const res = await recordClientPaymentAction({
       clientId: paymentClient.id,
-      amount: payAmount,
+      amount: Number(payAmount),
       paymentMethod: payMethod,
       transactionRef: payRef,
-      periodEnd: targetDueDate,
-      notes: payNotes || `Renewed for ${payCycleMonths} month(s)`
+      periodEnd: targetPeriodEnd,
+      notes: payNotes,
     });
-
     setIsSubmittingPay(false);
     if (res.success) {
       setPaymentClient(null);
@@ -237,10 +299,8 @@ export default function OwnerClientsPage() {
     setReceiptsClient(client);
     setLoadingPayments(true);
     const res = await getClientPaymentsAction(client.id);
-    if (res.success) {
+    if (res.success && res.payments) {
       setPaymentsHistory(res.payments);
-    } else {
-      alert("Error loading payments: " + res.error);
     }
     setLoadingPayments(false);
   };
@@ -273,7 +333,7 @@ export default function OwnerClientsPage() {
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editClient) return;
-    
+
     const res = await updateClientPlanAction(editClient.id, {
       subscriptionPlan: editClient.subscriptionPlan,
       monthlyFee: Number(editClient.monthlyFee),
@@ -345,7 +405,7 @@ export default function OwnerClientsPage() {
     setImpersonating(client.id);
     const res = await loginAsClientAction(client.id);
     if (res.success && res.user) {
-      document.cookie = `wm_session=whatin-session-2026; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `wm_session=whatmore-session-2026; path=/; max-age=86400; SameSite=Lax`;
       document.cookie = `wm_user=${encodeURIComponent(JSON.stringify(res.user))}; path=/; max-age=86400; SameSite=Lax`;
       window.open("/whatsapp/dashboard", "_blank");
     } else {
@@ -355,25 +415,23 @@ export default function OwnerClientsPage() {
   };
 
   const formatDueDate = (dateStr: string) => {
-    if (!dateStr) return { text: "No Date", sub: "", color: "#64748b", bg: "#f1f5f9", border: "#e2e8f0" };
+    if (!dateStr) return { text: "No Date", sub: "", color: "#94a3b8", bg: "rgba(255, 255, 255, 0.05)", border: "rgba(255, 255, 255, 0.1)" };
     const due = new Date(dateStr);
     const now = new Date();
     const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
     const dateFormatted = due.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
     if (diffDays > 7) {
-      return { text: dateFormatted, sub: `Due in ${diffDays} days`, color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" };
+      return { text: dateFormatted, sub: `Due in ${diffDays} days`, color: "#34d399", bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)" };
     } else if (diffDays > 0) {
-      return { text: dateFormatted, sub: `Due in ${diffDays}d`, color: "#b45309", bg: "#fffbeb", border: "#fde68a" };
+      return { text: dateFormatted, sub: `Due in ${diffDays}d`, color: "#fbbf24", bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)" };
     } else if (diffDays === 0) {
-      return { text: dateFormatted, sub: `Due Today`, color: "#c2410c", bg: "#fff7ed", border: "#fed7aa" };
+      return { text: dateFormatted, sub: `Due Today`, color: "#fb923c", bg: "rgba(249, 115, 22, 0.15)", border: "rgba(249, 115, 22, 0.3)" };
     } else {
-      return { text: dateFormatted, sub: `Overdue ${Math.abs(diffDays)}d`, color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" };
+      return { text: dateFormatted, sub: `Overdue ${Math.abs(diffDays)}d`, color: "#f87171", bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.3)" };
     }
   };
 
-  // Filter logic
   const filtered = clients.filter(c => {
     const matchesSearch =
       c.businessName?.toLowerCase().includes(search.toLowerCase()) ||
@@ -385,9 +443,6 @@ export default function OwnerClientsPage() {
     return c.subscriptionStatus === statusFilter;
   });
 
-  const webhookBase = "https://what-in.tinkal.in";
-
-  // Summary counts
   const totalCount = clients.length;
   const activeCount = clients.filter(c => c.subscriptionStatus === "ACTIVE").length;
   const pastDueCount = clients.filter(c => c.subscriptionStatus === "PAST_DUE").length;
@@ -395,104 +450,100 @@ export default function OwnerClientsPage() {
   const blockedCount = clients.filter(c => c.subscriptionStatus === "BLOCKED").length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Top Sticky Header */}
-      <header style={{ background: "#ffffff", borderBottom: "1px solid #e2e8f0", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+    <div style={{ minHeight: "100vh", background: "#0b0f19", color: "#f1f5f9", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      {/* Top Header */}
+      <header style={{ background: "rgba(15, 23, 42, 0.8)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, backdropFilter: "blur(16px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "white", boxShadow: "0 2px 8px rgba(79,70,229,0.25)" }}>👑</div>
+          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #6366f1, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: "white", boxShadow: "0 0 20px rgba(99, 102, 241, 0.4)" }}>👑</div>
           <div>
-            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#0f172a", letterSpacing: "-0.2px" }}>Owner Console</h1>
-            <p style={{ margin: 0, fontSize: "11px", color: "#64748b" }}>What-In SaaS Management</p>
+            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.2px" }}>WhatMore Super-Admin Console</h1>
+            <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>Client Directory & Feature Gating System</p>
           </div>
         </div>
-        <nav style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
           {[
             { label: "Dashboard", href: "/owner", icon: "📊" },
-            { label: "Clients", href: "/owner/clients", icon: "🏢" },
+            { label: "Clients & Modules", href: "/owner/clients", icon: "🏢" },
             { label: "Announcements", href: "/owner/announcements", icon: "📢" },
-            { label: "Plans", href: "/owner/plans", icon: "💎" },
+            { label: "Plans & Matrix", href: "/owner/plans", icon: "💎" },
           ].map(item => {
             const active = item.href === "/owner/clients";
             return (
-              <Link key={item.href} href={item.href} style={{ padding: "7px 12px", borderRadius: "8px", background: active ? "#eef2ff" : "transparent", border: active ? "1px solid #c7d2fe" : "1px solid transparent", color: active ? "#4f46e5" : "#64748b", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+              <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: active ? "rgba(99, 102, 241, 0.2)" : "transparent", border: active ? "1px solid #6366f1" : "1px solid transparent", color: active ? "#818cf8" : "#94a3b8", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
                 <span>{item.icon}</span> {item.label}
               </Link>
             );
           })}
-          <button onClick={() => { sessionStorage.removeItem("owner_authed"); fetch("/api/owner/auth", { method: "DELETE" }).then(() => router.push("/owner/login")); }} style={{ marginLeft: "8px", padding: "7px 12px", borderRadius: "8px", background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={() => { sessionStorage.removeItem("owner_authed"); fetch("/api/owner/auth", { method: "DELETE" }).then(() => router.push("/owner/login")); }} style={{ marginLeft: "12px", padding: "8px 14px", borderRadius: "10px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#f87171", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
             Sign Out
           </button>
         </nav>
       </header>
 
-      <main style={{ padding: "28px", maxWidth: "1600px", margin: "0 auto" }}>
-        {/* Page Title & Onboard Button */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "14px" }}>
+      <main style={{ padding: "32px", maxWidth: "1600px", margin: "0 auto" }}>
+        {/* Top Controls */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
           <div>
-            <h2 style={{ fontSize: "22px", fontWeight: 900, color: "#0f172a", margin: "0 0 2px 0", letterSpacing: "-0.4px" }}>Client & Subscription Management</h2>
-            <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>Onboard clients, record recurring monthly payments, track Meta health & quotas, and manage access.</p>
+            <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#ffffff", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>🏢 SaaS Tenant & Module Control Center</h2>
+            <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>Manage client credentials, toggle individual business modules ON/OFF, and monitor real-time quotas.</p>
           </div>
-          <button onClick={handleOpenAdd} style={{ padding: "10px 20px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
-            <span>➕</span> Onboard New Client
-          </button>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button onClick={handleOpenAdd} style={{ padding: "10px 20px", background: "linear-gradient(135deg, #6366f1, #a855f7)", border: "none", borderRadius: "12px", color: "white", fontWeight: 800, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 20px rgba(99, 102, 241, 0.35)" }}>
+              <span>➕</span> Onboard New Client
+            </button>
+          </div>
         </div>
 
-        {/* Filter & Search Bar */}
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "12px 16px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
-          {/* Status Tabs */}
+        {/* Filters & Search */}
+        <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "16px", padding: "14px 18px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "14px", backdropFilter: "blur(12px)" }}>
           <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
             {[
               { id: "ALL", label: "All Clients", count: totalCount },
-              { id: "ACTIVE", label: "Active", count: activeCount, color: "#16a34a" },
-              { id: "PAST_DUE", label: "Past Due", count: pastDueCount, color: "#d97706" },
-              { id: "TRIAL", label: "Trial", count: trialCount, color: "#2563eb" },
-              { id: "BLOCKED", label: "Blocked", count: blockedCount, color: "#dc2626" },
-            ].map(tab => {
-              const active = statusFilter === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setStatusFilter(tab.id)}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "8px",
-                    background: active ? "#eef2ff" : "#f8fafc",
-                    border: `1px solid ${active ? "#c7d2fe" : "#e2e8f0"}`,
-                    color: active ? "#4f46e5" : "#475569",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    transition: "all 0.15s"
-                  }}
-                >
-                  <span>{tab.label}</span>
-                  <span style={{ fontSize: "11px", padding: "1px 6px", borderRadius: "999px", background: active ? "#4f46e5" : "#e2e8f0", color: active ? "white" : "#64748b" }}>
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
+              { id: "ACTIVE", label: "Active", count: activeCount, color: "#34d399" },
+              { id: "PAST_DUE", label: "Past Due", count: pastDueCount, color: "#fbbf24" },
+              { id: "TRIAL", label: "Trial", count: trialCount, color: "#60a5fa" },
+              { id: "BLOCKED", label: "Blocked", count: blockedCount, color: "#f87171" },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: "10px",
+                  background: statusFilter === tab.id ? "rgba(99, 102, 241, 0.25)" : "rgba(255, 255, 255, 0.03)",
+                  border: statusFilter === tab.id ? "1px solid #6366f1" : "1px solid rgba(255, 255, 255, 0.06)",
+                  color: statusFilter === tab.id ? "#818cf8" : "#94a3b8",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                <span>{tab.label}</span>
+                <span style={{ padding: "2px 6px", background: "rgba(255, 255, 255, 0.08)", borderRadius: "999px", fontSize: "10px", color: tab.color || "#ffffff" }}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
           </div>
 
-          {/* Search Box */}
-          <div style={{ position: "relative", width: "280px" }}>
-            <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "13px", color: "#94a3b8" }}>🔍</span>
+          <div style={{ position: "relative", minWidth: "280px" }}>
+            <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#64748b", fontSize: "14px" }}>🔍</span>
             <input
               type="text"
+              placeholder="Search by business, email, phone..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search business, email, phone..."
               style={{
                 width: "100%",
-                padding: "8px 12px 8px 34px",
-                background: "#f8fafc",
-                border: "1px solid #cbd5e1",
-                borderRadius: "8px",
-                color: "#0f172a",
-                fontSize: "12px",
+                padding: "8px 12px 8px 36px",
+                background: "rgba(255, 255, 255, 0.04)",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                borderRadius: "10px",
+                color: "#ffffff",
+                fontSize: "13px",
                 outline: "none",
                 boxSizing: "border-box"
               }}
@@ -500,837 +551,544 @@ export default function OwnerClientsPage() {
           </div>
         </div>
 
-        {/* Clean Clients Table */}
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "14px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.03)" }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", tableLayout: "auto" }}>
-              <thead>
-                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <th style={{ padding: "12px 18px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "260px" }}>Client & Account</th>
-                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "150px" }}>Plan & Fee</th>
-                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "120px" }}>Status</th>
-                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "150px" }}>Due Date</th>
-                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "190px" }}>Quotas & Usage</th>
-                  <th style={{ padding: "12px 14px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", width: "160px" }}>Meta Integration</th>
-                  <th style={{ padding: "12px 18px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right", minWidth: "260px" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: "48px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
-                      Loading clients & subscriptions...
-                    </td>
+        {/* Client Table */}
+        <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", overflow: "hidden", backdropFilter: "blur(12px)" }}>
+          {loading ? (
+            <div style={{ padding: "60px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>
+              ⏳ Loading client directory & module states...
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: "60px", textAlign: "center", color: "#94a3b8" }}>
+              <div style={{ fontSize: "36px", marginBottom: "12px" }}>🏢</div>
+              <h3 style={{ fontSize: "16px", color: "#ffffff", margin: "0 0 6px 0" }}>No matching clients found</h3>
+              <p style={{ fontSize: "13px", margin: 0 }}>Try clearing your search query or onboard a new client above.</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                <thead>
+                  <tr style={{ background: "rgba(255, 255, 255, 0.03)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                    <th style={{ padding: "16px 20px", fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>Business & Contact</th>
+                    <th style={{ padding: "16px 14px", fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>Plan & Status</th>
+                    <th style={{ padding: "16px 14px", fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>Active Modules (Feature Gating)</th>
+                    <th style={{ padding: "16px 14px", fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>Renewal & Due</th>
+                    <th style={{ padding: "16px 14px", fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>Message & AI Quotas</th>
+                    <th style={{ padding: "16px 20px", fontSize: "12px", color: "#94a3b8", fontWeight: 800, textAlign: "right" }}>Actions</th>
                   </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: "48px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
-                      No clients found. Click <b>Onboard New Client</b> above to get started! 🚀
-                    </td>
-                  </tr>
-                ) : filtered.map(client => {
-                  const s = STATUS_CONFIG[client.subscriptionStatus] || STATUS_CONFIG.TRIAL;
-                  const due = formatDueDate(client.currentPeriodEnd);
-                  const webhookUrl = client.customWebhookUrl || `${webhookBase}/api/whatsapp/webhook/${client.webhookClientId}`;
+                </thead>
+                <tbody>
+                  {filtered.map((client, idx) => {
+                    const statusConf = STATUS_CONFIG[client.subscriptionStatus] || STATUS_CONFIG.ACTIVE;
+                    const dueInfo = formatDueDate(client.currentPeriodEnd);
+                    const enabledMods = parseEnabledModules(client.enabledModules);
 
-                  const msgQuota = client.monthlyMessageQuota || 5000;
-                  const msgUsed = client.messagesUsedCount || 0;
-                  const msgPercent = Math.min(100, Math.round((msgUsed / msgQuota) * 100));
-
-                  const aiQuota = client.monthlyAiQuota || 500;
-                  const aiUsed = client.aiRepliesUsedCount || 0;
-                  const aiPercent = Math.min(100, Math.round((aiUsed / aiQuota) * 100));
-
-                  const initialLetter = (client.businessName || "C").charAt(0).toUpperCase();
-
-                  return (
-                    <tr key={client.id} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }}>
-                      {/* 1. Client & Account */}
-                      <td style={{ padding: "14px 18px" }}>
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "#eef2ff", border: "1px solid #c7d2fe", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "14px", flexShrink: 0 }}>
-                            {initialLetter}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "14px", lineHeight: 1.3 }}>
-                              {client.businessName}
+                    return (
+                      <tr key={client.id} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.04)", background: idx % 2 === 0 ? "transparent" : "rgba(255, 255, 255, 0.015)" }}>
+                        {/* Business Info */}
+                        <td style={{ padding: "16px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2))", border: "1px solid rgba(99, 102, 241, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: "16px", color: "#818cf8" }}>
+                              {client.businessName?.charAt(0).toUpperCase() || "B"}
                             </div>
-                            <div style={{ color: "#64748b", fontSize: "12px", marginTop: "2px" }}>
-                              {client.contactEmail}
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: "14px", color: "#ffffff" }}>{client.businessName}</div>
+                              <div style={{ fontSize: "12px", color: "#94a3b8" }}>{client.contactEmail}</div>
+                              {client.contactPhone && <div style={{ fontSize: "11px", color: "#64748b" }}>📱 {client.contactPhone}</div>}
                             </div>
-                            {client.adminPassword && (
-                              <div style={{ marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "5px", background: "#f8fafc", padding: "2px 7px", borderRadius: "5px", border: "1px solid #e2e8f0" }}>
-                                <span style={{ fontSize: "11px", color: "#4f46e5", fontWeight: 700 }}>🔑 {client.adminPassword}</span>
-                                <button
-                                  onClick={() => { navigator.clipboard.writeText(client.adminPassword); alert("Password copied!"); }}
-                                  title="Copy initial login password"
-                                  style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: "10px", padding: 0 }}
-                                >
-                                  📋
-                                </button>
-                              </div>
-                            )}
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* 2. Plan & Fee */}
-                      <td style={{ padding: "14px 14px" }}>
-                        <div style={{ display: "inline-block", padding: "3px 8px", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: "6px", color: "#4f46e5", fontSize: "11px", fontWeight: 800 }}>
-                          {client.subscriptionPlan}
-                        </div>
-                        <div style={{ fontSize: "13px", fontWeight: 800, color: "#16a34a", marginTop: "3px" }}>
-                          ₹{client.monthlyFee?.toLocaleString()}<span style={{ fontSize: "11px", fontWeight: 500, color: "#64748b" }}>/mo</span>
-                        </div>
-                      </td>
-
-                      {/* 3. Status */}
-                      <td style={{ padding: "14px 14px" }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "3px 9px", background: s.bg, border: `1px solid ${s.border}`, borderRadius: "999px", color: s.color, fontSize: "11px", fontWeight: 800 }}>
-                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: s.dot }} />
-                          {s.label}
-                        </span>
-                      </td>
-
-                      {/* 4. Due Date */}
-                      <td style={{ padding: "14px 14px" }}>
-                        <div style={{ fontSize: "12px", fontWeight: 800, color: "#0f172a" }}>
-                          {due.text}
-                        </div>
-                        <div style={{ display: "inline-block", padding: "2px 6px", background: due.bg, border: `1px solid ${due.border}`, borderRadius: "4px", fontSize: "10px", fontWeight: 700, color: due.color, marginTop: "2px" }}>
-                          {due.sub}
-                        </div>
-                      </td>
-
-                      {/* 5. Quotas & Usage */}
-                      <td style={{ padding: "14px 14px" }}>
-                        {/* Messages Progress */}
-                        <div style={{ marginBottom: "5px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, color: "#475569", marginBottom: "2px" }}>
-                            <span>💬 {msgUsed.toLocaleString()} / {msgQuota.toLocaleString()}</span>
-                            <span>{msgPercent}%</span>
+                        {/* Plan & Status */}
+                        <td style={{ padding: "16px 14px" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
+                            <span style={{ padding: "3px 8px", background: statusConf.bg, border: `1px solid ${statusConf.border}`, borderRadius: "6px", fontSize: "11px", fontWeight: 800, color: statusConf.color, display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: statusConf.dot }} />
+                              {statusConf.label}
+                            </span>
+                            <div style={{ fontSize: "12px", color: "#ffffff", fontWeight: 800 }}>
+                              {client.subscriptionPlan} • <span style={{ color: "#34d399" }}>₹{client.monthlyFee?.toLocaleString()}/mo</span>
+                            </div>
                           </div>
-                          <div style={{ height: "4px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${msgPercent}%`, background: msgPercent > 90 ? "#ef4444" : "#4f46e5", borderRadius: "999px" }} />
-                          </div>
-                        </div>
-                        {/* AI Progress */}
-                        <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: 600, color: "#475569", marginBottom: "2px" }}>
-                            <span>🤖 {aiUsed.toLocaleString()} / {aiQuota.toLocaleString()}</span>
-                            <span>{aiPercent}%</span>
-                          </div>
-                          <div style={{ height: "4px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${aiPercent}%`, background: aiPercent > 90 ? "#ef4444" : "#10b981", borderRadius: "999px" }} />
-                          </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* 6. Meta Integration */}
-                      <td style={{ padding: "14px 14px" }}>
-                        {client.phoneId && client.metaAccessToken ? (
-                          <button
-                            onClick={() => handleCheckMetaHealth(client)}
-                            disabled={checkingMetaId === client.id}
-                            style={{ padding: "3px 8px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", color: "#166534", fontSize: "11px", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
-                          >
-                            <span>{checkingMetaId === client.id ? "⏳" : "🩺"}</span>
-                            <span>{checkingMetaId === client.id ? "Checking..." : "Live Health"}</span>
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: "11px", color: "#d97706", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                            ⚠️ Missing API Keys
+                        {/* Active Modules Pill */}
+                        <td style={{ padding: "16px 14px" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <span style={{ fontSize: "12px", fontWeight: 800, color: "#818cf8" }}>
+                                🎛️ {enabledMods.length} / 13 Modules
+                              </span>
+                              <button
+                                onClick={() => handleOpenModules(client)}
+                                style={{
+                                  padding: "3px 8px",
+                                  background: "rgba(99, 102, 241, 0.2)",
+                                  border: "1px solid rgba(99, 102, 241, 0.4)",
+                                  borderRadius: "6px",
+                                  color: "#a5b4fc",
+                                  fontSize: "10px",
+                                  fontWeight: 800,
+                                  cursor: "pointer"
+                                }}
+                              >
+                                Edit ⚙️
+                              </button>
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", maxWidth: "260px" }}>
+                              {enabledMods.slice(0, 6).map(modKey => {
+                                const m = MASTER_MODULES[modKey];
+                                return (
+                                  <span key={modKey} title={m.name} style={{ padding: "2px 5px", background: "rgba(255, 255, 255, 0.05)", borderRadius: "4px", fontSize: "10px", color: "#cbd5e1" }}>
+                                    {m.icon}
+                                  </span>
+                                );
+                              })}
+                              {enabledMods.length > 6 && (
+                                <span style={{ padding: "2px 5px", background: "rgba(255, 255, 255, 0.05)", borderRadius: "4px", fontSize: "10px", color: "#94a3b8" }}>
+                                  +{enabledMods.length - 6} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Renewal Due */}
+                        <td style={{ padding: "16px 14px" }}>
+                          <span style={{ padding: "4px 8px", background: dueInfo.bg, border: `1px solid ${dueInfo.border}`, borderRadius: "6px", fontSize: "11px", fontWeight: 800, color: dueInfo.color, display: "inline-block" }}>
+                            {dueInfo.text}
                           </span>
-                        )}
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "4px" }}>
-                          <code style={{ fontSize: "10px", color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", padding: "1px 5px", borderRadius: "4px", maxWidth: "110px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
-                            {webhookUrl}
-                          </code>
-                          <button
-                            onClick={() => { navigator.clipboard.writeText(webhookUrl); alert("Webhook URL copied!"); }}
-                            title="Copy webhook URL"
-                            style={{ background: "none", border: "none", color: "#4f46e5", cursor: "pointer", fontSize: "10px", padding: 0 }}
-                          >
-                            📋
-                          </button>
-                        </div>
-                      </td>
+                          {dueInfo.sub && <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "3px" }}>{dueInfo.sub}</div>}
+                        </td>
 
-                      {/* 7. Actions (Clean single-line suite) */}
-                      <td style={{ padding: "14px 18px", textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: "6px", position: "relative" }}>
-                          {/* Primary: Receive Payment */}
-                          <button
-                            onClick={() => handleOpenPayment(client)}
-                            style={{ padding: "6px 12px", background: "#16a34a", border: "none", borderRadius: "7px", color: "white", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px", boxShadow: "0 1px 2px rgba(22,163,74,0.2)" }}
-                          >
-                            <span>💳</span> Pay / Renew
-                          </button>
+                        {/* Usage Quotas */}
+                        <td style={{ padding: "16px 14px" }}>
+                          <div style={{ fontSize: "11px", color: "#94a3b8", display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <div>💬 Msgs: <b style={{ color: "#38bdf8" }}>{client.messagesUsedCount || 0}</b> / {client.monthlyMessageQuota?.toLocaleString() || 5000}</div>
+                            <div>🧠 AI: <b style={{ color: "#a855f7" }}>{client.aiRepliesUsedCount || 0}</b> / {client.monthlyAiQuota?.toLocaleString() || 500}</div>
+                          </div>
+                        </td>
 
-                          {/* Secondary: Login */}
-                          <button
-                            onClick={() => handleGhostLogin(client)}
-                            disabled={impersonating === client.id}
-                            title="Log into client dashboard"
-                            style={{ padding: "6px 10px", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: "7px", color: "#6d28d9", fontSize: "12px", fontWeight: 700, cursor: impersonating === client.id ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
-                          >
-                            <span>👻</span> {impersonating === client.id ? "..." : "Login"}
-                          </button>
-
-                          {/* Action Icon: Edit */}
-                          <button
-                            onClick={() => handleOpenEdit(client)}
-                            title="Edit Plan, Quotas & Password"
-                            style={{ width: "30px", height: "30px", borderRadius: "7px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#334155", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                          >
-                            ✏️
-                          </button>
-
-                          {/* Action Icon: Receipts */}
-                          <button
-                            onClick={() => handleOpenReceipts(client)}
-                            title="Payment History & Invoices"
-                            style={{ width: "30px", height: "30px", borderRadius: "7px", background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e40af", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                          >
-                            🧾
-                          </button>
-
-                          {/* More Options Dropdown Toggle */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setOpenActionMenuId(openActionMenuId === client.id ? null : client.id); }}
-                            title="More actions"
-                            style={{ width: "30px", height: "30px", borderRadius: "7px", background: "#f8fafc", border: "1px solid #cbd5e1", color: "#475569", fontSize: "14px", fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                          >
-                            ⋯
-                          </button>
-
-                          {/* Dropdown Menu */}
-                          {openActionMenuId === client.id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
+                        {/* Action Buttons */}
+                        <td style={{ padding: "16px 20px", textAlign: "right" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
+                            {/* Ghost Login Button */}
+                            <button
+                              onClick={() => handleGhostLogin(client)}
+                              disabled={impersonating === client.id}
+                              title="1-Click Super-Admin Login to this Client"
                               style={{
-                                position: "absolute",
-                                right: 0,
-                                top: "36px",
-                                background: "#ffffff",
-                                border: "1px solid #e2e8f0",
-                                borderRadius: "10px",
-                                padding: "6px",
-                                boxShadow: "0 10px 25px -5px rgba(0,0,0,0.15)",
-                                zIndex: 100,
-                                minWidth: "180px",
-                                textAlign: "left",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "2px"
+                                padding: "6px 10px",
+                                background: "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2))",
+                                border: "1px solid rgba(99, 102, 241, 0.4)",
+                                borderRadius: "8px",
+                                color: "#ffffff",
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px"
                               }}
                             >
-                              <button
-                                onClick={() => { setOpenActionMenuId(null); handleRegisterWebhook(client); }}
-                                style={{ width: "100%", padding: "7px 10px", background: "none", border: "none", borderRadius: "6px", color: "#0f172a", fontSize: "12px", fontWeight: 600, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-                              >
-                                <span>🔗</span> Auto-Register Webhook
-                              </button>
+                              <span>👻</span> {impersonating === client.id ? "Entering..." : "Login"}
+                            </button>
 
-                              <button
-                                onClick={() => { setOpenActionMenuId(null); handleToggleBlock(client); }}
-                                style={{ width: "100%", padding: "7px 10px", background: "none", border: "none", borderRadius: "6px", color: client.subscriptionStatus === "BLOCKED" ? "#16a34a" : "#d97706", fontSize: "12px", fontWeight: 600, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-                              >
-                                <span>{client.subscriptionStatus === "BLOCKED" ? "🔓" : "🔒"}</span>
-                                <span>{client.subscriptionStatus === "BLOCKED" ? "Unblock Client" : "Block Access"}</span>
-                              </button>
+                            {/* Collect Payment */}
+                            <button
+                              onClick={() => handleOpenPayment(client)}
+                              style={{
+                                padding: "6px 10px",
+                                background: "rgba(16, 185, 129, 0.2)",
+                                border: "1px solid rgba(16, 185, 129, 0.4)",
+                                borderRadius: "8px",
+                                color: "#34d399",
+                                fontSize: "11px",
+                                fontWeight: 800,
+                                cursor: "pointer"
+                              }}
+                            >
+                              💳 Collect
+                            </button>
 
-                              <div style={{ height: "1px", background: "#f1f5f9", margin: "4px 0" }} />
+                            {/* Edit Client */}
+                            <button
+                              onClick={() => handleOpenEdit(client)}
+                              style={{
+                                padding: "6px 10px",
+                                background: "rgba(255, 255, 255, 0.05)",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: "8px",
+                                color: "#cbd5e1",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                cursor: "pointer"
+                              }}
+                            >
+                              ✏️
+                            </button>
 
-                              <button
-                                onClick={() => { setOpenActionMenuId(null); handleDelete(client); }}
-                                style={{ width: "100%", padding: "7px 10px", background: "none", border: "none", borderRadius: "6px", color: "#dc2626", fontSize: "12px", fontWeight: 600, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = "#fef2f2")}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-                              >
-                                <span>🗑️</span> Delete Client
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            {/* Receipts */}
+                            <button
+                              onClick={() => handleOpenReceipts(client)}
+                              title="Payment History & Receipts"
+                              style={{
+                                padding: "6px 10px",
+                                background: "rgba(255, 255, 255, 0.05)",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: "8px",
+                                color: "#cbd5e1",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                cursor: "pointer"
+                              }}
+                            >
+                              📄
+                            </button>
+
+                            {/* Meta Health */}
+                            <button
+                              onClick={() => handleCheckMetaHealth(client)}
+                              title="Check Meta Graph API Health"
+                              style={{
+                                padding: "6px 10px",
+                                background: "rgba(255, 255, 255, 0.05)",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                borderRadius: "8px",
+                                color: "#cbd5e1",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                cursor: "pointer"
+                              }}
+                            >
+                              {checkingMetaId === client.id ? "⏳" : "📡"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      </main>
 
-      {/* ======================= MODAL: META HEALTH DIAGNOSTICS ======================= */}
-      {metaHealthResult && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "520px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "24px" }}>🩺</span>
-                <h3 style={{ fontSize: "18px", fontWeight: 800, color: "#0f172a", margin: 0 }}>Meta WABA Health Diagnostics</h3>
-              </div>
-              <button onClick={() => setMetaHealthResult(null)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
-            </div>
-
-            {metaHealthResult.status === "HEALTHY" ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <div style={{ padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "12px", color: "#166534", fontWeight: 800, display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span>✅</span> Live Meta Connection Active & Operational ({metaHealthResult.latencyMs}ms)
-                </div>
-
-                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px" }}>
-                  <div>
-                    <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Phone Number</span>
-                    <div style={{ fontWeight: 800, color: "#0f172a" }}>{metaHealthResult.displayPhoneNumber}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Verified Name</span>
-                    <div style={{ fontWeight: 800, color: "#0f172a" }}>{metaHealthResult.verifiedName}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Quality Rating</span>
-                    <div style={{ fontWeight: 800, color: metaHealthResult.qualityRating === "GREEN" ? "#16a34a" : "#d97706" }}>
-                      🟢 {metaHealthResult.qualityRating}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Messaging Limit</span>
-                    <div style={{ fontWeight: 800, color: "#4f46e5" }}>{metaHealthResult.messagingLimitTier}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>WABA Account</span>
-                    <div style={{ fontWeight: 700, color: "#0f172a" }}>{metaHealthResult.wabaName || "Connected"}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "#64748b", fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Webhook Verify Token</span>
-                    <div style={{ fontWeight: 700, color: "#16a34a" }}>✅ Synchronized</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: "16px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", color: "#991b1b" }}>
-                <div style={{ fontWeight: 800, fontSize: "14px", marginBottom: "6px" }}>⚠️ Meta Token Issue Detected</div>
-                <div style={{ fontSize: "13px", lineHeight: 1.5 }}>{metaHealthResult.error || metaHealthResult.message}</div>
-                <div style={{ fontSize: "12px", marginTop: "10px", color: "#64748b" }}>
-                  Please ask the client to generate a new Permanent Access Token in Meta Developer Portal or update credentials in Edit Client.
-                </div>
-              </div>
-            )}
-
-            <button onClick={() => setMetaHealthResult(null)} style={{ marginTop: "20px", width: "100%", padding: "12px", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "10px", color: "#475569", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}>
-              Close Diagnostics
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ======================= MODAL: ONBOARD NEW CLIENT ======================= */}
-      {showAdd && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "560px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <div>
-                <h3 style={{ color: "#0f172a", fontWeight: 800, fontSize: "20px", margin: 0 }}>🏢 Onboard New Client</h3>
-                <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>Set up business info, admin login credentials, quotas and plan.</p>
-              </div>
-              <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
-            </div>
-
-            <form onSubmit={handleAddClient} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Business Name *</label>
-                <input type="text" value={form.businessName} onChange={e => setForm({ ...form, businessName: e.target.value })} placeholder="e.g. Acme Clothing Pvt Ltd" required style={{ width: "100%", padding: "11px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        {/* 🎛️ MODULAR FEATURE GATING MODAL */}
+        {modulesClient && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(10px)" }}>
+            <div style={{ background: "#0f172a", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: "24px", padding: "30px", width: "100%", maxWidth: "840px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.6)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "16px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Admin Email (Login) *</label>
-                  <input type="email" value={form.contactEmail} onChange={e => setForm({ ...form, contactEmail: e.target.value })} placeholder="admin@acme.com" required style={{ width: "100%", padding: "11px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#475569", textTransform: "uppercase" }}>Admin Password *</label>
-                    <button type="button" onClick={generateRandomPassword} style={{ background: "none", border: "none", color: "#4f46e5", fontSize: "11px", fontWeight: 800, cursor: "pointer", padding: 0 }}>🎲 Generate</button>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "24px" }}>🎛️</span>
+                    <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: "#ffffff" }}>
+                      Manage Modules for {modulesClient.businessName}
+                    </h3>
                   </div>
-                  <div style={{ position: "relative" }}>
-                    <input type={showAddPassword ? "text" : "password"} value={form.adminPassword} onChange={e => setForm({ ...form, adminPassword: e.target.value })} placeholder="Password" required style={{ width: "100%", padding: "11px 36px 11px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-                    <button type="button" onClick={() => setShowAddPassword(!showAddPassword)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "14px" }}>
-                      {showAddPassword ? "🙈" : "👁️"}
-                    </button>
-                  </div>
+                  <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#94a3b8" }}>
+                    Enable or disable individual business modules for this tenant. Disabled modules are locked in their dashboard.
+                  </p>
                 </div>
+                <button onClick={() => setModulesClient(null)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Contact Phone</label>
-                  <input type="tel" value={form.contactPhone} onChange={e => setForm({ ...form, contactPhone: e.target.value })} placeholder="+91 99999 00000" style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+              {/* 1-Click Industry Presets Bar */}
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 800, color: "#818cf8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
+                  ✨ 1-Click Industry Presets
                 </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Owner WhatsApp (For Dues)</label>
-                  <input type="tel" value={form.ownerWhatsApp} onChange={e => setForm({ ...form, ownerWhatsApp: e.target.value })} placeholder="+91 98765 43210" style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Plan</label>
-                  <select value={form.subscriptionPlan} onChange={e => setForm({ ...form, subscriptionPlan: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none" }}>
-                    {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Monthly Fee (₹)</label>
-                  <input type="number" value={form.monthlyFee} onChange={e => setForm({ ...form, monthlyFee: Number(e.target.value) })} style={{ width: "100%", padding: "10px 12px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#16a34a", fontWeight: 800, fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Max Agents</label>
-                  <input type="number" min="1" max="100" value={form.maxAgents} onChange={e => setForm({ ...form, maxAgents: Number(e.target.value) })} style={{ width: "100%", padding: "10px 12px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-              </div>
-
-              {/* Quotas */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Monthly Msgs Quota</label>
-                  <input type="number" value={form.monthlyMessageQuota} onChange={e => setForm({ ...form, monthlyMessageQuota: Number(e.target.value) })} style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Monthly AI Replies Quota</label>
-                  <input type="number" value={form.monthlyAiQuota} onChange={e => setForm({ ...form, monthlyAiQuota: Number(e.target.value) })} style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-              </div>
-
-              {/* Initial Status */}
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Initial State</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <button type="button" onClick={() => setForm({ ...form, initialStatus: "ACTIVE" })} style={{ padding: "10px", background: form.initialStatus === "ACTIVE" ? "#f0fdf4" : "#f8fafc", border: form.initialStatus === "ACTIVE" ? "2px solid #16a34a" : "1px solid #cbd5e1", borderRadius: "8px", color: form.initialStatus === "ACTIVE" ? "#166534" : "#64748b", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
-                    ✅ Active (Paid for 1 Month)
-                  </button>
-                  <button type="button" onClick={() => setForm({ ...form, initialStatus: "TRIAL" })} style={{ padding: "10px", background: form.initialStatus === "TRIAL" ? "#eff6ff" : "#f8fafc", border: form.initialStatus === "TRIAL" ? "2px solid #2563eb" : "1px solid #cbd5e1", borderRadius: "8px", color: form.initialStatus === "TRIAL" ? "#1e40af" : "#64748b", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
-                    🧪 Free Trial (30 Days)
-                  </button>
-                </div>
-              </div>
-
-              {/* Meta & Shopify Credentials Accordion */}
-              <div>
-                <button type="button" onClick={() => setShowMetaFields(p => !p)} style={{ width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#475569", padding: "10px 14px", cursor: "pointer", fontSize: "12px", fontWeight: 700, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>{showMetaFields ? "▲ Hide" : "▼ Show"} Meta / Shopify API Keys (Optional)</span>
-                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Can be configured later</span>
-                </button>
-                {showMetaFields && (
-                  <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", padding: "14px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                    {[
-                      { label: "WABA ID", key: "wabaId", placeholder: "WhatsApp Business Account ID" },
-                      { label: "Phone Number ID", key: "phoneId", placeholder: "Meta Phone Number ID" },
-                      { label: "Phone Number", key: "phoneNumber", placeholder: "+91 99999 00000" },
-                      { label: "Meta Access Token", key: "metaAccessToken", placeholder: "Permanent access token" },
-                      { label: "Webhook Verify Token", key: "webhookVerifyToken", placeholder: "Custom verify token" },
-                      { label: "Shopify Domain", key: "shopifyDomain", placeholder: "store.myshopify.com" },
-                      { label: "Shopify Token", key: "shopifyToken", placeholder: "shpat_..." },
-                    ].map(f => (
-                      <div key={f.key}>
-                        <label style={{ display: "block", fontSize: "10px", fontWeight: 800, color: "#64748b", marginBottom: "4px", textTransform: "uppercase" }}>{f.label}</label>
-                        <input type={f.key.toLowerCase().includes("token") ? "password" : "text"} value={(form as any)[f.key]} onChange={e => setForm({ ...form, [f.key]: e.target.value })} placeholder={f.placeholder} style={{ width: "100%", padding: "8px 10px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "6px", color: "#0f172a", fontSize: "12px", outline: "none", boxSizing: "border-box" }} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Internal Notes</label>
-                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="e.g. Onboarded via client referral" style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none", minHeight: "50px", resize: "vertical", boxSizing: "border-box" }} />
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", marginTop: "6px" }}>
-                <button type="submit" style={{ flex: 1, padding: "13px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
-                  🚀 Create Client & Launch Account
-                </button>
-                <button type="button" onClick={() => setShowAdd(false)} style={{ padding: "13px 20px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", color: "#64748b", cursor: "pointer", fontSize: "14px" }}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ======================= MODAL: ONBOARD SUCCESS ======================= */}
-      {addSuccessInfo && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", border: "1px solid #bbf7d0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "500px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ textAlign: "center", marginBottom: "20px" }}>
-              <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: "#dcfce7", color: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", margin: "0 auto 12px" }}>
-                🎉
-              </div>
-              <h3 style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a", margin: "0 0 4px 0" }}>Client Onboarded Successfully!</h3>
-              <p style={{ fontSize: "13px", color: "#64748b", margin: 0 }}>Send these login credentials to your client to access their WhatsApp CRM dashboard.</p>
-            </div>
-
-            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "18px", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
-              <div>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Business</span>
-                <div style={{ fontSize: "15px", fontWeight: 800, color: "#0f172a" }}>{addSuccessInfo.businessName}</div>
-              </div>
-              <div>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Login Portal</span>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "#4f46e5" }}>{addSuccessInfo.loginUrl}</div>
-              </div>
-              <div>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Admin Email</span>
-                <div style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a" }}>{addSuccessInfo.email}</div>
-              </div>
-              <div>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Temporary Password</span>
-                <div style={{ fontSize: "16px", fontWeight: 900, color: "#16a34a", letterSpacing: "1px" }}>{addSuccessInfo.password}</div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={() => {
-                const text = `🎉 Welcome to What-In WhatsApp Platform!\n\nHere are your dashboard access credentials:\n\n📱 Login URL: ${addSuccessInfo.loginUrl}\n📧 Email: ${addSuccessInfo.email}\n🔑 Password: ${addSuccessInfo.password}\n\nUpon your first login, you will be prompted to set your permanent private password.`;
-                navigator.clipboard.writeText(text);
-                alert("✅ Credentials message copied to clipboard! You can now paste it into WhatsApp.");
-              }} style={{ flex: 1, padding: "12px", background: "linear-gradient(135deg, #16a34a, #15803d)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-                📋 Copy for WhatsApp
-              </button>
-              <button onClick={() => setAddSuccessInfo(null)} style={{ padding: "12px 24px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", color: "#475569", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================= MODAL: RECEIVE PAYMENT & EXTEND DUE DATE ======================= */}
-      {paymentClient && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", border: "1px solid #bbf7d0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "520px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <div>
-                <h3 style={{ color: "#16a34a", fontWeight: 800, fontSize: "20px", margin: 0 }}>💳 Receive Payment & Renew</h3>
-                <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>Client: <b>{paymentClient.businessName}</b> (Fee: ₹{paymentClient.monthlyFee}/mo)</p>
-              </div>
-              <button onClick={() => setPaymentClient(null)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
-            </div>
-
-            <form onSubmit={handleRecordPaymentSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "8px", textTransform: "uppercase" }}>Extend Billing Cycle</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
-                  {[
-                    { label: "+1 Month", months: 1 },
-                    { label: "+3 Months", months: 3 },
-                    { label: "+6 Months", months: 6 },
-                    { label: "+1 Year", months: 12 },
-                  ].map(c => (
-                    <button key={c.months} type="button" onClick={() => handleCycleChange(c.months)} style={{ padding: "10px 4px", background: payCycleMonths === c.months ? "#f0fdf4" : "#f8fafc", border: payCycleMonths === c.months ? "2px solid #16a34a" : "1px solid #cbd5e1", borderRadius: "8px", color: payCycleMonths === c.months ? "#15803d" : "#64748b", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}>
-                      {c.label}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {INDUSTRY_MODULE_PRESETS.map(preset => (
+                    <button
+                      key={preset.name}
+                      onClick={() => handleApplyPreset(preset.modules)}
+                      style={{
+                        padding: "5px 10px",
+                        background: "rgba(255, 255, 255, 0.05)",
+                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        borderRadius: "8px",
+                        color: "#e2e8f0",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px"
+                      }}
+                    >
+                      <span>{preset.icon}</span> {preset.name}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Amount Received (₹) *</label>
-                  <input type="number" value={payAmount} onChange={e => setPayAmount(Number(e.target.value))} required style={{ width: "100%", padding: "11px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#16a34a", fontWeight: 800, fontSize: "16px", outline: "none", boxSizing: "border-box" }} />
+              {/* Quick Select Buttons */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                  Active: <b style={{ color: "#34d399" }}>{activeClientModules.length}</b> / {ALL_MODULE_KEYS.length} Modules
+                </span>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => setActiveClientModules(ALL_MODULE_KEYS)} style={{ padding: "4px 10px", background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "6px", color: "#34d399", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                    Select All
+                  </button>
+                  <button onClick={() => setActiveClientModules(["INBOX"])} style={{ padding: "4px 10px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "6px", color: "#f87171", fontSize: "11px", fontWeight: 800, cursor: "pointer" }}>
+                    Minimal Only
+                  </button>
                 </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Payment Mode</label>
-                  <select value={payMethod} onChange={e => setPayMethod(e.target.value)} style={{ width: "100%", padding: "11px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none" }}>
-                    {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
               </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>New Next Due Date *</label>
-                <input type="date" value={payCustomDueDate} onChange={e => setPayCustomDueDate(e.target.value)} required style={{ width: "100%", padding: "11px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-                <span style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", display: "block" }}>Plan will stay ACTIVE and unlocked until this date.</span>
+              {/* 13 Modules Interactive Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px", marginBottom: "26px" }}>
+                {ALL_MODULE_KEYS.map(modKey => {
+                  const m = MASTER_MODULES[modKey];
+                  const isEnabled = activeClientModules.includes(modKey);
+
+                  return (
+                    <div
+                      key={modKey}
+                      onClick={() => handleToggleModule(modKey)}
+                      style={{
+                        padding: "14px",
+                        borderRadius: "14px",
+                        background: isEnabled ? "rgba(99, 102, 241, 0.12)" : "rgba(255, 255, 255, 0.02)",
+                        border: isEnabled ? "1px solid #6366f1" : "1px solid rgba(255, 255, 255, 0.06)",
+                        cursor: "pointer",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        transition: "all 0.15s ease",
+                        boxShadow: isEnabled ? "0 4px 14px rgba(99, 102, 241, 0.15)" : "none"
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "20px" }}>{m.icon}</span>
+                            <span style={{ fontWeight: 800, fontSize: "13px", color: isEnabled ? "#ffffff" : "#94a3b8" }}>{m.name}</span>
+                          </div>
+                          {/* Toggle Switch */}
+                          <div style={{ width: "36px", height: "20px", borderRadius: "999px", background: isEnabled ? "#6366f1" : "rgba(255,255,255,0.1)", position: "relative", transition: "background 0.2s" }}>
+                            <div style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#ffffff", position: "absolute", top: "2px", left: isEnabled ? "18px" : "2px", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />
+                          </div>
+                        </div>
+
+                        <p style={{ margin: 0, fontSize: "11px", color: "#64748b", lineHeight: 1.4 }}>
+                          {m.tagline}
+                        </p>
+                      </div>
+
+                      <div style={{ marginTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "10px", padding: "2px 6px", background: "rgba(255, 255, 255, 0.05)", borderRadius: "4px", color: "#94a3b8", fontWeight: 700 }}>
+                          {m.category}
+                        </span>
+                        <span style={{ fontSize: "11px", fontWeight: 800, color: isEnabled ? "#34d399" : "#64748b" }}>
+                          {isEnabled ? "ENABLED" : "DISABLED"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>UTR / Reference Number (Optional)</label>
-                <input type="text" value={payRef} onChange={e => setPayRef(e.target.value)} placeholder="e.g. UPI/582910283912 or Bank Ref" style={{ width: "100%", padding: "10px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Receipt Notes (Optional)</label>
-                <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder="e.g. Paid via PhonePe by client manager" style={{ width: "100%", padding: "10px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "10px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-              </div>
-
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                <button type="submit" disabled={isSubmittingPay} style={{ flex: 1, padding: "13px", background: "linear-gradient(135deg, #16a34a, #15803d)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, cursor: isSubmittingPay ? "not-allowed" : "pointer", fontSize: "14px", boxShadow: "0 4px 12px rgba(22,163,74,0.3)" }}>
-                  {isSubmittingPay ? "Recording..." : "💾 Record Payment & Activate"}
-                </button>
-                <button type="button" onClick={() => setPaymentClient(null)} style={{ padding: "13px 20px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", color: "#64748b", cursor: "pointer", fontSize: "14px" }}>
+              {/* Action Buttons */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() => setModulesClient(null)}
+                  style={{ padding: "10px 18px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "10px", color: "#94a3b8", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}
+                >
                   Cancel
                 </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ======================= MODAL: PAYMENT HISTORY & RECEIPTS ======================= */}
-      {receiptsClient && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "700px", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <div>
-                <h3 style={{ color: "#0f172a", fontWeight: 800, fontSize: "20px", margin: 0 }}>🧾 Payment History & Invoices</h3>
-                <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>{receiptsClient.businessName} — {receiptsClient.contactEmail}</p>
-              </div>
-              <button onClick={() => setReceiptsClient(null)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
-            </div>
-
-            {loadingPayments ? (
-              <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Loading payment ledger...</div>
-            ) : paymentsHistory.length === 0 ? (
-              <div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>
-                No recorded payments yet for this client.
-                <div style={{ marginTop: "12px" }}>
-                  <button onClick={() => { setReceiptsClient(null); handleOpenPayment(receiptsClient); }} style={{ padding: "8px 16px", background: "#16a34a", border: "none", borderRadius: "8px", color: "white", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}>
-                    💳 Record First Payment
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {paymentsHistory.map((p) => (
-                  <div key={p.id} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "16px", fontWeight: 800, color: "#16a34a" }}>₹{p.amount?.toLocaleString()}</span>
-                        <span style={{ fontSize: "11px", padding: "2px 8px", background: "#dcfce7", color: "#15803d", borderRadius: "4px", fontWeight: 800 }}>PAID</span>
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#475569", marginTop: "4px" }}>
-                        📅 Paid: {new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                        🗓️ Access Valid: {new Date(p.periodStart).toLocaleDateString("en-IN")} → {new Date(p.periodEnd).toLocaleDateString("en-IN")}
-                      </div>
-                      {p.notes && (
-                        <div style={{ fontSize: "11px", color: "#4f46e5", marginTop: "4px", fontWeight: 600 }}>
-                          📝 {p.notes}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <button onClick={() => setSelectedReceipt({ payment: p, client: receiptsClient })} style={{ padding: "8px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", color: "#1e40af", fontSize: "12px", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-                        🖨️ View / Print Receipt
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ======================= MODAL: SINGLE PRINTABLE SAAS RECEIPT ======================= */}
-      {selectedReceipt && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", color: "#0f172a", borderRadius: "16px", padding: "36px", width: "100%", maxWidth: "560px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #e2e8f0", paddingBottom: "16px", marginBottom: "20px" }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 900, color: "#4338ca", letterSpacing: "-0.5px" }}>WHAT-IN SAAS</h2>
-                <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#64748b" }}>Developed by tinkal.in • Cloud WhatsApp SaaS</p>
-                <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#64748b" }}>https://what-in.tinkal.in</p>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <span style={{ display: "inline-block", background: "#dcfce7", color: "#15803d", padding: "4px 12px", borderRadius: "999px", fontSize: "12px", fontWeight: 800 }}>
-                  PAID RECEIPT
-                </span>
-                <div style={{ fontSize: "11px", color: "#64748b", marginTop: "6px" }}>
-                  Receipt #{selectedReceipt.payment.id.slice(0, 8).toUpperCase()}
-                </div>
-                <div style={{ fontSize: "11px", color: "#64748b" }}>
-                  Date: {new Date(selectedReceipt.payment.createdAt).toLocaleDateString("en-IN")}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>BILLED TO:</div>
-              <div style={{ fontSize: "16px", fontWeight: 800, color: "#0f172a" }}>{selectedReceipt.client.businessName}</div>
-              <div style={{ fontSize: "13px", color: "#475569" }}>{selectedReceipt.client.contactEmail}</div>
-              {selectedReceipt.client.contactPhone && <div style={{ fontSize: "13px", color: "#475569" }}>{selectedReceipt.client.contactPhone}</div>}
-            </div>
-
-            <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
-              <thead>
-                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                  <th style={{ padding: "8px 12px", textAlign: "left", fontSize: "12px", color: "#475569" }}>Description</th>
-                  <th style={{ padding: "8px 12px", textAlign: "right", fontSize: "12px", color: "#475569" }}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "12px" }}>
-                    <div style={{ fontWeight: 700, fontSize: "13px", color: "#0f172a" }}>
-                      What-In {selectedReceipt.client.subscriptionPlan || "Standard"} Plan Subscription
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#64748b" }}>
-                      Access: {new Date(selectedReceipt.payment.periodStart).toLocaleDateString("en-IN")} to {new Date(selectedReceipt.payment.periodEnd).toLocaleDateString("en-IN")}
-                    </div>
-                    {selectedReceipt.payment.notes && (
-                      <div style={{ fontSize: "11px", color: "#4338ca", marginTop: "2px" }}>
-                        {selectedReceipt.payment.notes}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: "12px", textAlign: "right", fontWeight: 800, fontSize: "14px", color: "#0f172a" }}>
-                    ₹{selectedReceipt.payment.amount?.toLocaleString()}
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td style={{ padding: "12px", textAlign: "right", fontWeight: 800, fontSize: "14px", color: "#0f172a" }}>Total Paid:</td>
-                  <td style={{ padding: "12px", textAlign: "right", fontWeight: 900, fontSize: "16px", color: "#15803d" }}>
-                    ₹{selectedReceipt.payment.amount?.toLocaleString()}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-
-            <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-              <button onClick={() => window.print()} style={{ flex: 1, padding: "12px", background: "#4338ca", border: "none", borderRadius: "8px", color: "white", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
-                🖨️ Print / Save as PDF
-              </button>
-              <button onClick={() => setSelectedReceipt(null)} style={{ padding: "12px 20px", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#475569", fontWeight: 600, fontSize: "13px", cursor: "pointer" }}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================= MODAL: EDIT CLIENT & RESET PASSWORD & QUOTAS ======================= */}
-      {editClient && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(6px)", padding: "20px" }}>
-          <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "32px", width: "100%", maxWidth: "560px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <div>
-                <h3 style={{ color: "#0f172a", fontWeight: 800, fontSize: "20px", margin: 0 }}>✏️ Edit Client — {editClient.businessName}</h3>
-                <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#64748b" }}>Update plan, reset admin password, adjust quotas, and update Meta keys.</p>
-              </div>
-              <button onClick={() => setEditClient(null)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              {/* Reset Admin Password */}
-              <div style={{ background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: "12px", padding: "14px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#4338ca", textTransform: "uppercase" }}>🔑 Client Admin Login Password</label>
-                  <button type="button" onClick={() => setEditPassword("WhatIn@" + Math.floor(100000 + Math.random() * 900000))} style={{ background: "none", border: "none", color: "#4f46e5", fontSize: "11px", fontWeight: 800, cursor: "pointer", padding: 0 }}>🎲 Generate New</button>
-                </div>
-                <input type="text" value={editPassword} onChange={e => setEditPassword(e.target.value)} placeholder="Enter new password for client admin" style={{ width: "100%", padding: "10px 12px", background: "#ffffff", border: "1px solid #c7d2fe", borderRadius: "8px", color: "#0f172a", fontSize: "14px", fontWeight: 700, outline: "none", boxSizing: "border-box" }} />
-                <span style={{ fontSize: "11px", color: "#475569", marginTop: "4px", display: "block" }}>Client can log into <code>/login</code> with email <b>{editClient.contactEmail}</b> and this password.</span>
-              </div>
-
-              {/* Adjust Due Date */}
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Next Due Date (Subscription Expiry)</label>
-                <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-              </div>
-
-              {/* Quotas */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", background: "#f8fafc", padding: "12px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "4px", textTransform: "uppercase" }}>Monthly Msgs Quota</label>
-                  <input type="number" value={editMsgQuota} onChange={e => setEditMsgQuota(Number(e.target.value))} style={{ width: "100%", padding: "8px 10px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "6px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "4px", textTransform: "uppercase" }}>Monthly AI Quota</label>
-                  <input type="number" value={editAiQuota} onChange={e => setEditAiQuota(Number(e.target.value))} style={{ width: "100%", padding: "8px 10px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "6px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-                <div style={{ gridColumn: "span 2", marginTop: "4px" }}>
-                  <button type="button" onClick={() => handleResetQuotas(editClient.id)} style={{ padding: "6px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", color: "#dc2626", fontSize: "11px", fontWeight: 700, cursor: "pointer" }}>
-                    🔄 Reset Month Usage Counters to 0
-                  </button>
-                </div>
-              </div>
-
-              {/* Plan, Fee, Agents */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Plan</label>
-                  <select value={editClient.subscriptionPlan} onChange={e => setEditClient({ ...editClient, subscriptionPlan: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none" }}>
-                    {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Fee/mo (₹)</label>
-                  <input type="number" value={editClient.monthlyFee} onChange={e => setEditClient({ ...editClient, monthlyFee: Number(e.target.value) })} style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#16a34a", fontWeight: 800, fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Max Agents</label>
-                  <input type="number" min="1" max="100" value={editClient.maxAgents} onChange={e => setEditClient({ ...editClient, maxAgents: Number(e.target.value) })} style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-              </div>
-
-              {/* Owner WhatsApp */}
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Owner WhatsApp (for blocked screen)</label>
-                <input type="tel" value={editClient.ownerWhatsApp || ""} onChange={e => setEditClient({ ...editClient, ownerWhatsApp: e.target.value })} placeholder="+91 98765 43210" style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-              </div>
-
-              {/* Meta Credentials in Edit */}
-              <div>
-                <button type="button" onClick={() => setShowEditMeta(p => !p)} style={{ width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", color: "#475569", padding: "10px 14px", cursor: "pointer", fontSize: "12px", fontWeight: 700, display: "flex", justifyContent: "space-between" }}>
-                  <span>{showEditMeta ? "▲ Hide" : "▼ Show"} Meta / Shopify API Keys</span>
+                <button
+                  type="button"
+                  onClick={handleSaveModules}
+                  disabled={isSavingModules}
+                  style={{ padding: "10px 24px", background: "linear-gradient(135deg, #6366f1, #a855f7)", border: "none", borderRadius: "10px", color: "#ffffff", fontSize: "13px", fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 16px rgba(99, 102, 241, 0.3)" }}
+                >
+                  {isSavingModules ? "Saving Module States..." : "💾 Save Module Access"}
                 </button>
-                {showEditMeta && (
-                  <div style={{ marginTop: "10px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", padding: "14px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-                    {[
-                      { label: "WABA ID", key: "wabaId", placeholder: "WhatsApp Business Account ID" },
-                      { label: "Phone Number ID", key: "phoneId", placeholder: "Meta Phone Number ID" },
-                      { label: "Phone Number", key: "phoneNumber", placeholder: "+91 99999 00000" },
-                      { label: "Meta Access Token", key: "metaAccessToken", placeholder: "Permanent access token" },
-                      { label: "Webhook Verify Token", key: "webhookVerifyToken", placeholder: "Custom verify token" },
-                      { label: "Shopify Domain", key: "shopifyDomain", placeholder: "store.myshopify.com" },
-                      { label: "Shopify Token", key: "shopifyToken", placeholder: "shpat_..." },
-                    ].map(f => (
-                      <div key={f.key}>
-                        <label style={{ display: "block", fontSize: "10px", fontWeight: 800, color: "#64748b", marginBottom: "4px", textTransform: "uppercase" }}>{f.label}</label>
-                        <input type={f.key.toLowerCase().includes("token") ? "password" : "text"} value={editClient[f.key] || ""} onChange={e => setEditClient({ ...editClient, [f.key]: e.target.value })} placeholder={f.placeholder} style={{ width: "100%", padding: "8px 10px", background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "6px", color: "#0f172a", fontSize: "12px", outline: "none", boxSizing: "border-box" }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ONBOARD NEW CLIENT MODAL */}
+        {showAdd && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(10px)" }}>
+            <div style={{ background: "#0f172a", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: "24px", padding: "30px", width: "100%", maxWidth: "680px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.6)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "14px" }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "#ffffff" }}>➕ Onboard New WhatsApp SaaS Client</h3>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>Set credentials, choose subscription tier, and configure initial modules.</p>
+                </div>
+                <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
+              </div>
+
+              <form onSubmit={handleCreateClient} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {/* Business Name & Email */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Business / Brand Name *</label>
+                    <input type="text" required placeholder="e.g. Apex Sports Club" value={form.businessName} onChange={e => setForm({ ...form, businessName: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Admin Email (Login ID) *</label>
+                    <input type="email" required placeholder="admin@brand.com" value={form.contactEmail} onChange={e => setForm({ ...form, contactEmail: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                </div>
+
+                {/* Password Generator */}
+                <div style={{ background: "rgba(99, 102, 241, 0.1)", border: "1px solid rgba(99, 102, 241, 0.25)", borderRadius: "12px", padding: "12px 14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 800, color: "#818cf8", textTransform: "uppercase" }}>🔑 Auto-Generated Initial Password</label>
+                    <button type="button" onClick={() => setForm({ ...form, adminPassword: "WhatMore@" + Math.floor(100000 + Math.random() * 900000) })} style={{ background: "none", border: "none", color: "#a5b4fc", fontSize: "11px", fontWeight: 800, cursor: "pointer", padding: 0 }}>🎲 Generate New</button>
+                  </div>
+                  <input type="text" value={form.adminPassword} onChange={e => setForm({ ...form, adminPassword: e.target.value })} style={{ width: "100%", padding: "8px 12px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", fontWeight: 700, outline: "none", boxSizing: "border-box" }} />
+                </div>
+
+                {/* Plan Tier Selector */}
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "8px" }}>Select Subscription Plan Tier</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
+                    {DEFAULT_PLAN_TIERS.map(p => (
+                      <div
+                        key={p.id}
+                        onClick={() => handlePlanSelectInAdd(p.id)}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "10px",
+                          background: form.subscriptionPlan === p.id ? "rgba(99, 102, 241, 0.25)" : "rgba(255, 255, 255, 0.03)",
+                          border: form.subscriptionPlan === p.id ? "1px solid #6366f1" : "1px solid rgba(255, 255, 255, 0.08)",
+                          cursor: "pointer",
+                          textAlign: "center"
+                        }}
+                      >
+                        <div style={{ fontWeight: 800, fontSize: "12px", color: "#ffffff" }}>{p.name}</div>
+                        <div style={{ fontSize: "11px", color: "#34d399", fontWeight: 700 }}>₹{p.monthlyFee}/mo</div>
+                        <div style={{ fontSize: "10px", color: "#818cf8", marginTop: "2px" }}>{p.modules.length} Modules</div>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Notes</label>
-                <textarea value={editClient.notes || ""} onChange={e => setEditClient({ ...editClient, notes: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", color: "#0f172a", fontSize: "13px", outline: "none", minHeight: "60px", resize: "vertical", boxSizing: "border-box" }} />
-              </div>
+                {/* Fees and Limits */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "10px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginBottom: "4px" }}>Monthly Fee (₹)</label>
+                    <input type="number" value={form.monthlyFee} onChange={e => setForm({ ...form, monthlyFee: Number(e.target.value) })} style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "10px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginBottom: "4px" }}>Monthly Msgs</label>
+                    <input type="number" value={form.monthlyMessageQuota} onChange={e => setForm({ ...form, monthlyMessageQuota: Number(e.target.value) })} style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "10px", fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", marginBottom: "4px" }}>AI Replies</label>
+                    <input type="number" value={form.monthlyAiQuota} onChange={e => setForm({ ...form, monthlyAiQuota: Number(e.target.value) })} style={{ width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                </div>
 
-              <div style={{ display: "flex", gap: "10px", marginTop: "6px" }}>
-                <button type="submit" style={{ flex: 1, padding: "12px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "10px", color: "white", fontWeight: 700, cursor: "pointer", fontSize: "14px" }}>
-                  Save Changes
-                </button>
-                <button type="button" onClick={() => setEditClient(null)} style={{ padding: "12px 20px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", color: "#64748b", cursor: "pointer", fontSize: "14px" }}>
-                  Cancel
-                </button>
-              </div>
-            </form>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+                  <button type="button" onClick={() => setShowAdd(false)} style={{ padding: "10px 18px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "10px", color: "#94a3b8", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                  <button type="submit" style={{ padding: "10px 24px", background: "linear-gradient(135deg, #6366f1, #a855f7)", border: "none", borderRadius: "10px", color: "#ffffff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>
+                    🚀 Onboard & Save
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* ONBOARD SUCCESS MODAL */}
+        {addSuccessInfo && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(10px)" }}>
+            <div style={{ background: "#0f172a", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "24px", padding: "30px", width: "100%", maxWidth: "560px", boxShadow: "0 25px 60px rgba(0,0,0,0.6)" }}>
+              <div style={{ textAlign: "center", marginBottom: "20px" }}>
+                <div style={{ fontSize: "48px", marginBottom: "8px" }}>🎉</div>
+                <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: "#34d399" }}>Client Successfully Onboarded!</h3>
+                <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#94a3b8" }}>Share these login credentials with the client admin.</p>
+              </div>
+
+              <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "14px", padding: "18px", marginBottom: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div>
+                  <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>Login Portal URL</div>
+                  <div style={{ fontSize: "13px", color: "#38bdf8", fontWeight: 700 }}>{addSuccessInfo.loginUrl}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>Admin Email</div>
+                  <div style={{ fontSize: "13px", color: "#ffffff", fontWeight: 700 }}>{addSuccessInfo.email}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>Generated Password</div>
+                  <div style={{ fontSize: "15px", color: "#34d399", fontWeight: 900, fontFamily: "monospace" }}>{addSuccessInfo.password}</div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={() => {
+                    const text = `🎉 Welcome to WhatMore WhatsApp Platform!\n\nHere are your dashboard access credentials:\n\n📱 Login URL: ${addSuccessInfo.loginUrl}\n📧 Email: ${addSuccessInfo.email}\n🔑 Password: ${addSuccessInfo.password}\n\nUpon your first login, you will be prompted to set your permanent private password.`;
+                    navigator.clipboard.writeText(text);
+                    alert("✅ Credentials message copied to clipboard! You can now paste it into WhatsApp.");
+                  }}
+                  style={{ flex: 1, padding: "12px", background: "linear-gradient(135deg, #10b981, #059669)", border: "none", borderRadius: "10px", color: "white", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}
+                >
+                  📋 Copy for WhatsApp
+                </button>
+                <button onClick={() => setAddSuccessInfo(null)} style={{ padding: "12px 20px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "#ffffff", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* RECORD PAYMENT MODAL */}
+        {paymentClient && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(10px)" }}>
+            <div style={{ background: "#0f172a", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: "24px", padding: "30px", width: "100%", maxWidth: "520px", boxShadow: "0 25px 60px rgba(0,0,0,0.6)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "14px" }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "#ffffff" }}>💳 Record Monthly SaaS Renewal</h3>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>Client: {paymentClient.businessName}</p>
+                </div>
+                <button onClick={() => setPaymentClient(null)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
+              </div>
+
+              <form onSubmit={handleSavePayment} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Amount Received (₹) *</label>
+                  <input type="number" required value={payAmount} onChange={e => setPayAmount(Number(e.target.value))} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "14px", fontWeight: 800, outline: "none", boxSizing: "border-box" }} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Payment Method</label>
+                  <select value={payMethod} onChange={e => setPayMethod(e.target.value)} style={{ width: "100%", padding: "10px 12px", background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }}>
+                    {PAYMENT_METHODS.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>UPI UTR / Reference No. (Optional)</label>
+                  <input type="text" placeholder="e.g. UPI 432876129847" value={payRef} onChange={e => setPayRef(e.target.value)} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+                  <button type="button" onClick={() => setPaymentClient(null)} style={{ padding: "10px 18px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "10px", color: "#94a3b8", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={isSubmittingPay} style={{ padding: "10px 24px", background: "linear-gradient(135deg, #10b981, #059669)", border: "none", borderRadius: "10px", color: "#ffffff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>
+                    {isSubmittingPay ? "Recording..." : "✅ Confirm Payment"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

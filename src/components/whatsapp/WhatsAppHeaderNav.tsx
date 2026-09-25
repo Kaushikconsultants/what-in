@@ -22,16 +22,25 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-const subNavItems = [
+import { ModuleKey, ALL_MODULE_KEYS } from "@/lib/moduleRegistry";
+
+interface SubNavItem {
+  name: string;
+  path: string;
+  icon: any;
+  requiredModule?: ModuleKey | ModuleKey[];
+}
+
+const subNavItems: SubNavItem[] = [
   { name: "Dashboard", path: "/whatsapp/dashboard", icon: LayoutDashboard },
-  { name: "Orders", path: "/whatsapp/orders", icon: ShoppingCart },
-  { name: "Inbox", path: "/whatsapp/inbox", icon: MessageSquare },
-  { name: "Shopify", path: "/whatsapp/shopify", icon: ShoppingBag },
-  { name: "WhatsApp", path: "/whatsapp/templates", icon: Bot },
-  { name: "Integrations", path: "/whatsapp/integrations", icon: Zap },
-  { name: "Products & Prices", path: "/whatsapp/commerce", icon: Box },
+  { name: "Orders", path: "/whatsapp/orders", icon: ShoppingCart, requiredModule: ["COMMERCE", "PAYMENTS"] },
+  { name: "Inbox", path: "/whatsapp/inbox", icon: MessageSquare, requiredModule: "INBOX" },
+  { name: "Shopify", path: "/whatsapp/shopify", icon: ShoppingBag, requiredModule: "COMMERCE" },
+  { name: "WhatsApp", path: "/whatsapp/templates", icon: Bot, requiredModule: ["CHATBOT", "BROADCASTS"] },
+  { name: "Integrations", path: "/whatsapp/integrations", icon: Zap, requiredModule: ["WIDGET", "DEVELOPER_API"] },
+  { name: "Products & Prices", path: "/whatsapp/commerce", icon: Box, requiredModule: ["COMMERCE", "INVOICING"] },
   { name: "Settings", path: "/whatsapp/api-settings", icon: Key },
-  { name: "Logs", path: "/whatsapp/logs", icon: Activity },
+  { name: "Logs", path: "/whatsapp/logs", icon: Activity, requiredModule: "DEVELOPER_API" },
 ];
 
 export default function WhatsAppHeaderNav() {
@@ -76,15 +85,16 @@ export default function WhatsAppHeaderNav() {
 
   const [userName, setUserName] = React.useState("");
   const [userRole, setUserRole] = React.useState("");
-  const [brandTitle, setBrandTitle] = React.useState("What-In");
+  const [brandTitle, setBrandTitle] = React.useState("Whatmore");
+  const [enabledModules, setEnabledModules] = React.useState<ModuleKey[]>(ALL_MODULE_KEYS);
 
   React.useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        if (window.location.hostname.includes("whatmore") || window.location.hostname.includes("espon")) {
-          setBrandTitle("Whatmore");
-        } else {
+        if (window.location.hostname.includes("what-in") || window.location.hostname.includes("whatin")) {
           setBrandTitle("What-In");
+        } else {
+          setBrandTitle("Whatmore");
         }
       }
 
@@ -93,6 +103,9 @@ export default function WhatsAppHeaderNav() {
         .then(d => {
           if (d?.businessName) {
             setBrandTitle(d.businessName);
+          }
+          if (d?.enabledModules && Array.isArray(d.enabledModules) && d.enabledModules.length > 0) {
+            setEnabledModules(d.enabledModules);
           }
         })
         .catch(() => {});
@@ -264,6 +277,12 @@ export default function WhatsAppHeaderNav() {
         <nav className="whatmore-nav-track">
           {subNavItems.map((item) => {
             if (userRole === "AGENT" && item.name !== "Inbox" && item.name !== "Settings") return null;
+            if (item.requiredModule) {
+              const permitted = Array.isArray(item.requiredModule)
+                ? item.requiredModule.some(m => enabledModules.includes(m))
+                : enabledModules.includes(item.requiredModule);
+              if (!permitted) return null;
+            }
             const Icon = item.icon;
             const active = isItemActive(item.path);
             return (

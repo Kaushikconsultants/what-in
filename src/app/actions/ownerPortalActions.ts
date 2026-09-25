@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { isOwnerAuthenticated, getAuthenticatedUser } from "@/lib/authSession";
+import { DEFAULT_PLAN_TIERS, ALL_MODULE_KEYS, ModuleKey } from "@/lib/moduleRegistry";
 
 const OWNER_SECRET = process.env.OWNER_PORTAL_SECRET || "whatin-owner-2026";
 
@@ -51,7 +52,11 @@ export async function getOwnerClientsAction() {
 
     await prisma.whatsAppClient.updateMany({
       where: {
-        contactEmail: "admin@what-in.tinkal.in",
+        OR: [
+          { contactEmail: "admin@whatmore.tinkal.in" },
+          { contactEmail: "admin@what-in.tinkal.in" },
+          { contactEmail: "admin@esponsports.com" }
+        ],
         subscriptionStatus: "PAST_DUE"
       },
       data: {
@@ -74,7 +79,7 @@ export async function getOwnerClientsAction() {
 async function registerMetaWebhook(wabaId: string, accessToken: string, webhookClientId: string): Promise<{ success: boolean; error?: string }> {
   if (!wabaId || !accessToken) return { success: false, error: "Missing WABA ID or access token" };
   try {
-    const appUrl = "https://what-in.tinkal.in";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://whatsapp.esponsports.com";
     const callbackUrl = `${appUrl}/api/whatsapp/webhook/${webhookClientId}`;
     const verifyToken = `wm_${webhookClientId.slice(0, 8)}`;
     
@@ -123,12 +128,19 @@ export async function createClientAction(data: {
       return { success: false, error: "Unauthorized access: Owner login required" };
     }
 
-    const rawPassword = data.adminPassword?.trim() || "WhatIn@" + Math.floor(100000 + Math.random() * 900000);
+    const rawPassword = data.adminPassword?.trim() || "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const initialStatus = data.initialStatus || "ACTIVE";
     const now = new Date();
     const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const generatedVerifyToken = data.webhookVerifyToken?.trim() || `whsec_${Math.random().toString(36).slice(2, 10)}_${Date.now()}`;
+
+    // Resolve default modules if not explicitly passed
+    let modulesToSet = (data as any).enabledModules;
+    if (!modulesToSet || !Array.isArray(modulesToSet) || modulesToSet.length === 0) {
+      const plan = DEFAULT_PLAN_TIERS.find(p => p.id === data.subscriptionPlan);
+      modulesToSet = plan ? plan.modules : ALL_MODULE_KEYS;
+    }
 
     const client = await prisma.whatsAppClient.create({
       data: {
@@ -142,6 +154,7 @@ export async function createClientAction(data: {
         maxAgents: Number(data.maxAgents) || 1,
         monthlyMessageQuota: Number(data.monthlyMessageQuota) || 5000,
         monthlyAiQuota: Number(data.monthlyAiQuota) || 500,
+        enabledModules: JSON.stringify(modulesToSet),
         notes: data.notes || "",
         ownerWhatsApp: data.ownerWhatsApp || "",
         wabaId: data.wabaId || "",
@@ -563,7 +576,7 @@ export async function getClientMetaCredentialsAction(clientId?: string) {
       phoneNumber: client.phoneNumber || "",
       shopifyDomain: client.shopifyDomain || "",
       shopifyToken: client.shopifyToken || "",
-      webhookUrl: `https://what-in.tinkal.in/api/whatsapp/webhook/${client.webhookClientId}`,
+      webhookUrl: client.customWebhookUrl || `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://whatsapp.esponsports.com"}/api/whatsapp/webhook/${client.webhookClientId}`,
       clientId: client.id,
       webhookClientId: client.webhookClientId,
     };
@@ -621,7 +634,7 @@ export async function registerWebhookForClientAction(clientId: string) {
       await prisma.whatsAppClient.update({ where: { id: clientId }, data: { webhookVerifyToken: verifyToken } });
     }
     
-    const appUrl = "https://what-in.tinkal.in";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://whatsapp.esponsports.com";
     return {
       ...result,
       webhookUrl: `${appUrl}/api/whatsapp/webhook/${client.webhookClientId}`,
@@ -924,3 +937,53 @@ export async function changeUserPasswordAction(email: string, newPassword: strin
     return { success: false, error: e.message };
   }
 }
+
+/**
+ * Super-Admin: Update enabled feature modules for a specific tenant client
+ */
+export async function updateClientModulesAction(clientId: string, modules: ModuleKey[], customLimits?: any) {
+  try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+    const client = await prisma.whatsAppClient.update({
+      where: { id: clientId },
+      data: {
+        enabledModules: JSON.stringify(modules),
+        customLimitsJson: customLimits ? JSON.stringify(customLimits) : null,
+      }
+    });
+    return { success: true, client };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Super-Admin: Upgrade / Switch client to a specific plan tier
+ */
+export async function updateClientPlanTierAction(clientId: string, planId: string) {
+  try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+    const plan = DEFAULT_PLAN_TIERS.find(p => p.id === planId);
+    if (!plan) return { success: false, error: "Plan not found" };
+
+    const client = await prisma.whatsAppClient.update({
+      where: { id: clientId },
+      data: {
+        subscriptionPlan: plan.id,
+        monthlyFee: plan.monthlyFee,
+        monthlyMessageQuota: plan.monthlyMessageQuota,
+        monthlyAiQuota: plan.monthlyAiQuota,
+        maxAgents: plan.maxAgents,
+        enabledModules: JSON.stringify(plan.modules),
+      }
+    });
+    return { success: true, client };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
