@@ -73,7 +73,8 @@ import {
   Monitor,
   Smartphone,
   Play,
-  RotateCcw
+  RotateCcw,
+  Layers
 } from "lucide-react";
 import {
   getWhatsAppConversations,
@@ -399,6 +400,16 @@ export default function WhatsAppInboxComponent() {
   const [coBrowseReplayIndex, setCoBrowseReplayIndex] = useState<number | null>(null);
   const [isAutoReplaying, setIsAutoReplaying] = useState<boolean>(false);
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
+  const [modulesFetched, setModulesFetched] = useState<boolean>(false);
+
+  const isModuleActive = (mod: string | string[]) => {
+    if (!modulesFetched) return true;
+    if (!enabledModules || enabledModules.length === 0) return false;
+    if (Array.isArray(mod)) {
+      return mod.some(m => enabledModules.includes(m));
+    }
+    return enabledModules.includes(mod);
+  };
 
   // Active customer normalized phone number
   const activeCustomerPhone = useMemo(() => {
@@ -469,8 +480,11 @@ export default function WhatsAppInboxComponent() {
         if (d?.enabledModules && Array.isArray(d.enabledModules)) {
           setEnabledModules(d.enabledModules);
         }
+        setModulesFetched(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        setModulesFetched(true);
+      });
 
     getWhatsAppTemplates()
       .then(res => {
@@ -2973,26 +2987,28 @@ export default function WhatsAppInboxComponent() {
                   <span>{activeConvDetail.assignedEmployee?.user?.name ? activeConvDetail.assignedEmployee.user.name : "Assign"}</span>
                 </button>
 
-                <button
-                  className={`chat-action-btn ${activeConvDetail.aiHandled ? "ai-active" : "ai-manual"}`}
-                  disabled={aiToggleLoading}
-                  onClick={async () => {
-                    if (!activeConvDetail?.id) return;
-                    setAiToggleLoading(true);
-                    const newVal = !activeConvDetail.aiHandled;
-                    const res = await toggleConversationAIAction(activeConvDetail.id, newVal);
-                    if (res.success) {
-                      setActiveConvDetail((prev: any) => ({ ...prev, aiHandled: newVal }));
-                      setToastMsg(newVal ? "AI Assistant enabled for this chat" : "Manual Mode — AI auto-replies paused");
-                      setTimeout(() => setToastMsg(null), 3000);
-                    }
-                    setAiToggleLoading(false);
-                  }}
-                  title={activeConvDetail.aiHandled ? "AI is ON — Click to switch to Manual Mode" : "AI is OFF — Click to enable AI auto-replies"}
-                >
-                  <Bot size={13} />
-                  <span>{aiToggleLoading ? "..." : activeConvDetail.aiHandled ? "AI: ON" : "Manual"}</span>
-                </button>
+                {isModuleActive("AI_AGENT") && (
+                  <button
+                    className={`chat-action-btn ${activeConvDetail.aiHandled ? "ai-active" : "ai-manual"}`}
+                    disabled={aiToggleLoading}
+                    onClick={async () => {
+                      if (!activeConvDetail?.id) return;
+                      setAiToggleLoading(true);
+                      const newVal = !activeConvDetail.aiHandled;
+                      const res = await toggleConversationAIAction(activeConvDetail.id, newVal);
+                      if (res.success) {
+                        setActiveConvDetail((prev: any) => ({ ...prev, aiHandled: newVal }));
+                        setToastMsg(newVal ? "AI Assistant enabled for this chat" : "Manual Mode — AI auto-replies paused");
+                        setTimeout(() => setToastMsg(null), 3000);
+                      }
+                      setAiToggleLoading(false);
+                    }}
+                    title={activeConvDetail.aiHandled ? "AI is ON — Click to switch to Manual Mode" : "AI is OFF — Click to enable AI auto-replies"}
+                  >
+                    <Bot size={13} />
+                    <span>{aiToggleLoading ? "..." : activeConvDetail.aiHandled ? "AI: ON" : "Manual"}</span>
+                  </button>
+                )}
 
                 <button
                   className={`chat-action-btn ${activeConvDetail.status === 'CLOSED' ? "chat-closed" : ""}`}
@@ -4673,9 +4689,11 @@ export default function WhatsAppInboxComponent() {
                 <button type="button" className="quick-chip" onClick={() => setShowReplyLibraryModal(true)} title="Manage Reply Library">
                   <MessageSquare size={12} /> Reply Library
                 </button>
-                <button type="button" className="quick-chip ai-suggest" onClick={handleSuggestReply} disabled={aiSuggesting}>
-                  <Sparkles size={12} /> {aiSuggesting ? "Generating..." : "Suggest Reply AI"}
-                </button>
+                {isModuleActive("AI_AGENT") && (
+                  <button type="button" className="quick-chip ai-suggest" onClick={handleSuggestReply} disabled={aiSuggesting}>
+                    <Sparkles size={12} /> {aiSuggesting ? "Generating..." : "Suggest Reply AI"}
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`quick-chip internal-toggle ${isInternalNote ? "active" : ""}`}
@@ -4884,24 +4902,28 @@ export default function WhatsAppInboxComponent() {
                     </button>
 
                     {/* Product Catalog Button */}
-                    <button
-                      type="button"
-                      className={`input-attachment-btn ${showProductPanel ? "btn-active-product" : ""}`}
-                      title="Send Product from Catalog"
-                      onClick={() => setShowProductPanel(v => !v)}
-                    >
-                      <ShoppingBag size={18} />
-                    </button>
+                    {isModuleActive(["META_CATALOG", "SHOPIFY_INTEGRATION"]) && (
+                      <button
+                        type="button"
+                        className={`input-attachment-btn ${showProductPanel ? "btn-active-product" : ""}`}
+                        title="Send Product from Catalog"
+                        onClick={() => setShowProductPanel(v => !v)}
+                      >
+                        <ShoppingBag size={18} />
+                      </button>
+                    )}
 
                     {/* Flow Picker Button */}
-                    <button
-                      type="button"
-                      className={`input-attachment-btn ${showFlowPicker ? "btn-active-flow" : ""}`}
-                      title="Send Interactive Flow Form"
-                      onClick={() => setShowFlowPicker(true)}
-                    >
-                      <Zap size={18} />
-                    </button>
+                    {isModuleActive("CHATBOT") && (
+                      <button
+                        type="button"
+                        className={`input-attachment-btn ${showFlowPicker ? "btn-active-flow" : ""}`}
+                        title="Send Interactive Flow Form"
+                        onClick={() => setShowFlowPicker(v => !v)}
+                      >
+                        <Layers size={18} />
+                      </button>
+                    )}
 
                     {/* Quick Replies Button */}
                     <button
@@ -5268,7 +5290,7 @@ export default function WhatsAppInboxComponent() {
             </div>
 
             {/* Live Store Browsing & Active Activity Card in CRM Panel */}
-            {latestWebsiteContext && (
+            {latestWebsiteContext && isModuleActive(["WIDGET", "COBROWSE"]) && (
               <div className="crm-section-box" style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "12px" }}>
                 <h5 className="crm-section-title" style={{ color: "#0f172a", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                   <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -5401,7 +5423,7 @@ export default function WhatsAppInboxComponent() {
                   <span>{pushingToCrm ? "Pushing to CRM..." : isLeadPushed ? "Re-sync to CRM & ERP" : "Push Lead to CRM & ERP"}</span>
                 </button>
 
-                {paymentConfigured && (
+                {paymentConfigured && isModuleActive("PAYMENT_GATEWAY") && (
                   <button className="crm-action-tile" onClick={() => setShowPaymentModal(true)}>
                     <CreditCard size={14} color="#d97706" /> Send Payment Link
                   </button>
@@ -6233,257 +6255,295 @@ export default function WhatsAppInboxComponent() {
               )}
 
               {/* Native In-App Live Screen Co-Browsing & Replay Card */}
-              <div className="tracking-section-card cobrowse-card" style={{
-                background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-                border: "1px solid #334155",
-                borderRadius: "14px",
-                padding: "16px",
-                color: "#f8fafc",
-                boxShadow: "0 8px 20px rgba(0,0,0,0.25)"
-              }}>
-                {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, fontSize: "13px", color: "#ffffff" }}>
-                    <Monitor size={17} color="#38bdf8" />
-                    <span>Live Screen Co-Browsing</span>
-                  </div>
-                  <span style={{
-                    fontSize: "10.5px",
-                    fontWeight: 700,
-                    padding: "3px 9px",
-                    borderRadius: "12px",
-                    background: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "rgba(34, 197, 94, 0.2)" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "rgba(234, 179, 8, 0.2)" : "rgba(148, 163, 184, 0.15)",
-                    color: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#4ade80" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#facc15" : "#94a3b8",
-                    border: `1px solid ${activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "rgba(74, 222, 128, 0.4)" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "rgba(250, 204, 21, 0.4)" : "rgba(148, 163, 184, 0.3)"}`,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "5px"
-                  }}>
-                    {activeWebsiteTrackingData.presenceStatus === "ONLINE" ? (
-                      <>
-                        <span className="live-dot" style={{ width: 6, height: 6 }} />
-                        <span>Live Stream</span>
-                      </>
-                    ) : activeWebsiteTrackingData.presenceStatus === "AWAY" ? (
-                      <>
-                        <span className="away-dot" style={{ width: 6, height: 6 }} />
-                        <span>Tab Away</span>
-                      </>
-                    ) : (
-                      <>
-                        <Clock size={10} />
-                        <span>Session Recorded</span>
-                      </>
-                    )}
-                  </span>
-                </div>
-
-                {/* Simulated Mini Screen Mirror Viewport (Real Website Embedded via Reverse Proxy) */}
-                <div style={{
-                  position: "relative",
-                  background: "#020617",
-                  borderRadius: "10px",
+              {isModuleActive("COBROWSE") ? (
+                <div className="tracking-section-card cobrowse-card" style={{
+                  background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
                   border: "1px solid #334155",
-                  overflow: "hidden",
-                  marginBottom: "12px",
-                  boxShadow: "inset 0 2px 4px rgba(0,0,0,0.5)"
+                  borderRadius: "14px",
+                  padding: "16px",
+                  color: "#f8fafc",
+                  boxShadow: "0 8px 20px rgba(0,0,0,0.25)"
                 }}>
-                  {/* Browser / Device Address Bar */}
-                  <div style={{
-                    background: "#1e293b",
-                    padding: "6px 10px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderBottom: "1px solid #334155",
-                    fontSize: "10.5px"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "80%" }}>
-                      <Lock size={10} color="#10b981" />
-                      <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{activeWebsiteTrackingData.pageTitle || "Online Store"}</span>
+                  {/* Header */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, fontSize: "13px", color: "#ffffff" }}>
+                      <Monitor size={17} color="#38bdf8" />
+                      <span>Live Screen Co-Browsing</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <button
-                        type="button"
-                        onClick={() => setCoBrowseDeviceMode(effectiveCoBrowseDevice === "Mobile" ? "Desktop" : "Mobile")}
-                        style={{
-                          background: "rgba(255,255,255,0.12)",
-                          border: "1px solid rgba(255,255,255,0.2)",
-                          borderRadius: "4px",
-                          padding: "2px 7px",
-                          fontSize: "9.5px",
-                          color: effectiveCoBrowseDevice === "Mobile" ? "#38bdf8" : "#a78bfa",
-                          cursor: "pointer",
-                          fontWeight: 700,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px"
-                        }}
-                        title={`Currently showing ${effectiveCoBrowseDevice} view. Click to switch.`}
-                      >
-                        {effectiveCoBrowseDevice === "Mobile" ? "📱 Mobile" : "💻 Desktop"}
-                      </button>
-                    </div>
+                    <span style={{
+                      fontSize: "10.5px",
+                      fontWeight: 700,
+                      padding: "3px 9px",
+                      borderRadius: "12px",
+                      background: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "rgba(34, 197, 94, 0.2)" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "rgba(234, 179, 8, 0.2)" : "rgba(148, 163, 184, 0.15)",
+                      color: activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "#4ade80" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "#facc15" : "#94a3b8",
+                      border: `1px solid ${activeWebsiteTrackingData.presenceStatus === "ONLINE" ? "rgba(74, 222, 128, 0.4)" : activeWebsiteTrackingData.presenceStatus === "AWAY" ? "rgba(250, 204, 21, 0.4)" : "rgba(148, 163, 184, 0.3)"}`,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px"
+                    }}>
+                      {activeWebsiteTrackingData.presenceStatus === "ONLINE" ? (
+                        <>
+                          <span className="live-dot" style={{ width: 6, height: 6 }} />
+                          <span>Live Stream</span>
+                        </>
+                      ) : activeWebsiteTrackingData.presenceStatus === "AWAY" ? (
+                        <>
+                          <span className="away-dot" style={{ width: 6, height: 6 }} />
+                          <span>Tab Away</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock size={10} />
+                          <span>Session Recorded</span>
+                        </>
+                      )}
+                    </span>
                   </div>
 
-                  {/* Real Website Iframe Preview with Live Synchronized Scroll */}
+                  {/* Simulated Mini Screen Mirror Viewport (Real Website Embedded via Reverse Proxy) */}
                   <div style={{
                     position: "relative",
-                    height: effectiveCoBrowseDevice === "Mobile" ? "280px" : "190px",
-                    background: "#ffffff",
+                    background: "#020617",
+                    borderRadius: "10px",
+                    border: "1px solid #334155",
                     overflow: "hidden",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "flex-start",
-                    transition: "height 0.25s ease"
+                    marginBottom: "12px",
+                    boxShadow: "inset 0 2px 4px rgba(0,0,0,0.5)"
                   }}>
-                    {/* Embedded Real Website through our reverse proxy */}
-                    <iframe
-                      ref={cobrowseMiniIframeRef}
-                      src={`/api/cobrowse/proxy?url=${encodeURIComponent(activeCoBrowseUrl)}&device=${effectiveCoBrowseDevice.toLowerCase()}`}
-                      title="Mini Screen Preview"
-                      style={effectiveCoBrowseDevice === "Mobile" ? {
-                        width: "100%",
-                        maxWidth: "360px",
-                        height: "100%",
-                        border: "none",
-                        pointerEvents: "none",
-                        background: "#ffffff",
-                        display: "block"
-                      } : {
-                        width: "1280px",
-                        height: "720px",
-                        border: "none",
-                        transform: "scale(0.26)",
-                        transformOrigin: "top left",
-                        pointerEvents: "none",
-                        background: "#ffffff",
-                        display: "block"
-                      }}
-                      onLoad={() => {
-                        try {
-                          if (cobrowseMiniIframeRef.current?.contentWindow) {
-                            cobrowseMiniIframeRef.current.contentWindow.postMessage({
-                              type: "COBROWSE_SCROLL",
-                              depth: activeCoBrowseDepth
-                            }, "*");
-                            if (activeWebsiteTrackingData.cart) {
-                              cobrowseMiniIframeRef.current.contentWindow.postMessage({
-                                type: "COBROWSE_SYNC_CART",
-                                cart: activeWebsiteTrackingData.cart
-                              }, "*");
-                            }
-                          }
-                        } catch (_) {}
-                      }}
-                    />
-
-                    {/* Live Laser Cursor Pointer */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: `${activeWebsiteTrackingData.cursorX}%`,
-                        top: `${activeWebsiteTrackingData.cursorY}%`,
-                        transform: "translate(-50%, -50%)",
-                        pointerEvents: "none",
-                        transition: "left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
-                        zIndex: 20
-                      }}
-                    >
-                      <div style={{
-                        width: "12px",
-                        height: "12px",
-                        borderRadius: "50%",
-                        background: "#f43f5e",
-                        border: "2px solid #ffffff",
-                        boxShadow: "0 0 10px #f43f5e"
-                      }} />
-                      <div style={{
-                        position: "absolute",
-                        left: "14px",
-                        top: "-4px",
-                        background: "#f43f5e",
-                        color: "#ffffff",
-                        fontSize: "9px",
-                        fontWeight: 700,
-                        padding: "1px 5px",
-                        borderRadius: "4px",
-                        whiteSpace: "nowrap",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.3)"
-                      }}>
-                        Visitor
+                    {/* Browser / Device Address Bar */}
+                    <div style={{
+                      background: "#1e293b",
+                      padding: "6px 10px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      borderBottom: "1px solid #334155",
+                      fontSize: "10.5px"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "80%" }}>
+                        <Lock size={10} color="#10b981" />
+                        <span style={{ color: "#cbd5e1", fontWeight: 600 }}>{activeWebsiteTrackingData.pageTitle || "Online Store"}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <button
+                          type="button"
+                          onClick={() => setCoBrowseDeviceMode(effectiveCoBrowseDevice === "Mobile" ? "Desktop" : "Mobile")}
+                          style={{
+                            background: "rgba(255,255,255,0.12)",
+                            border: "1px solid rgba(255,255,255,0.2)",
+                            borderRadius: "4px",
+                            padding: "2px 7px",
+                            fontSize: "9.5px",
+                            color: effectiveCoBrowseDevice === "Mobile" ? "#38bdf8" : "#a78bfa",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px"
+                          }}
+                          title={`Currently showing ${effectiveCoBrowseDevice} view. Click to switch.`}
+                        >
+                          {effectiveCoBrowseDevice === "Mobile" ? "📱 Mobile" : "💻 Desktop"}
+                        </button>
                       </div>
                     </div>
 
-                    {/* Bottom Status Overlay */}
+                    {/* Real Website Iframe Preview with Live Synchronized Scroll */}
                     <div style={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      zIndex: 25,
+                      position: "relative",
+                      height: effectiveCoBrowseDevice === "Mobile" ? "280px" : "190px",
+                      background: "#ffffff",
+                      overflow: "hidden",
                       display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontSize: "10.5px",
-                      color: "#94a3b8",
-                      background: "rgba(15, 23, 42, 0.90)",
-                      backdropFilter: "blur(4px)",
-                      padding: "4px 8px",
-                      borderTop: "1px solid rgba(255,255,255,0.1)"
+                      justifyContent: "center",
+                      alignItems: "flex-start",
+                      transition: "height 0.25s ease"
                     }}>
-                      <span style={{ color: "#38bdf8", fontWeight: 600 }}>
-                        ↕ Scroll: {activeWebsiteTrackingData.scrollDepth !== null ? `${activeWebsiteTrackingData.scrollDepth}%` : "0%"}
-                      </span>
-                      <span style={{ color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "65%" }}>
-                        {activeWebsiteTrackingData.lastInteraction || "Viewing screen"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                      {/* Embedded Real Website through our reverse proxy */}
+                      <iframe
+                        ref={cobrowseMiniIframeRef}
+                        src={`/api/cobrowse/proxy?url=${encodeURIComponent(activeCoBrowseUrl)}&device=${effectiveCoBrowseDevice.toLowerCase()}`}
+                        title="Mini Screen Preview"
+                        style={effectiveCoBrowseDevice === "Mobile" ? {
+                          width: "100%",
+                          maxWidth: "360px",
+                          height: "100%",
+                          border: "none",
+                          pointerEvents: "none",
+                          background: "#ffffff",
+                          display: "block"
+                        } : {
+                          width: "1280px",
+                          height: "720px",
+                          border: "none",
+                          transform: "scale(0.26)",
+                          transformOrigin: "top left",
+                          pointerEvents: "none",
+                          background: "#ffffff",
+                          display: "block"
+                        }}
+                        onLoad={() => {
+                          try {
+                            if (cobrowseMiniIframeRef.current?.contentWindow) {
+                              cobrowseMiniIframeRef.current.contentWindow.postMessage({
+                                type: "COBROWSE_SCROLL",
+                                depth: activeCoBrowseDepth
+                              }, "*");
+                              if (activeWebsiteTrackingData.cart) {
+                                cobrowseMiniIframeRef.current.contentWindow.postMessage({
+                                  type: "COBROWSE_SYNC_CART",
+                                  cart: activeWebsiteTrackingData.cart
+                                }, "*");
+                              }
+                            }
+                          } catch (_) {}
+                        }}
+                      />
 
-                {/* Device & Resolution Badges */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-                  <div style={{ background: "#1e293b", padding: "8px 10px", borderRadius: "8px", border: "1px solid #334155" }}>
-                    <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600 }}>DEVICE & RESOLUTION</div>
-                    <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#f8fafc", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {parsedViewport.formatted}
-                    </div>
-                  </div>
-                  <div style={{ background: "#1e293b", padding: "8px 10px", borderRadius: "8px", border: "1px solid #334155" }}>
-                    <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600 }}>RECORDED ACTIONS</div>
-                    <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#f8fafc", marginTop: "2px" }}>
-                      {activeWebsiteTrackingData.screenTimeline.length} events logged
-                    </div>
-                  </div>
-                </div>
+                      {/* Live Laser Cursor Pointer */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: `${activeWebsiteTrackingData.cursorX}%`,
+                          top: `${activeWebsiteTrackingData.cursorY}%`,
+                          transform: "translate(-50%, -50%)",
+                          pointerEvents: "none",
+                          transition: "left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                          zIndex: 20
+                        }}
+                      >
+                        <div style={{
+                          width: "12px",
+                          height: "12px",
+                          borderRadius: "50%",
+                          background: "#f43f5e",
+                          border: "2px solid #ffffff",
+                          boxShadow: "0 0 10px #f43f5e"
+                        }} />
+                        <div style={{
+                          position: "absolute",
+                          left: "14px",
+                          top: "-4px",
+                          background: "#f43f5e",
+                          color: "#ffffff",
+                          fontSize: "9px",
+                          fontWeight: 700,
+                          padding: "1px 5px",
+                          borderRadius: "4px",
+                          whiteSpace: "nowrap",
+                          boxShadow: "0 2px 4px rgba(0,0,0,0.3)"
+                        }}>
+                          Visitor
+                        </div>
+                      </div>
 
-                {/* Primary Action Button: Open Live Co-Browse Theater */}
-                <button
-                  type="button"
-                  onClick={() => setShowLiveCoBrowseModal(true)}
-                  style={{
+                      {/* Bottom Status Overlay */}
+                      <div style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: 25,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: "10.5px",
+                        color: "#94a3b8",
+                        background: "rgba(15, 23, 42, 0.90)",
+                        backdropFilter: "blur(4px)",
+                        padding: "4px 8px",
+                        borderTop: "1px solid rgba(255,255,255,0.1)"
+                      }}>
+                        <span style={{ color: "#38bdf8", fontWeight: 600 }}>
+                          ↕ Scroll: {activeWebsiteTrackingData.scrollDepth !== null ? `${activeWebsiteTrackingData.scrollDepth}%` : "0%"}
+                        </span>
+                        <span style={{ color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "65%" }}>
+                          {activeWebsiteTrackingData.lastInteraction || "Viewing screen"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Device & Resolution Badges */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                    <div style={{ background: "#1e293b", padding: "8px 10px", borderRadius: "8px", border: "1px solid #334155" }}>
+                      <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600 }}>DEVICE & RESOLUTION</div>
+                      <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#f8fafc", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {parsedViewport.formatted}
+                      </div>
+                    </div>
+                    <div style={{ background: "#1e293b", padding: "8px 10px", borderRadius: "8px", border: "1px solid #334155" }}>
+                      <div style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600 }}>RECORDED ACTIONS</div>
+                      <div style={{ fontSize: "11.5px", fontWeight: 600, color: "#f8fafc", marginTop: "2px" }}>
+                        {activeWebsiteTrackingData.screenTimeline.length} events logged
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Primary Action Button: Open Live Co-Browse Theater */}
+                  <button
+                    type="button"
+                    onClick={() => setShowLiveCoBrowseModal(true)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      width: "100%",
+                      padding: "10px 14px",
+                      background: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "12.5px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <Maximize2 size={15} color="#ffffff" />
+                    <span>Launch Live Co-Browse Theater & Replay</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="tracking-section-card cobrowse-card" style={{
+                  background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                  border: "1px dashed #475569",
+                  borderRadius: "14px",
+                  padding: "24px 18px",
+                  color: "#f8fafc",
+                  textAlign: "center",
+                  boxShadow: "0 8px 20px rgba(0,0,0,0.25)",
+                  position: "relative",
+                  overflow: "hidden"
+                }}>
+                  <div style={{
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "12px",
+                    background: "rgba(239, 68, 68, 0.15)",
+                    border: "1px solid rgba(239, 68, 68, 0.3)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: "8px",
-                    width: "100%",
-                    padding: "10px 14px",
-                    background: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
-                    color: "#ffffff",
-                    border: "none",
-                    borderRadius: "8px",
-                    fontSize: "12.5px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)",
-                    transition: "all 0.2s ease"
-                  }}
-                >
-                  <Maximize2 size={15} color="#ffffff" />
-                  <span>Launch Live Co-Browse Theater & Replay</span>
-                </button>
-              </div>
+                    margin: "0 auto 12px",
+                    color: "#f87171"
+                  }}>
+                    <Lock size={20} />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "14px", color: "#ffffff", marginBottom: "6px" }}>
+                    Live Screen Co-Browsing Locked
+                  </div>
+                  <div style={{ fontSize: "11.5px", color: "#94a3b8", lineHeight: "1.5", maxWidth: "290px", margin: "0 auto 12px" }}>
+                    The real-time visitor screen proxy & session assist module is deactivated for your tenant workspace. Please contact your account administrator to unlock Co-Browsing Screen Assist.
+                  </div>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "10.5px", fontWeight: 700, padding: "3px 10px", borderRadius: "12px", background: "rgba(239, 68, 68, 0.12)", color: "#fca5a5", border: "1px solid rgba(239, 68, 68, 0.25)" }}>
+                    <Lock size={10} /> MODULE: COBROWSE (LOCKED)
+                  </div>
+                </div>
+              )}
 
               {/* ================================================================= */}
               {/* DATE-WISE & TIME-WISE RECORDINGS & PAST BEHAVIOR (LAST 7 DAYS)    */}
@@ -7098,7 +7158,7 @@ export default function WhatsAppInboxComponent() {
       {/* ================================================================= */}
       {/* NATIVE LIVE SCREEN CO-BROWSING THEATER & SESSION REPLAY MODAL    */}
       {/* ================================================================= */}
-      {showLiveCoBrowseModal && activeConvDetail && (
+      {showLiveCoBrowseModal && isModuleActive("COBROWSE") && activeConvDetail && (
         <div 
           className="cobrowse-modal-backdrop"
           onClick={() => {

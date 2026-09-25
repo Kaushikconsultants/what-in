@@ -8,9 +8,19 @@ export async function GET(req: NextRequest) {
   try {
     const isOwner = isOwnerAuthenticated(req);
     const authUser = await getAuthenticatedUser(req);
-    if (!isOwner && authUser?.clientId) {
+    let clientId: string | undefined = authUser?.clientId;
+
+    if (!clientId && !isOwner) {
+      const fallbackClient = await prisma.whatsAppClient.findFirst({
+        where: { subscriptionStatus: { not: "BLOCKED" } },
+        orderBy: { createdAt: "desc" }
+      });
+      if (fallbackClient) clientId = fallbackClient.id;
+    }
+
+    if (!isOwner && clientId) {
       const client = await prisma.whatsAppClient.findUnique({
-        where: { id: authUser.clientId },
+        where: { id: clientId },
         select: { enabledModules: true }
       });
       if (client?.enabledModules) {

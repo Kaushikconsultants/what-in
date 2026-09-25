@@ -104,7 +104,7 @@ export default function WhatsAppHeaderNav() {
           if (d?.businessName) {
             setBrandTitle(d.businessName);
           }
-          if (d?.enabledModules && Array.isArray(d.enabledModules) && d.enabledModules.length > 0) {
+          if (d?.enabledModules && Array.isArray(d.enabledModules)) {
             setEnabledModules(d.enabledModules);
           }
         })
