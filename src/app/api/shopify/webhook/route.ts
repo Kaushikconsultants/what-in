@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessageAction } from "@/app/actions/whatsAppPlatformActions";
+import { sendNewOrderPushNotification } from "@/lib/pushNotifications";
 
 function verifyShopifyHmac(rawBody: string, hmacHeader: string | null, secret: string): boolean {
   if (!hmacHeader || !secret) return false;
@@ -64,6 +65,16 @@ export async function POST(req: NextRequest) {
         const customerName = payload.customer ? `${payload.customer.first_name || ''} ${payload.customer.last_name || ''}`.trim() : (payload.shipping_address?.name || 'Customer');
         const items = (payload.line_items || []).map((it: any) => `${it.quantity}x ${it.title}`).join(', ');
         const isCod = (payload.gateway || '').toLowerCase().includes('cod') || (payload.payment_gateway_names || []).some((g: string) => g.toLowerCase().includes('cod')) || payload.financial_status === 'pending';
+
+        // Dispatch instant push notification to store agents & owners
+        sendNewOrderPushNotification({
+          orderNumber: orderNumber,
+          customerName: customerName,
+          customerPhone: cleanPhone,
+          totalAmount: totalAmount,
+          itemsCount: (payload.line_items || []).length || 1,
+          source: "Shopify Store"
+        }).catch(() => {});
 
         // Check customer / conversation
         const last10 = cleanPhone.slice(-10);

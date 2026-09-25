@@ -10,7 +10,11 @@ import {
   sendWhatsAppMessageAction 
 } from "@/app/actions/whatsAppPlatformActions";
 import { formatWhatsAppPhone } from "@/lib/phoneUtils";
-import { notifyAdminsOfTemplateStatusChange } from "@/lib/pushNotifications";
+import { 
+  notifyAdminsOfTemplateStatusChange,
+  sendInboxMessagePushNotification,
+  sendNewOrderPushNotification
+} from "@/lib/pushNotifications";
 import { emitInboxEvent } from "@/lib/inboxEvents";
 import { processUpiScreenshotAction } from "@/app/actions/upiScreenshotActions";
 import { getRecoveryAgentSettings } from "@/lib/paymentRecoveryAgent";
@@ -1003,6 +1007,37 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       conversationId: conversation.id,
       clientId
     });
+
+    // Mobile Push Notification Dispatch (Only for Inbox & Orders)
+    if (effectiveMessageType === "ORDER") {
+      let orderTotal = 0;
+      let orderItemsCount = 1;
+      try {
+        if (msg.order) {
+          orderTotal = (msg.order.order_price || msg.order.total_amount || 0);
+          if (msg.order.product_items && Array.isArray(msg.order.product_items)) {
+            orderItemsCount = msg.order.product_items.length;
+          }
+        }
+      } catch (_) {}
+      sendNewOrderPushNotification({
+        clientId,
+        orderNumber: msg.id || Date.now().toString().slice(-6),
+        customerName: customer.contactPerson || customer.businessName || cleanPhone,
+        customerPhone: cleanPhone,
+        totalAmount: orderTotal,
+        itemsCount: orderItemsCount,
+        source: "WhatsApp Catalog"
+      }).catch(() => {});
+    } else {
+      sendInboxMessagePushNotification({
+        clientId,
+        customerName: customer.contactPerson || customer.businessName || cleanPhone,
+        customerPhone: cleanPhone,
+        messageText: textContent || "Sent an attachment or photo",
+        conversationId: conversation.id
+      }).catch(() => {});
+    }
 
     if (clientId) {
       dispatchOutboundWebhook(clientId, "message.received", {

@@ -47,6 +47,7 @@ import {
   getCheckoutFlowDetailsAction
 } from "@/app/actions/paymentRecoveryActions";
 import { generateMetaCheckoutFlowJson } from "@/lib/paymentRecoveryAgent";
+import MobilePushAlertBanner from "@/components/whatsapp/MobilePushAlertBanner";
 
 export default function WhatsAppOrdersComponent() {
   const [activeTab, setActiveTab] = useState<"orders" | "settings" | "shipments">("orders");
@@ -380,6 +381,9 @@ export default function WhatsAppOrdersComponent() {
       {/* TAB 1: ALL ORDERS (SHOPIFY STYLE) */}
       {activeTab === "orders" && (
         <div className="flex flex-col gap-6">
+          {/* Mobile Push Alert & PWA Banner */}
+          <MobilePushAlertBanner context="orders" />
+
           {/* Top Metrics Cards */}
           {metrics && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
