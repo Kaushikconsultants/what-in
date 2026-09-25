@@ -1527,9 +1527,17 @@ export default function WhatsAppInboxComponent() {
             if (matchedConv) {
               setSelectedConvId(matchedConv.id);
             } else {
+              const isMobile = typeof window !== "undefined" && window.innerWidth <= 900;
               const isCurrentInList = filtered.some((c: any) => c.id === selectedConvId);
-              if (!selectedConvId || !isCurrentInList) {
-                setSelectedConvId(filtered[0].id);
+              if (!isMobile) {
+                if (!selectedConvId || !isCurrentInList) {
+                  setSelectedConvId(filtered[0].id);
+                }
+              } else {
+                if (selectedConvId && !isCurrentInList) {
+                  setSelectedConvId(null);
+                  setActiveConvDetail(null);
+                }
               }
             }
           } else {
@@ -2510,7 +2518,7 @@ export default function WhatsAppInboxComponent() {
   };
 
   return (
-    <div className={`inbox-container ${isFullScreen ? "fullscreen-mode" : ""}`}>
+    <div className={`inbox-container ${isFullScreen ? "fullscreen-mode" : ""} ${selectedConvId ? "has-active-chat" : "no-active-chat"}`}>
       {toastMsg && (
         <div style={{ position: "absolute", top: "12px", right: "20px", background: "#dcfce7", border: "1px solid #86efac", color: "#166534", padding: "8px 16px", borderRadius: "8px", fontSize: "12.5px", fontWeight: 700, zIndex: 9999, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
           {toastMsg}
@@ -2839,6 +2847,20 @@ export default function WhatsAppInboxComponent() {
             {/* Chat Header */}
             <div className="chat-header">
               <div className="chat-header-user-info">
+                {/* Mobile Back Button */}
+                <button
+                  type="button"
+                  className="mobile-back-to-chats-btn"
+                  onClick={() => {
+                    setSelectedConvId(null);
+                    setActiveConvDetail(null);
+                  }}
+                  title="Back to Chats list"
+                >
+                  <ChevronLeft size={18} />
+                  <span>Chats</span>
+                </button>
+
                 <div className="chat-avatar-large" style={{ background: getAvatarGradient(activeConvDetail.customer?.contactPerson || activeConvDetail.customer?.businessName || activeConvDetail.customer?.whatsappNumber) }}>
                   <span style={{ color: "#ffffff", fontWeight: 700 }}>{getCustomerAvatarInitials(activeConvDetail.customer)}</span>
                 </div>

@@ -1,5 +1,22 @@
+import webPush from "web-push";
 import { prisma } from "@/lib/prisma";
 
+const VAPID_PUBLIC_KEY = "BB-KZlpv_rpNWxWRhy0qmhKvmRPSD54y7BKlbA07xsuRbUlEbDLASekDIHTFgX-au3sAOSG4WJ5ZaHgk9tJ0HEg";
+const VAPID_PRIVATE_KEY = "yWJ-C37EvnvQMHhHuwWSwCiOn3Ni7x5Rt3pywRbdjso";
+
+try {
+  webPush.setVapidDetails(
+    "mailto:support@whatmore.com",
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+} catch (e) {
+  console.warn("[webPush setVapidDetails warning]:", e);
+}
+
+/**
+ * Dispatches a push notification directly in-process to all or selected admins.
+ */
 export async function sendPushNotificationToAdmins(title: string, body: string, url: string = "/whatsapp/templates") {
   try {
     const [adminUsers, adminAgents] = await Promise.all([
@@ -18,40 +35,31 @@ export async function sendPushNotificationToAdmins(title: string, body: string, 
     const payload = JSON.stringify({
       title,
       body,
-      icon: "/whatsapp-icon.png",
+      icon: "/icon-192.png",
       badge: "/whatsapp-badge.png",
-      data: { url }
+      type: "admin",
+      url,
+      timestamp: Date.now()
     });
 
-    for (const sub of subs) {
-      if (targetEmails.length > 0 && !targetEmails.includes(sub.userId)) {
-        continue;
-      }
-
-      try {
-        const subscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth
+    await Promise.allSettled(
+      subs.map(async (sub) => {
+        if (targetEmails.length > 0 && !targetEmails.includes(sub.userId)) {
+          return;
+        }
+        try {
+          const pushSubscription = {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth }
+          };
+          await webPush.sendNotification(pushSubscription, payload);
+        } catch (err: any) {
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await prisma.whatsAppPushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
           }
-        };
-
-        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-        fetch(`${baseUrl}/api/push/send`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-internal-secret": process.env.INTERNAL_API_SECRET || "crm_internal_2026"
-          },
-          body: JSON.stringify({ subscription, payload })
-        }).catch((err) => {
-          console.warn("[Push] Background send error:", err.message);
-        });
-      } catch (err) {
-        console.warn("[Push] Failed for subscription:", sub.id, err);
-      }
-    }
+        }
+      })
+    );
   } catch (error) {
     console.error("[sendPushNotificationToAdmins] Error:", error);
   }
@@ -69,10 +77,10 @@ export async function notifyAdminsOfTemplateStatusChange(
 
   if (normStatus === "APPROVED") {
     notifTitle = `🎉 Meta Template Approved: ${templateName}`;
-    notifBody = `Template "${templateName}" (${language}) has been APPROVED by Meta and is now active for broadcasts & chat responses!`;
+    notifBody = `Template "${templateName}" (${language}) has been APPROVED by Meta and is now active!`;
   } else if (normStatus === "REJECTED") {
     notifTitle = `❌ Meta Template Rejected: ${templateName}`;
-    notifBody = `Template "${templateName}" was REJECTED by Meta. Reason: ${reason || "Content policy guideline violation"}. Click to review.`;
+    notifBody = `Template "${templateName}" was REJECTED by Meta. Reason: ${reason || "Content policy guideline violation"}.`;
   } else if (normStatus === "PAUSED") {
     notifTitle = `⏸️ Meta Template Paused: ${templateName}`;
     notifBody = `Template "${templateName}" has been PAUSED by Meta due to delivery/quality ratings.`;
@@ -84,10 +92,8 @@ export async function notifyAdminsOfTemplateStatusChange(
     notifBody = `Template "${templateName}" status updated to ${normStatus}.`;
   }
 
-  // 1. Dispatch Web Push to all Admins
   await sendPushNotificationToAdmins(notifTitle, notifBody, "/whatsapp/templates");
 
-  // 2. Log event in WhatsApp Webhook Log
   try {
     await prisma.whatsAppWebhookLog.create({
       data: {
@@ -105,7 +111,7 @@ export async function notifyAdminsOfTemplateStatusChange(
 }
 
 /**
- * Dispatches an instant mobile push notification for new inbound WhatsApp customer messages.
+ * Dispatches an instant mobile push notification for new inbound WhatsApp customer messages directly via webPush.
  */
 export async function sendInboxMessagePushNotification(params: {
   clientId?: string | null;
@@ -116,7 +122,10 @@ export async function sendInboxMessagePushNotification(params: {
 }) {
   try {
     const subs = await prisma.whatsAppPushSubscription.findMany();
-    if (subs.length === 0) return;
+    if (subs.length === 0) {
+      console.log("[Push Notification] No active subscriptions in database");
+      return;
+    }
 
     const senderDisplay = params.customerName
       ? `${params.customerName} (${params.customerPhone})`
@@ -138,34 +147,32 @@ export async function sendInboxMessagePushNotification(params: {
       timestamp: Date.now()
     });
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    for (const sub of subs) {
-      try {
-        const subscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth
-          }
-        };
+    console.log(`[Push Notification] Broadcasting to ${subs.length} device(s): ${title}`);
 
-        fetch(`${baseUrl}/api/push/send`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-internal-secret": process.env.INTERNAL_API_SECRET || "crm_internal_2026"
-          },
-          body: JSON.stringify({ subscription, payload })
-        }).catch(() => {});
-      } catch (_) {}
-    }
+    await Promise.allSettled(
+      subs.map(async (sub) => {
+        try {
+          const pushSubscription = {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth }
+          };
+          await webPush.sendNotification(pushSubscription, payload);
+          console.log("[Push Notification] Delivered to endpoint:", sub.endpoint.substring(0, 45) + "...");
+        } catch (err: any) {
+          console.warn("[Push Notification Error]:", sub.id, err.statusCode, err.message);
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await prisma.whatsAppPushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+          }
+        }
+      })
+    );
   } catch (error) {
     console.error("[sendInboxMessagePushNotification Error]:", error);
   }
 }
 
 /**
- * Dispatches a high-priority mobile push notification when a new order is received.
+ * Dispatches a high-priority mobile push notification when a new order is received directly via webPush.
  */
 export async function sendNewOrderPushNotification(params: {
   clientId?: string | null;
@@ -178,7 +185,10 @@ export async function sendNewOrderPushNotification(params: {
 }) {
   try {
     const subs = await prisma.whatsAppPushSubscription.findMany();
-    if (subs.length === 0) return;
+    if (subs.length === 0) {
+      console.log("[Push Notification] No active subscriptions in database");
+      return;
+    }
 
     const formattedAmount = Number(params.totalAmount || 0).toLocaleString("en-IN", {
       maximumFractionDigits: 0
@@ -198,29 +208,26 @@ export async function sendNewOrderPushNotification(params: {
       timestamp: Date.now()
     });
 
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    for (const sub of subs) {
-      try {
-        const subscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth
-          }
-        };
+    console.log(`[Push Notification] Broadcasting Order alert to ${subs.length} device(s): ${title}`);
 
-        fetch(`${baseUrl}/api/push/send`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-internal-secret": process.env.INTERNAL_API_SECRET || "crm_internal_2026"
-          },
-          body: JSON.stringify({ subscription, payload })
-        }).catch(() => {});
-      } catch (_) {}
-    }
+    await Promise.allSettled(
+      subs.map(async (sub) => {
+        try {
+          const pushSubscription = {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth }
+          };
+          await webPush.sendNotification(pushSubscription, payload);
+          console.log("[Push Notification] Order alert delivered to endpoint:", sub.endpoint.substring(0, 45) + "...");
+        } catch (err: any) {
+          console.warn("[Push Notification Order Error]:", sub.id, err.statusCode, err.message);
+          if (err.statusCode === 410 || err.statusCode === 404) {
+            await prisma.whatsAppPushSubscription.delete({ where: { id: sub.id } }).catch(() => {});
+          }
+        }
+      })
+    );
   } catch (error) {
     console.error("[sendNewOrderPushNotification Error]:", error);
   }
 }
-

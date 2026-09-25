@@ -85,7 +85,7 @@ export default function WhatsAppHeaderNav() {
 
   const [userName, setUserName] = React.useState("");
   const [userRole, setUserRole] = React.useState("");
-  const [brandTitle, setBrandTitle] = React.useState("What-In");
+  const [brandTitle, setBrandTitle] = React.useState("Whatmore");
   const [enabledModules, setEnabledModules] = React.useState<ModuleKey[]>(ALL_MODULE_KEYS);
 
   React.useEffect(() => {
@@ -94,7 +94,7 @@ export default function WhatsAppHeaderNav() {
         if (window.location.hostname.includes("what-in") || window.location.hostname.includes("whatin")) {
           setBrandTitle("What-In");
         } else {
-          setBrandTitle("What-In");
+          setBrandTitle("Whatmore");
         }
       }
 
@@ -128,7 +128,7 @@ export default function WhatsAppHeaderNav() {
   }, []);
   const handleTestNotification = async () => {
     if (!("Notification" in window)) {
-      alert("This browser does not support desktop notification");
+      console.warn("This browser does not support desktop notifications.");
       return;
     }
     const permission = await Notification.requestPermission();
@@ -136,52 +136,39 @@ export default function WhatsAppHeaderNav() {
       try {
         const registration = await navigator.serviceWorker.register("/sw.js");
         let subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          await subscription.unsubscribe();
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+          });
         }
-        
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-        });
         const sub = subscription.toJSON();
         
-        // Save it
-        await fetch("/api/push/subscribe", {
+        // Show immediate local confirmation notification
+        try {
+          await (registration as any).showNotification("🔔 Push Alerts Active", {
+            body: "Push notifications are working! You will receive live alerts for WhatsApp messages and orders.",
+            icon: "/icon-192.png",
+            badge: "/whatsapp-badge.png",
+            vibrate: [200, 100, 200]
+          } as any);
+        } catch (_) {}
+
+        // Trigger real server push test with subscription attached
+        await fetch("/api/push/test", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            endpoint: sub.endpoint,
-            p256dh: sub.keys?.p256dh,
-            auth: sub.keys?.auth
-          })
-        });
-
-        // Trigger test push
-        await fetch("/api/push/send", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "x-internal-secret": "crm_internal_2026"
-          },
-          body: JSON.stringify({
+            type: "inbox",
             subscription: {
-              endpoint: sub.endpoint,
-              keys: { p256dh: sub.keys?.p256dh, auth: sub.keys?.auth }
-            },
-            payload: JSON.stringify({
-              title: "Test Notification",
-              body: "Web Push Notifications are working!",
-              data: { url: "/whatsapp/inbox" }
-            })
+              endpoint: subscription.endpoint,
+              keys: sub.keys
+            }
           })
         });
       } catch (err) {
-        console.error(err);
-        alert("Failed to subscribe or test notifications. Check console.");
+        console.error("[Header Notification Test Error]:", err);
       }
-    } else {
-      alert("Notification permission denied.");
     }
   };
 

@@ -5513,3 +5513,97 @@ html.dark .tracking-timeline::before,
   align-items: center;
   justify-content: space-between;
 }
+
+/* ----------------------------------------------------------------- */
+/* MOBILE & TABLET INBOX RESPONSIVE LAYOUT (< 900px) */
+/* ----------------------------------------------------------------- */
+.mobile-back-to-chats-btn {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .inbox-container {
+    flex-direction: column !important;
+    overflow-x: hidden !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    height: 100% !important;
+  }
+
+  /* When no active chat is selected: Left panel takes full 100% width, Chat panel is hidden */
+  .inbox-container.no-active-chat .inbox-left-panel,
+  .inbox-container:not(.has-active-chat) .inbox-left-panel {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+    border-right: none !important;
+  }
+
+  .inbox-container.no-active-chat .inbox-center-panel,
+  .inbox-container.no-active-chat .inbox-right-panel,
+  .inbox-container:not(.has-active-chat) .inbox-center-panel,
+  .inbox-container:not(.has-active-chat) .inbox-right-panel {
+    display: none !important;
+  }
+
+  /* When a chat IS selected: Left panel is hidden, Center panel takes full 100% width */
+  .inbox-container.has-active-chat .inbox-left-panel {
+    display: none !important;
+  }
+
+  .inbox-container.has-active-chat .inbox-center-panel {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+    height: 100% !important;
+  }
+
+  .inbox-container.has-active-chat .inbox-right-panel {
+    display: none !important;
+  }
+
+  .mobile-back-to-chats-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+    background: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #334155 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    margin-right: 6px !important;
+    flex-shrink: 0 !important;
+    transition: background 0.15s;
+  }
+
+  .mobile-back-to-chats-btn:hover {
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+  }
+
+  html.dark .mobile-back-to-chats-btn,
+  [data-theme="dark"] .mobile-back-to-chats-btn {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+  }
+
+  .chat-header {
+    padding: 8px 12px !important;
+    min-height: 58px !important;
+    gap: 8px !important;
+  }
+
+  .chat-header-actions {
+    gap: 4px !important;
+  }
+}
+

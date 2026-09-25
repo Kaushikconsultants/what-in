@@ -15,11 +15,20 @@ export async function POST(req: NextRequest) {
     const authUser = await getAuthenticatedUser(req).catch(() => null);
     const isOwner = isOwnerAuthenticated(req);
 
-    if (!authUser && !isOwner) {
-      return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+    let userEmail = authUser?.email;
+    if (!userEmail) {
+      try {
+        const rawUser = req.cookies.get("wm_user")?.value;
+        if (rawUser) {
+          const parsed = JSON.parse(decodeURIComponent(rawUser));
+          if (parsed?.email) userEmail = parsed.email;
+        }
+      } catch (_) {}
+    }
+    if (!userEmail) {
+      userEmail = isOwner ? "owner@platform.superadmin" : "agent@esponclothing.com";
     }
 
-    const userEmail = authUser?.email || "owner@platform.superadmin";
     const { endpoint, p256dh, auth } = await req.json();
 
     if (!endpoint || !p256dh || !auth) {

@@ -49,10 +49,27 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
       setIsSupported(true);
       setPermission(Notification.permission);
 
-      // Check existing subscription
-      navigator.serviceWorker.ready.then((registration) => {
-        registration.pushManager.getSubscription().then((sub) => {
-          setIsSubscribed(!!sub);
+      // Ensure service worker is registered & sync existing subscription
+      navigator.serviceWorker.register("/sw.js").then((registration) => {
+        registration.pushManager.getSubscription().then(async (sub) => {
+          if (sub) {
+            setIsSubscribed(true);
+            // Auto-sync subscription to server so DB always has it
+            try {
+              const rawSub = sub.toJSON();
+              await fetch("/api/push/subscribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  endpoint: sub.endpoint,
+                  p256dh: rawSub.keys?.p256dh,
+                  auth: rawSub.keys?.auth
+                })
+              });
+            } catch (_) {}
+          } else {
+            setIsSubscribed(false);
+          }
         }).catch(() => {});
       }).catch(() => {});
     }
@@ -64,7 +81,7 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
 
   const showToast = (text: string, type: "success" | "error" = "success") => {
     setToast({ text, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 4500);
   };
 
   const handleSubscribe = async () => {
@@ -80,12 +97,12 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
       setPermission(perm);
 
       if (perm !== "granted") {
-        showToast("Notification permission was denied. Enable alerts in your browser settings.", "error");
+        showToast("Notification permission was denied. Allow notifications in browser settings.", "error");
         setSubscribing(false);
         return;
       }
 
-      // 2. Register Service Worker if not registered
+      // 2. Register Service Worker
       const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       await navigator.serviceWorker.ready;
 
@@ -120,7 +137,18 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
 
       if (saveRes.ok) {
         setIsSubscribed(true);
-        showToast("🎉 Push Alerts Active! Your phone will buzz for every incoming message & order.", "success");
+
+        // Immediate confirmation notification on the device
+        try {
+          await (registration as any).showNotification("🎉 Alerts Activated!", {
+            body: "Your phone is now connected! You will receive lock-screen alerts for new messages and orders.",
+            icon: "/icon-192.png",
+            badge: "/whatsapp-badge.png",
+            vibrate: [200, 100, 200]
+          } as any);
+        } catch (_) {}
+
+        showToast("🎉 Push Alerts Active! Your device will buzz for every incoming message & order.", "success");
       } else {
         showToast("Failed to save push subscription on server.", "error");
       }
@@ -134,17 +162,63 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
 
   const handleTestNotification = async () => {
     setTesting(true);
+    const isOrder = context === "orders";
     try {
+      let reg: ServiceWorkerRegistration | null = null;
+      let currentSub: PushSubscription | null = null;
+
+      if ("serviceWorker" in navigator) {
+        try {
+          reg = await navigator.serviceWorker.getRegistration() || await navigator.serviceWorker.register("/sw.js");
+          if (reg) {
+            currentSub = await reg.pushManager.getSubscription();
+          }
+        } catch (e) {
+          console.warn("[SW reg check error]:", e);
+        }
+      }
+
+      // 1. Instant local vibration & notification display directly via Service Worker
+      if (reg && Notification.permission === "granted") {
+        try {
+          await (reg as any).showNotification(
+            isOrder ? "🛍️ Test Order #ORD-9821 • ₹2,499" : "💬 Test Chat: Rahul Sharma (+91 98965 07407)",
+            {
+              body: isOrder
+                ? "Priya Patel placed an order (2 items) via WhatsApp Catalog. Tap to fulfill."
+                : "Hello! Can I order this item via Cash on Delivery? Please confirm.",
+              icon: "/icon-192.png",
+              badge: "/whatsapp-badge.png",
+              tag: `test-buzz-${Date.now()}`,
+              requireInteraction: isOrder,
+              vibrate: isOrder ? [300, 100, 300, 100, 300] : [200, 100, 200],
+              data: { url: isOrder ? "/whatsapp/orders" : "/whatsapp/inbox" }
+            } as any
+          );
+        } catch (swErr) {
+          console.warn("[Local SW Notification warning]", swErr);
+        }
+      }
+
+      // 2. Dispatch real backend Web Push via server with current subscription attached
+      const rawSub = currentSub ? currentSub.toJSON() : null;
       const res = await fetch("/api/push/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: context })
+        body: JSON.stringify({
+          type: context,
+          subscription: currentSub ? {
+            endpoint: currentSub.endpoint,
+            keys: rawSub?.keys
+          } : null
+        })
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        setIsSubscribed(true);
         showToast(data.message || "🔔 Test buzz sent! Check your phone lock-screen / notification drawer.", "success");
       } else {
-        showToast(data.error || "Failed to send test push.", "error");
+        showToast(data.error || "Failed to send server push.", "error");
       }
     } catch {
       showToast("Connection error sending test buzz.", "error");
@@ -170,48 +244,47 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
 
   if (!isSupported || dismissed) return null;
 
-  // Context-specific strings
   const isOrder = context === "orders";
   const titleText = isOrder
-    ? "Real-time Order Alerts for Phone & Desktop"
+    ? "Real-time Order Alerts for Mobile & PC"
     : "Live WhatsApp Incoming Message Alerts";
   const descText = isOrder
     ? "Get a native lock-screen buzz on your phone whenever a customer places an order via WhatsApp or Shopify."
-    : "Never miss a lead: Receive instant push notifications on your phone lock-screen for every inbound customer message.";
+    : "Never miss a lead: Receive instant lock-screen notifications for every inbound customer message.";
 
-  // Compact bar when already granted & subscribed
+  // Active State: Sleek, responsive, never cut off
   if (permission === "granted" && isSubscribed) {
     return (
-      <div className="w-full bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3.5 py-2 flex items-center justify-between gap-3 text-xs mb-3 text-slate-800 dark:text-slate-200 shadow-sm backdrop-blur-md">
+      <div className="w-full bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 sm:px-3 sm:py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs mb-2 text-slate-800 dark:text-slate-200 shadow-sm backdrop-blur-md">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="relative flex h-2 w-2">
+          <span className="relative flex h-2 w-2 shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span className="font-bold text-emerald-600 dark:text-emerald-400">Mobile Push Active:</span>
-          <span className="truncate text-slate-600 dark:text-slate-300">
-            Lock-screen alerts enabled for {isOrder ? "New Orders" : "Inbox Chats"}
+          <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">Push Active:</span>
+          <span className="text-[11px] text-slate-600 dark:text-slate-300">
+            {isOrder ? "Order alerts enabled" : "Chats alert enabled"}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
           <button
             onClick={handleTestNotification}
             disabled={testing}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer"
             title="Send sample notification to your device to verify it buzzes"
           >
-            {testing ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
+            {testing ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
             <span>Test Buzz</span>
           </button>
 
           {installPrompt && !isStandalone && (
             <button
               onClick={handleInstallApp}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white border border-slate-700 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg font-bold text-[11px] bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white border border-slate-700 transition-all cursor-pointer"
             >
-              <Download size={12} />
-              <span>Install App</span>
+              <Download size={11} />
+              <span>Install</span>
             </button>
           )}
         </div>
@@ -229,15 +302,15 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
   // Permission Denied State
   if (permission === "denied") {
     return (
-      <div className="w-full bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs mb-3 text-amber-800 dark:text-amber-300">
-        <div className="flex items-center gap-2">
-          <BellOff size={16} className="text-amber-500 shrink-0" />
-          <span>
-            <strong>Alerts Blocked:</strong> Push notifications are blocked in your browser settings. Please allow notifications for this site to receive lock-screen order & chat buzzes.
+      <div className="w-full bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 flex items-center justify-between gap-2 text-xs mb-2 text-amber-800 dark:text-amber-300">
+        <div className="flex items-center gap-2 min-w-0">
+          <BellOff size={15} className="text-amber-500 shrink-0" />
+          <span className="text-[11px] leading-tight">
+            <strong>Alerts Blocked:</strong> Allow notifications in browser settings for lock-screen alerts.
           </span>
         </div>
-        <button onClick={() => setDismissed(true)} className="text-slate-400 hover:text-slate-600 p-1">
-          <X size={14} />
+        <button onClick={() => setDismissed(true)} className="text-slate-400 hover:text-slate-600 p-1 shrink-0">
+          <X size={13} />
         </button>
       </div>
     );
@@ -245,54 +318,51 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
 
   // Not Enabled Banner (Permission: 'default' or not subscribed)
   return (
-    <div className="w-full relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/60 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-slate-900/80 border border-indigo-500/30 dark:border-emerald-500/30 p-4 mb-4 shadow-lg backdrop-blur-md">
-      {/* Decorative ambient background */}
-      <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 rounded-full bg-indigo-500/10 dark:bg-emerald-500/10 blur-2xl pointer-events-none" />
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-10">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600/20 dark:bg-emerald-600/20 border border-indigo-500/30 dark:border-emerald-500/30 flex items-center justify-center shrink-0 text-indigo-400 dark:text-emerald-400 shadow-inner">
-            <Smartphone size={20} />
+    <div className="w-full relative overflow-hidden rounded-xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/60 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-slate-900/80 border border-indigo-500/30 dark:border-emerald-500/30 p-3 mb-2.5 shadow-sm backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 relative z-10">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600/20 dark:bg-emerald-600/20 border border-indigo-500/30 dark:border-emerald-500/30 flex items-center justify-center shrink-0 text-indigo-400 dark:text-emerald-400">
+            <Smartphone size={16} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h4 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h4 className="font-extrabold text-xs text-slate-900 dark:text-white tracking-tight">
                 {titleText}
               </h4>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 dark:bg-emerald-500/20 text-indigo-300 dark:text-emerald-300 border border-indigo-500/30 dark:border-emerald-500/30 uppercase tracking-wider">
-                PWA Active
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-indigo-500/20 dark:bg-emerald-500/20 text-indigo-300 dark:text-emerald-300 border border-indigo-500/30 dark:border-emerald-500/30 uppercase">
+                PWA
               </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 max-w-xl">
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">
               {descText}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0 pt-2 sm:pt-0">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end shrink-0 pt-1 sm:pt-0">
           {installPrompt && !isStandalone && (
             <button
               onClick={handleInstallApp}
-              className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center gap-1 transition-all cursor-pointer shadow-xs"
             >
-              <Download size={14} />
-              <span>Install PWA</span>
+              <Download size={12} />
+              <span>Install</span>
             </button>
           )}
 
           <button
             onClick={handleSubscribe}
             disabled={subscribing}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-emerald-600 dark:to-teal-600 hover:opacity-95 shadow-md shadow-indigo-500/20 dark:shadow-emerald-500/20 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-emerald-600 dark:to-teal-600 hover:opacity-95 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
           >
             {subscribing ? (
               <>
-                <RefreshCw size={14} className="animate-spin" />
+                <RefreshCw size={12} className="animate-spin" />
                 <span>Enabling...</span>
               </>
             ) : (
               <>
-                <BellRing size={14} />
+                <BellRing size={12} />
                 <span>Turn On Phone Alerts</span>
               </>
             )}
@@ -300,10 +370,10 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
 
           <button
             onClick={() => setDismissed(true)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 transition-colors"
+            className="p-1 rounded text-slate-400 hover:text-slate-200 transition-colors"
             title="Dismiss banner"
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
       </div>

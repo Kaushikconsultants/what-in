@@ -18,7 +18,7 @@ function urlBase64ToUint8Array(base64String: string) {
 
 export default function PushNotificationInitializer() {
   useEffect(() => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
     const registerPush = async () => {
       try {
@@ -28,36 +28,34 @@ export default function PushNotificationInitializer() {
         // 2. Check for existing subscription
         let subscription = await registration.pushManager.getSubscription();
 
-        // 3. Subscribe if not yet subscribed
-        if (!subscription) {
+        // 3. Subscribe if not yet subscribed AND permission is already granted
+        if (!subscription && Notification.permission === "granted") {
           subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
           });
         }
 
-        // 4. Send to server to save in DB
-        const sub = subscription.toJSON();
-        await fetch("/api/push/subscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            endpoint: sub.endpoint,
-            p256dh: sub.keys?.p256dh,
-            auth: sub.keys?.auth
-          })
-        });
-
-        console.log("[Push] Successfully registered for WhatsApp notifications");
+        // 4. Send to server to ensure it is stored in DB
+        if (subscription) {
+          const sub = subscription.toJSON();
+          await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              endpoint: sub.endpoint,
+              p256dh: sub.keys?.p256dh,
+              auth: sub.keys?.auth
+            })
+          });
+          console.log("[Push] Successfully synced subscription for WhatsApp notifications");
+        }
       } catch (err) {
-        console.warn("[Push] Could not register for push notifications:", err);
+        console.warn("[Push] Subscription sync note:", err);
       }
     };
 
-    // Only auto-register if permission not yet denied
-    if (Notification.permission !== "denied") {
-      registerPush();
-    }
+    registerPush();
   }, []);
 
   return null; // Invisible component
