@@ -74,3 +74,23 @@ html.dark .skeleton-card,
   background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%) !important;
   background-size: 200% 100% !important;
 }
+
+/* ----------------------------------------------------------------- */
+/* MOBILE: WhatsApp layout root — use dvh units, header is not sticky */
+/* so the nav tabs can never float over the chat header               */
+/* ----------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .wa-layout-root {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+
+  .wa-layout-content {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}

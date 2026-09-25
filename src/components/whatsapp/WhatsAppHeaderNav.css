@@ -344,20 +344,38 @@ html.dark .nav-pill.active,
 /* ----------------------------------------------------------------- */
 /* MOBILE RESPONSIVE STYLES */
 /* ----------------------------------------------------------------- */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
+  /* On mobile the header must NOT be sticky — it scrolls with content */
+  /* This prevents the nav tabs from floating over the chat header */
+  .whatmore-header {
+    position: static !important;
+    z-index: 10 !important;
+    flex-shrink: 0 !important;
+  }
+
   .whatmore-header-top {
-    padding: 8px 12px;
-    gap: 8px;
-    flex-wrap: wrap;
+    padding: 6px 10px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  /* Compact brand on mobile */
+  .brand-logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+  }
+
+  .brand-text h1 {
+    font-size: 13px;
+  }
+
+  .brand-text p {
+    display: none;
   }
 
   .status-badge {
-    padding: 3px 8px;
-    font-size: 11px;
-    gap: 6px;
-  }
-
-  .status-badge .status-prefix {
     display: none;
   }
 
@@ -370,17 +388,32 @@ html.dark .nav-pill.active,
     gap: 4px;
   }
 
+  .theme-toggle-btn,
+  .notif-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Compact nav track */
   .whatmore-nav-container {
-    padding: 0 12px 6px;
+    padding: 0 8px 5px;
   }
 
   .whatmore-nav-track {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    padding: 2px;
+    gap: 2px;
   }
 
   .whatmore-nav-track::-webkit-scrollbar {
     display: none;
+  }
+
+  .nav-pill {
+    padding: 4px 9px;
+    font-size: 11px;
+    gap: 4px;
   }
 }
 

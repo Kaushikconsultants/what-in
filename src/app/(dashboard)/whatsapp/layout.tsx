@@ -15,12 +15,12 @@ export default function WhatsAppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", maxHeight: "100vh", width: "100%", overflow: "hidden" }}>
+    <div className="wa-layout-root" style={{ display: "flex", flexDirection: "column", height: "100vh", maxHeight: "100vh", width: "100%", overflow: "hidden" }}>
       <GlobalAnnouncementBanner />
       <PaymentWarningBanner />
       <WhatsAppHeaderNav />
       <PushNotificationInitializer />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
+      <div className="wa-layout-content" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
         {children}
       </div>
     </div>
