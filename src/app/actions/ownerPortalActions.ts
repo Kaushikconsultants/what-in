@@ -798,7 +798,7 @@ export async function updateClientQuotasAction(clientId: string, data: {
 }
 
 // -------------------------------------------------------------
-// 3. Global In-App Announcements (CRUD)
+// 3. Global In-App Announcements (CRUD with Scheduling)
 // -------------------------------------------------------------
 export async function getAnnouncementsAction() {
   try {
@@ -814,10 +814,39 @@ export async function getAnnouncementsAction() {
   }
 }
 
-export async function getActiveAnnouncementsAction() {
+export async function getActiveAnnouncementsAction(targetPlan?: string) {
   try {
+    const now = new Date();
+    const whereClause: any = {
+      isActive: true,
+      AND: [
+        {
+          OR: [
+            { startsAt: null },
+            { startsAt: { lte: now } }
+          ]
+        },
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gte: now } }
+          ]
+        }
+      ]
+    };
+
+    if (targetPlan && targetPlan !== "ALL") {
+      whereClause.AND.push({
+        OR: [
+          { targetPlan: null },
+          { targetPlan: "ALL" },
+          { targetPlan: targetPlan }
+        ]
+      });
+    }
+
     const announcements = await prisma.whatsAppAnnouncement.findMany({
-      where: { isActive: true },
+      where: whereClause,
       orderBy: { createdAt: "desc" }
     });
     return { success: true, announcements };
@@ -831,6 +860,7 @@ export async function createAnnouncementAction(data: {
   message: string;
   type: string; // INFO, WARNING, MAINTENANCE, SUCCESS
   targetPlan?: string;
+  startsAt?: string;
   expiresAt?: string;
 }) {
   try {
@@ -844,8 +874,41 @@ export async function createAnnouncementAction(data: {
         type: data.type || "INFO",
         targetPlan: data.targetPlan || "ALL",
         isActive: true,
+        startsAt: data.startsAt ? new Date(data.startsAt) : null,
         expiresAt: data.expiresAt ? new Date(data.expiresAt) : null
       }
+    });
+    return { success: true, announcement };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function updateAnnouncementAction(id: string, data: {
+  title?: string;
+  message?: string;
+  type?: string;
+  targetPlan?: string;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  isActive?: boolean;
+}) {
+  try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+    const updateData: any = {};
+    if (data.title !== undefined) updateData.title = data.title.trim();
+    if (data.message !== undefined) updateData.message = data.message.trim();
+    if (data.type !== undefined) updateData.type = data.type;
+    if (data.targetPlan !== undefined) updateData.targetPlan = data.targetPlan;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.startsAt !== undefined) updateData.startsAt = data.startsAt ? new Date(data.startsAt) : null;
+    if (data.expiresAt !== undefined) updateData.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+
+    const announcement = await prisma.whatsAppAnnouncement.update({
+      where: { id },
+      data: updateData
     });
     return { success: true, announcement };
   } catch (e: any) {

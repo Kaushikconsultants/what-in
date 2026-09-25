@@ -2,6 +2,7 @@ import React from "react";
 import WhatsAppHeaderNav from "@/components/whatsapp/WhatsAppHeaderNav";
 import PushNotificationInitializer from "@/components/whatsapp/PushNotificationInitializer";
 import PaymentWarningBanner from "@/components/whatsapp/PaymentWarningBanner";
+import GlobalAnnouncementBanner from "@/components/whatsapp/GlobalAnnouncementBanner";
 
 export const metadata = {
   title: "WhatsApp Business Automation + CRM Platform",
@@ -15,6 +16,7 @@ export default function WhatsAppLayout({
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", maxHeight: "100vh", width: "100%", overflow: "hidden" }}>
+      <GlobalAnnouncementBanner />
       <PaymentWarningBanner />
       <WhatsAppHeaderNav />
       <PushNotificationInitializer />

@@ -2120,6 +2120,7 @@ model WhatsAppAnnouncement {
   isActive    Boolean   @default(true)
   targetPlan  String?   @default("ALL")  // ALL or specific plan
   createdAt   DateTime  @default(now())
+  startsAt    DateTime?
   expiresAt   DateTime?
 }
 

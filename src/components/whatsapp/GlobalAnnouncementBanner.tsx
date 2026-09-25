@@ -1,17 +1,70 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import { getActiveAnnouncementsAction } from "@/app/actions/ownerPortalActions";
+import { Wrench, AlertTriangle, Sparkles, Megaphone, X, Clock } from "lucide-react";
 
-const TYPE_STYLES: Record<string, { bg: string; border: string; color: string; icon: string; badge: string; badgeBg: string }> = {
-  MAINTENANCE: { bg: "#fef2f2", border: "#fecaca", color: "#991b1b", icon: "🛠️", badge: "Maintenance Notice", badgeBg: "#fee2e2" },
-  WARNING:     { bg: "#fffbeb", border: "#fde68a", color: "#92400e", icon: "⚠️", badge: "Important Alert", badgeBg: "#fef3c7" },
-  SUCCESS:     { bg: "#f0fdf4", border: "#bbf7d0", color: "#166534", icon: "🎉", badge: "System Update", badgeBg: "#dcfce7" },
-  INFO:        { bg: "#eff6ff", border: "#bfdbfe", color: "#1e40af", icon: "📢", badge: "Announcement", badgeBg: "#dbeafe" },
+const TYPE_CONFIG: Record<string, {
+  bg: string;
+  border: string;
+  text: string;
+  badgeBg: string;
+  badgeText: string;
+  icon: any;
+  label: string;
+}> = {
+  MAINTENANCE: {
+    bg: "bg-rose-50 dark:bg-rose-950/90",
+    border: "border-rose-200 dark:border-rose-800",
+    text: "text-rose-900 dark:text-rose-100",
+    badgeBg: "bg-rose-100 dark:bg-rose-900/80",
+    badgeText: "text-rose-700 dark:text-rose-200",
+    icon: Wrench,
+    label: "Maintenance Notice"
+  },
+  WARNING: {
+    bg: "bg-amber-50 dark:bg-amber-950/90",
+    border: "border-amber-200 dark:border-amber-800",
+    text: "text-amber-900 dark:text-amber-100",
+    badgeBg: "bg-amber-100 dark:bg-amber-900/80",
+    badgeText: "text-amber-800 dark:text-amber-200",
+    icon: AlertTriangle,
+    label: "Important Alert"
+  },
+  SUCCESS: {
+    bg: "bg-emerald-50 dark:bg-emerald-950/90",
+    border: "border-emerald-200 dark:border-emerald-800",
+    text: "text-emerald-900 dark:text-emerald-100",
+    badgeBg: "bg-emerald-100 dark:bg-emerald-900/80",
+    badgeText: "text-emerald-800 dark:text-emerald-200",
+    icon: Sparkles,
+    label: "System Update"
+  },
+  INFO: {
+    bg: "bg-indigo-50 dark:bg-indigo-950/90",
+    border: "border-indigo-200 dark:border-indigo-800",
+    text: "text-indigo-900 dark:text-indigo-100",
+    badgeBg: "bg-indigo-100 dark:bg-indigo-900/80",
+    badgeText: "text-indigo-800 dark:text-indigo-200",
+    icon: Megaphone,
+    label: "Announcement"
+  },
 };
 
 export default function GlobalAnnouncementBanner() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
+
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await getActiveAnnouncementsAction();
+      if (res.success && res.announcements) {
+        setAnnouncements(res.announcements);
+      }
+    } catch (e) {
+      console.error("Failed to fetch active announcements:", e);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -19,11 +72,11 @@ export default function GlobalAnnouncementBanner() {
       if (stored) setDismissed(JSON.parse(stored));
     } catch {}
 
-    getActiveAnnouncementsAction().then(res => {
-      if (res.success && res.announcements) {
-        setAnnouncements(res.announcements);
-      }
-    });
+    fetchAnnouncements();
+
+    // Re-check periodically every 60s so scheduled broadcasts automatically pop up without reload
+    const interval = setInterval(fetchAnnouncements, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleDismiss = (id: string) => {
@@ -38,55 +91,50 @@ export default function GlobalAnnouncementBanner() {
   if (visible.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%", zIndex: 90 }}>
+    <aside aria-label="System announcements" className="w-full z-40 flex flex-col shrink-0 shadow-xs">
       {visible.map(item => {
-        const style = TYPE_STYLES[item.type] || TYPE_STYLES.INFO;
+        const conf = TYPE_CONFIG[item.type] || TYPE_CONFIG.INFO;
+        const Icon = conf.icon;
+
         return (
           <div
             key={item.id}
-            style={{
-              background: style.bg,
-              borderBottom: `1px solid ${style.border}`,
-              padding: "10px 24px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "16px",
-              fontSize: "13px",
-              color: style.color,
-              fontFamily: "system-ui, -apple-system, sans-serif"
-            }}
+            className={`w-full px-4 sm:px-6 py-2.5 sm:py-3 border-b ${conf.bg} ${conf.border} ${conf.text} flex items-center justify-between gap-3 transition-colors`}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "16px" }}>{style.icon}</span>
-              <span style={{ padding: "2px 8px", background: style.badgeBg, borderRadius: "6px", fontWeight: 800, fontSize: "11px", letterSpacing: "0.02em", textTransform: "uppercase" }}>
-                {style.badge}
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <span className={`p-1.5 rounded-lg ${conf.badgeBg} ${conf.badgeText} shrink-0`}>
+                <Icon size={14} className="animate-pulse" />
               </span>
-              <span style={{ fontWeight: 700 }}>{item.title}</span>
-              <span style={{ opacity: 0.9 }}>— {item.message}</span>
+
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${conf.badgeBg} ${conf.badgeText} shrink-0`}>
+                {conf.label}
+              </span>
+
+              <div className="flex items-center gap-1.5 flex-wrap text-xs sm:text-sm">
+                <span className="font-extrabold">{item.title}</span>
+                <span className="opacity-75 hidden sm:inline">—</span>
+                <span className="font-medium opacity-90">{item.message}</span>
+              </div>
+
+              {item.expiresAt && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold opacity-75 bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-md shrink-0">
+                  <Clock size={10} />
+                  <span>Until {new Date(item.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, {new Date(item.expiresAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                </span>
+              )}
             </div>
+
             <button
               onClick={() => handleDismiss(item.id)}
-              style={{
-                background: "none",
-                border: "none",
-                color: style.color,
-                fontSize: "16px",
-                cursor: "pointer",
-                padding: "2px 6px",
-                borderRadius: "4px",
-                opacity: 0.7,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
+              className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-current opacity-70 hover:opacity-100 transition-all shrink-0 cursor-pointer"
               title="Dismiss announcement"
+              aria-label="Dismiss announcement"
             >
-              ✕
+              <X size={15} />
             </button>
           </div>
         );
       })}
-    </div>
+    </aside>
   );
 }
