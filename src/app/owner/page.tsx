@@ -31,7 +31,10 @@ import {
   X,
   Gauge,
   Sliders,
-  Smartphone
+  Smartphone,
+  Users,
+  Phone,
+  Mail
 } from "lucide-react";
 import {
   getOwnerDashboardStatsAction,
@@ -42,12 +45,14 @@ import {
   repairAllWebhooksAction,
   topUpClientQuotaAction
 } from "@/app/actions/ownerPortalActions";
+import { getPlatformLeadsAction } from "@/app/actions/leadActions";
 import { MASTER_MODULES, ALL_MODULE_KEYS, parseEnabledModules } from "@/lib/moduleRegistry";
 import PlatformMissionControl from "@/components/owner/PlatformMissionControl";
 
 export default function OwnerDashboardPage() {
   const [data, setData] = useState<any>(null);
   const [telemetry, setTelemetry] = useState<any>(null);
+  const [inboundLeads, setInboundLeads] = useState<any[]>([]);
   const [metaHealthResults, setMetaHealthResults] = useState<any[]>([]);
   const [scanningMeta, setScanningMeta] = useState(false);
   const [healingWebhooks, setHealingWebhooks] = useState(false);
@@ -79,13 +84,15 @@ export default function OwnerDashboardPage() {
   const loadStats = async () => {
     setLoading(true);
     await syncSubscriptionStatusesAction();
-    const [statsRes, telemetryRes] = await Promise.all([
+    const [statsRes, telemetryRes, leadsRes] = await Promise.all([
       getOwnerDashboardStatsAction(),
-      getOwnerTelemetryStatsAction()
+      getOwnerTelemetryStatsAction(),
+      getPlatformLeadsAction({ status: "ALL" })
     ]);
 
     if (statsRes.success) setData(statsRes);
     if (telemetryRes.success && telemetryRes.telemetry) setTelemetry(telemetryRes.telemetry);
+    if (leadsRes.success && leadsRes.leads) setInboundLeads(leadsRes.leads);
     setLoading(false);
   };
 
@@ -263,6 +270,14 @@ export default function OwnerDashboardPage() {
           </button>
 
           <Link
+            href="/owner/leads"
+            className="px-4 py-3 rounded-2xl font-bold text-xs text-white bg-white/10 hover:bg-white/15 border border-white/10 transition-all flex items-center gap-1.5"
+          >
+            <Users size={15} />
+            <span>Leads ({inboundLeads.filter(l => l.status === "NEW").length})</span>
+          </Link>
+
+          <Link
             href="/owner/announcements"
             className="px-4 py-3 rounded-2xl font-bold text-xs text-white bg-white/10 hover:bg-white/15 border border-white/10 transition-all flex items-center gap-1.5"
           >
@@ -356,6 +371,77 @@ export default function OwnerDashboardPage() {
 
       {/* 🌐 "MISSION CONTROL" LIVE EVENT STREAM / PLATFORM PULSE */}
       <PlatformMissionControl />
+
+      {/* 🎯 INBOUND LANDING PAGE LEADS */}
+      {inboundLeads.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <span className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600">
+                <Users size={16} />
+              </span>
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Inbound Prospective Leads ({inboundLeads.length})
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Prospective clients who submitted the 3D landing page inquiry form.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/owner/leads"
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+            >
+              <span>Manage All Leads</span> <ArrowRight size={13} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {inboundLeads.slice(0, 3).map((lead) => {
+              const cleanPhone = lead.mobile.replace(/[^0-9]/g, "");
+              const waLink = `https://wa.me/${cleanPhone}?text=Hello%20${encodeURIComponent(lead.name)}%2C%20thank%20you%20for%20contacting%20us%20regarding%20your%20business%20${encodeURIComponent(lead.businessName)}.`;
+
+              return (
+                <div
+                  key={lead.id}
+                  className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between space-y-3"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                        {lead.name}
+                      </span>
+                      <span className={`px-2 py-0.2 rounded-full text-[10px] font-black uppercase ${
+                        lead.status === "NEW" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {lead.status}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                      🏢 {lead.businessName} • Plan: {lead.selectedPlan || "GROWTH"}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      📞 +{cleanPhone} • ✉️ {lead.email}
+                    </div>
+                  </div>
+
+                  <a
+                    href={waLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-1.5 rounded-xl font-bold text-xs text-white bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <MessageSquare size={12} />
+                    <span>Quick WhatsApp Pitch</span>
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 📊 GLOBAL TELEMETRY HEATMAP & TRAFFIC GAUGES */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6">

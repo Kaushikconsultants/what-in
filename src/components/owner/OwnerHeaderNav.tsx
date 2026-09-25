@@ -14,7 +14,8 @@ import {
   LogOut,
   Crown,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Users
 } from "lucide-react";
 
 export default function OwnerHeaderNav() {
@@ -64,6 +65,7 @@ export default function OwnerHeaderNav() {
   const navItems = [
     { label: "Dashboard", href: "/owner", icon: LayoutDashboard, exact: true },
     { label: "Clients & Modules", href: "/owner/clients", icon: Building2, exact: false },
+    { label: "Inbound Leads", href: "/owner/leads", icon: Users, exact: false },
     { label: "Announcements", href: "/owner/announcements", icon: Megaphone, exact: false },
     { label: "Plans & Matrix", href: "/owner/plans", icon: Gem, exact: false },
   ];
