@@ -183,11 +183,11 @@ export default function OwnerDashboardPage() {
             )}
           </div>
 
-          {/* 13-Module Platform Adoption Gauge */}
+          {/* 11-Module & Integration Platform Adoption Gauge */}
           <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", padding: "24px", backdropFilter: "blur(12px)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <div>
-                <h3 style={{ fontSize: "16px", fontWeight: 900, color: "#ffffff", margin: 0 }}>🎛️ 13-Module Feature Adoption</h3>
+                <h3 style={{ fontSize: "16px", fontWeight: 900, color: "#ffffff", margin: 0 }}>🎛️ 11-Module & Integration Adoption</h3>
                 <p style={{ fontSize: "12px", color: "#94a3b8", margin: "2px 0 0 0" }}>Active tenant penetration across all modules</p>
               </div>
               <Link href="/owner/plans" style={{ fontSize: "12px", color: "#818cf8", textDecoration: "none", fontWeight: 700 }}>

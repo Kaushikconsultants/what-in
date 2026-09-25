@@ -33,12 +33,12 @@ interface SubNavItem {
 
 const subNavItems: SubNavItem[] = [
   { name: "Dashboard", path: "/whatsapp/dashboard", icon: LayoutDashboard },
-  { name: "Orders", path: "/whatsapp/orders", icon: ShoppingCart, requiredModule: ["COMMERCE", "PAYMENTS"] },
+  { name: "Orders", path: "/whatsapp/orders", icon: ShoppingCart, requiredModule: ["META_CATALOG", "PAYMENT_GATEWAY", "SHOPIFY_INTEGRATION"] },
   { name: "Inbox", path: "/whatsapp/inbox", icon: MessageSquare, requiredModule: "INBOX" },
-  { name: "Shopify", path: "/whatsapp/shopify", icon: ShoppingBag, requiredModule: "COMMERCE" },
+  { name: "Shopify", path: "/whatsapp/shopify", icon: ShoppingBag, requiredModule: "SHOPIFY_INTEGRATION" },
   { name: "WhatsApp", path: "/whatsapp/templates", icon: Bot, requiredModule: ["CHATBOT", "BROADCASTS"] },
-  { name: "Integrations", path: "/whatsapp/integrations", icon: Zap, requiredModule: ["WIDGET", "DEVELOPER_API"] },
-  { name: "Products & Prices", path: "/whatsapp/commerce", icon: Box, requiredModule: ["COMMERCE", "INVOICING"] },
+  { name: "Integrations", path: "/whatsapp/integrations", icon: Zap, requiredModule: ["WIDGET", "DEVELOPER_API", "META_PIXEL_CAPI", "SHOPIFY_INTEGRATION", "PAYMENT_GATEWAY"] },
+  { name: "Products & Prices", path: "/whatsapp/commerce", icon: Box, requiredModule: ["META_CATALOG", "SHOPIFY_INTEGRATION"] },
   { name: "Settings", path: "/whatsapp/api-settings", icon: Key },
   { name: "Logs", path: "/whatsapp/logs", icon: Activity, requiredModule: "DEVELOPER_API" },
 ];

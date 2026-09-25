@@ -1,36 +1,35 @@
 /**
  * WhatMore SaaS — Modular Feature Gating & Module Registry
- * Defines all 13 core business modules, plan tier defaults, industry presets, and route mappings.
+ * Defines all core WhatsApp marketing, commerce, intelligence modules & official integrations.
  */
 
 export type ModuleKey =
   | "INBOX"
   | "CHATBOT"
   | "AI_AGENT"
-  | "COMMERCE"
-  | "PAYMENTS"
   | "BROADCASTS"
   | "WIDGET"
   | "COBROWSE"
-  | "INVOICING"
-  | "HRMS"
-  | "RECRUITMENT"
-  | "CRM"
-  | "DEVELOPER_API";
+  | "DEVELOPER_API"
+  | "SHOPIFY_INTEGRATION"
+  | "META_CATALOG"
+  | "META_PIXEL_CAPI"
+  | "PAYMENT_GATEWAY";
 
 export interface ModuleDefinition {
   key: ModuleKey;
   name: string;
-  category: "CORE" | "COMMERCE" | "OPERATIONS" | "INTELLIGENCE" | "ENTERPRISE";
+  category: "CORE" | "COMMERCE" | "INTELLIGENCE" | "ENGAGEMENT" | "INTEGRATIONS" | "DEVELOPER";
   icon: string;
   badgeColor: string;
   tagline: string;
   description: string;
-  routes: string[]; // Dashboard routes gated by this module
+  routes: string[];
   industryFit: string[];
 }
 
 export const MASTER_MODULES: Record<ModuleKey, ModuleDefinition> = {
+  // 1. Core Live Chat
   INBOX: {
     key: "INBOX",
     name: "Live Team Inbox",
@@ -38,10 +37,12 @@ export const MASTER_MODULES: Record<ModuleKey, ModuleDefinition> = {
     icon: "💬",
     badgeColor: "#10b981",
     tagline: "Multi-agent live chat, notes & quick replies",
-    description: "Real-time WhatsApp team inbox with assignment, internal notes, canned responses, and collision avoidance.",
+    description: "Real-time WhatsApp team inbox with assignment, internal notes, canned responses, and agent collision avoidance.",
     routes: ["/whatsapp/inbox", "/whatsapp/direct-messages", "/whatsapp/team-inbox", "/whatsapp/reply-library"],
-    industryFit: ["All Industries", "E-Commerce", "Support", "Services"]
+    industryFit: ["All Industries", "E-Commerce", "Customer Support", "Services"]
   },
+
+  // 2. Chatbot Builder
   CHATBOT: {
     key: "CHATBOT",
     name: "Visual Bot & Meta Flows",
@@ -49,10 +50,12 @@ export const MASTER_MODULES: Record<ModuleKey, ModuleDefinition> = {
     icon: "🤖",
     badgeColor: "#6366f1",
     tagline: "Visual flowchart bot & native WhatsApp Flows",
-    description: "Canvas-based chatbot automation, keyword triggers, and interactive native Meta WhatsApp Flows forms.",
+    description: "Drag-and-drop chatbot automation, keyword triggers, and interactive native Meta WhatsApp Flows forms.",
     routes: ["/whatsapp/chatbot-builder", "/whatsapp/chatbots", "/whatsapp/flows", "/whatsapp/forms"],
     industryFit: ["All Industries", "Lead Generation", "E-Commerce", "Real Estate"]
   },
+
+  // 3. AI Agent
   AI_AGENT: {
     key: "AI_AGENT",
     name: "AI Auto-Pilot & Knowledge Base",
@@ -60,119 +63,113 @@ export const MASTER_MODULES: Record<ModuleKey, ModuleDefinition> = {
     icon: "🧠",
     badgeColor: "#8b5cf6",
     tagline: "Autonomous Gemini / OpenAI customer agent",
-    description: "Smart 24/7 AI agent trained on client documents, catalog FAQs, and intent-aware contextual conversation.",
+    description: "Smart 24/7 AI agent trained on store catalog, PDFs, business FAQs, and intent-aware contextual conversation.",
     routes: ["/whatsapp/ai-automation"],
-    industryFit: ["D2C", "Real Estate", "Consultancies", "Healthcare"]
+    industryFit: ["D2C Brands", "Real Estate", "Consultancies", "Healthcare"]
   },
-  COMMERCE: {
-    key: "COMMERCE",
-    name: "E-Commerce & Catalog Checkout",
-    category: "COMMERCE",
-    icon: "🛍️",
-    badgeColor: "#ec4899",
-    tagline: "Shopify sync & In-WhatsApp catalog order",
-    description: "Real-time Shopify product sync, in-WhatsApp catalog ordering, automated pincode city/state auto-fill.",
-    routes: ["/whatsapp/commerce", "/whatsapp/orders", "/whatsapp/shopify"],
-    industryFit: ["D2C Brands", "Fashion & Apparel", "Retail", "Wholesale"]
-  },
-  PAYMENTS: {
-    key: "PAYMENTS",
-    name: "Payments & COD Advance Recovery",
-    category: "COMMERCE",
-    icon: "💳",
-    badgeColor: "#f59e0b",
-    tagline: "Razorpay, Cashfree, UPI & Partial COD",
-    description: "Automated payment recovery links, dynamic UPI QR generation, token advance partial COD, and prepaid discounts.",
-    routes: ["/whatsapp/payments"],
-    industryFit: ["D2C Brands", "Services", "Clinics", "Agencies"]
-  },
+
+  // 4. Broadcasts
   BROADCASTS: {
     key: "BROADCASTS",
     name: "Bulk Broadcasts & Drip Campaigns",
-    category: "CORE",
+    category: "ENGAGEMENT",
     icon: "📢",
     badgeColor: "#3b82f6",
     tagline: "Template messaging & scheduled sequences",
-    description: "Meta-approved template campaigns, dynamic CSV customer import, segment filters, and multi-day drip sequences.",
+    description: "Meta-approved template marketing campaigns, dynamic CSV customer import, segment filters, and multi-day drip sequences.",
     routes: ["/whatsapp/broadcasts", "/whatsapp/campaigns", "/whatsapp/templates", "/whatsapp/contacts", "/whatsapp/tags"],
-    industryFit: ["Marketing", "EdTech", "Events", "Coaching"]
+    industryFit: ["Marketing", "D2C Brands", "EdTech", "Events"]
   },
+
+  // 5. Website Widget
   WIDGET: {
     key: "WIDGET",
     name: "Website Widget & Lead Radar",
-    category: "OPERATIONS",
+    category: "ENGAGEMENT",
     icon: "🌐",
     badgeColor: "#14b8a6",
     tagline: "Zero-dependency web chat & lead forms",
-    description: "Embeddable website widget script, proactive exit-intent speech bubble nudges, and visitor lead capture.",
+    description: "Embeddable website widget script, proactive exit-intent speech bubble nudges, and instant visitor lead capture.",
     routes: ["/whatsapp/integrations"],
     industryFit: ["Websites", "Service Businesses", "Clinics", "Real Estate"]
   },
+
+  // 6. Co-Browsing
   COBROWSE: {
     key: "COBROWSE",
     name: "Live Co-Browsing Screen Assist",
-    category: "ENTERPRISE",
+    category: "ENGAGEMENT",
     icon: "👁️",
     badgeColor: "#06b6d4",
     tagline: "Real-time visitor screen proxy & guidance",
     description: "Agent sees live visitor website view, dynamic island controls, cursor highlights, and guides high-ticket form fills.",
     routes: ["/whatsapp/inbox"],
-    industryFit: ["Real Estate", "EdTech Admissions", "Luxury Services", "B2B SaaS"]
+    industryFit: ["Real Estate", "EdTech Admissions", "Luxury Brands", "B2B SaaS"]
   },
-  INVOICING: {
-    key: "INVOICING",
-    name: "GST Invoicing & Quotations",
-    category: "OPERATIONS",
-    icon: "📄",
-    badgeColor: "#f97316",
-    tagline: "Instant B2B GST quotes & invoice PDFs",
-    description: "Generate branded GST Quotations and Tax Invoices with HSN codes, UPI QR payment codes, and send directly via WhatsApp.",
-    routes: ["/whatsapp/commerce"],
-    industryFit: ["B2B Wholesalers", "Manufacturers", "Agencies", "CA / Tax"]
-  },
-  HRMS: {
-    key: "HRMS",
-    name: "Staff Attendance & Leave HRMS",
-    category: "OPERATIONS",
-    icon: "👥",
-    badgeColor: "#84cc16",
-    tagline: "GPS punch-in, leave approval & salary slips",
-    description: "Field staff WhatsApp GPS attendance, 1-tap interactive leave approval for managers, and monthly salary slip delivery.",
-    routes: ["/whatsapp/contacts"],
-    industryFit: ["Factories", "Hospitals & Clinics", "Schools", "Offices"]
-  },
-  RECRUITMENT: {
-    key: "RECRUITMENT",
-    name: "Candidate Screening & Hiring Bot",
-    category: "OPERATIONS",
-    icon: "📝",
-    badgeColor: "#a855f7",
-    tagline: "Resume intake, pre-screening & interview slots",
-    description: "Automated candidate pre-screening via WhatsApp Flows, scoring applicant responses, and booking HR interview slots.",
-    routes: ["/whatsapp/forms"],
-    industryFit: ["Recruitment Agencies", "Corporate HR", "BPOs", "Delivery Teams"]
-  },
-  CRM: {
-    key: "CRM",
-    name: "Telecaller CRM & Sales Pipeline",
-    category: "OPERATIONS",
-    icon: "🎯",
-    badgeColor: "#e11d48",
-    tagline: "Call scripts, objections & follow-up queues",
-    description: "Lead territory routing, agent call script cheatsheets, objection rebuttals, and automated follow-up reminder sequences.",
-    routes: ["/whatsapp/contacts", "/whatsapp/analytics"],
-    industryFit: ["Real Estate", "Visa Consultants", "Automotive", "Financial Services"]
-  },
+
+  // 7. Developer APIs
   DEVELOPER_API: {
     key: "DEVELOPER_API",
     name: "Developer APIs & Outbound Webhooks",
-    category: "ENTERPRISE",
+    category: "DEVELOPER",
     icon: "⚡",
     badgeColor: "#64748b",
     tagline: "REST API keys & live webhook events",
     description: "Generate client API keys, register custom outbound webhook endpoints (Zapier / Make / custom CRM), and inspect raw logs.",
     routes: ["/whatsapp/api-settings", "/whatsapp/logs"],
     industryFit: ["Tech Enterprises", "SaaS Integrators", "Custom In-House Apps"]
+  },
+
+  // 8. Shopify Integration
+  SHOPIFY_INTEGRATION: {
+    key: "SHOPIFY_INTEGRATION",
+    name: "Shopify Store & Webhook Sync",
+    category: "INTEGRATIONS",
+    icon: "🛍️",
+    badgeColor: "#95bf47",
+    tagline: "Live catalog sync, stock & order webhooks",
+    description: "Automatic Shopify store integration, real-time product/variant inventory sync, abandoned cart recovery, and order status tracking.",
+    routes: ["/whatsapp/shopify", "/whatsapp/commerce"],
+    industryFit: ["Shopify Stores", "D2C Brands", "Fashion & Retail", "Dropshipping"]
+  },
+
+  // 9. Meta WhatsApp Catalog
+  META_CATALOG: {
+    key: "META_CATALOG",
+    name: "Meta WhatsApp Catalog Engine",
+    category: "INTEGRATIONS",
+    icon: "📦",
+    badgeColor: "#0084ff",
+    tagline: "Native catalog browsing & cart checkout",
+    description: "Display native WhatsApp Commerce product cards, collection sets, and process in-chat catalog orders with pincode auto-fill.",
+    routes: ["/whatsapp/commerce", "/whatsapp/orders"],
+    industryFit: ["D2C Brands", "Restaurants", "Grocery", "Wholesalers"]
+  },
+
+  // 10. Meta Pixel & CAPI Ad Tracking
+  META_PIXEL_CAPI: {
+    key: "META_PIXEL_CAPI",
+    name: "Meta Pixel & CAPI Ad Tracking",
+    category: "INTEGRATIONS",
+    icon: "🎯",
+    badgeColor: "#8b5cf6",
+    tagline: "Conversions API, Pixel & Custom Audiences",
+    description: "Server-side Meta Conversions API (CAPI), Purchase & Lead event tracking, and automated Custom Audience syncing for maximum Ad ROAS.",
+    routes: ["/whatsapp/chatbots", "/whatsapp/chatbot-builder", "/whatsapp/campaigns"],
+    industryFit: ["Performance Marketers", "Media Buyers", "E-Commerce", "Lead Gen"]
+  },
+
+  // 11. Payment Gateways
+  PAYMENT_GATEWAY: {
+    key: "PAYMENT_GATEWAY",
+    name: "Payment Gateways & COD Recovery",
+    category: "INTEGRATIONS",
+    icon: "💳",
+    badgeColor: "#f59e0b",
+    tagline: "Razorpay, Cashfree, UPI QR & Partial COD",
+    description: "Automated payment recovery links, dynamic UPI QR generation, token advance partial COD (₹ or %), and prepaid discount rules.",
+    routes: ["/whatsapp/payments", "/whatsapp/orders"],
+    industryFit: ["D2C Brands", "Online Stores", "Services", "Clinics"]
   }
 };
 
@@ -208,8 +205,8 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
     monthlyMessageQuota: 5000,
     monthlyAiQuota: 500,
     maxAgents: 3,
-    modules: ["INBOX", "CHATBOT", "WIDGET", "PAYMENTS"],
-    tagline: "Perfect for small local businesses starting with WhatsApp support"
+    modules: ["INBOX", "CHATBOT", "WIDGET", "PAYMENT_GATEWAY"],
+    tagline: "Perfect for local businesses starting with WhatsApp support & payments"
   },
   {
     id: "GROWTH",
@@ -222,8 +219,17 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
     monthlyMessageQuota: 25000,
     monthlyAiQuota: 2500,
     maxAgents: 8,
-    modules: ["INBOX", "CHATBOT", "AI_AGENT", "COMMERCE", "PAYMENTS", "BROADCASTS", "WIDGET", "CRM"],
-    tagline: "Built for scaling D2C brands, retail stores, and sales teams"
+    modules: [
+      "INBOX",
+      "CHATBOT",
+      "AI_AGENT",
+      "BROADCASTS",
+      "WIDGET",
+      "SHOPIFY_INTEGRATION",
+      "META_CATALOG",
+      "PAYMENT_GATEWAY"
+    ],
+    tagline: "Built for scaling Shopify & D2C brands with catalog sales & AI auto-pilot"
   },
   {
     id: "BUSINESS",
@@ -240,16 +246,16 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
       "INBOX",
       "CHATBOT",
       "AI_AGENT",
-      "COMMERCE",
-      "PAYMENTS",
       "BROADCASTS",
       "WIDGET",
       "COBROWSE",
-      "INVOICING",
-      "CRM",
-      "DEVELOPER_API"
+      "DEVELOPER_API",
+      "SHOPIFY_INTEGRATION",
+      "META_CATALOG",
+      "META_PIXEL_CAPI",
+      "PAYMENT_GATEWAY"
     ],
-    tagline: "For B2B wholesalers, high-ticket agencies, and omni-channel commerce"
+    tagline: "Full powerhouse with Meta CAPI ad tracking, Co-Browsing & developer APIs"
   },
   {
     id: "ENTERPRISE",
@@ -263,7 +269,7 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
     monthlyAiQuota: 50000,
     maxAgents: 100,
     modules: ALL_MODULE_KEYS,
-    tagline: "All 13 modules including HRMS, Recruitment, Co-Browsing & Custom APIs"
+    tagline: "All 11 modules & integrations with maximum quotas and VIP dedicated support"
   }
 ];
 
@@ -274,37 +280,77 @@ export const INDUSTRY_MODULE_PRESETS: { name: string; icon: string; description:
   {
     name: "E-Commerce & D2C Brands",
     icon: "🛍️",
-    description: "Shopify sync, Catalog checkouts, Pincode auto-fill & COD advance recovery",
-    modules: ["INBOX", "CHATBOT", "AI_AGENT", "COMMERCE", "PAYMENTS", "BROADCASTS", "WIDGET"]
+    description: "Shopify sync, Meta Catalog checkouts, Pincode auto-fill & Payment Gateway COD recovery",
+    modules: [
+      "INBOX",
+      "CHATBOT",
+      "AI_AGENT",
+      "BROADCASTS",
+      "WIDGET",
+      "SHOPIFY_INTEGRATION",
+      "META_CATALOG",
+      "META_PIXEL_CAPI",
+      "PAYMENT_GATEWAY"
+    ]
   },
   {
-    name: "Real Estate & High-Ticket",
+    name: "Performance Marketers & Meta Ads",
+    icon: "🎯",
+    description: "Meta Pixel & CAPI conversion tracking, Custom Audiences, Meta Catalog & Broadcasts",
+    modules: [
+      "INBOX",
+      "CHATBOT",
+      "BROADCASTS",
+      "META_PIXEL_CAPI",
+      "META_CATALOG",
+      "PAYMENT_GATEWAY",
+      "WIDGET"
+    ]
+  },
+  {
+    name: "Real Estate & High-Ticket Leads",
     icon: "🏢",
-    description: "Co-Browsing screen assist, CRM telecaller pipeline & interactive lead forms",
-    modules: ["INBOX", "CHATBOT", "AI_AGENT", "COBROWSE", "CRM", "BROADCASTS", "WIDGET"]
+    description: "Co-Browsing screen assist, AI FAQ agent, Meta CAPI lead tracking & Broadcasts",
+    modules: [
+      "INBOX",
+      "CHATBOT",
+      "AI_AGENT",
+      "COBROWSE",
+      "META_PIXEL_CAPI",
+      "BROADCASTS",
+      "WIDGET"
+    ]
   },
   {
-    name: "B2B Wholesale & Manufacturing",
-    icon: "🏭",
-    description: "Instant GST Invoices, Quotation PDFs, Staff HRMS & Developer APIs",
-    modules: ["INBOX", "CHATBOT", "INVOICING", "HRMS", "PAYMENTS", "DEVELOPER_API"]
-  },
-  {
-    name: "Clinics, Hospitals & Healthcare",
+    name: "Clinics & Service Bookings",
     icon: "🏥",
-    description: "Doctor appointment booking, staff attendance, website widget & AI FAQs",
-    modules: ["INBOX", "CHATBOT", "AI_AGENT", "WIDGET", "HRMS", "BROADCASTS"]
+    description: "Appointment booking, Website chat widget, AI auto-replies & Payment Gateway QR links",
+    modules: [
+      "INBOX",
+      "CHATBOT",
+      "AI_AGENT",
+      "WIDGET",
+      "BROADCASTS",
+      "PAYMENT_GATEWAY"
+    ]
   },
   {
-    name: "Recruitment & Staffing Agencies",
-    icon: "💼",
-    description: "Candidate screening bot, resume intake, interview scheduling & CRM",
-    modules: ["INBOX", "CHATBOT", "RECRUITMENT", "CRM", "BROADCASTS", "DEVELOPER_API"]
+    name: "API & SaaS Integrators",
+    icon: "⚡",
+    description: "Developer REST APIs, Outbound Webhooks, Team Inbox, Payment Gateway & Broadcasts",
+    modules: [
+      "INBOX",
+      "CHATBOT",
+      "DEVELOPER_API",
+      "PAYMENT_GATEWAY",
+      "WIDGET",
+      "BROADCASTS"
+    ]
   },
   {
-    name: "Full Enterprise OS (All Modules)",
+    name: "Full Enterprise Suite (All 11 Modules)",
     icon: "👑",
-    description: "Complete unconstrained access to all 13 business automation modules",
+    description: "Complete access to all 11 modules and official integrations",
     modules: ALL_MODULE_KEYS
   }
 ];
@@ -313,11 +359,12 @@ export const INDUSTRY_MODULE_PRESETS: { name: string; icon: string; description:
  * Parses client enabledModules safely
  */
 export function parseEnabledModules(raw: string | null | undefined): ModuleKey[] {
-  if (!raw) return ALL_MODULE_KEYS; // Default: grant all if unset
+  if (!raw) return ALL_MODULE_KEYS;
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.filter((k: any) => Object.prototype.hasOwnProperty.call(MASTER_MODULES, k));
+      const filtered = parsed.filter((k: any) => Object.prototype.hasOwnProperty.call(MASTER_MODULES, k));
+      return filtered.length > 0 ? filtered : ALL_MODULE_KEYS;
     }
   } catch {
     // fallback
@@ -329,10 +376,8 @@ export function parseEnabledModules(raw: string | null | undefined): ModuleKey[]
  * Checks if a specific route is allowed for a client
  */
 export function isRouteAllowed(route: string, enabledModules: ModuleKey[]): boolean {
-  // Always permit core routes
   if (route === "/whatsapp" || route === "/whatsapp/dashboard") return true;
 
-  // Find if route matches any module
   for (const [modKey, def] of Object.entries(MASTER_MODULES)) {
     if (def.routes.some(r => route.startsWith(r))) {
       return enabledModules.includes(modKey as ModuleKey);

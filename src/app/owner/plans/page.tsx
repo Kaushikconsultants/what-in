@@ -28,7 +28,7 @@ export default function OwnerPlansPage() {
           <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #6366f1, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: "white", boxShadow: "0 0 20px rgba(99, 102, 241, 0.4)" }}>👑</div>
           <div>
             <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.2px" }}>WhatMore Super-Admin Console</h1>
-            <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>Plan Tiers & 13-Module Architecture</p>
+            <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>Plan Tiers & 11-Module/Integration Architecture</p>
           </div>
         </div>
         <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -56,13 +56,13 @@ export default function OwnerPlansPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
           <div>
             <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#ffffff", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>💎 Plan Tiers & Modular Entitlements</h2>
-            <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>Configure standard subscription packages, view the 13-module feature matrix, and explore industry presets</p>
+            <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>Configure standard subscription packages, view the 11-module & integration feature matrix, and explore presets</p>
           </div>
 
           <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "12px", padding: "4px", gap: "4px" }}>
             {[
               { id: "TIERS", label: "💎 Plan Cards", icon: "📦" },
-              { id: "MATRIX", label: "📊 Feature Matrix (13 Modules)", icon: "🎛️" },
+              { id: "MATRIX", label: "📊 Feature Matrix (11 Modules)", icon: "🎛️" },
               { id: "PRESETS", label: "🏭 Industry Presets", icon: "✨" },
             ].map(tab => (
               <button
@@ -142,12 +142,13 @@ export default function OwnerPlansPage() {
 
                   <div>
                     <div style={{ fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px", display: "flex", justifyContent: "space-between" }}>
-                      <span>Included Modules</span>
-                      <span style={{ color: "#818cf8" }}>{plan.modules.length} / 13 Active</span>
+                      <span>Included Modules & Integrations</span>
+                      <span style={{ color: "#818cf8" }}>{plan.modules.length} / {ALL_MODULE_KEYS.length} Active</span>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                       {plan.modules.map(modKey => {
                         const m = MASTER_MODULES[modKey];
+                        if (!m) return null;
                         return (
                           <span
                             key={modKey}
@@ -197,15 +198,15 @@ export default function OwnerPlansPage() {
           </div>
         )}
 
-        {/* VIEW 2: 13-Module Matrix Table */}
+        {/* VIEW 2: 11-Module Matrix Table */}
         {selectedTab === "MATRIX" && (
           <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "20px", overflow: "hidden", backdropFilter: "blur(12px)" }}>
             <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 900, color: "#ffffff" }}>Master 13-Module Feature Matrix</h3>
-                <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>Granular breakdown of which business modules are bundled into each plan tier</p>
+                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 900, color: "#ffffff" }}>Master 11-Module & Integration Feature Matrix</h3>
+                <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>Granular breakdown of which business modules & integrations are bundled into each plan tier</p>
               </div>
-              <span style={{ fontSize: "12px", color: "#818cf8", fontWeight: 700 }}>13 Total Modules</span>
+              <span style={{ fontSize: "12px", color: "#818cf8", fontWeight: 700 }}>{ALL_MODULE_KEYS.length} Total Modules & Integrations</span>
             </div>
 
             <div style={{ overflowX: "auto" }}>

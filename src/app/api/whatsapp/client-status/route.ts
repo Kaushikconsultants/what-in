@@ -68,8 +68,8 @@ export async function GET(req: NextRequest) {
       aiRepliesUsedCount: client.aiRepliesUsedCount || 0,
       subscriptionPlan: client.subscriptionPlan || "STARTER",
       enabledModules: client.enabledModules ? JSON.parse(client.enabledModules) : [
-        "INBOX", "CHATBOT", "AI_AGENT", "COMMERCE", "PAYMENTS", "BROADCASTS",
-        "WIDGET", "COBROWSE", "INVOICING", "HRMS", "RECRUITMENT", "CRM", "DEVELOPER_API"
+        "INBOX", "CHATBOT", "AI_AGENT", "BROADCASTS", "WIDGET", "COBROWSE",
+        "DEVELOPER_API", "SHOPIFY_INTEGRATION", "META_CATALOG", "META_PIXEL_CAPI", "PAYMENT_GATEWAY"
       ]
     });
   } catch {

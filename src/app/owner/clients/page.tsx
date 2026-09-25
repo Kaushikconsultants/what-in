@@ -616,7 +616,7 @@ export default function OwnerClientsPage() {
                           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                               <span style={{ fontSize: "12px", fontWeight: 800, color: "#818cf8" }}>
-                                🎛️ {enabledMods.length} / 13 Modules
+                                🎛️ {enabledMods.length} / {ALL_MODULE_KEYS.length} Modules
                               </span>
                               <button
                                 onClick={() => handleOpenModules(client)}
