@@ -54,7 +54,8 @@ import {
   TrendingUp,
   Percent,
   SlidersHorizontal,
-  ChevronRight as ArrowRight
+  ChevronRight as ArrowRight,
+  Wrench
 } from "lucide-react";
 import {
   getOwnerClientsAction,
@@ -71,7 +72,9 @@ import {
   registerWebhookForClientAction,
   loginAsClientAction,
   updateClientModulesAction,
-  updateClientPlanTierAction
+  updateClientPlanTierAction,
+  topUpClientQuotaAction,
+  repairClientMetaWebhookAction
 } from "@/app/actions/ownerPortalActions";
 import {
   MASTER_MODULES,
@@ -164,6 +167,16 @@ export default function OwnerClientsPage() {
 
   // Quick action loaders
   const [impersonating, setImpersonating] = useState<string | null>(null);
+  const [repairingClientId, setRepairingClientId] = useState<string | null>(null);
+
+  // Top-Up Quota Modal
+  const [topUpClient, setTopUpClient] = useState<any | null>(null);
+  const [topUpForm, setTopUpForm] = useState({
+    addMessages: 5000,
+    addAiReplies: 500,
+    resetCounter: false
+  });
+  const [submittingTopUp, setSubmittingTopUp] = useState(false);
 
   // Add Form state
   const [form, setForm] = useState({
@@ -355,6 +368,42 @@ export default function OwnerClientsPage() {
       setModulesClient(null);
     } else {
       alert("Error updating modules: " + res.error);
+    }
+  };
+
+  const handleOpenTopUp = (client: any) => {
+    setActiveActionDropdown(null);
+    setTopUpClient(client);
+    setTopUpForm({
+      addMessages: 5000,
+      addAiReplies: 500,
+      resetCounter: false
+    });
+  };
+
+  const handleSubmitTopUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topUpClient) return;
+    setSubmittingTopUp(true);
+    const res = await topUpClientQuotaAction(topUpClient.id, topUpForm);
+    setSubmittingTopUp(false);
+    if (res.success) {
+      setTopUpClient(null);
+      load();
+    } else {
+      alert("Error adding top-up: " + res.error);
+    }
+  };
+
+  const handleRepairWebhook = async (client: any) => {
+    setActiveActionDropdown(null);
+    setRepairingClientId(client.id);
+    const res = await repairClientMetaWebhookAction(client.id);
+    setRepairingClientId(null);
+    if (res.success) {
+      alert(res.message);
+    } else {
+      alert("Error: " + res.error);
     }
   };
 
@@ -1116,6 +1165,23 @@ export default function OwnerClientsPage() {
                                         <span>Check Meta API Health</span>
                                       </button>
 
+                                      <button
+                                        onClick={() => handleOpenTopUp(client)}
+                                        className="w-full px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer transition-colors"
+                                      >
+                                        <Zap size={14} className="text-amber-500" />
+                                        <span>Add Quota Top-Up</span>
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleRepairWebhook(client)}
+                                        disabled={repairingClientId === client.id}
+                                        className="w-full px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer transition-colors"
+                                      >
+                                        <Wrench size={14} className="text-emerald-500" />
+                                        <span>{repairingClientId === client.id ? "Repairing..." : "Repair Meta Webhook"}</span>
+                                      </button>
+
                                       <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
 
                                       <button
@@ -1212,21 +1278,35 @@ export default function OwnerClientsPage() {
                                     <div>
                                       <div className="text-[11px] font-black uppercase text-slate-500 mb-1">Fast Quick-Links</div>
                                       <p className="text-[11px] text-slate-400">Launch client tools directly</p>
-                                    </div>
-                                    <div className="flex gap-2 pt-2">
+                                                          <div className="grid grid-cols-2 gap-1.5 pt-2">
+                                      <button
+                                        onClick={() => handleOpenTopUp(client)}
+                                        className="py-1.5 px-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold text-[11px] text-center hover:bg-amber-100 flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Zap size={11} className="text-amber-500" />
+                                        <span>+ Top-Up</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleRepairWebhook(client)}
+                                        disabled={repairingClientId === client.id}
+                                        className="py-1.5 px-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] text-center hover:bg-emerald-100 flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Wrench size={11} />
+                                        <span>{repairingClientId === client.id ? "Repairing..." : "Heal Webhook"}</span>
+                                      </button>
                                       <button
                                         onClick={() => handleOpenModules(client)}
-                                        className="flex-1 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-[11px] text-center hover:bg-indigo-100"
+                                        className="py-1.5 px-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold text-[11px] text-center hover:bg-indigo-100 cursor-pointer"
                                       >
-                                        Edit Modules
+                                        Modules
                                       </button>
                                       <button
                                         onClick={() => handleOpenEdit(client)}
-                                        className="flex-1 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[11px] text-center hover:bg-slate-200"
+                                        className="py-1.5 px-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[11px] text-center hover:bg-slate-200 cursor-pointer"
                                       >
                                         Settings
                                       </button>
-                                    </div>
+                                    </div>               </div>
                                   </div>
 
                                 </div>
@@ -2336,6 +2416,125 @@ export default function OwnerClientsPage() {
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* ⚡ MODAL 9: TOP-UP QUOTA MODAL                             */}
+      {/* ========================================================= */}
+      {topUpClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+            <div className="flex items-start justify-between pb-4 mb-5 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600">
+                    <Zap size={18} className="text-amber-500" />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                    Add Quota Top-Up
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Provision additional message and AI reply capacity for <b>{topUpClient.businessName}</b>.
+                </p>
+              </div>
+              <button
+                onClick={() => setTopUpClient(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitTopUp} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Add Messages Quota (+Msgs)
+                </label>
+                <div className="flex gap-1.5 mb-2">
+                  {[1000, 5000, 10000, 25000].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setTopUpForm({ ...topUpForm, addMessages: amt })}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold border cursor-pointer ${
+                        topUpForm.addMessages === amt
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      +{amt.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  value={topUpForm.addMessages}
+                  onChange={e => setTopUpForm({ ...topUpForm, addMessages: Number(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Add AI Replies Quota (+AI)
+                </label>
+                <div className="flex gap-1.5 mb-2">
+                  {[250, 500, 1000, 5000].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setTopUpForm({ ...topUpForm, addAiReplies: amt })}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold border cursor-pointer ${
+                        topUpForm.addAiReplies === amt
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      +{amt.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  value={topUpForm.addAiReplies}
+                  onChange={e => setTopUpForm({ ...topUpForm, addAiReplies: Number(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
+                />
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={topUpForm.resetCounter}
+                    onChange={e => setTopUpForm({ ...topUpForm, resetCounter: e.target.checked })}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                  <span>Reset current month's usage counter to 0</span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setTopUpClient(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingTopUp}
+                  className="px-5 py-2 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  {submittingTopUp ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
+                  <span>Apply Top-Up</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

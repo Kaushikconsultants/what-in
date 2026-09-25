@@ -797,6 +797,285 @@ export async function updateClientQuotasAction(clientId: string, data: {
   }
 }
 
+export async function topUpClientQuotaAction(clientId: string, data: {
+  addMessages?: number;
+  addAiReplies?: number;
+  resetCounter?: boolean;
+}) {
+  try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+    if (!client) return { success: false, error: "Client not found" };
+
+    const updateData: any = {};
+    if (data.addMessages) {
+      updateData.monthlyMessageQuota = (client.monthlyMessageQuota || 5000) + Number(data.addMessages);
+    }
+    if (data.addAiReplies) {
+      updateData.monthlyAiQuota = (client.monthlyAiQuota || 500) + Number(data.addAiReplies);
+    }
+    if (data.resetCounter) {
+      updateData.messagesUsedCount = 0;
+      updateData.aiRepliesUsedCount = 0;
+    }
+
+    const updated = await prisma.whatsAppClient.update({
+      where: { id: clientId },
+      data: updateData
+    });
+    return { success: true, client: updated };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+// -------------------------------------------------------------
+// 2b. SaaS Telemetry & Real-Time Usage Intelligence
+// -------------------------------------------------------------
+export async function getOwnerTelemetryStatsAction() {
+  try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+
+    const clients = await prisma.whatsAppClient.findMany({
+      select: {
+        id: true,
+        businessName: true,
+        contactEmail: true,
+        subscriptionPlan: true,
+        subscriptionStatus: true,
+        monthlyMessageQuota: true,
+        monthlyAiQuota: true,
+        messagesUsedCount: true,
+        aiRepliesUsedCount: true,
+        wabaId: true,
+        phoneId: true,
+        metaAccessToken: true,
+        webhookClientId: true,
+        createdAt: true,
+      },
+      orderBy: { messagesUsedCount: "desc" }
+    });
+
+    const totalMessagesUsed = clients.reduce((acc, c) => acc + (c.messagesUsedCount || 0), 0);
+    const totalAiRepliesUsed = clients.reduce((acc, c) => acc + (c.aiRepliesUsedCount || 0), 0);
+    const totalMessagesAllotted = clients.reduce((acc, c) => acc + (c.monthlyMessageQuota || 5000), 0);
+    const totalAiAllotted = clients.reduce((acc, c) => acc + (c.monthlyAiQuota || 500), 0);
+
+    const messageUtilizationPct = totalMessagesAllotted > 0 
+      ? Math.min(100, Math.round((totalMessagesUsed / totalMessagesAllotted) * 100))
+      : 0;
+
+    const aiUtilizationPct = totalAiAllotted > 0
+      ? Math.min(100, Math.round((totalAiRepliesUsed / totalAiAllotted) * 100))
+      : 0;
+
+    // Detect tenants with high quota utilization (>75% warning, >90% critical)
+    const exhaustionAlerts: any[] = [];
+    clients.forEach(c => {
+      const msgQuota = c.monthlyMessageQuota || 5000;
+      const aiQuota = c.monthlyAiQuota || 500;
+      const msgPct = Math.round(((c.messagesUsedCount || 0) / msgQuota) * 100);
+      const aiPct = Math.round(((c.aiRepliesUsedCount || 0) / aiQuota) * 100);
+
+      const maxPct = Math.max(msgPct, aiPct);
+      if (maxPct >= 75) {
+        exhaustionAlerts.push({
+          clientId: c.id,
+          businessName: c.businessName,
+          contactEmail: c.contactEmail,
+          plan: c.subscriptionPlan,
+          msgPct,
+          aiPct,
+          maxPct,
+          severity: maxPct >= 90 ? "CRITICAL" : "WARNING",
+          messagesUsed: c.messagesUsedCount || 0,
+          messagesQuota: msgQuota,
+          aiUsed: c.aiRepliesUsedCount || 0,
+          aiQuota: aiQuota,
+        });
+      }
+    });
+
+    return {
+      success: true,
+      telemetry: {
+        totalMessagesUsed,
+        totalAiRepliesUsed,
+        totalMessagesAllotted,
+        totalAiAllotted,
+        messageUtilizationPct,
+        aiUtilizationPct,
+        activeTenantsCount: clients.filter(c => c.subscriptionStatus === "ACTIVE").length,
+        totalTenantsCount: clients.length,
+        exhaustionAlerts: exhaustionAlerts.sort((a, b) => b.maxPct - a.maxPct),
+        topConsumers: clients.slice(0, 6)
+      }
+    };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+// -------------------------------------------------------------
+// 2c. Meta Cloud API Sentinel & Auto-Healer Actions
+// -------------------------------------------------------------
+export async function checkAllClientsMetaHealthAction() {
+  try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+
+    const clients = await prisma.whatsAppClient.findMany({
+      select: {
+        id: true,
+        businessName: true,
+        contactEmail: true,
+        wabaId: true,
+        phoneId: true,
+        metaAccessToken: true,
+        webhookClientId: true,
+        webhookVerifyToken: true,
+        phoneNumber: true
+      }
+    });
+
+    const results = await Promise.all(
+      clients.map(async (client) => {
+        if (!client.metaAccessToken || !client.phoneId) {
+          return {
+            clientId: client.id,
+            businessName: client.businessName,
+            status: "NOT_CONFIGURED",
+            message: "Missing token or phone ID",
+            qualityRating: "UNKNOWN",
+            isSubscribed: false,
+          };
+        }
+
+        try {
+          const res = await fetch(
+            `https://graph.facebook.com/v21.0/${client.phoneId}?fields=display_phone_number,verified_name,quality_rating,code_verification_status`,
+            {
+              headers: { Authorization: `Bearer ${client.metaAccessToken}` },
+              cache: "no-store"
+            }
+          );
+          const data = await res.json();
+          if (!res.ok || data.error) {
+            return {
+              clientId: client.id,
+              businessName: client.businessName,
+              status: "TOKEN_INVALID",
+              message: data.error?.message || "Invalid or expired token",
+              qualityRating: "UNKNOWN",
+              isSubscribed: false,
+            };
+          }
+
+          // Check webhook subscription if WABA ID is provided
+          let isSubscribed = true;
+          if (client.wabaId) {
+            try {
+              const subRes = await fetch(
+                `https://graph.facebook.com/v21.0/${client.wabaId}/subscribed_apps`,
+                { headers: { Authorization: `Bearer ${client.metaAccessToken}` }, cache: "no-store" }
+              );
+              const subData = await subRes.json();
+              isSubscribed = Array.isArray(subData.data) && subData.data.length > 0;
+            } catch {
+              isSubscribed = false;
+            }
+          }
+
+          return {
+            clientId: client.id,
+            businessName: client.businessName,
+            status: isSubscribed ? "HEALTHY" : "WEBHOOK_DEGRADED",
+            message: isSubscribed ? "Active & Webhooks Subscribed" : "Token valid, but Webhook not subscribed to Meta",
+            qualityRating: data.quality_rating || "GREEN",
+            displayPhone: data.display_phone_number || client.phoneNumber,
+            isSubscribed,
+          };
+        } catch (err: any) {
+          return {
+            clientId: client.id,
+            businessName: client.businessName,
+            status: "ERROR",
+            message: err.message,
+            qualityRating: "UNKNOWN",
+            isSubscribed: false,
+          };
+        }
+      })
+    );
+
+    return { success: true, results };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function repairClientMetaWebhookAction(clientId: string) {
+  try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+    if (!client) return { success: false, error: "Client not found" };
+    if (!client.wabaId || !client.metaAccessToken) {
+      return { success: false, error: "Client does not have WABA ID or Access Token configured" };
+    }
+
+    const res = await registerMetaWebhook(client.wabaId, client.metaAccessToken, client.webhookClientId);
+    if (res.success) {
+      return { success: true, message: `Successfully re-subscribed ${client.businessName} WABA to Meta Graph Webhooks.` };
+    } else {
+      return { success: false, error: res.error || "Meta Graph subscription failed" };
+    }
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function repairAllWebhooksAction() {
+  try {
+    if (!(await isOwnerAuthenticated())) {
+      return { success: false, error: "Unauthorized access: Owner login required" };
+    }
+
+    const clients = await prisma.whatsAppClient.findMany({
+      where: {
+        metaAccessToken: { not: null },
+        wabaId: { not: null }
+      }
+    });
+
+    const outcomes: { clientId: string; businessName: string; success: boolean; error?: string }[] = [];
+
+    for (const client of clients) {
+      if (client.wabaId && client.metaAccessToken) {
+        const res = await registerMetaWebhook(client.wabaId, client.metaAccessToken, client.webhookClientId);
+        outcomes.push({
+          clientId: client.id,
+          businessName: client.businessName,
+          success: res.success,
+          error: res.error
+        });
+      }
+    }
+
+    const successCount = outcomes.filter(o => o.success).length;
+    return { success: true, total: outcomes.length, successCount, outcomes };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
 // -------------------------------------------------------------
 // 3. Global In-App Announcements (CRUD with Scheduling)
 // -------------------------------------------------------------
