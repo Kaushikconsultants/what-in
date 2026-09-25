@@ -1,15 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Crown, Lock, ArrowRight, AlertCircle, RefreshCw, KeyRound } from "lucide-react";
+import { Crown, ArrowRight, AlertCircle, RefreshCw, KeyRound, ShieldCheck } from "lucide-react";
 
 export default function OwnerLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,17 +17,19 @@ export default function OwnerLoginPage() {
       const res = await fetch("/api/owner/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ password: password.trim() })
       });
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
         sessionStorage.setItem("owner_authed", "1");
-        router.push("/owner");
+        // Use window.location.href for guaranteed cookie propagation & full page session sync
+        window.location.href = "/owner";
       } else {
-        setError("Invalid master password. Access denied.");
+        setError(data.error || "Invalid master password. Access denied.");
+        setLoading(false);
       }
     } catch {
       setError("Connection error. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -40,7 +40,7 @@ export default function OwnerLoginPage() {
         
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center mx-auto mb-4 text-white shadow-xl shadow-emerald-500/25">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 shadow-emerald-500/25 flex items-center justify-center mx-auto mb-4 text-white shadow-xl">
             <Crown size={32} className="text-amber-300" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
@@ -83,12 +83,12 @@ export default function OwnerLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-2xl font-bold text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-md shadow-indigo-500/25 transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
+              className="w-full py-3.5 rounded-2xl font-bold text-sm text-white bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/25 shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
             >
               {loading ? (
                 <>
                   <RefreshCw size={16} className="animate-spin" />
-                  <span>Authenticating...</span>
+                  <span>Authenticating & Redirecting...</span>
                 </>
               ) : (
                 <>
@@ -104,7 +104,7 @@ export default function OwnerLoginPage() {
         <div className="text-center mt-6 space-y-1">
           <Link
             href="/login"
-            className="text-xs font-bold text-slate-500 hover:text-emerald-500 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors"
+            className="text-xs font-bold text-slate-500 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors"
           >
             ← Back to Client Login Portal
           </Link>

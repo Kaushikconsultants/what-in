@@ -20,6 +20,7 @@ import {
 
 export default function OwnerHeaderNav() {
   const pathname = usePathname();
+  if (pathname === "/owner/login") return null;
   const router = useRouter();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
