@@ -43,6 +43,7 @@ import {
   topUpClientQuotaAction
 } from "@/app/actions/ownerPortalActions";
 import { MASTER_MODULES, ALL_MODULE_KEYS, parseEnabledModules } from "@/lib/moduleRegistry";
+import PlatformMissionControl from "@/components/owner/PlatformMissionControl";
 
 export default function OwnerDashboardPage() {
   const [data, setData] = useState<any>(null);
@@ -352,6 +353,9 @@ export default function OwnerDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* 🌐 "MISSION CONTROL" LIVE EVENT STREAM / PLATFORM PULSE */}
+      <PlatformMissionControl />
 
       {/* 📊 GLOBAL TELEMETRY HEATMAP & TRAFFIC GAUGES */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs space-y-6">
