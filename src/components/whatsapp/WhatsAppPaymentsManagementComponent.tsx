@@ -27,6 +27,7 @@ import {
 } from "@/app/actions/paymentRecoveryActions";
 import { generateMetaCheckoutFlowJson } from "@/lib/paymentRecoveryAgent";
 import { formatWhatsAppPhone, getCustomerDisplayName } from "@/lib/phoneUtils";
+import ModuleGatedView from "@/components/whatsapp/ModuleGatedView";
 
 interface WhatsAppPaymentsManagementComponentProps {
   embedded?: boolean;
@@ -434,7 +435,8 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
   };
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-7xl">
+    <ModuleGatedView moduleKey="PAYMENT_GATEWAY">
+      <div className="flex flex-col gap-6 w-full max-w-7xl">
       {/* Toast Alert */}
       {toast && (
         <div className={`fixed top-6 right-6 z-[99999] px-4 py-3 rounded-xl text-sm font-bold shadow-2xl flex items-center gap-2 border transition-all ${
@@ -2316,5 +2318,6 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
         </div>
       )}
     </div>
+    </ModuleGatedView>
   );
 }

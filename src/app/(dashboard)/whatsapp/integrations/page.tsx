@@ -38,7 +38,8 @@ import WhatsAppPaymentsManagementComponent from "@/components/whatsapp/WhatsAppP
 import DeveloperApiPortalComponent from "@/components/whatsapp/DeveloperApiPortalComponent";
 import WebsiteWidgetBuilderComponent from "@/components/whatsapp/WebsiteWidgetBuilderComponent";
 import GoogleSheetsSyncComponent from "@/components/whatsapp/GoogleSheetsSyncComponent";
-
+import ModuleGatedView from "@/components/whatsapp/ModuleGatedView";
+import { ModuleKey } from "@/lib/moduleRegistry";
 
 export default function IntegrationsHubPage() {
   const [activeTab, setActiveTab] = useState("whatsapp");
@@ -685,6 +686,13 @@ const reloadTeams = async () => {
     ? webhookIntegrations 
     : webhookIntegrations.filter(h => h.type === activeCategoryTab);
 
+  const userModules: ModuleKey[] = clientInfo?.enabledModules || [];
+  const isModuleEnabled = (mod: ModuleKey | ModuleKey[]) => {
+    if (!clientInfo || !clientInfo.enabledModules) return true;
+    const arr = Array.isArray(mod) ? mod : [mod];
+    return arr.some(k => userModules.includes(k));
+  };
+
   return (
     <div className="p-4 sm:p-8 w-full max-w-none flex flex-col gap-6 sm:gap-8">
       {/* Header title */}
@@ -698,27 +706,41 @@ const reloadTeams = async () => {
         <button onClick={() => handleTabChange("whatsapp")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "whatsapp" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
           WhatsApp API
         </button>
-        <button onClick={() => handleTabChange("developer-api")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "developer-api" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
-          <Code2 size={16} /> Developer API & Keys
-        </button>
-        <button onClick={() => handleTabChange("website-widget")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "website-widget" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
-          <Smartphone size={16} /> Website Widget
-        </button>
-        <button onClick={() => handleTabChange("google-sheets")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "google-sheets" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
-          <FileSpreadsheet size={16} /> Google Sheets
-        </button>
-        <button onClick={() => handleTabChange("ai-automation")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "ai-automation" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
-          <Bot size={16} /> AI Automation
-        </button>
-        <button onClick={() => handleTabChange("payment")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "payment" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
-          <CreditCard size={16} /> Payments & Gateways
-        </button>
-        <button onClick={() => handleTabChange("webhooks")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "webhooks" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
-          Webhooks
-        </button>
-        <button onClick={() => handleTabChange("facebook")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "facebook" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
-          <Target size={16} /> Meta Ads, CAPI & Catalog
-        </button>
+        {isModuleEnabled("DEVELOPER_API") && (
+          <button onClick={() => handleTabChange("developer-api")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "developer-api" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
+            <Code2 size={16} /> Developer API & Keys
+          </button>
+        )}
+        {isModuleEnabled("WIDGET") && (
+          <button onClick={() => handleTabChange("website-widget")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "website-widget" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
+            <Smartphone size={16} /> Website Widget
+          </button>
+        )}
+        {isModuleEnabled("DEVELOPER_API") && (
+          <button onClick={() => handleTabChange("google-sheets")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "google-sheets" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
+            <FileSpreadsheet size={16} /> Google Sheets
+          </button>
+        )}
+        {isModuleEnabled("AI_AGENT") && (
+          <button onClick={() => handleTabChange("ai-automation")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "ai-automation" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
+            <Bot size={16} /> AI Automation
+          </button>
+        )}
+        {isModuleEnabled("PAYMENT_GATEWAY") && (
+          <button onClick={() => handleTabChange("payment")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "payment" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
+            <CreditCard size={16} /> Payments & Gateways
+          </button>
+        )}
+        {isModuleEnabled("DEVELOPER_API") && (
+          <button onClick={() => handleTabChange("webhooks")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "webhooks" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
+            Webhooks
+          </button>
+        )}
+        {isModuleEnabled(["META_PIXEL_CAPI", "META_CATALOG"]) && (
+          <button onClick={() => handleTabChange("facebook")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "facebook" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
+            <Target size={16} /> Meta Ads, CAPI & Catalog
+          </button>
+        )}
       </nav>
 
       {/* 1. Integrations tab */}
@@ -876,47 +898,54 @@ const reloadTeams = async () => {
               </form>
             </div>
           </div>
-
-                  </div>
+        </div>
       )}
 
       {/* 2. AI Automation Tab */}
       {activeTab === "ai-automation" && (
-        <div className="w-full max-w-7xl">
-          <WhatsAppAIAutomationComponent embedded={true} />
-        </div>
+        <ModuleGatedView moduleKey="AI_AGENT">
+          <div className="w-full max-w-7xl">
+            <WhatsAppAIAutomationComponent embedded={true} />
+          </div>
+        </ModuleGatedView>
       )}
 
       {activeTab === "shopify" && (
-        <div className="flex flex-col gap-6 w-full max-w-7xl">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 shadow-sm p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-2xl border border-emerald-200 dark:border-emerald-800/60">
-                <Store size={28} />
+        <ModuleGatedView moduleKey="SHOPIFY_INTEGRATION">
+          <div className="flex flex-col gap-6 w-full max-w-7xl">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 shadow-sm p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-2xl border border-emerald-200 dark:border-emerald-800/60">
+                  <Store size={28} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white m-0">Shopify Integration Moved to Shopify Hub</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 m-0 mt-1 max-w-xl leading-relaxed">
+                    Shopify store connection credentials, automated order notifications, abandoned checkout recovery drips, and webhooks are now unified in the primary <strong>Shopify</strong> section.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white m-0">Shopify Integration Moved to Shopify Hub</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 m-0 mt-1 max-w-xl leading-relaxed">
-                  Shopify store connection credentials, automated order notifications, abandoned checkout recovery drips, and webhooks are now unified in the primary <strong>Shopify</strong> section.
-                </p>
-              </div>
+              <Link
+                href="/whatsapp/shopify?tab=settings"
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2 shrink-0"
+              >
+                <span>Open Shopify Hub Settings</span>
+                <ArrowRight size={16} />
+              </Link>
             </div>
-            <Link
-              href="/whatsapp/shopify?tab=settings"
-              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2 shrink-0"
-            >
-              <span>Open Shopify Hub Settings</span>
-              <ArrowRight size={16} />
-            </Link>
           </div>
-        </div>
-      )}
-      {activeTab === "payment" && (
-        <WhatsAppPaymentsManagementComponent embedded={true} />
+        </ModuleGatedView>
       )}
 
-      {activeTab === "webhooks" && (
-        <div className="flex flex-col gap-8 w-full max-w-7xl">
+      {activeTab === "payment" && (
+        <ModuleGatedView moduleKey="PAYMENT_GATEWAY">
+          <WhatsAppPaymentsManagementComponent embedded={true} />
+        </ModuleGatedView>
+      )}
+
+      {activeTab === "webhooks" && (
+        <ModuleGatedView moduleKey="DEVELOPER_API">
+          <div className="flex flex-col gap-8 w-full max-w-7xl">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             
             <div className="flex justify-between items-center mb-6">
@@ -986,10 +1015,12 @@ const reloadTeams = async () => {
             </div>
           </div>
         </div>
+        </ModuleGatedView>
       )}
 
       {activeTab === "facebook" && (
-        <div className="flex flex-col gap-8 w-full max-w-7xl">
+        <ModuleGatedView moduleKey={["META_PIXEL_CAPI", "META_CATALOG"]}>
+          <div className="flex flex-col gap-8 w-full max-w-7xl">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
@@ -1345,21 +1376,28 @@ const reloadTeams = async () => {
 
           </div>
         </div>
+        </ModuleGatedView>
       )}
 
       {/* Developer API & Scoped Keys Tab */}
       {activeTab === "developer-api" && (
-        <DeveloperApiPortalComponent />
+        <ModuleGatedView moduleKey="DEVELOPER_API">
+          <DeveloperApiPortalComponent />
+        </ModuleGatedView>
       )}
 
       {/* Smart Website Widget Customizer Tab */}
       {activeTab === "website-widget" && (
-        <WebsiteWidgetBuilderComponent />
+        <ModuleGatedView moduleKey="WIDGET">
+          <WebsiteWidgetBuilderComponent />
+        </ModuleGatedView>
       )}
 
       {/* Native Google Sheets 2-Way Automation Tab */}
       {activeTab === "google-sheets" && (
-        <GoogleSheetsSyncComponent />
+        <ModuleGatedView moduleKey="DEVELOPER_API">
+          <GoogleSheetsSyncComponent />
+        </ModuleGatedView>
       )}
 
       {/* Global Shared Modal for Adding/Editing Webhooks and Meta Integrations */}
