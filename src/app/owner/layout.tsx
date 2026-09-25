@@ -2,7 +2,7 @@ import React from "react";
 import OwnerHeaderNav from "@/components/owner/OwnerHeaderNav";
 
 export const metadata = {
-  title: "WhatMore Super-Admin Console",
+  title: "What-In Super-Admin Console",
   description: "Executive Multi-Tenant Operations & Feature Gating Platform",
 };
 

@@ -85,7 +85,7 @@ export default function WhatsAppHeaderNav() {
 
   const [userName, setUserName] = React.useState("");
   const [userRole, setUserRole] = React.useState("");
-  const [brandTitle, setBrandTitle] = React.useState("Whatmore");
+  const [brandTitle, setBrandTitle] = React.useState("What-In");
   const [enabledModules, setEnabledModules] = React.useState<ModuleKey[]>(ALL_MODULE_KEYS);
 
   React.useEffect(() => {
@@ -94,7 +94,7 @@ export default function WhatsAppHeaderNav() {
         if (window.location.hostname.includes("what-in") || window.location.hostname.includes("whatin")) {
           setBrandTitle("What-In");
         } else {
-          setBrandTitle("Whatmore");
+          setBrandTitle("What-In");
         }
       }
 

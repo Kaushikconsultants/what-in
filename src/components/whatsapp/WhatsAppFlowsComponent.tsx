@@ -932,7 +932,7 @@ export default function WhatsAppFlowsComponent() {
                   <div className="bg-white dark:bg-[#1f2c34] rounded-xl p-3 shadow-xs">
                     <div className="font-bold text-xs text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-1 mb-1">{name || "Flow Header"}</div>
                     <div className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">{description || "Please tap the button to open the form."}</div>
-                    <div className="text-[10px] text-slate-400 mt-1 text-right">Powered by Whatmore</div>
+                    <div className="text-[10px] text-slate-400 mt-1 text-right">Powered by What-In</div>
                   </div>
                   {/* CTA button mock */}
                   <div className="bg-white dark:bg-[#202c33] hover:bg-slate-50 dark:hover:bg-[#2a3942] rounded-xl py-2 px-3 text-center text-xs font-bold text-[#00a5f4] dark:text-[#53bdeb] shadow-xs cursor-pointer">

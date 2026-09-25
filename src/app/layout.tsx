@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Whatmore - Commerce & Automation",
-  description: "Unified Commerce Platform",
+  title: "What-In - Enterprise WhatsApp Business OS & AI Platform",
+  description: "Official Meta Cloud API v21.0 WhatsApp Commerce & Automation Platform",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

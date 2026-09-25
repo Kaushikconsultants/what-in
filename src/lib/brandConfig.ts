@@ -57,6 +57,6 @@ export const BRAND_WHATIN: BrandConfig = {
 
 // Default active brand for whatsapp-app (can be overridden by environment variable NEXT_PUBLIC_BRAND)
 export function getActiveBrand(): BrandConfig {
-  const brandEnv = process.env.NEXT_PUBLIC_BRAND || "WHATMORE";
-  return brandEnv.toUpperCase() === "WHATIN" ? BRAND_WHATIN : BRAND_WHATMORE;
+  const brandEnv = process.env.NEXT_PUBLIC_BRAND || "WHATIN";
+  return brandEnv.toUpperCase() === "WHATMORE" ? BRAND_WHATMORE : BRAND_WHATIN;
 }

@@ -89,10 +89,10 @@ export default function OwnerHeaderNav() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">
-                    WhatMore
+                    What-In
                   </span>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 uppercase tracking-wider">
-                    <ShieldCheck size={11} className="text-indigo-500" /> Super-Admin
+                    <ShieldCheck size={11} className="text-emerald-500" /> Super-Admin
                   </span>
                 </div>
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 m-0">

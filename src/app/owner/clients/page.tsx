@@ -267,7 +267,7 @@ export default function OwnerClientsPage() {
   };
 
   const handleOpenAdd = () => {
-    const defaultPassword = "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
+    const defaultPassword = "WhatIn@" + Math.floor(100000 + Math.random() * 900000);
     const starterPlan = DEFAULT_PLAN_TIERS[0];
     setForm({
       businessName: "",
@@ -2179,7 +2179,7 @@ export default function OwnerClientsPage() {
           <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
             <div className="text-center pb-4 border-b border-slate-200 dark:border-slate-800 mb-4">
               <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">OFFICIAL PAYMENT RECEIPT</span>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mt-1">WhatMore SaaS Platform</h3>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mt-1">What-In SaaS Platform</h3>
               <p className="text-[11px] text-slate-500 font-mono">Invoice ID: {selectedReceipt.id.slice(0, 12)}</p>
             </div>
 

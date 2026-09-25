@@ -40,14 +40,14 @@ export default function OwnerLoginPage() {
         
         {/* Logo & Title */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center mx-auto mb-4 text-white shadow-xl shadow-indigo-500/25">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex items-center justify-center mx-auto mb-4 text-white shadow-xl shadow-emerald-500/25">
             <Crown size={32} className="text-amber-300" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             Super-Admin Console
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            WhatMore SaaS Platform Operations & Gating Command
+            What-In SaaS Platform Operations & Gating Command
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export default function OwnerLoginPage() {
                   required
                   autoComplete="new-password"
                   autoFocus
-                  className="w-full px-4 py-3 rounded-2xl text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all font-mono"
+                  className="w-full px-4 py-3 rounded-2xl text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all font-mono"
                 />
                 <KeyRound size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
@@ -104,7 +104,7 @@ export default function OwnerLoginPage() {
         <div className="text-center mt-6 space-y-1">
           <Link
             href="/login"
-            className="text-xs font-bold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+            className="text-xs font-bold text-slate-500 hover:text-emerald-500 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors"
           >
             ← Back to Client Login Portal
           </Link>
