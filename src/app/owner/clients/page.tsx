@@ -177,6 +177,13 @@ export default function OwnerClientsPage() {
     resetCounter: false
   });
   const [submittingTopUp, setSubmittingTopUp] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollLeft = 0;
+    }
+  }, [viewMode, clients]);
 
   // Add Form state
   const [form, setForm] = useState({
@@ -622,7 +629,7 @@ export default function OwnerClientsPage() {
   const totalMRR = clients.filter(c => c.subscriptionStatus === "ACTIVE").reduce((sum, c) => sum + (c.monthlyFee || 0), 0);
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-7">
+    <main className="w-full px-4 sm:px-6 lg:px-10 py-7 space-y-7">
       
       {/* 🌟 Top Page Header & Executive Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden">
@@ -929,17 +936,17 @@ export default function OwnerClientsPage() {
           {/* 1. TABLE VIEW (Modern Professional Data Grid)             */}
           {/* ========================================================= */}
           {viewMode === "TABLE" && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden">
-              <div className="overflow-x-auto">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-xs overflow-visible">
+              <div ref={tableContainerRef} className="overflow-x-auto min-h-[380px] rounded-3xl">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      <th className="py-4 px-6 min-w-[240px]">Business & Contact</th>
-                      <th className="py-4 px-5 min-w-[170px]">Plan & Status</th>
-                      <th className="py-4 px-5 min-w-[190px]">Active Modules</th>
-                      <th className="py-4 px-5 min-w-[150px]">Renewal & Due</th>
-                      <th className="py-4 px-5 min-w-[200px]">Usage & Quotas</th>
-                      <th className="py-4 px-6 text-right min-w-[170px]">Actions</th>
+                      <th className="py-4 px-6 w-[27%] min-w-[220px]">Business & Contact</th>
+                      <th className="py-4 px-5 w-[15%] min-w-[140px]">Plan & Status</th>
+                      <th className="py-4 px-5 w-[18%] min-w-[170px]">Active Modules</th>
+                      <th className="py-4 px-5 w-[13%] min-w-[130px]">Renewal & Due</th>
+                      <th className="py-4 px-5 w-[15%] min-w-[150px]">Usage & Quotas</th>
+                      <th className="py-4 px-6 text-right w-[12%] min-w-[160px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
@@ -962,9 +969,9 @@ export default function OwnerClientsPage() {
                                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
                                   {client.businessName?.charAt(0).toUpperCase() || "B"}
                                 </div>
-                                <div className="space-y-0.5 min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-black text-slate-900 dark:text-white text-sm truncate max-w-[180px]" title={client.businessName}>
+                                <div className="space-y-0.5 min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-black text-slate-900 dark:text-white text-sm" title={client.businessName}>
                                       {client.businessName}
                                     </span>
                                     <button
@@ -975,9 +982,9 @@ export default function OwnerClientsPage() {
                                       {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                                     </button>
                                   </div>
-                                  <div className="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1 truncate max-w-[200px]" title={client.contactEmail}>
+                                  <div className="text-slate-500 dark:text-slate-400 text-[11px] flex items-center gap-1" title={client.contactEmail}>
                                     <Mail size={11} className="shrink-0 text-slate-400" />
-                                    <span className="truncate">{client.contactEmail}</span>
+                                    <span>{client.contactEmail}</span>
                                   </div>
                                   {client.contactPhone && (
                                     <div className="text-slate-400 dark:text-slate-500 text-[11px] flex items-center gap-1">
@@ -1059,7 +1066,7 @@ export default function OwnerClientsPage() {
 
                             {/* 5. Usage & Quotas (Visual Progress Bars) */}
                             <td className="py-4 px-5">
-                              <div className="space-y-2 min-w-[170px]">
+                              <div className="space-y-2 min-w-[150px]">
                                 {/* Messages Quota */}
                                 <div>
                                   <div className="flex items-center justify-between text-[11px] mb-1">
@@ -1101,7 +1108,7 @@ export default function OwnerClientsPage() {
                                   onClick={() => handleGhostLogin(client)}
                                   disabled={impersonating === client.id}
                                   title="1-Click Super-Admin Impersonation into Client Dashboard"
-                                  className="px-3 py-1.5 rounded-xl font-black text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs shadow-indigo-500/20 transition-all cursor-pointer flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98]"
+                                  className="px-3 py-1.5 rounded-xl font-black text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs shadow-indigo-500/20 transition-all cursor-pointer flex items-center gap-1.5 hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
                                 >
                                   {impersonating === client.id ? (
                                     <RefreshCw size={12} className="animate-spin" />
@@ -1115,10 +1122,10 @@ export default function OwnerClientsPage() {
                                 <button
                                   onClick={() => handleOpenPayment(client)}
                                   title="Record Payment & Extend Cycle"
-                                  className="px-2.5 py-1.5 rounded-xl font-bold text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all cursor-pointer flex items-center gap-1"
+                                  className="px-2.5 py-1.5 rounded-xl font-bold text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap"
                                 >
                                   <CreditCard size={12} />
-                                  <span className="hidden xl:inline">Collect</span>
+                                  <span>Collect</span>
                                 </button>
 
                                 {/* More Actions Dropdown Menu */}
@@ -1132,7 +1139,7 @@ export default function OwnerClientsPage() {
                                   </button>
 
                                   {activeActionDropdown === client.id && (
-                                    <div className="absolute right-0 top-full mt-1.5 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-1.5 z-30 space-y-0.5 text-left animate-fade-in">
+                                    <div className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-1.5 z-50 space-y-0.5 text-left animate-fade-in">
                                       <button
                                         onClick={() => handleOpenModules(client)}
                                         className="w-full px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-2 cursor-pointer transition-colors"
