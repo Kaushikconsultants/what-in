@@ -1,22 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const targetUrl = searchParams.get("url");
+    const isOwner = isOwnerAuthenticated(req);
+    const authUser = await getAuthenticatedUser(req);
+    if (!isOwner && authUser?.clientId) {
+      const client = await prisma.whatsAppClient.findUnique({
+        where: { id: authUser.clientId },
+        select: { enabledModules: true }
+      });
+      if (client?.enabledModules) {
+        try {
+          const modules = JSON.parse(client.enabledModules);
+          if (Array.isArray(modules) && !modules.includes("COBROWSE")) {
+            return new NextResponse(
+              `<html><body style='font-family:sans-serif;background:#0f172a;color:#f87171;padding:40px;text-align:center;'><h3>🔒 Live Co-Browsing Disabled</h3><p style='color:#94a3b8;'>The Live Co-Browsing Screen Assist module is deactivated for your tenant workspace.</p></body></html>`,
+              { status: 403, headers: { "Content-Type": "text/html; charset=utf-8" } }
+            );
+          }
+        } catch {}
+      }
+    }
 
-    if (!targetUrl || !targetUrl.startsWith("http")) {
-      return new NextResponse(
-        "<html><body style='font-family:sans-serif;padding:40px;text-align:center;color:#64748b;'><h3>Invalid URL for Live Co-Browsing</h3></body></html>",
-        { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } }
-      );
+    const { searchParams } = new URL(req.url);
+    let targetUrl = searchParams.get("url") || "";
+
+    // Recursively unwrap any nested /api/cobrowse/proxy?url= parameters
+    let unwrapDepth = 15;
+    while (unwrapDepth > 0 && targetUrl && (targetUrl.includes("/api/cobrowse/proxy?url=") || targetUrl.includes("/api/cobrowse/proxy?"))) {
+      unwrapDepth--;
+      try {
+        const match = targetUrl.match(/[?&]url=([^&]+)/);
+        if (match && match[1]) {
+          targetUrl = decodeURIComponent(match[1]);
+        } else {
+          break;
+        }
+      } catch {
+        break;
+      }
+    }
+
+    // Fallback if URL points to CRM itself or is invalid
+    if (!targetUrl || !targetUrl.startsWith("http") || targetUrl.includes("/api/cobrowse/proxy")) {
+      targetUrl = "https://esponsports.com";
     }
 
     const urlObj = new URL(targetUrl);
     const origin = urlObj.origin;
-    const deviceParam = searchParams.get("device") || "desktop";
+    const deviceParam = searchParams.get("device") || "mobile";
     const isMobile = deviceParam.toLowerCase() === "mobile";
 
     const userAgent = isMobile
@@ -224,7 +260,25 @@ export async function GET(req: NextRequest) {
             window.fetch = function(url, opts) {
               if (typeof url === 'string' && customerCart) {
                 if (url.indexOf('/cart.js') !== -1 || url.indexOf('/cart.json') !== -1) {
-                  return Promise.resolve(new Response(JSON.stringify(customerCart), {
+                  var rawTotal = customerCart.total_price || 0;
+                  var shopifyCartMock = {
+                    item_count: typeof customerCart.item_count === 'number' ? customerCart.item_count : (customerCart.items ? customerCart.items.length : 0),
+                    total_price: Math.round(rawTotal * 100),
+                    currency: customerCart.currency || 'INR',
+                    items: (customerCart.items || []).map(function(it) {
+                      var rawPrice = it.price || 0;
+                      return {
+                        title: it.title || it.name,
+                        product_title: it.title || it.name,
+                        quantity: it.quantity || 1,
+                        price: Math.round(rawPrice * 100),
+                        image: it.image || '',
+                        variant_title: it.variant_title || null,
+                        url: it.url || null
+                      };
+                    })
+                  };
+                  return Promise.resolve(new Response(JSON.stringify(shopifyCartMock), {
                     status: 200,
                     headers: { 'Content-Type': 'application/json' }
                   }));
@@ -337,6 +391,9 @@ export async function GET(req: NextRequest) {
         }
       </style>
     `;
+
+    // Strip any embed widget script tags so widget never runs inside the co-browse proxy mirror
+    html = html.replace(/<script[^>]*api\/widget\/script\.js[^>]*><\/script>/gi, '');
 
     // Inject right after <head> or at the beginning of <html>
     if (/<head[^>]*>/i.test(html)) {

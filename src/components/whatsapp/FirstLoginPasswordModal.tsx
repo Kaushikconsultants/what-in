@@ -77,7 +77,7 @@ export default function FirstLoginPasswordModal() {
           <div style={{ textAlign: "center", padding: "20px 0" }}>
             <div style={{ fontSize: "52px", marginBottom: "12px" }}>🎉</div>
             <h3 style={{ color: "#16a34a", fontSize: "20px", fontWeight: 800, margin: "0 0 6px 0" }}>Password Updated!</h3>
-            <p style={{ color: "#64748b", fontSize: "14px", margin: 0 }}>Your new password has been securely saved. Welcome to What-In!</p>
+            <p style={{ color: "#64748b", fontSize: "14px", margin: 0 }}>Your new password has been securely saved. Welcome to WhatMore!</p>
           </div>
         ) : (
           <div>
@@ -86,7 +86,7 @@ export default function FirstLoginPasswordModal() {
                 🔒
               </div>
               <h3 style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a", margin: "0 0 6px 0", letterSpacing: "-0.5px" }}>
-                Welcome {userName ? `${userName}!` : "to What-In!"}
+                Welcome {userName ? `${userName}!` : "to WhatMore!"}
               </h3>
               <p style={{ fontSize: "13px", color: "#64748b", margin: 0, lineHeight: 1.4 }}>
                 For your account security, please set your new permanent password to continue.

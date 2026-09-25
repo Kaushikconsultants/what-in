@@ -1,7 +1,24 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  Megaphone,
+  Plus,
+  Info,
+  AlertTriangle,
+  Wrench,
+  Sparkles,
+  Trash2,
+  Play,
+  Pause,
+  X,
+  Send,
+  Calendar,
+  Layers,
+  CheckCircle2
+} from "lucide-react";
 import {
   getAnnouncementsAction,
   createAnnouncementAction,
@@ -9,11 +26,11 @@ import {
   deleteAnnouncementAction
 } from "@/app/actions/ownerPortalActions";
 
-const TYPE_CONFIG: Record<string, { label: string; icon: string; bg: string; border: string; text: string }> = {
-  INFO:        { label: "General Info", icon: "📢", bg: "rgba(59, 130, 246, 0.15)", border: "rgba(59, 130, 246, 0.3)", text: "#60a5fa" },
-  WARNING:     { label: "Warning Alert", icon: "⚠️", bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)", text: "#fbbf24" },
-  MAINTENANCE: { label: "Maintenance", icon: "🛠️", bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.3)", text: "#f87171" },
-  SUCCESS:     { label: "Update / Feature", icon: "🎉", bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)", text: "#34d399" },
+const TYPE_CONFIG: Record<string, { label: string; icon: any; bg: string; border: string; text: string }> = {
+  INFO:        { label: "General Info", icon: Info, bg: "bg-blue-50 dark:bg-blue-950/50", border: "border-blue-200 dark:border-blue-800/60", text: "text-blue-700 dark:text-blue-300" },
+  WARNING:     { label: "Warning Alert", icon: AlertTriangle, bg: "bg-amber-50 dark:bg-amber-950/50", border: "border-amber-200 dark:border-amber-800/60", text: "text-amber-700 dark:text-amber-300" },
+  MAINTENANCE: { label: "Maintenance", icon: Wrench, bg: "bg-rose-50 dark:bg-rose-950/50", border: "border-rose-200 dark:border-rose-800/60", text: "text-rose-700 dark:text-rose-300" },
+  SUCCESS:     { label: "Feature Update", icon: Sparkles, bg: "bg-emerald-50 dark:bg-emerald-950/50", border: "border-emerald-200 dark:border-emerald-800/60", text: "text-emerald-700 dark:text-emerald-300" },
 };
 
 export default function OwnerAnnouncementsPage() {
@@ -78,160 +95,218 @@ export default function OwnerAnnouncementsPage() {
     else alert("Error: " + res.error);
   };
 
-  const handleLogout = async () => {
-    sessionStorage.removeItem("owner_authed");
-    await fetch("/api/owner/auth", { method: "DELETE" });
-    router.push("/owner/login");
-  };
-
   return (
-    <div style={{ minHeight: "100vh", background: "#0b0f19", color: "#f1f5f9", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      
       {/* Top Header */}
-      <header style={{ background: "rgba(15, 23, 42, 0.8)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, backdropFilter: "blur(16px)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #6366f1, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: "white", boxShadow: "0 0 20px rgba(99, 102, 241, 0.4)" }}>👑</div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.2px" }}>WhatMore Super-Admin Console</h1>
-            <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>In-App Announcements & Broadcasts</p>
-          </div>
-        </div>
-        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          {[
-            { label: "Dashboard", href: "/owner", icon: "📊" },
-            { label: "Clients & Modules", href: "/owner/clients", icon: "🏢" },
-            { label: "Announcements", href: "/owner/announcements", icon: "📢" },
-            { label: "Plans & Matrix", href: "/owner/plans", icon: "💎" },
-          ].map(item => {
-            const active = item.href === "/owner/announcements";
-            return (
-              <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: active ? "rgba(99, 102, 241, 0.2)" : "transparent", border: active ? "1px solid #6366f1" : "1px solid transparent", color: active ? "#818cf8" : "#94a3b8", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", transition: "all 0.15s ease" }}>
-                <span>{item.icon}</span> {item.label}
-              </Link>
-            );
-          })}
-          <button onClick={handleLogout} style={{ marginLeft: "12px", padding: "8px 14px", borderRadius: "10px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#f87171", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-            Sign Out
-          </button>
-        </nav>
-      </header>
-
-      <main style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#ffffff", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>📢 Tenant In-App Broadcasts</h2>
-            <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>Publish alerts, feature update notes, and maintenance marquee notices across all client dashboards</p>
-          </div>
-          <button onClick={() => setShowAdd(true)} style={{ padding: "10px 20px", background: "linear-gradient(135deg, #6366f1, #a855f7)", border: "none", borderRadius: "12px", color: "white", fontWeight: 800, fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", boxShadow: "0 4px 20px rgba(99, 102, 241, 0.35)" }}>
-            <span>➕</span> Create New Broadcast
-          </button>
-        </div>
-
-        {/* Announcements List */}
-        <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", overflow: "hidden", backdropFilter: "blur(12px)" }}>
-          {loading ? (
-            <div style={{ padding: "60px", textAlign: "center", color: "#94a3b8" }}>Loading broadcasts...</div>
-          ) : announcements.length === 0 ? (
-            <div style={{ padding: "60px", textAlign: "center", color: "#94a3b8" }}>
-              <div style={{ fontSize: "36px", marginBottom: "12px" }}>📢</div>
-              <h3 style={{ fontSize: "16px", color: "#ffffff", margin: "0 0 6px 0" }}>No broadcasts published yet</h3>
-              <p style={{ fontSize: "13px", margin: 0 }}>Click Create New Broadcast above to post your first system notification.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200/80 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400">
+              <Megaphone size={20} className="text-indigo-500" />
             </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {announcements.map((a, idx) => {
-                const conf = TYPE_CONFIG[a.type] || TYPE_CONFIG.INFO;
-                return (
-                  <div key={a.id} style={{ padding: "20px 24px", borderBottom: idx === announcements.length - 1 ? "none" : "1px solid rgba(255, 255, 255, 0.04)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px" }}>
-                    <div style={{ display: "flex", gap: "14px", flex: 1 }}>
-                      <span style={{ fontSize: "24px", width: "42px", height: "42px", borderRadius: "12px", background: conf.bg, border: `1px solid ${conf.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {conf.icon}
-                      </span>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                          <span style={{ fontWeight: 800, fontSize: "15px", color: "#ffffff" }}>{a.title}</span>
-                          <span style={{ padding: "2px 8px", background: conf.bg, border: `1px solid ${conf.border}`, borderRadius: "6px", fontSize: "10px", fontWeight: 800, color: conf.text }}>
-                            {conf.label}
-                          </span>
-                          <span style={{ fontSize: "11px", color: a.isActive ? "#34d399" : "#f87171", fontWeight: 700 }}>
-                            {a.isActive ? "● LIVE" : "○ PAUSED"}
-                          </span>
-                        </div>
-                        <p style={{ margin: "0 0 8px 0", fontSize: "13px", color: "#94a3b8", lineHeight: 1.5 }}>{a.message}</p>
-                        <div style={{ fontSize: "11px", color: "#64748b" }}>
-                          Target: <b style={{ color: "#cbd5e1" }}>{a.targetPlan}</b> • Created {new Date(a.createdAt).toLocaleDateString()}
-                        </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+              Tenant In-App Broadcasts
+            </h1>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
+            Publish alerts, feature update notes, and maintenance marquee notices across all client dashboards.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowAdd(true)}
+          className="px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-md shadow-indigo-500/25 flex items-center gap-2 transition-all cursor-pointer hover:scale-[1.02]"
+        >
+          <Plus size={15} />
+          <span>Create New Broadcast</span>
+        </button>
+      </div>
+
+      {/* Announcements List */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden">
+        {loading ? (
+          <div className="p-16 text-center text-slate-400 text-xs font-bold">
+            Loading broadcasts...
+          </div>
+        ) : announcements.length === 0 ? (
+          <div className="p-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mx-auto mb-4">
+              <Megaphone size={28} />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">No broadcasts published yet</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
+              Click Create New Broadcast above to post your first system notification to client dashboards.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+            {announcements.map((a) => {
+              const conf = TYPE_CONFIG[a.type] || TYPE_CONFIG.INFO;
+              const Icon = conf.icon;
+
+              return (
+                <div key={a.id} className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border shrink-0 ${conf.bg} ${conf.border} ${conf.text}`}>
+                      <Icon size={18} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-black text-slate-900 dark:text-white text-base">{a.title}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${conf.bg} ${conf.border} ${conf.text}`}>
+                          {conf.label}
+                        </span>
+                        <span className={`text-xs font-bold ${a.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                          {a.isActive ? "● LIVE" : "○ PAUSED"}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-2">
+                        {a.message}
+                      </p>
+                      <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                        <span>Target: <b className="text-slate-700 dark:text-slate-300 font-bold">{a.targetPlan}</b></span>
+                        <span>•</span>
+                        <span>Created {new Date(a.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
-
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => handleToggle(a)} style={{ padding: "6px 12px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "8px", color: a.isActive ? "#fbbf24" : "#34d399", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-                        {a.isActive ? "Pause" : "Resume"}
-                      </button>
-                      <button onClick={() => handleDelete(a.id)} style={{ padding: "6px 12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "8px", color: "#f87171", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-                        Delete
-                      </button>
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Modal */}
-        {showAdd && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(10px)" }}>
-            <div style={{ background: "#0f172a", border: "1px solid rgba(255, 255, 255, 0.15)", borderRadius: "24px", padding: "30px", width: "100%", maxWidth: "560px", boxShadow: "0 25px 60px rgba(0,0,0,0.6)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", paddingBottom: "14px" }}>
-                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: "#ffffff" }}>📢 Post Tenant Broadcast</h3>
-                <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "20px", cursor: "pointer" }}>✕</button>
-              </div>
-
-              <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Title *</label>
-                  <input type="text" required placeholder="e.g. Scheduled Meta API Upgrade" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }} />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Message *</label>
-                  <textarea rows={3} required placeholder="Describe the announcement or notice..." value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} style={{ width: "100%", padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box", resize: "vertical" }} />
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Type</label>
-                    <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={{ width: "100%", padding: "10px", background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }}>
-                      <option value="INFO">General Info</option>
-                      <option value="WARNING">Warning Alert</option>
-                      <option value="MAINTENANCE">Maintenance</option>
-                      <option value="SUCCESS">Feature Update</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", marginBottom: "6px" }}>Target Plan</label>
-                    <select value={form.targetPlan} onChange={e => setForm({ ...form, targetPlan: e.target.value })} style={{ width: "100%", padding: "10px", background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", color: "#ffffff", fontSize: "13px", outline: "none", boxSizing: "border-box" }}>
-                      <option value="ALL">All Clients (Universal)</option>
-                      <option value="STARTER">Starter Tier Only</option>
-                      <option value="GROWTH">Growth Tier Only</option>
-                      <option value="ENTERPRISE">Enterprise Tier Only</option>
-                    </select>
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-start">
+                    <button
+                      onClick={() => handleToggle(a)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5"
+                    >
+                      {a.isActive ? <Pause size={13} /> : <Play size={13} />}
+                      <span>{a.isActive ? "Pause" : "Resume"}</span>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(a.id)}
+                      className="p-1.5 rounded-xl text-rose-600 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 transition-all"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
-                  <button type="button" onClick={() => setShowAdd(false)} style={{ padding: "10px 18px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "10px", color: "#94a3b8", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>
-                    Cancel
-                  </button>
-                  <button type="submit" disabled={submitting} style={{ padding: "10px 24px", background: "linear-gradient(135deg, #6366f1, #a855f7)", border: "none", borderRadius: "10px", color: "#ffffff", fontSize: "13px", fontWeight: 800, cursor: "pointer" }}>
-                    {submitting ? "Publishing..." : "🚀 Publish Broadcast"}
-                  </button>
-                </div>
-              </form>
-            </div>
+              );
+            })}
           </div>
         )}
-      </main>
-    </div>
+      </div>
+
+      {/* Create Broadcast Modal */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+            
+            <div className="flex items-start justify-between pb-4 mb-6 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                    <Megaphone size={18} />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                    Publish Tenant Broadcast
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Broadcast notification will appear at top of client dashboard.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAdd(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Scheduled Meta WhatsApp API Maintenance"
+                  value={form.title}
+                  onChange={e => setForm({ ...form, title: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
+                  Message Content *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Describe the announcement details for all client admins..."
+                  value={form.message}
+                  onChange={e => setForm({ ...form, message: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
+                    Alert Type
+                  </label>
+                  <select
+                    value={form.type}
+                    onChange={e => setForm({ ...form, type: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
+                  >
+                    <option value="INFO">General Info</option>
+                    <option value="WARNING">Warning Alert</option>
+                    <option value="MAINTENANCE">Maintenance</option>
+                    <option value="SUCCESS">Feature Update</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
+                    Target Audience
+                  </label>
+                  <select
+                    value={form.targetPlan}
+                    onChange={e => setForm({ ...form, targetPlan: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800"
+                  >
+                    <option value="ALL">All Clients (Universal)</option>
+                    <option value="STARTER">Starter Tier Only</option>
+                    <option value="GROWTH">Growth Tier Only</option>
+                    <option value="ENTERPRISE">Enterprise Tier Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAdd(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-500/25 transition-all flex items-center gap-1.5"
+                >
+                  <Send size={14} />
+                  <span>{submitting ? "Publishing..." : "Publish Broadcast"}</span>
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+    </main>
   );
 }

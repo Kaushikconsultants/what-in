@@ -1,7 +1,21 @@
 "use client";
+
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import {
+  Gem,
+  Package,
+  Layers,
+  Sparkles,
+  Check,
+  X,
+  Users,
+  MessageSquare,
+  Bot,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2
+} from "lucide-react";
 import {
   DEFAULT_PLAN_TIERS,
   MASTER_MODULES,
@@ -11,304 +25,233 @@ import {
 } from "@/lib/moduleRegistry";
 
 export default function OwnerPlansPage() {
-  const router = useRouter();
   const [selectedTab, setSelectedTab] = useState<"TIERS" | "MATRIX" | "PRESETS">("TIERS");
 
-  const handleLogout = async () => {
-    sessionStorage.removeItem("owner_authed");
-    await fetch("/api/owner/auth", { method: "DELETE" });
-    router.push("/owner/login");
-  };
-
   return (
-    <div style={{ minHeight: "100vh", background: "#0b0f19", color: "#f1f5f9", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Top Sticky Header */}
-      <header style={{ background: "rgba(15, 23, 42, 0.8)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, backdropFilter: "blur(16px)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #6366f1, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: "white", boxShadow: "0 0 20px rgba(99, 102, 241, 0.4)" }}>👑</div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.2px" }}>WhatMore Super-Admin Console</h1>
-            <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>Plan Tiers & 11-Module/Integration Architecture</p>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      
+      {/* Top Header & View Switcher */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200/80 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400">
+              <Gem size={20} className="text-indigo-500" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+              Plan Tiers & Modular Entitlements
+            </h1>
           </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
+            Configure standard subscription packages, inspect the 10-module feature matrix, and explore industry presets.
+          </p>
         </div>
-        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+
+        {/* View Switcher Pills */}
+        <div className="flex items-center p-1 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
           {[
-            { label: "Dashboard", href: "/owner", icon: "📊" },
-            { label: "Clients & Modules", href: "/owner/clients", icon: "🏢" },
-            { label: "Announcements", href: "/owner/announcements", icon: "📢" },
-            { label: "Plans & Matrix", href: "/owner/plans", icon: "💎" },
-          ].map(item => {
-            const active = item.href === "/owner/plans";
+            { id: "TIERS", label: "Plan Cards", icon: Package },
+            { id: "MATRIX", label: "Feature Matrix (10 Modules)", icon: Layers },
+            { id: "PRESETS", label: "Industry Presets", icon: Sparkles },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = selectedTab === tab.id;
             return (
-              <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: active ? "rgba(99, 102, 241, 0.2)" : "transparent", border: active ? "1px solid #6366f1" : "1px solid transparent", color: active ? "#818cf8" : "#94a3b8", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", transition: "all 0.15s ease" }}>
-                <span>{item.icon}</span> {item.label}
-              </Link>
-            );
-          })}
-          <button onClick={handleLogout} style={{ marginLeft: "12px", padding: "8px 14px", borderRadius: "10px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#f87171", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-            Sign Out
-          </button>
-        </nav>
-      </header>
-
-      <main style={{ padding: "32px", maxWidth: "1600px", margin: "0 auto" }}>
-        {/* Title & View Switcher */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#ffffff", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>💎 Plan Tiers & Modular Entitlements</h2>
-            <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>Configure standard subscription packages, view the 11-module & integration feature matrix, and explore presets</p>
-          </div>
-
-          <div style={{ display: "flex", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "12px", padding: "4px", gap: "4px" }}>
-            {[
-              { id: "TIERS", label: "💎 Plan Cards", icon: "📦" },
-              { id: "MATRIX", label: "📊 Feature Matrix (11 Modules)", icon: "🎛️" },
-              { id: "PRESETS", label: "🏭 Industry Presets", icon: "✨" },
-            ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setSelectedTab(tab.id as any)}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  background: selectedTab === tab.id ? "linear-gradient(135deg, #6366f1, #4f46e5)" : "transparent",
-                  color: selectedTab === tab.id ? "#ffffff" : "#94a3b8",
-                  border: "none",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  boxShadow: selectedTab === tab.id ? "0 4px 12px rgba(99, 102, 241, 0.3)" : "none",
-                  transition: "all 0.15s ease"
-                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  active
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
               >
-                <span>{tab.icon}</span> {tab.label}
+                <Icon size={14} />
+                <span>{tab.label}</span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
+      </div>
 
-        {/* VIEW 1: Standard Plan Cards */}
-        {selectedTab === "TIERS" && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "22px" }}>
-            {DEFAULT_PLAN_TIERS.map(plan => (
-              <div
-                key={plan.id}
-                style={{
-                  background: "rgba(15, 23, 42, 0.65)",
-                  border: `1px solid ${plan.border || "rgba(255, 255, 255, 0.1)"}`,
-                  borderRadius: "20px",
-                  padding: "26px",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  backdropFilter: "blur(12px)",
-                  position: "relative",
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
-                }}
-              >
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                    <span style={{ padding: "4px 12px", background: plan.bg, border: `1px solid ${plan.border}`, borderRadius: "999px", color: plan.color, fontSize: "11px", fontWeight: 900, letterSpacing: "0.05em" }}>
-                      {plan.badge}
-                    </span>
-                    <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 700 }}>
-                      👥 {plan.maxAgents} Agents
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: "20px", fontWeight: 900, color: "#ffffff", margin: "0 0 6px 0" }}>{plan.name}</h3>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "12px" }}>
-                    <span style={{ fontSize: "32px", fontWeight: 900, color: "#ffffff", letterSpacing: "-1px" }}>₹{plan.monthlyFee.toLocaleString()}</span>
-                    <span style={{ fontSize: "13px", color: "#64748b", fontWeight: 600 }}>/ month</span>
-                  </div>
-
-                  <p style={{ fontSize: "12px", color: "#94a3b8", margin: "0 0 20px 0", lineHeight: 1.5 }}>
-                    {plan.tagline}
-                  </p>
-
-                  <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "12px", padding: "12px 14px", marginBottom: "20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                    <div>
-                      <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>Monthly Msgs</div>
-                      <div style={{ fontSize: "14px", fontWeight: 900, color: "#38bdf8" }}>{plan.monthlyMessageQuota.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>AI Replies</div>
-                      <div style={{ fontSize: "14px", fontWeight: 900, color: "#a855f7" }}>{plan.monthlyAiQuota.toLocaleString()}</div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ fontSize: "11px", fontWeight: 800, color: "#cbd5e1", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px", display: "flex", justifyContent: "space-between" }}>
-                      <span>Included Modules & Integrations</span>
-                      <span style={{ color: "#818cf8" }}>{plan.modules.length} / {ALL_MODULE_KEYS.length} Active</span>
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {plan.modules.map(modKey => {
-                        const m = MASTER_MODULES[modKey];
-                        if (!m) return null;
-                        return (
-                          <span
-                            key={modKey}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: "6px",
-                              background: "rgba(255, 255, 255, 0.06)",
-                              border: "1px solid rgba(255, 255, 255, 0.1)",
-                              color: "#e2e8f0",
-                              fontSize: "11px",
-                              fontWeight: 700,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "4px"
-                            }}
-                          >
-                            <span>{m.icon}</span> {m.name}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                  <Link
-                    href="/owner/clients"
-                    style={{
-                      display: "block",
-                      textAlign: "center",
-                      padding: "10px",
-                      background: "linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2))",
-                      border: "1px solid rgba(99, 102, 241, 0.4)",
-                      borderRadius: "10px",
-                      color: "#ffffff",
-                      textDecoration: "none",
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      transition: "all 0.15s ease"
-                    }}
-                  >
-                    Assign to Clients in Matrix →
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* VIEW 2: 11-Module Matrix Table */}
-        {selectedTab === "MATRIX" && (
-          <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "20px", overflow: "hidden", backdropFilter: "blur(12px)" }}>
-            <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      {/* VIEW 1: Standard Plan Cards */}
+      {selectedTab === "TIERS" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {DEFAULT_PLAN_TIERS.map((plan) => (
+            <div
+              key={plan.id}
+              className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs flex flex-col justify-between hover:border-indigo-300 dark:hover:border-indigo-700/60 transition-all hover:shadow-md"
+            >
               <div>
-                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 900, color: "#ffffff" }}>Master 11-Module & Integration Feature Matrix</h3>
-                <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#94a3b8" }}>Granular breakdown of which business modules & integrations are bundled into each plan tier</p>
-              </div>
-              <span style={{ fontSize: "12px", color: "#818cf8", fontWeight: 700 }}>{ALL_MODULE_KEYS.length} Total Modules & Integrations</span>
-            </div>
-
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                <thead>
-                  <tr style={{ background: "rgba(255, 255, 255, 0.03)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                    <th style={{ padding: "14px 20px", fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>Module</th>
-                    <th style={{ padding: "14px 16px", fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>Category</th>
-                    <th style={{ padding: "14px 16px", fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>Target Industry</th>
-                    {DEFAULT_PLAN_TIERS.map(p => (
-                      <th key={p.id} style={{ padding: "14px 16px", fontSize: "12px", color: "#ffffff", fontWeight: 900, textAlign: "center" }}>
-                        <div>{p.name}</div>
-                        <div style={{ fontSize: "10px", color: "#64748b", fontWeight: 600 }}>₹{p.monthlyFee}/mo</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ALL_MODULE_KEYS.map((modKey, idx) => {
-                    const m = MASTER_MODULES[modKey];
-                    return (
-                      <tr key={modKey} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.04)", background: idx % 2 === 0 ? "transparent" : "rgba(255, 255, 255, 0.015)" }}>
-                        <td style={{ padding: "14px 20px" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <span style={{ fontSize: "20px" }}>{m.icon}</span>
-                            <div>
-                              <div style={{ fontWeight: 800, fontSize: "13px", color: "#ffffff" }}>{m.name}</div>
-                              <div style={{ fontSize: "11px", color: "#64748b" }}>{m.tagline}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td style={{ padding: "14px 16px" }}>
-                          <span style={{ padding: "3px 8px", background: "rgba(255, 255, 255, 0.05)", borderRadius: "6px", fontSize: "10px", fontWeight: 800, color: "#94a3b8" }}>
-                            {m.category}
-                          </span>
-                        </td>
-                        <td style={{ padding: "14px 16px", fontSize: "11px", color: "#94a3b8" }}>
-                          {m.industryFit.slice(0, 2).join(", ")}
-                        </td>
-                        {DEFAULT_PLAN_TIERS.map(p => {
-                          const hasModule = p.modules.includes(modKey);
-                          return (
-                            <td key={p.id} style={{ padding: "14px 16px", textAlign: "center" }}>
-                              {hasModule ? (
-                                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", fontSize: "14px", fontWeight: 900 }}>
-                                  ✓
-                                </span>
-                              ) : (
-                                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "26px", height: "26px", borderRadius: "50%", background: "rgba(255, 255, 255, 0.03)", color: "#475569", fontSize: "12px" }}>
-                                  —
-                                </span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* VIEW 3: Industry Presets */}
-        {selectedTab === "PRESETS" && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "20px" }}>
-            {INDUSTRY_MODULE_PRESETS.map(preset => (
-              <div key={preset.name} style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "20px", padding: "24px", backdropFilter: "blur(12px)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-                  <span style={{ fontSize: "28px", width: "48px", height: "48px", borderRadius: "14px", background: "rgba(99, 102, 241, 0.15)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                    {preset.icon}
+                <div className="flex items-center justify-between mb-4">
+                  <span className="px-3 py-1 rounded-full text-[11px] font-black tracking-wider uppercase bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    {plan.badge || plan.name}
                   </span>
-                  <div>
-                    <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#ffffff" }}>{preset.name}</h4>
-                    <p style={{ margin: "2px 0 0 0", fontSize: "11px", color: "#818cf8" }}>{preset.modules.length} Modules Bundled</p>
-                  </div>
+                  <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                    <Users size={13} /> {plan.maxAgents} Agents
+                  </span>
                 </div>
 
-                <p style={{ fontSize: "12px", color: "#94a3b8", margin: "0 0 16px 0", lineHeight: 1.5 }}>
-                  {preset.description}
+                <h3 className="text-xl font-black text-slate-900 dark:text-white mb-1">
+                  {plan.name}
+                </h3>
+                
+                <div className="flex items-baseline gap-1.5 mb-3">
+                  <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                    ₹{plan.monthlyFee.toLocaleString()}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">/ month</span>
+                </div>
+
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
+                  {plan.tagline}
                 </p>
 
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "20px" }}>
+                {/* Quota metric cards */}
+                <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 mb-5">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Monthly Msgs</span>
+                    <span className="text-sm font-black text-sky-600 dark:text-sky-400">{plan.monthlyMessageQuota.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">AI Replies</span>
+                    <span className="text-sm font-black text-purple-600 dark:text-purple-400">{plan.monthlyAiQuota.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Module badges */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-2">
+                    <span>Included Modules</span>
+                    <span className="text-indigo-600 dark:text-indigo-400">{plan.modules.length} / {ALL_MODULE_KEYS.length}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {plan.modules.map((modKey) => {
+                      const m = MASTER_MODULES[modKey];
+                      return (
+                        <span
+                          key={modKey}
+                          className="px-2 py-1 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300 flex items-center gap-1"
+                        >
+                          <span>{m?.icon || "📦"}</span>
+                          <span>{m?.name || modKey}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                href={`/owner/clients`}
+                className="w-full py-2.5 rounded-xl font-bold text-xs text-center text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>Apply to Client</span> <ArrowRight size={13} />
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* VIEW 2: Complete 10-Module Feature Matrix */}
+      {selectedTab === "MATRIX" && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-[11px] font-black uppercase tracking-wider text-slate-500">
+                  <th className="py-4 px-6 min-w-[220px]">Platform Module / Integration</th>
+                  {DEFAULT_PLAN_TIERS.map(p => (
+                    <th key={p.id} className="py-4 px-4 text-center min-w-[120px]">
+                      <div className="font-extrabold text-slate-900 dark:text-white text-xs">{p.name}</div>
+                      <div className="text-[10px] text-emerald-600 font-bold">₹{p.monthlyFee}/mo</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                {ALL_MODULE_KEYS.map((modKey) => {
+                  const m = MASTER_MODULES[modKey];
+                  return (
+                    <tr key={modKey} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">{m?.icon || "📦"}</span>
+                          <div>
+                            <div className="font-bold text-slate-900 dark:text-white">{m?.name || modKey}</div>
+                            <div className="text-[11px] text-slate-400">{m?.tagline || ""}</div>
+                          </div>
+                        </div>
+                      </td>
+                      {DEFAULT_PLAN_TIERS.map(p => {
+                        const hasModule = p.modules.includes(modKey);
+                        return (
+                          <td key={p.id} className="py-4 px-4 text-center">
+                            {hasModule ? (
+                              <div className="w-6 h-6 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center mx-auto">
+                                <Check size={14} />
+                              </div>
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                                <X size={13} />
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 3: Industry Presets */}
+      {selectedTab === "PRESETS" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {INDUSTRY_MODULE_PRESETS.map((preset) => (
+            <div
+              key={preset.name}
+              className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl p-2 rounded-2xl bg-slate-100 dark:bg-slate-800">{preset.icon}</span>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">{preset.name}</h3>
+                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{preset.modules.length} Modules Included</span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+                  Tailored default stack for clients in the {preset.name.toLowerCase()} sector.
+                </p>
+
+                <div className="space-y-1.5 mb-6">
                   {preset.modules.map(modKey => {
                     const m = MASTER_MODULES[modKey];
                     return (
-                      <span key={modKey} style={{ padding: "3px 8px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "6px", fontSize: "11px", color: "#cbd5e1", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                        <span>{m.icon}</span> {m.name}
-                      </span>
+                      <div key={modKey} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                        <span>{m?.name || modKey}</span>
+                      </div>
                     );
                   })}
                 </div>
-
-                <Link href="/owner/clients" style={{ display: "block", textAlign: "center", padding: "9px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "10px", color: "#ffffff", textDecoration: "none", fontSize: "12px", fontWeight: 800 }}>
-                  Apply Preset in Clients Tab →
-                </Link>
               </div>
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+
+              <Link
+                href="/owner/clients"
+                className="w-full py-2.5 rounded-xl font-bold text-xs text-center text-white bg-indigo-600 hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5"
+              >
+                <span>Apply in Client Manager</span> <ArrowRight size={13} />
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+
+    </main>
   );
 }

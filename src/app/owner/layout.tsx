@@ -1,18 +1,18 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import React from "react";
-
-const OWNER_SECRET = process.env.OWNER_PORTAL_SECRET || "whatin-owner-2026";
+import OwnerHeaderNav from "@/components/owner/OwnerHeaderNav";
 
 export const metadata = {
-  title: "What-In Owner Console",
-  description: "Super Admin portal for managing SaaS clients"
+  title: "WhatMore Super-Admin Console",
+  description: "Executive Multi-Tenant Operations & Feature Gating Platform",
 };
 
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ margin: 0, fontFamily: "Inter, -apple-system, sans-serif", background: "#f8fafc", color: "#0f172a", minHeight: "100vh" }}>
-      {children}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-500 selection:text-white transition-colors duration-200">
+      <OwnerHeaderNav />
+      <div className="w-full">
+        {children}
+      </div>
     </div>
   );
 }

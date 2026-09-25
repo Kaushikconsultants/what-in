@@ -48,7 +48,7 @@ function LoginForm() {
           <div style={{ width: "68px", height: "68px", borderRadius: "20px", background: "linear-gradient(135deg, #7c3aed, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: "30px", boxShadow: "0 0 50px rgba(124, 58, 237, 0.35)" }}>
             💬
           </div>
-          <h1 style={{ fontSize: "28px", fontWeight: 900, color: "#f8fafc", margin: "0 0 6px 0", letterSpacing: "-0.5px" }}>What-In</h1>
+          <h1 style={{ fontSize: "28px", fontWeight: 900, color: "#f8fafc", margin: "0 0 6px 0", letterSpacing: "-0.5px" }}>Whatmore</h1>
           <p style={{ color: "#64748b", fontSize: "14px", margin: 0 }}>WhatsApp Business Automation Platform</p>
         </div>
 

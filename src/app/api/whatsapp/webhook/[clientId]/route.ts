@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { processWebhookPayload } from "../route";
+import { processWebhookPayload, verifyMetaWebhookSignature } from "../route";
 
 // GET Endpoint - Tenant-Specific Webhook Verification Challenge from Meta WhatsApp API
 export async function GET(req: NextRequest, { params }: { params: any }) {
@@ -92,7 +92,15 @@ export async function POST(req: NextRequest, { params }: { params: any }) {
       return NextResponse.json({ status: "ignored", reason: "client_blocked" });
     }
 
-    const body = await req.json();
+    const rawBody = await req.text();
+    const signatureHeader = req.headers.get("x-hub-signature-256");
+
+    if (!verifyMetaWebhookSignature(rawBody, signatureHeader, (client as any).metaAppSecret)) {
+      console.warn(`[Tenant Webhook POST] Forbidden: Invalid X-Hub-Signature-256 for client "${client.businessName}"`);
+      return NextResponse.json({ error: "Invalid webhook signature" }, { status: 403 });
+    }
+
+    const body = JSON.parse(rawBody);
     const result = await processWebhookPayload(body, client.id);
 
     return NextResponse.json({ status: "received", clientId: client.id, result });

@@ -1,7 +1,9 @@
 "use client";
+
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Crown, Lock, ArrowRight, AlertCircle, RefreshCw, KeyRound } from "lucide-react";
 
 export default function OwnerLoginPage() {
   const [password, setPassword] = useState("");
@@ -33,56 +35,84 @@ export default function OwnerLoginPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      <div style={{ width: "100%", maxWidth: "440px", padding: "24px" }}>
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{ width: "64px", height: "64px", borderRadius: "18px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: "28px", color: "white", boxShadow: "0 10px 25px rgba(79, 70, 229, 0.25)" }}>
-            👑
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 px-4 sm:px-6">
+      <div className="w-full max-w-md">
+        
+        {/* Logo & Title */}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center mx-auto mb-4 text-white shadow-xl shadow-indigo-500/25">
+            <Crown size={32} className="text-amber-300" />
           </div>
-          <h1 style={{ fontSize: "26px", fontWeight: 900, color: "#0f172a", margin: 0, letterSpacing: "-0.5px" }}>Owner Console</h1>
-          <p style={{ color: "#64748b", fontSize: "14px", marginTop: "4px" }}>What-In Super Admin Portal</p>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            Super-Admin Console
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+            WhatMore SaaS Platform Operations & Gating Command
+          </p>
         </div>
 
-        {/* Card */}
-        <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "20px", padding: "32px", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)" }}>
-          <form onSubmit={handleLogin} autoComplete="off">
-            <label style={{ display: "block", fontSize: "12px", fontWeight: 800, color: "#475569", marginBottom: "8px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-              Master Owner Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter master password..."
-              required
-              autoComplete="new-password"
-              autoFocus
-              style={{ width: "100%", padding: "12px 16px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "12px", color: "#0f172a", fontSize: "16px", outline: "none", boxSizing: "border-box" }}
-            />
+        {/* Login Form Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl shadow-slate-200/50 dark:shadow-none">
+          <form onSubmit={handleLogin} autoComplete="off" className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 uppercase tracking-wider">
+                Master Owner Password
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter super-admin password..."
+                  required
+                  autoComplete="new-password"
+                  autoFocus
+                  className="w-full px-4 py-3 rounded-2xl text-sm bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all font-mono"
+                />
+                <KeyRound size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
             {error && (
-              <div style={{ marginTop: "14px", padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "10px", color: "#dc2626", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>⚠️</span> {error}
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{error}</span>
               </div>
             )}
+
             <button
               type="submit"
               disabled={loading}
-              style={{ width: "100%", marginTop: "20px", padding: "14px", background: loading ? "#a5b4fc" : "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", borderRadius: "12px", color: "white", fontSize: "15px", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", letterSpacing: "0.2px", boxShadow: "0 4px 12px rgba(79, 70, 229, 0.25)", transition: "all 0.2s" }}
+              className="w-full py-3 rounded-2xl font-bold text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-md shadow-indigo-500/25 transition-all cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
             >
-              {loading ? "Authenticating..." : "Access Console →"}
+              {loading ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <>
+                  <span>Access Command Center</span>
+                  <ArrowRight size={15} />
+                </>
+              )}
             </button>
           </form>
         </div>
 
-        <div style={{ textAlign: "center", marginTop: "24px" }}>
-          <Link href="/login" style={{ color: "#64748b", fontSize: "13px", textDecoration: "none", fontWeight: 600 }}>
+        {/* Footer Link */}
+        <div className="text-center mt-6 space-y-1">
+          <Link
+            href="/login"
+            className="text-xs font-bold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+          >
             ← Back to Client Login Portal
           </Link>
-          <p style={{ color: "#94a3b8", fontSize: "12px", marginTop: "8px" }}>
-            Restricted access • Authorized administrators only
+          <p className="text-[11px] text-slate-400 dark:text-slate-600">
+            Authorized super-administrators only • Restricted environment
           </p>
         </div>
+
       </div>
     </div>
   );

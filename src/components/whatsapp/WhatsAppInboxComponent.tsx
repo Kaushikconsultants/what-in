@@ -308,17 +308,21 @@ export function cleanActualStoreUrl(rawUrl: string | null | undefined): string {
       parsed.searchParams.delete("cb_ts");
       parsed.searchParams.delete("cb_session");
       if (parsed.pathname.includes("/api/cobrowse/proxy")) {
-        return "https://esponsports.com";
+        const inner = parsed.searchParams.get("url");
+        if (inner) return decodeURIComponent(inner);
+        return "";
       }
       url = parsed.toString();
     } else {
       url = url.replace(/([?&])(device|cb_ts|cb_session)=[^&]*(&|$)/gi, '');
       if (url.includes("/api/cobrowse/proxy")) {
-        return "https://esponsports.com";
+        const match = url.match(/[?&]url=([^&]+)/i);
+        if (match && match[1]) return decodeURIComponent(match[1]);
+        return "";
       }
     }
   } catch {
-    if (url.includes("/api/cobrowse/proxy")) return "https://esponsports.com";
+    if (url.includes("/api/cobrowse/proxy")) return "";
   }
 
   url = url.replace(/[?&]$/, "");
@@ -394,6 +398,7 @@ export default function WhatsAppInboxComponent() {
   const [showLiveCoBrowseModal, setShowLiveCoBrowseModal] = useState<boolean>(false);
   const [coBrowseReplayIndex, setCoBrowseReplayIndex] = useState<number | null>(null);
   const [isAutoReplaying, setIsAutoReplaying] = useState<boolean>(false);
+  const [enabledModules, setEnabledModules] = useState<string[]>([]);
 
   // Active customer normalized phone number
   const activeCustomerPhone = useMemo(() => {
@@ -456,8 +461,17 @@ export default function WhatsAppInboxComponent() {
 
 
 
-  // Preload approved templates, product catalog & CRM integrations for accurate previews and actions
+  // Preload approved templates, product catalog, CRM integrations & module entitlements
   useEffect(() => {
+    fetch("/api/whatsapp/client-status")
+      .then(res => res.json())
+      .then(d => {
+        if (d?.enabledModules && Array.isArray(d.enabledModules)) {
+          setEnabledModules(d.enabledModules);
+        }
+      })
+      .catch(() => {});
+
     getWhatsAppTemplates()
       .then(res => {
         if (res?.templates) setApprovedTemplates(res.templates);

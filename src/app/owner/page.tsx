@@ -1,9 +1,28 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  Crown,
+  Building2,
+  DollarSign,
+  TrendingUp,
+  Clock,
+  FlaskConical,
+  ShieldAlert,
+  Plus,
+  Megaphone,
+  Layers,
+  CreditCard,
+  ArrowRight,
+  ExternalLink,
+  Sparkles,
+  CheckCircle2,
+  RefreshCw
+} from "lucide-react";
 import { getOwnerDashboardStatsAction, syncSubscriptionStatusesAction } from "@/app/actions/ownerPortalActions";
 import { MASTER_MODULES, ALL_MODULE_KEYS, parseEnabledModules } from "@/lib/moduleRegistry";
-import Link from "next/link";
 
 export default function OwnerDashboardPage() {
   const [data, setData] = useState<any>(null);
@@ -23,16 +42,11 @@ export default function OwnerDashboardPage() {
   }, []);
 
   const loadStats = async () => {
+    setLoading(true);
     await syncSubscriptionStatusesAction();
     const res = await getOwnerDashboardStatsAction();
     if (res.success) setData(res);
     setLoading(false);
-  };
-
-  const handleLogout = async () => {
-    sessionStorage.removeItem("owner_authed");
-    await fetch("/api/owner/auth", { method: "DELETE" });
-    router.push("/owner/login");
   };
 
   const stats = data?.stats;
@@ -42,12 +56,60 @@ export default function OwnerDashboardPage() {
   const arrValue = mrrValue * 12;
 
   const statCards = [
-    { label: "Monthly Recurring (MRR)", value: "₹" + mrrValue.toLocaleString(), sub: "ARR: ₹" + arrValue.toLocaleString(), icon: "💰", color: "#34d399", bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)" },
-    { label: "Total SaaS Tenants", value: stats?.total ?? "—", sub: `${stats?.active || 0} active subscriptions`, icon: "🏢", color: "#818cf8", bg: "rgba(99, 102, 241, 0.15)", border: "rgba(99, 102, 241, 0.3)" },
-    { label: "Active Subscriptions", value: stats?.active ?? "—", sub: "Paying monthly", icon: "✅", color: "#34d399", bg: "rgba(16, 185, 129, 0.15)", border: "rgba(16, 185, 129, 0.3)" },
-    { label: "Renewals & Past Due", value: stats?.pastDue ?? "—", sub: "Action required", icon: "⏰", color: "#fbbf24", bg: "rgba(245, 158, 11, 0.15)", border: "rgba(245, 158, 11, 0.3)" },
-    { label: "Free Trial Accounts", value: stats?.trial ?? "—", sub: "Evaluating platform", icon: "🧪", color: "#60a5fa", bg: "rgba(59, 130, 246, 0.15)", border: "rgba(59, 130, 246, 0.3)" },
-    { label: "Blocked / Suspended", value: stats?.blocked ?? "—", sub: "Access restricted", icon: "🔒", color: "#f87171", bg: "rgba(239, 68, 68, 0.15)", border: "rgba(239, 68, 68, 0.3)" },
+    {
+      label: "Monthly Recurring (MRR)",
+      value: "₹" + mrrValue.toLocaleString(),
+      sub: "ARR: ₹" + arrValue.toLocaleString(),
+      icon: DollarSign,
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-50 dark:bg-emerald-950/50",
+      border: "border-emerald-200/80 dark:border-emerald-800/60"
+    },
+    {
+      label: "Total SaaS Tenants",
+      value: stats?.total ?? "—",
+      sub: `${stats?.active || 0} active subscriptions`,
+      icon: Building2,
+      color: "text-indigo-600 dark:text-indigo-400",
+      bg: "bg-indigo-50 dark:bg-indigo-950/50",
+      border: "border-indigo-200/80 dark:border-indigo-800/60"
+    },
+    {
+      label: "Active Subscriptions",
+      value: stats?.active ?? "—",
+      sub: "Paying monthly",
+      icon: CheckCircle2,
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-50 dark:bg-emerald-950/50",
+      border: "border-emerald-200/80 dark:border-emerald-800/60"
+    },
+    {
+      label: "Renewals & Past Due",
+      value: stats?.pastDue ?? "—",
+      sub: "Action required",
+      icon: Clock,
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-50 dark:bg-amber-950/50",
+      border: "border-amber-200/80 dark:border-amber-800/60"
+    },
+    {
+      label: "Free Trial Accounts",
+      value: stats?.trial ?? "—",
+      sub: "Evaluating platform",
+      icon: FlaskConical,
+      color: "text-blue-600 dark:text-blue-400",
+      bg: "bg-blue-50 dark:bg-blue-950/50",
+      border: "border-blue-200/80 dark:border-blue-800/60"
+    },
+    {
+      label: "Suspended / Blocked",
+      value: stats?.blocked ?? "—",
+      sub: "Access restricted",
+      icon: ShieldAlert,
+      color: "text-rose-600 dark:text-rose-400",
+      bg: "bg-rose-50 dark:bg-rose-950/50",
+      border: "border-rose-200/80 dark:border-rose-800/60"
+    },
   ];
 
   // Module adoption telemetry
@@ -58,7 +120,7 @@ export default function OwnerDashboardPage() {
       return mods.includes(modKey);
     }).length;
     const pct = clients.length > 0 ? Math.round((count / clients.length) * 100) : 0;
-    return { modKey, name: m.name, icon: m.icon, count, pct, category: m.category };
+    return { modKey, name: m?.name || modKey, icon: m?.icon || "📦", count, pct, category: m?.category || "FEATURE" };
   });
 
   const now = new Date();
@@ -70,153 +132,196 @@ export default function OwnerDashboardPage() {
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0b0f19", color: "#f1f5f9", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Top Header */}
-      <header style={{ background: "rgba(15, 23, 42, 0.8)", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "14px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 40, backdropFilter: "blur(16px)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #6366f1, #a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: "white", boxShadow: "0 0 20px rgba(99, 102, 241, 0.4)" }}>👑</div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.2px" }}>WhatMore Super-Admin Console</h1>
-            <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>Enterprise Telemetry & Operations Command</p>
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      
+      {/* Hero Title & Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200/80 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400">
+              <Crown size={20} className="text-amber-500" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+              Executive SaaS Overview & Telemetry
+            </h1>
           </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
+            High-level financial KPIs, tenant module adoption matrix, and upcoming renewal billing queues.
+          </p>
         </div>
-        <nav style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-          {[
-            { label: "Dashboard", href: "/owner", icon: "📊" },
-            { label: "Clients & Modules", href: "/owner/clients", icon: "🏢" },
-            { label: "Announcements", href: "/owner/announcements", icon: "📢" },
-            { label: "Plans & Matrix", href: "/owner/plans", icon: "💎" },
-          ].map(item => {
-            const active = item.href === "/owner";
-            return (
-              <Link key={item.href} href={item.href} style={{ padding: "8px 14px", borderRadius: "10px", background: active ? "rgba(99, 102, 241, 0.2)" : "transparent", border: active ? "1px solid #6366f1" : "1px solid transparent", color: active ? "#818cf8" : "#94a3b8", textDecoration: "none", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", transition: "all 0.15s ease" }}>
-                <span>{item.icon}</span> {item.label}
-              </Link>
-            );
-          })}
-          <button onClick={handleLogout} style={{ marginLeft: "12px", padding: "8px 14px", borderRadius: "10px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#f87171", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>
-            Sign Out
+
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={loadStats}
+            disabled={loading}
+            title="Refresh Metrics"
+            className="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-xs transition-all cursor-pointer"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin text-indigo-600" : ""} />
           </button>
-        </nav>
-      </header>
 
-      <main style={{ padding: "32px", maxWidth: "1600px", margin: "0 auto" }}>
-        {/* Top Controls */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h2 style={{ fontSize: "24px", fontWeight: 900, color: "#ffffff", margin: "0 0 4px 0", letterSpacing: "-0.5px" }}>👑 Executive SaaS Overview & Telemetry</h2>
-            <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>High-level financial KPIs, tenant module adoption matrix, and upcoming renewal billing queues</p>
-          </div>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <Link href="/owner/clients" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", background: "linear-gradient(135deg, #6366f1, #a855f7)", borderRadius: "12px", color: "white", textDecoration: "none", fontWeight: 800, fontSize: "13px", boxShadow: "0 4px 20px rgba(99, 102, 241, 0.35)" }}>
-              <span>➕</span> Onboard New Client
-            </Link>
-            <Link href="/owner/announcements" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 16px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "12px", color: "#ffffff", textDecoration: "none", fontWeight: 700, fontSize: "13px" }}>
-              <span>📢</span> Broadcast Marquee
-            </Link>
-          </div>
+          <Link
+            href="/owner/announcements"
+            className="px-4 py-2.5 rounded-xl font-bold text-xs text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-xs flex items-center gap-1.5"
+          >
+            <Megaphone size={14} />
+            <span>Broadcast Marquee</span>
+          </Link>
+
+          <Link
+            href="/owner/clients"
+            className="px-5 py-2.5 rounded-xl font-bold text-xs text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-md shadow-indigo-500/25 flex items-center gap-1.5 transition-all cursor-pointer hover:scale-[1.02]"
+          >
+            <Plus size={15} />
+            <span>Onboard Client</span>
+          </Link>
         </div>
+      </div>
 
-        {/* Stats Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "16px", marginBottom: "28px" }}>
-          {statCards.map(card => (
-            <div key={card.label} style={{ background: "rgba(15, 23, 42, 0.65)", border: `1px solid ${card.border || "rgba(255,255,255,0.08)"}`, borderRadius: "18px", padding: "20px", backdropFilter: "blur(12px)", position: "relative" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: 800 }}>{card.label}</span>
-                <span style={{ width: "36px", height: "36px", borderRadius: "10px", background: card.bg, border: `1px solid ${card.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
-                  {card.icon}
-                </span>
-              </div>
-              <div style={{ fontSize: "28px", fontWeight: 900, color: card.color, letterSpacing: "-0.5px", marginBottom: "4px" }}>
-                {loading ? "..." : card.value}
-              </div>
-              <div style={{ fontSize: "11px", color: "#64748b" }}>{card.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* 2-Column Section: Renewals + Module Adoption Matrix */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "24px" }}>
-          {/* Renewals & Invoices Queue */}
-          <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", padding: "24px", backdropFilter: "blur(12px)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-              <div>
-                <h3 style={{ fontSize: "16px", fontWeight: 900, color: "#ffffff", margin: 0 }}>⏰ Renewal & Payment Queues</h3>
-                <p style={{ fontSize: "12px", color: "#94a3b8", margin: "2px 0 0 0" }}>Tenants due in next 7 days or currently in past due cycle</p>
-              </div>
-              <Link href="/owner/clients" style={{ fontSize: "12px", color: "#818cf8", textDecoration: "none", fontWeight: 700 }}>
-                View All Clients →
-              </Link>
-            </div>
-
-            {loading ? (
-              <div style={{ padding: "30px", textAlign: "center", color: "#94a3b8", fontSize: "13px" }}>Checking renewals...</div>
-            ) : upcomingRenewals.length === 0 ? (
-              <div style={{ padding: "32px", textAlign: "center", color: "#34d399", background: "rgba(16, 185, 129, 0.1)", borderRadius: "14px", border: "1px solid rgba(16, 185, 129, 0.25)", fontSize: "13px", fontWeight: 700 }}>
-                ✨ All clients are currently active and up to date! No immediate dues.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {upcomingRenewals.map((c: any) => {
-                  const due = new Date(c.currentPeriodEnd);
-                  const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                  const isOverdue = diffDays < 0;
-
-                  return (
-                    <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: isOverdue ? "rgba(239, 68, 68, 0.1)" : "rgba(245, 158, 11, 0.1)", border: `1px solid ${isOverdue ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`, borderRadius: "12px", flexWrap: "wrap", gap: "12px" }}>
-                      <div>
-                        <div style={{ fontWeight: 800, color: "#ffffff", fontSize: "14px" }}>{c.businessName}</div>
-                        <div style={{ fontSize: "12px", color: "#94a3b8" }}>{c.contactEmail} • Fee: <b style={{ color: "#34d399" }}>₹{c.monthlyFee?.toLocaleString()}/mo</b></div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 800, color: isOverdue ? "#f87171" : "#fbbf24", padding: "4px 10px", background: "rgba(0,0,0,0.3)", borderRadius: "6px" }}>
-                          {isOverdue ? `Overdue by ${Math.abs(diffDays)}d` : diffDays === 0 ? "Due Today" : `Due in ${diffDays}d`}
-                        </span>
-                        <Link href="/owner/clients" style={{ padding: "6px 14px", background: "linear-gradient(135deg, #10b981, #059669)", borderRadius: "8px", color: "white", textDecoration: "none", fontSize: "12px", fontWeight: 800 }}>
-                          💳 Collect
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 11-Module & Integration Platform Adoption Gauge */}
-          <div style={{ background: "rgba(15, 23, 42, 0.65)", border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "20px", padding: "24px", backdropFilter: "blur(12px)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <div>
-                <h3 style={{ fontSize: "16px", fontWeight: 900, color: "#ffffff", margin: 0 }}>🎛️ 11-Module & Integration Adoption</h3>
-                <p style={{ fontSize: "12px", color: "#94a3b8", margin: "2px 0 0 0" }}>Active tenant penetration across all modules</p>
-              </div>
-              <Link href="/owner/plans" style={{ fontSize: "12px", color: "#818cf8", textDecoration: "none", fontWeight: 700 }}>
-                Plans & Matrix →
-              </Link>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "380px", overflowY: "auto", paddingRight: "4px" }}>
-              {moduleAdoption.map(m => (
-                <div key={m.modKey} style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "10px", padding: "10px 14px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span>{m.icon}</span>
-                      <span style={{ fontSize: "12px", fontWeight: 800, color: "#ffffff" }}>{m.name}</span>
-                    </div>
-                    <span style={{ fontSize: "11px", fontWeight: 800, color: "#818cf8" }}>
-                      {m.count} Tenants ({m.pct}%)
-                    </span>
-                  </div>
-                  {/* Progress Bar */}
-                  <div style={{ width: "100%", height: "6px", background: "rgba(255, 255, 255, 0.06)", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ width: `${m.pct}%`, height: "100%", background: "linear-gradient(90deg, #6366f1, #a855f7)", borderRadius: "999px" }} />
-                  </div>
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        {statCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border ${card.border} shadow-xs transition-all hover:shadow-md flex flex-col justify-between`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{card.label}</span>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${card.bg} ${card.color}`}>
+                  <Icon size={18} />
                 </div>
-              ))}
+              </div>
+              <div>
+                <div className={`text-3xl font-black ${card.color} tracking-tight mb-1`}>
+                  {loading ? "..." : card.value}
+                </div>
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {card.sub}
+                </div>
+              </div>
             </div>
+          );
+        })}
+      </div>
+
+      {/* 2-Column Section: Renewals Queue + Module Adoption */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Renewals & Invoices Queue (7 cols) */}
+        <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <Clock size={16} className="text-amber-500" />
+                <h3 className="text-base font-black text-slate-900 dark:text-white">Renewal & Payment Queues</h3>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Tenants due in the next 7 days or currently past due.</p>
+            </div>
+            <Link
+              href="/owner/clients"
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+            >
+              <span>View All</span> <ArrowRight size={13} />
+            </Link>
+          </div>
+
+          {loading ? (
+            <div className="p-8 text-center text-slate-400 text-xs">Checking renewals...</div>
+          ) : upcomingRenewals.length === 0 ? (
+            <div className="p-8 text-center rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center justify-center gap-2">
+              <CheckCircle2 size={16} /> All clients are currently active and up to date!
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {upcomingRenewals.map((c: any) => {
+                const due = new Date(c.currentPeriodEnd);
+                const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                const isOverdue = diffDays < 0;
+
+                return (
+                  <div
+                    key={c.id}
+                    className={`p-3.5 rounded-2xl border flex items-center justify-between flex-wrap gap-2 ${
+                      isOverdue
+                        ? "bg-rose-50/50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/60"
+                        : "bg-amber-50/50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60"
+                    }`}
+                  >
+                    <div>
+                      <div className="font-extrabold text-sm text-slate-900 dark:text-white">{c.businessName}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {c.contactEmail} • Fee: <b className="text-emerald-600 font-bold">₹{c.monthlyFee?.toLocaleString()}/mo</b>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                        isOverdue ? "bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300" : "bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300"
+                      }`}>
+                        {isOverdue ? `Overdue ${Math.abs(diffDays)}d` : diffDays === 0 ? "Due Today" : `Due in ${diffDays}d`}
+                      </span>
+                      <Link
+                        href="/owner/clients"
+                        className="px-3 py-1 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs flex items-center gap-1"
+                      >
+                        <CreditCard size={12} /> Collect
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* 10-Module Platform Penetration (5 cols) */}
+        <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <Layers size={16} className="text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-base font-black text-slate-900 dark:text-white">Module Adoption</h3>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Active tenant penetration across features.</p>
+            </div>
+            <Link
+              href="/owner/plans"
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+            >
+              <span>Matrix</span> <ArrowRight size={13} />
+            </Link>
+          </div>
+
+          <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+            {moduleAdoption.map((m) => (
+              <div
+                key={m.modKey}
+                className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800"
+              >
+                <div className="flex items-center justify-between mb-1.5 text-xs">
+                  <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
+                    <span className="text-sm">{m.icon}</span>
+                    <span>{m.name}</span>
+                  </div>
+                  <span className="font-extrabold text-indigo-600 dark:text-indigo-400">
+                    {m.count} Tenants ({m.pct}%)
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-300"
+                    style={{ width: `${m.pct}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </main>
-    </div>
+
+      </div>
+
+    </main>
   );
 }

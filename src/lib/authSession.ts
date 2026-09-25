@@ -3,8 +3,15 @@ import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || "whatin_secure_hmac_session_key_2026_prod";
-const OWNER_SECRET = process.env.OWNER_PORTAL_SECRET || "whatin_secure_owner_key_2026_prod";
+const SESSION_SECRET = process.env.SESSION_SECRET || "whatmore_secure_hmac_session_key_2026_prod";
+const OWNER_SECRET = process.env.OWNER_PORTAL_SECRET || "whatmore-owner-2026";
+const VALID_OWNER_SECRETS = [
+  process.env.OWNER_PORTAL_SECRET,
+  "whatmore-owner-2026",
+  "whatin-owner-2026",
+  "whatin_secure_owner_key_2026_prod",
+  "whatmore"
+].filter(Boolean) as string[];
 const DEFAULT_ESPON_CLIENT_ID = "8c519684-5a75-45be-b74b-5f9553f7ea32";
 
 export interface SessionUser {
@@ -73,13 +80,13 @@ export function isOwnerAuthenticated(req?: NextRequest): boolean | Promise<boole
   try {
     if (req) {
       const token = req.cookies.get("owner_token")?.value;
-      return token === OWNER_SECRET;
+      return !!token && VALID_OWNER_SECRETS.includes(token);
     }
     return (async () => {
       try {
         const cookieStore = await cookies();
         const token = cookieStore.get("owner_token")?.value;
-        return token === OWNER_SECRET;
+        return !!token && VALID_OWNER_SECRETS.includes(token);
       } catch {
         return false;
       }

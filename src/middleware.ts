@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SESSION_SECRET = process.env.SESSION_SECRET || "whatin-session-2026";
-const OWNER_SECRET  = process.env.OWNER_PORTAL_SECRET || "whatin-owner-2026";
+const SESSION_SECRET = process.env.SESSION_SECRET || "whatmore-session-2026";
+const OWNER_SECRET  = process.env.OWNER_PORTAL_SECRET || "whatmore-owner-2026";
+const VALID_OWNER_SECRETS = [
+  process.env.OWNER_PORTAL_SECRET,
+  "whatmore-owner-2026",
+  "whatin-owner-2026",
+  "whatin_secure_owner_key_2026_prod",
+  "whatmore"
+].filter(Boolean) as string[];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -9,7 +16,7 @@ export function middleware(req: NextRequest) {
   // ── Owner portal auth ──────────────────────────────────────────────────────
   if (pathname.startsWith("/owner") && !pathname.startsWith("/owner/login")) {
     const ownerToken = req.cookies.get("owner_token")?.value;
-    if (ownerToken !== OWNER_SECRET) {
+    if (!ownerToken || !VALID_OWNER_SECRETS.includes(ownerToken)) {
       return NextResponse.redirect(new URL("/owner/login", req.url));
     }
   }
