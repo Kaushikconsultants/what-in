@@ -75,10 +75,8 @@ html.dark .skeleton-card,
   background-size: 200% 100% !important;
 }
 
-/* ----------------------------------------------------------------- */
-/* MOBILE: WhatsApp layout root — use dvh units, header is not sticky */
-/* so the nav tabs can never float over the chat header               */
-/* ----------------------------------------------------------------- */
+/* Mobile: WhatsApp layout root - header is not sticky on mobile */
+/* so the nav tabs can never float over the chat header */
 @media (max-width: 900px) {
   .wa-layout-root {
     height: 100dvh !important;
