@@ -450,6 +450,21 @@ export default function WhatsAppInboxComponent() {
     }
   }, [activeCustomerPhone]);
 
+  // On mobile (<=900px): hide brand header + nav when a chat is open.
+  // CSS in WhatsAppHeaderNav.css targets body.mobile-chat-open .whatmore-header
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMobile = window.innerWidth <= 900;
+    if (isMobile && selectedConvId) {
+      document.body.classList.add("mobile-chat-open");
+    } else {
+      document.body.classList.remove("mobile-chat-open");
+    }
+    return () => {
+      document.body.classList.remove("mobile-chat-open");
+    };
+  }, [selectedConvId]);
+
   // Group customer web sessions date-wise & time-wise (Retained for last 7 days to optimize memory)
   const groupedCustomerSessions = useMemo(() => {
     if (!customerWebSessions || customerWebSessions.length === 0) return [];

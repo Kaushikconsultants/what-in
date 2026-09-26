@@ -416,4 +416,13 @@ html.dark .nav-pill.active,
     gap: 4px;
   }
 }
-
+/* ----------------------------------------------------------------- */
+/* MOBILE CHAT OPEN: Hide entire header nav when a chat is selected   */
+/* body.mobile-chat-open is toggled by WhatsAppInboxComponent.tsx     */
+/* This reclaims ~90px for message content on mobile screens          */
+/* ----------------------------------------------------------------- */
+@media (max-width: 900px) {
+  body.mobile-chat-open .whatmore-header {
+    display: none !important;
+  }
+}
