@@ -1,6 +1,16 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { X, Search, ShoppingBag, ChevronRight, ExternalLink, Send } from "lucide-react";
+import {
+  X,
+  Search,
+  ShoppingBag,
+  ExternalLink,
+  Send,
+  RefreshCw,
+  Tag,
+  CheckCircle2,
+  Sparkles
+} from "lucide-react";
 
 interface Product {
   id: string;
@@ -26,6 +36,7 @@ export default function ProductCatalogPanel({ onClose, onSendProduct, recipientN
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState<string | null>(null);
+  const [sentId, setSentId] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
 
   // Dynamic Theme Detection
@@ -60,6 +71,15 @@ export default function ProductCatalogPanel({ onClose, onSendProduct, recipientN
     };
   }, []);
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   useEffect(() => {
     fetch("/api/shopify/products?limit=100")
       .then((r) => r.json())
@@ -76,7 +96,7 @@ export default function ProductCatalogPanel({ onClose, onSendProduct, recipientN
             variants: p.variants
           }));
           setProducts(prods);
-          const cols = ["All", ...((Array.from(new Set(prods.map((p) => p.collection || "General")))) as string[])];
+          const cols = ["All", ...((Array.from(new Set(prods.map((p) => p.collection || "General").filter(Boolean)))) as string[])];
           setCollections(cols);
         }
         setLoading(false);
@@ -94,269 +114,454 @@ export default function ProductCatalogPanel({ onClose, onSendProduct, recipientN
     setSending(product.id);
     await onSendProduct(product);
     setSending(null);
+    setSentId(product.id);
+    setTimeout(() => setSentId(null), 2500);
   };
 
   return (
     <div
       style={{
-        width: "320px",
-        minWidth: "320px",
-        height: "100%",
-        borderLeft: `1px solid ${isDark ? "#1e293b" : "#e5e7eb"}`,
-        background: isDark ? "#0f172a" : "#ffffff",
+        position: "fixed",
+        inset: 0,
+        zIndex: 1200,
         display: "flex",
-        flexDirection: "column",
-        flexShrink: 0,
-        fontFamily: "Inter, sans-serif",
-        transition: "background 0.2s ease, border-color 0.2s ease"
+        justifyContent: "flex-end",
+        background: "rgba(0, 0, 0, 0.45)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
+        animation: "catalogBackdropFade 0.18s ease-out"
       }}
+      onClick={onClose}
     >
-      {/* Header */}
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
-          padding: "16px 16px 12px",
-          borderBottom: `1px solid ${isDark ? "#1e293b" : "#f3f4f6"}`,
+          width: "100%",
+          maxWidth: "420px",
+          height: "100%",
+          background: isDark ? "#0f172a" : "#ffffff",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          background: isDark ? "#151e2e" : "#f8fafc"
+          flexDirection: "column",
+          boxShadow: isDark ? "-8px 0 32px rgba(0, 0, 0, 0.6)" : "-8px 0 32px rgba(0, 0, 0, 0.16)",
+          borderLeft: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
+          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+          animation: "catalogDrawerSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1)"
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <ShoppingBag size={18} color={isDark ? "#818cf8" : "#4f46e5"} />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: "14px", color: isDark ? "#f8fafc" : "#111827" }}>
-              Product Catalog
+        {/* Header */}
+        <div
+          style={{
+            padding: "14px 16px",
+            borderBottom: `1px solid ${isDark ? "#1e293b" : "#f1f5f9"}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: isDark ? "#151e2e" : "#f8fafc"
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                boxShadow: "0 2px 6px rgba(16, 185, 129, 0.25)"
+              }}
+            >
+              <ShoppingBag size={18} />
             </div>
-            {recipientName && (
-              <div style={{ fontSize: "11px", color: isDark ? "#94a3b8" : "#6b7280" }}>
-                Send to {recipientName}
+            <div>
+              <div style={{ fontWeight: 800, fontSize: "14px", color: isDark ? "#f8fafc" : "#0f172a", letterSpacing: "-0.2px" }}>
+                Product Catalog
               </div>
+              <div style={{ fontSize: "11px", color: isDark ? "#94a3b8" : "#64748b", marginTop: "1px" }}>
+                {recipientName ? `Send to ${recipientName}` : "Share product card directly into chat"}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            title="Close Catalog (Esc)"
+            style={{
+              background: isDark ? "#1e293b" : "#f1f5f9",
+              border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+              borderRadius: "50%",
+              width: "30px",
+              height: "30px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: isDark ? "#cbd5e1" : "#64748b",
+              transition: "all 0.15s ease"
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Search Input Bar */}
+        <div
+          style={{
+            padding: "10px 14px 6px",
+            background: isDark ? "#0f172a" : "#ffffff"
+          }}
+        >
+          <div style={{ position: "relative" }}>
+            <Search
+              size={15}
+              style={{
+                position: "absolute",
+                left: "11px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: isDark ? "#64748b" : "#94a3b8",
+                pointerEvents: "none"
+              }}
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products by title or type..."
+              style={{
+                width: "100%",
+                padding: "8px 32px 8px 34px",
+                border: `1.5px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+                borderRadius: "10px",
+                fontSize: "12.5px",
+                outline: "none",
+                boxSizing: "border-box",
+                background: isDark ? "#151f32" : "#f8fafc",
+                color: isDark ? "#f8fafc" : "#0f172a",
+                transition: "border-color 0.15s ease, background 0.15s ease"
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = "#4f46e5";
+                e.target.style.background = isDark ? "#111827" : "#ffffff";
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = isDark ? "#334155" : "#e2e8f0";
+                e.target.style.background = isDark ? "#151f32" : "#f8fafc";
+              }}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: isDark ? "#94a3b8" : "#94a3b8",
+                  padding: "4px"
+                }}
+              >
+                <X size={14} />
+              </button>
             )}
           </div>
         </div>
-        <button
-          onClick={onClose}
+
+        {/* Collection Filter Pills */}
+        <div
           style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: isDark ? "#94a3b8" : "#9ca3af",
-            padding: "4px"
+            display: "flex",
+            gap: "5px",
+            padding: "6px 14px 10px",
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+            borderBottom: `1px solid ${isDark ? "#1e293b" : "#f1f5f9"}`,
+            flexShrink: 0,
+            background: isDark ? "#0f172a" : "#ffffff"
           }}
         >
-          <X size={18} />
-        </button>
-      </div>
-
-      {/* Search */}
-      <div
-        style={{
-          padding: "10px 12px",
-          borderBottom: `1px solid ${isDark ? "#1e293b" : "#f3f4f6"}`,
-          background: isDark ? "#0f172a" : "#ffffff"
-        }}
-      >
-        <div style={{ position: "relative" }}>
-          <Search
-            size={14}
-            style={{
-              position: "absolute",
-              left: "10px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: isDark ? "#64748b" : "#9ca3af"
-            }}
-          />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products..."
-            style={{
-              width: "100%",
-              padding: "7px 10px 7px 30px",
-              border: `1px solid ${isDark ? "#334155" : "#e5e7eb"}`,
-              borderRadius: "8px",
-              fontSize: "12.5px",
-              outline: "none",
-              boxSizing: "border-box",
-              background: isDark ? "#151f32" : "#ffffff",
-              color: isDark ? "#f8fafc" : "#111827"
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Collection Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          padding: "8px 12px",
-          overflowX: "auto",
-          borderBottom: `1px solid ${isDark ? "#1e293b" : "#f3f4f6"}`,
-          flexShrink: 0,
-          background: isDark ? "#0c1322" : "#fafafa"
-        }}
-      >
-        {collections.map((col) => (
-          <button
-            key={col}
-            onClick={() => setSelectedCollection(col)}
-            style={{
-              padding: "4px 10px",
-              borderRadius: "20px",
-              fontSize: "11px",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-              cursor: "pointer",
-              border: "none",
-              background:
-                selectedCollection === col
-                  ? "#4f46e5"
-                  : isDark
-                  ? "#1e293b"
-                  : "#f3f4f6",
-              color: selectedCollection === col ? "#ffffff" : isDark ? "#94a3b8" : "#4b5563"
-            }}
-          >
-            {col}
-          </button>
-        ))}
-      </div>
-
-      {/* Products List */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px", background: isDark ? "#070b14" : "#ffffff" }}>
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "40px", color: isDark ? "#64748b" : "#9ca3af", fontSize: "13px" }}>
-            Loading products...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px", color: isDark ? "#64748b" : "#9ca3af", fontSize: "13px" }}>
-            No products found
-          </div>
-        ) : (
-          filtered.map((product) => (
-            <div
-              key={product.id}
-              style={{
-                display: "flex",
-                gap: "10px",
-                padding: "10px",
-                borderRadius: "10px",
-                border: `1px solid ${isDark ? "#1e293b" : "#f3f4f6"}`,
-                marginBottom: "8px",
-                background: isDark ? "#111927" : "#fafafa",
-                transition: "all 0.15s ease"
-              }}
-            >
-              {/* Product Image */}
-              <div
+          {collections.map((col) => {
+            const isSelected = selectedCollection === col;
+            return (
+              <button
+                key={col}
+                onClick={() => setSelectedCollection(col)}
                 style={{
-                  width: "56px",
-                  height: "56px",
-                  borderRadius: "8px",
-                  overflow: "hidden",
-                  flexShrink: 0,
-                  background: isDark ? "#1e293b" : "#e5e7eb"
+                  padding: "4px 10px",
+                  borderRadius: "16px",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  cursor: "pointer",
+                  border: `1px solid ${
+                    isSelected
+                      ? "#4f46e5"
+                      : isDark
+                      ? "#334155"
+                      : "#e2e8f0"
+                  }`,
+                  background: isSelected
+                    ? "#4f46e5"
+                    : isDark
+                    ? "#1e293b"
+                    : "#f8fafc",
+                  color: isSelected ? "#ffffff" : isDark ? "#cbd5e1" : "#475569",
+                  transition: "all 0.15s ease"
                 }}
               >
-                {product.image ? (
-                  <img
-                    src={product.image}
-                    alt={product.title}
-                    referrerPolicy="no-referrer"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                ) : (
+                {col}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Count Bar */}
+        <div
+          style={{
+            padding: "6px 16px",
+            fontSize: "11px",
+            fontWeight: 600,
+            color: isDark ? "#64748b" : "#94a3b8",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: isDark ? "#0a0f1d" : "#fafafa",
+            borderBottom: `1px solid ${isDark ? "#1e293b" : "#f1f5f9"}`
+          }}
+        >
+          <span>{filtered.length} {filtered.length === 1 ? "Product" : "Products"} available</span>
+          {selectedCollection !== "All" && (
+            <span style={{ color: "#4f46e5", cursor: "pointer" }} onClick={() => setSelectedCollection("All")}>
+              Reset filter
+            </span>
+          )}
+        </div>
+
+        {/* Products List */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "10px 12px",
+            background: isDark ? "#0b0f19" : "#f8fafc",
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px"
+          }}
+        >
+          {loading ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 0" }}>
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    height: "76px",
+                    borderRadius: "12px",
+                    background: isDark ? "#1e293b" : "#ffffff",
+                    border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
+                    opacity: 0.6,
+                    animation: "pulse 1.5s infinite"
+                  }}
+                />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 20px", color: isDark ? "#64748b" : "#94a3b8" }}>
+              <ShoppingBag size={36} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
+              <div style={{ fontSize: "13px", fontWeight: 700, color: isDark ? "#cbd5e1" : "#475569" }}>
+                No products found
+              </div>
+              <div style={{ fontSize: "11.5px", marginTop: "4px" }}>
+                {search ? `No products match "${search}"` : "No products in this category."}
+              </div>
+            </div>
+          ) : (
+            filtered.map((product) => {
+              const isSendingThis = sending === product.id;
+              const isSentJustNow = sentId === product.id;
+
+              return (
+                <div
+                  key={product.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "8px 10px",
+                    borderRadius: "12px",
+                    border: `1px solid ${isDark ? "#1e293b" : "#e2e8f0"}`,
+                    background: isDark ? "#151e2e" : "#ffffff",
+                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.03)",
+                    transition: "all 0.15s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#6366f1";
+                    e.currentTarget.style.boxShadow = "0 3px 10px rgba(99, 102, 241, 0.08)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = isDark ? "#1e293b" : "#e2e8f0";
+                    e.currentTarget.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.03)";
+                  }}
+                >
+                  {/* Product Thumbnail */}
                   <div
                     style={{
-                      width: "100%",
-                      height: "100%",
+                      width: "56px",
+                      height: "56px",
+                      minWidth: "56px",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      background: isDark ? "#1e293b" : "#f1f5f9",
+                      border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center"
                     }}
                   >
-                    <ShoppingBag size={20} color={isDark ? "#64748b" : "#9ca3af"} />
+                    {product.image ? (
+                      <img
+                        src={product.image}
+                        alt={product.title}
+                        referrerPolicy="no-referrer"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <ShoppingBag size={20} color={isDark ? "#64748b" : "#94a3b8"} />
+                    )}
                   </div>
-                )}
-              </div>
-              {/* Product Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: "12px",
-                    color: isDark ? "#f1f5f9" : "#111827",
-                    marginBottom: "2px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }}
-                >
-                  {product.title}
-                </div>
-                <div
-                  style={{
-                    fontWeight: 800,
-                    fontSize: "13px",
-                    color: isDark ? "#818cf8" : "#4f46e5",
-                    marginBottom: "6px"
-                  }}
-                >
-                  ₹{parseFloat(product.price).toLocaleString("en-IN")}
-                </div>
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <button
-                    onClick={() => handleSend(product)}
-                    disabled={sending === product.id}
-                    style={{
-                      flex: 1,
-                      padding: "5px 8px",
-                      background:
-                        sending === product.id
-                          ? isDark
-                            ? "#334155"
-                            : "#9ca3af"
+
+                  {/* Product Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: "12.5px",
+                        color: isDark ? "#f1f5f9" : "#0f172a",
+                        lineHeight: "1.3",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical"
+                      }}
+                      title={product.title}
+                    >
+                      {product.title}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          color: isDark ? "#94a3b8" : "#64748b",
+                          background: isDark ? "#1e293b" : "#f1f5f9",
+                          padding: "1px 6px",
+                          borderRadius: "4px",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {product.collection || "General"}
+                      </span>
+
+                      <div
+                        style={{
+                          fontWeight: 800,
+                          fontSize: "13.5px",
+                          color: "#10b981",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        ₹{parseFloat(product.price).toLocaleString("en-IN")}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-end", flexShrink: 0 }}>
+                    {product.url && (
+                      <a
+                        href={product.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Preview in Store ↗"
+                        style={{
+                          color: isDark ? "#64748b" : "#94a3b8",
+                          padding: "2px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          transition: "color 0.15s"
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "#4f46e5")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = isDark ? "#64748b" : "#94a3b8")}
+                      >
+                        <ExternalLink size={13} />
+                      </a>
+                    )}
+
+                    <button
+                      onClick={() => handleSend(product)}
+                      disabled={isSendingThis}
+                      style={{
+                        padding: "5px 12px",
+                        background: isSentJustNow
+                          ? "#10b981"
+                          : isSendingThis
+                          ? (isDark ? "#334155" : "#94a3b8")
                           : "#4f46e5",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "6px",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      cursor: sending === product.id ? "not-allowed" : "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "4px"
-                    }}
-                  >
-                    <Send size={11} />
-                    {sending === product.id ? "Sending..." : "Send"}
-                  </button>
-                  <a
-                    href={product.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      padding: "5px 8px",
-                      background: isDark ? "#1e293b" : "#f3f4f6",
-                      border: `1px solid ${isDark ? "#334155" : "transparent"}`,
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center"
-                    }}
-                  >
-                    <ExternalLink size={11} color={isDark ? "#94a3b8" : "#6b7280"} />
-                  </a>
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "7px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        cursor: isSendingThis ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        whiteSpace: "nowrap",
+                        boxShadow: "0 1px 3px rgba(79, 70, 229, 0.25)",
+                        transition: "all 0.15s ease"
+                      }}
+                    >
+                      {isSendingThis ? (
+                        <RefreshCw size={11} className="spin-icon" />
+                      ) : isSentJustNow ? (
+                        <CheckCircle2 size={11} />
+                      ) : (
+                        <Send size={11} />
+                      )}
+                      <span>{isSendingThis ? "Sending..." : isSentJustNow ? "Sent ✓" : "Send"}</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes catalogBackdropFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes catalogDrawerSlide {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+        .catalog-pill-scroll::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </div>
   );
 }
