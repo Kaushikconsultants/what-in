@@ -251,46 +251,38 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
   const descText = isOrder
     ? "Get a native lock-screen buzz on your phone whenever a customer places an order via WhatsApp or Shopify."
     : "Never miss a lead: Receive instant lock-screen notifications for every inbound customer message.";
-
-  // Active State: Sleek, responsive, never cut off
+  // ── Active State: ultra-compact single-line pill strip ──────────────
   if (permission === "granted" && isSubscribed) {
     return (
-      <div className="w-full bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2 sm:px-3 sm:py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs mb-2 text-slate-800 dark:text-slate-200 shadow-sm backdrop-blur-md">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 mb-1.5 rounded-lg bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800/40">
+        {/* Pulsing dot + label */}
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className="relative flex h-2 w-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">Push Active:</span>
-          <span className="text-[11px] text-slate-600 dark:text-slate-300">
-            {isOrder ? "Order alerts enabled" : "Chats alert enabled"}
+          <span className="font-bold text-emerald-700 dark:text-emerald-400 text-[11px] shrink-0">Push Active:</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+            {isOrder ? "Order alerts on" : "Chats alert enabled"}
           </span>
         </div>
-
-        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+        {/* Test Buzz + dismiss */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={handleTestNotification}
             disabled={testing}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all cursor-pointer"
-            title="Send sample notification to your device to verify it buzzes"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white transition-all cursor-pointer disabled:opacity-60"
+            title="Test notification"
           >
-            {testing ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
+            {testing ? <RefreshCw size={9} className="animate-spin" /> : <Zap size={9} />}
             <span>Test Buzz</span>
           </button>
-
-          {installPrompt && !isStandalone && (
-            <button
-              onClick={handleInstallApp}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg font-bold text-[11px] bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white border border-slate-700 transition-all cursor-pointer"
-            >
-              <Download size={11} />
-              <span>Install</span>
-            </button>
-          )}
+          <button onClick={() => setDismissed(true)} className="p-0.5 text-slate-400 hover:text-slate-600 rounded" title="Hide">
+            <X size={12} />
+          </button>
         </div>
-
         {toast && (
-          <div className="fixed bottom-5 right-5 z-50 p-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-bold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <div className="fixed bottom-5 right-5 z-50 p-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-xs font-bold shadow-2xl flex items-center gap-2">
             {toast.type === "success" ? <CheckCircle2 size={15} className="text-emerald-400" /> : <BellOff size={15} className="text-rose-400" />}
             <span>{toast.text}</span>
           </div>
