@@ -4732,14 +4732,18 @@ export default function WhatsAppInboxComponent() {
                           return (
                             <div className="message-text-content">
                               {msg.messageType === "UNSUPPORTED" ? (
-                                bodyText && bodyText !== "[Message]" ? (
-                                  <div>{renderWhatsAppFormattedText(bodyText)}</div>
-                                ) : (
-                                  <span style={{ color: "#38bdf8", display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600 }}>
-                                    <ShoppingBag size={14} />
-                                    <span>WhatsApp Catalog Order Received</span>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                  <span style={{ color: "#f59e0b", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "0.82rem", fontWeight: 600 }}>
+                                    ⚠️ Unsupported Message or Call
                                   </span>
-                                )
+                                  {bodyText && !bodyText.startsWith("[Message]") && !bodyText.startsWith("⚠️ [Unsupported") ? (
+                                    <div style={{ opacity: 0.85, fontSize: "0.85rem" }}>{renderWhatsAppFormattedText(bodyText)}</div>
+                                  ) : (
+                                    <span style={{ fontSize: "0.78rem", color: "var(--text-muted, #94a3b8)", fontStyle: "italic" }}>
+                                      WhatsApp Business API does not support direct calls or this message format.
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
                                 <div>{renderWhatsAppFormattedText(bodyText)}</div>
                               )}

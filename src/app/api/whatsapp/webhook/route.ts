@@ -431,17 +431,21 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
         summary += `Raw response: ${flowReply.response_json}`;
       }
       textContent = summary.trim();
+    } else if (msg.type === "unsupported") {
+      textContent = "⚠️ [Unsupported message, call, or interaction - Not supported by WhatsApp Business API]";
     }
 
     // Feature: Detect and extract Widget Visitor Tracking Reference Token [Ref: WXXXX]
     let widgetRefCode: string | null = null;
-    const refMatch = textContent.match(/\[(?:Ref:?\s*)?([A-Za-z0-9]{4,10})\]/i);
-    if (refMatch) {
-      widgetRefCode = refMatch[1].toUpperCase();
-      // Clean up textContent so the agent inbox and customer view shows ONLY clean natural text
-      textContent = textContent.replace(/\s*\[(?:Ref:?\s*)?[A-Za-z0-9]{4,10}\]/gi, "").trim();
-      if (!textContent) {
-        textContent = "Hello! Can I get more info on this?";
+    if (msg.type === "text" && msg.text?.body) {
+      const refMatch = textContent.match(/\[(?:Ref:\s*|W)([A-Za-z0-9]{3,15})\]/i);
+      if (refMatch) {
+        widgetRefCode = (refMatch[1] || "").toUpperCase();
+        // Clean up textContent so the agent inbox and customer view shows ONLY clean natural text
+        textContent = textContent.replace(/\s*\[(?:Ref:\s*|W)[A-Za-z0-9]{3,15}\]/gi, "").trim();
+        if (!textContent) {
+          textContent = "Hello! Can I get more info on this?";
+        }
       }
     }
 
@@ -1713,6 +1717,22 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
             durationMs: aiDuration
           }
         }).catch(() => {});
+      }
+    }
+
+    // Auto-respond to unsupported actions (direct calls, unsupported media) so the customer isn't left hanging
+    if (msg.type === "unsupported" && conversation) {
+      try {
+        await sendWhatsAppMessageAction({
+          conversationId: conversation.id,
+          senderId: "bot",
+          senderType: "BOT",
+          messageType: "TEXT",
+          content: "Namaste! 🙏 WhatsApp Business API par direct audio/video calls ya yeh format support nahi hota hai.\n\nKripya apna sawal ya order yahan text message mein likhein, ya 'Hi' reply karein taaki hum aapki turant sahayata kar sakein.",
+          senderName: "Espon Support"
+        });
+      } catch (err: any) {
+        console.error("[Webhook Unsupported Auto-Reply Error]:", err?.message);
       }
     }
   }
