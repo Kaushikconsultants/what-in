@@ -1260,6 +1260,15 @@
   padding: 8px;
   border-radius: 10px;
   border: 1px solid #cbd5e1;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.msg-payment-qr-box img,
+.msg-payment-qr-box canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 .msg-payment-qr-caption {
@@ -5754,29 +5763,54 @@ html.dark .tracking-timeline::before,
     display: none !important;
   }
 
+  /* Plain text bubbles: 78% max — comfortable reading width */
   .message-bubble {
-    max-width: 88% !important;
+    max-width: 78% !important;
     font-size: 13px !important;
     line-height: 1.45 !important;
     word-break: break-word !important;
+    width: fit-content !important;
   }
 
+  /* Rich payment card: fixed max 260px, scales down on very small screens */
   .msg-payment-card {
-    max-width: 100% !important;
+    max-width: min(260px, 85vw) !important;
     width: 100% !important;
+    box-sizing: border-box !important;
   }
 
+  /* QR code image: fill the card but never overflow */
   .msg-payment-qr-wrap img,
-  .msg-payment-qr-box img {
+  .msg-payment-qr-box img,
+  .msg-payment-qr-wrap canvas,
+  .msg-payment-qr-box canvas {
     max-width: 100% !important;
     height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
   }
 
+  /* Template / catalog cards: fixed reasonable width */
   .template-card,
   .catalog-card,
-  .wa-rich-card {
-    max-width: 100% !important;
+  .wa-rich-card,
+  .msg-template-card {
+    max-width: min(260px, 85vw) !important;
     width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Message row containing a rich card: fit to card width */
+  .message-row.outgoing .message-bubble:has(.msg-payment-card),
+  .message-row.outgoing .message-bubble:has(.msg-template-card),
+  .message-row.incoming .message-bubble:has(.msg-payment-card),
+  .message-row.incoming .message-bubble:has(.msg-template-card) {
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: fit-content !important;
+    max-width: min(260px, 85vw) !important;
   }
 
   .message-timestamp {
