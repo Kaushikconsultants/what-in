@@ -5057,222 +5057,229 @@ export default function WhatsAppInboxComponent() {
                 )}
                 <form className={`chat-input-form ${isInternalNote ? "internal-mode" : ""}`} onSubmit={handleSendMessage}>
                   
-                  <div className="composer-attachments-bar">
-                    <button
-                      type="button"
-                      className="input-attachment-btn"
-                      title="Attach File / Image / Document"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Paperclip size={18} />
-                    </button>
-                    
-                    <button
-                      type="button"
-                      className="input-attachment-btn btn-record"
-                      title="Record Voice Note"
-                      onClick={startRecording}
-                    >
-                      <Mic size={18} />
-                    </button>
-
-                    {/* Template Picker Button */}
-                    <button
-                      type="button"
-                      className={`input-attachment-btn ${showTemplatePicker ? "btn-active-template" : ""}`}
-                      title="Send Template Message"
-                      onClick={() => setShowTemplatePicker(true)}
-                    >
-                      <FileCode size={18} />
-                    </button>
-
-                    {/* Product Catalog Button */}
-                    {isModuleActive(["META_CATALOG", "SHOPIFY_INTEGRATION"]) && (
-                      <button
-                        type="button"
-                        className={`input-attachment-btn ${showProductPanel ? "btn-active-product" : ""}`}
-                        title="Send Product from Catalog"
-                        onClick={() => setShowProductPanel(v => !v)}
-                      >
-                        <ShoppingBag size={18} />
-                      </button>
-                    )}
-
-                    {/* Flow Picker Button */}
-                    {isModuleActive("CHATBOT") && (
-                      <button
-                        type="button"
-                        className={`input-attachment-btn ${showFlowPicker ? "btn-active-flow" : ""}`}
-                        title="Send Interactive Flow Form"
-                        onClick={() => setShowFlowPicker(v => !v)}
-                      >
-                        <Layers size={18} />
-                      </button>
-                    )}
-
-                    {/* Quick Replies Button */}
-                    <button
-                      ref={quickRepliesBarBtnRef}
-                      type="button"
-                      className={`input-attachment-btn ${showCannedResponses ? "btn-active-quick" : ""}`}
-                      title="Quick Replies & Slash Commands (/)"
-                      onClick={() => {
-                        setShowCannedResponses(prev => !prev);
-                        if (!showCannedResponses) {
-                          setCannedPopupSearch("");
-                          setCannedPopupHighlight(0);
-                        }
-                      }}
-                    >
-                      <Zap size={18} className={showCannedResponses ? "text-amber-500 fill-amber-500" : ""} />
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`input-attachment-btn ${showEmojiPicker ? "btn-active-emoji" : ""}`}
-                      title="Quick Emojis"
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    >
-                      <Smile size={18} />
-                    </button>
-                  </div>
-
-                {/* Team Mentions Popup Menu */}
-                {showMentionsMenu && (
-                  <div className="mentions-popup-menu">
-                    <div className="mentions-popup-header">
-                      Mention Teammate
+                  {/* Team Mentions Popup Menu */}
+                  {showMentionsMenu && (
+                    <div className="mentions-popup-menu">
+                      <div className="mentions-popup-header">
+                        Mention Teammate
+                      </div>
+                      <div className="mentions-popup-list">
+                        {employeesList.filter(emp => emp.firstName?.toLowerCase().includes(mentionSearch) || emp.name?.toLowerCase().includes(mentionSearch)).length > 0 ? (
+                          employeesList.filter(emp => emp.firstName?.toLowerCase().includes(mentionSearch) || emp.name?.toLowerCase().includes(mentionSearch)).map(emp => (
+                            <button
+                              key={emp.id}
+                              type="button"
+                              onClick={() => {
+                                const lastAtSymbol = messageInput.lastIndexOf("@");
+                                const newText = messageInput.slice(0, lastAtSymbol) + `@${emp.firstName || emp.name} `;
+                                setMessageInput(newText);
+                                setShowMentionsMenu(false);
+                              }}
+                              className="mention-item-btn"
+                            >
+                              <User size={14} color="#3b82f6" />
+                              <strong className="mention-item-name">{emp.firstName || emp.name}</strong>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="mention-empty">No team members found.</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="mentions-popup-list">
-                      {employeesList.filter(emp => emp.firstName?.toLowerCase().includes(mentionSearch) || emp.name?.toLowerCase().includes(mentionSearch)).length > 0 ? (
-                        employeesList.filter(emp => emp.firstName?.toLowerCase().includes(mentionSearch) || emp.name?.toLowerCase().includes(mentionSearch)).map(emp => (
-                          <button
-                            key={emp.id}
-                            type="button"
-                            onClick={() => {
-                              const lastAtSymbol = messageInput.lastIndexOf("@");
-                              const newText = messageInput.slice(0, lastAtSymbol) + `@${emp.firstName || emp.name} `;
-                              setMessageInput(newText);
-                              setShowMentionsMenu(false);
-                            }}
-                            className="mention-item-btn"
-                          >
-                            <User size={14} color="#3b82f6" />
-                            <strong className="mention-item-name">{emp.firstName || emp.name}</strong>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="mention-empty">No team members found.</div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                <textarea
-                  ref={chatTextareaRef}
-                  rows={2}
-                  className="chat-textarea"
-                  disabled={sessionStatus.expired && !isInternalNote}
-                  placeholder={
-                    isInternalNote
-                      ? "Add an internal note visible only to your team..."
-                      : sessionStatus.expired
-                        ? "24-Hour session window expired. Send a pre-approved template or Flow above to resume..."
-                        : "Type a WhatsApp message or use shortcuts like /return, /shipping, /discount..."
-                  }
-                  value={messageInput}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setMessageInput(val);
-                    
-                    // Mention Autocomplete logic
-                    if (isInternalNote) {
-                      const lastAtSymbol = val.lastIndexOf("@");
-                      if (lastAtSymbol !== -1 && (lastAtSymbol === 0 || val[lastAtSymbol - 1] === " ")) {
-                        const searchText = val.slice(lastAtSymbol + 1);
-                        if (!searchText.includes(" ")) {
-                          setShowMentionsMenu(true);
-                          setMentionSearch(searchText.toLowerCase());
+                  <textarea
+                    ref={chatTextareaRef}
+                    rows={2}
+                    className="chat-textarea"
+                    disabled={sessionStatus.expired && !isInternalNote}
+                    placeholder={
+                      isInternalNote
+                        ? "Add an internal note visible only to your team..."
+                        : sessionStatus.expired
+                          ? "24-Hour session window expired. Send a pre-approved template or Flow above to resume..."
+                          : "Type a WhatsApp message or use shortcuts like /return, /shipping, /discount..."
+                    }
+                    value={messageInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMessageInput(val);
+                      
+                      // Mention Autocomplete logic
+                      if (isInternalNote) {
+                        const lastAtSymbol = val.lastIndexOf("@");
+                        if (lastAtSymbol !== -1 && (lastAtSymbol === 0 || val[lastAtSymbol - 1] === " ")) {
+                          const searchText = val.slice(lastAtSymbol + 1);
+                          if (!searchText.includes(" ")) {
+                            setShowMentionsMenu(true);
+                            setMentionSearch(searchText.toLowerCase());
+                          } else {
+                            setShowMentionsMenu(false);
+                          }
                         } else {
                           setShowMentionsMenu(false);
                         }
                       } else {
                         setShowMentionsMenu(false);
-                      }
-                    } else {
-                      setShowMentionsMenu(false);
 
-                      // Quick Replies Slash Command Trigger (e.g. "/" or "/return")
-                      const lastSlash = val.lastIndexOf("/");
-                      if (lastSlash !== -1 && (lastSlash === 0 || val[lastSlash - 1] === " " || val[lastSlash - 1] === "\n")) {
-                        const query = val.slice(lastSlash + 1);
-                        if (!query.includes(" ")) {
-                          setShowCannedResponses(true);
-                          setCannedPopupSearch(query);
-                          setCannedPopupHighlight(0);
+                        // Quick Replies Slash Command Trigger (e.g. "/" or "/return")
+                        const lastSlash = val.lastIndexOf("/");
+                        if (lastSlash !== -1 && (lastSlash === 0 || val[lastSlash - 1] === " " || val[lastSlash - 1] === "\n")) {
+                          const query = val.slice(lastSlash + 1);
+                          if (!query.includes(" ")) {
+                            setShowCannedResponses(true);
+                            setCannedPopupSearch(query);
+                            setCannedPopupHighlight(0);
+                          } else {
+                            setShowCannedResponses(false);
+                          }
                         } else {
+                          // If user erased the slash, close popup
+                          if (showCannedResponses && (!cannedPopupSearch || !val.includes("/"))) {
+                            setShowCannedResponses(false);
+                          }
+                        }
+                      }
+
+                      // Check if they typed a shortcut followed by space (e.g. "/return ")
+                      const match = cannedResponses.find(cr => cr.shortcut && val.endsWith(cr.shortcut + " "));
+                      if (match) {
+                        const idx = val.lastIndexOf(match.shortcut + " ");
+                        if (idx !== -1) {
+                          const replaced = val.slice(0, idx) + match.content + " ";
+                          setMessageInput(replaced);
                           setShowCannedResponses(false);
+                          setCannedPopupSearch("");
                         }
-                      } else {
-                        // If user erased the slash, close popup
-                        if (showCannedResponses && (!cannedPopupSearch || !val.includes("/"))) {
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (showCannedResponses && filteredCanned.length > 0) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setCannedPopupHighlight(h => Math.min(h + 1, filteredCanned.length - 1));
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setCannedPopupHighlight(h => Math.max(h - 1, 0));
+                          return;
+                        }
+                        if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                          e.preventDefault();
+                          const selected = filteredCanned[safeHighlight];
+                          if (selected) {
+                            insertCannedResponse(selected);
+                          }
+                          return;
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
                           setShowCannedResponses(false);
+                          setCannedPopupSearch("");
+                          return;
                         }
                       }
-                    }
 
-                    // Check if they typed a shortcut followed by space (e.g. "/return ")
-                    const match = cannedResponses.find(cr => cr.shortcut && val.endsWith(cr.shortcut + " "));
-                    if (match) {
-                      const idx = val.lastIndexOf(match.shortcut + " ");
-                      if (idx !== -1) {
-                        const replaced = val.slice(0, idx) + match.content + " ";
-                        setMessageInput(replaced);
-                        setShowCannedResponses(false);
-                        setCannedPopupSearch("");
-                      }
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (showCannedResponses && filteredCanned.length > 0) {
-                      if (e.key === "ArrowDown") {
+                      if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        setCannedPopupHighlight(h => Math.min(h + 1, filteredCanned.length - 1));
-                        return;
+                        handleSendMessage();
                       }
-                      if (e.key === "ArrowUp") {
-                        e.preventDefault();
-                        setCannedPopupHighlight(h => Math.max(h - 1, 0));
-                        return;
-                      }
-                      if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
-                        e.preventDefault();
-                        const selected = filteredCanned[safeHighlight];
-                        if (selected) {
-                          insertCannedResponse(selected);
-                        }
-                        return;
-                      }
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        setShowCannedResponses(false);
-                        setCannedPopupSearch("");
-                        return;
-                      }
-                    }
+                    }}
+                  />
 
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                />
+                  {/* Unified Bottom Action Toolbar */}
+                  <div className="composer-bottom-bar">
+                    <div className="composer-attachments-bar">
+                      <button
+                        type="button"
+                        className="input-attachment-btn"
+                        title="Attach File / Image / Document"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Paperclip size={16} />
+                      </button>
+                      
+                      <button
+                        type="button"
+                        className="input-attachment-btn btn-record"
+                        title="Record Voice Note"
+                        onClick={startRecording}
+                      >
+                        <Mic size={16} />
+                      </button>
 
-                <button type="submit" className="send-msg-btn" disabled={sendingMsg || (!messageInput.trim() && !isInternalNote) || (sessionStatus.expired && !isInternalNote)}>
-                  {sendingMsg ? <RefreshCw size={16} className="spin-icon" /> : <Send size={16} />}
-                  <span>{isInternalNote ? "Save Note" : "Send"}</span>
-                </button>
-              </form>
+                      {/* Template Picker Button */}
+                      <button
+                        type="button"
+                        className={`input-attachment-btn ${showTemplatePicker ? "btn-active-template" : ""}`}
+                        title="Send Template Message"
+                        onClick={() => setShowTemplatePicker(true)}
+                      >
+                        <FileCode size={16} />
+                      </button>
+
+                      {/* Product Catalog Button */}
+                      {isModuleActive(["META_CATALOG", "SHOPIFY_INTEGRATION"]) && (
+                        <button
+                          type="button"
+                          className={`input-attachment-btn ${showProductPanel ? "btn-active-product" : ""}`}
+                          title="Send Product from Catalog"
+                          onClick={() => setShowProductPanel(v => !v)}
+                        >
+                          <ShoppingBag size={16} />
+                        </button>
+                      )}
+
+                      {/* Flow Picker Button */}
+                      {isModuleActive("CHATBOT") && (
+                        <button
+                          type="button"
+                          className={`input-attachment-btn ${showFlowPicker ? "btn-active-flow" : ""}`}
+                          title="Send Interactive Flow Form"
+                          onClick={() => setShowFlowPicker(v => !v)}
+                        >
+                          <Layers size={16} />
+                        </button>
+                      )}
+
+                      {/* Quick Replies Button */}
+                      <button
+                        ref={quickRepliesBarBtnRef}
+                        type="button"
+                        className={`input-attachment-btn ${showCannedResponses ? "btn-active-quick" : ""}`}
+                        title="Quick Replies & Slash Commands (/)"
+                        onClick={() => {
+                          setShowCannedResponses(prev => !prev);
+                          if (!showCannedResponses) {
+                            setCannedPopupSearch("");
+                            setCannedPopupHighlight(0);
+                          }
+                        }}
+                      >
+                        <Zap size={16} className={showCannedResponses ? "text-amber-500 fill-amber-500" : ""} />
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`input-attachment-btn ${showEmojiPicker ? "btn-active-emoji" : ""}`}
+                        title="Quick Emojis"
+                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      >
+                        <Smile size={16} />
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="send-msg-btn"
+                      disabled={sendingMsg || (!messageInput.trim() && !isInternalNote) || (sessionStatus.expired && !isInternalNote)}
+                    >
+                      {sendingMsg ? <RefreshCw size={14} className="spin-icon" /> : <Send size={14} />}
+                      <span>{isInternalNote ? "Save Note" : "Send"}</span>
+                    </button>
+                  </div>
+                </form>
               </>)}
             </div>
           </>
