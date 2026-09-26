@@ -5753,8 +5753,8 @@ html.dark .tracking-timeline::before,
     min-height: 0 !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
-    padding: 10px 10px !important;
-    gap: 10px !important;
+    padding: 8px 8px !important;
+    gap: 8px !important;
     scrollbar-width: none !important;
     -webkit-overflow-scrolling: touch !important;
   }
@@ -5763,46 +5763,242 @@ html.dark .tracking-timeline::before,
     display: none !important;
   }
 
-  /* Plain text bubbles: 78% max — comfortable reading width */
+  /* Plain text bubbles: 78% max — compact native WhatsApp look */
   .message-bubble {
     max-width: 78% !important;
+    padding: 6px 10px !important;
+    border-radius: 12px !important;
     font-size: 13px !important;
-    line-height: 1.45 !important;
+    line-height: 1.4 !important;
     word-break: break-word !important;
     width: fit-content !important;
   }
 
-  /* Rich payment card: capped at 260px */
+  .message-sender-name {
+    margin-bottom: 2px !important;
+  }
+
+  .sender-badge {
+    font-size: 9.5px !important;
+    padding: 1px 5px !important;
+    border-radius: 4px !important;
+  }
+
+  .message-text-content {
+    font-size: 12.5px !important;
+    line-height: 1.4 !important;
+  }
+
+  .message-meta-line {
+    margin-top: 2px !important;
+    gap: 3px !important;
+  }
+
+  .message-timestamp {
+    font-size: 9.5px !important;
+  }
+
+  .date-separator {
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+    margin: 4px auto !important;
+  }
+
+  /* Media elements inside bubbles */
+  .message-bubble img {
+    max-height: 180px !important;
+  }
+
+  .message-bubble video {
+    max-height: 180px !important;
+  }
+
+  .message-audio-box {
+    padding: 6px 8px !important;
+    border-radius: 8px !important;
+    gap: 5px !important;
+  }
+
+  .message-audio-title {
+    font-size: 10.5px !important;
+  }
+
+  .message-audio-box audio {
+    height: 32px !important;
+  }
+
+  .message-doc-box {
+    padding: 6px 8px !important;
+    border-radius: 8px !important;
+    gap: 8px !important;
+  }
+
+  .doc-filename {
+    font-size: 11.5px !important;
+  }
+
+  .doc-download-btn {
+    font-size: 10.5px !important;
+  }
+
+  /* Rich payment card: capped at 250px */
   .msg-payment-card {
-    max-width: min(260px, 88vw) !important;
+    max-width: min(250px, 86vw) !important;
     width: 100% !important;
+    border-radius: 12px !important;
     box-sizing: border-box !important;
   }
 
-  /* QR code image: fill the card but never overflow */
+  .msg-payment-header {
+    padding: 8px 10px !important;
+  }
+
+  .msg-payment-icon-wrap {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .msg-payment-title {
+    font-size: 12px !important;
+  }
+
+  .msg-payment-amount {
+    font-size: 10.5px !important;
+  }
+
+  .msg-payment-qr-wrap {
+    padding: 8px !important;
+  }
+
+  .msg-payment-qr-box {
+    padding: 6px !important;
+    border-radius: 8px !important;
+  }
+
   .msg-payment-qr-wrap img,
   .msg-payment-qr-box img,
   .msg-payment-qr-wrap canvas,
   .msg-payment-qr-box canvas {
-    max-width: 100% !important;
+    max-width: 130px !important;
+    max-height: 130px !important;
     height: auto !important;
     display: block !important;
     margin: 0 auto !important;
   }
 
-  /* Catalog order card: capped at 300px (needs room for product images) */
+  .msg-payment-qr-caption {
+    font-size: 9.5px !important;
+    margin-top: 4px !important;
+  }
+
+  .msg-payment-body {
+    padding: 8px 10px !important;
+    font-size: 11.5px !important;
+    line-height: 1.4 !important;
+  }
+
+  .msg-payment-btn-wrap {
+    padding: 0 8px 8px !important;
+  }
+
+  .msg-payment-btn {
+    padding: 7px 10px !important;
+    font-size: 11.5px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Catalog order card: capped at 290px */
   .msg-order-card {
-    max-width: min(300px, 90vw) !important;
+    max-width: min(290px, 88vw) !important;
     width: 100% !important;
+    border-radius: 12px !important;
     box-sizing: border-box !important;
   }
 
-  /* Product images inside order card: constrained */
-  .msg-order-item-img {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    object-fit: cover !important;
+  .msg-order-header {
+    padding: 8px 10px !important;
+  }
+
+  .msg-order-icon-wrap {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .msg-order-header-title {
+    font-size: 12px !important;
+  }
+
+  .msg-order-header-subtitle {
+    font-size: 10px !important;
+  }
+
+  .msg-order-badge {
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+
+  .msg-order-items {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+  }
+
+  .msg-order-item {
+    gap: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .msg-order-thumb {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    border-radius: 6px !important;
+  }
+
+  .msg-order-item-title {
+    font-size: 11.5px !important;
+    line-height: 1.25 !important;
+  }
+
+  .msg-order-item-qty-row {
+    font-size: 10px !important;
+    gap: 4px !important;
+    margin-top: 2px !important;
+  }
+
+  .msg-order-qty-chip {
+    font-size: 9.5px !important;
+    padding: 1px 4px !important;
+  }
+
+  .msg-order-price {
+    font-size: 12px !important;
+  }
+
+  .msg-order-customer-note {
+    padding: 6px 8px !important;
+    font-size: 10.5px !important;
+  }
+
+  .msg-order-footer-total {
+    padding-top: 6px !important;
+  }
+
+  .msg-order-total-label {
+    font-size: 11px !important;
+  }
+
+  .msg-order-total-value {
+    font-size: 13.5px !important;
+  }
+
+  .msg-order-actions {
+    padding: 0 8px 8px !important;
+    gap: 5px !important;
+  }
+
+  .msg-order-btn {
+    padding: 5px 8px !important;
+    font-size: 10.5px !important;
     border-radius: 6px !important;
   }
 
@@ -5811,8 +6007,55 @@ html.dark .tracking-timeline::before,
   .catalog-card,
   .wa-rich-card,
   .msg-template-card {
-    max-width: min(280px, 88vw) !important;
+    max-width: min(270px, 86vw) !important;
     width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .msg-type-badge {
+    font-size: 9.5px !important;
+    padding: 2px 6px !important;
+  }
+
+  .msg-template-header-title {
+    font-size: 12.5px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .msg-template-body-text {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  .msg-template-footer-text {
+    font-size: 10px !important;
+    margin-top: 4px !important;
+  }
+
+  .msg-template-buttons-container {
+    margin-top: 6px !important;
+  }
+
+  .msg-template-btn {
+    padding: 7px 10px !important;
+    font-size: 11.5px !important;
+  }
+
+  /* Internal note card */
+  .internal-note-card {
+    max-width: min(320px, 92vw) !important;
+    margin: 4px auto !important;
+    padding: 7px 10px !important;
+    font-size: 11.5px !important;
+  }
+
+  /* Referral / lead cards */
+  .meta-ad-card,
+  .website-visitor-card {
+    max-width: min(320px, 92vw) !important;
+    width: 100% !important;
+    padding: 12px !important;
+    border-radius: 14px !important;
     box-sizing: border-box !important;
   }
 
@@ -5828,16 +6071,19 @@ html.dark .tracking-timeline::before,
     border: none !important;
     box-shadow: none !important;
     width: fit-content !important;
-    max-width: min(300px, 90vw) !important;
+    max-width: min(290px, 88vw) !important;
   }
 
-  .message-timestamp {
-    font-size: 10px !important;
+  .message-bubble:has(.msg-payment-card) .message-sender-name,
+  .message-bubble:has(.msg-template-card) .message-sender-name,
+  .message-bubble:has(.msg-order-card) .message-sender-name {
+    padding: 0 4px 2px !important;
   }
 
-  .date-separator {
-    font-size: 10.5px !important;
-    padding: 2px 8px !important;
+  .message-bubble:has(.msg-payment-card) .message-meta-line,
+  .message-bubble:has(.msg-template-card) .message-meta-line,
+  .message-bubble:has(.msg-order-card) .message-meta-line {
+    padding: 2px 4px 0 !important;
   }
 
   /* ==================================================

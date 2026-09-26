@@ -3423,7 +3423,7 @@ export default function WhatsAppInboxComponent() {
                     <React.Fragment key={msg.id}>
                       {dateDividerNode}
                       <div style={{ display: "flex", justifyContent: "center", margin: "14px 0" }}>
-                        <div style={{
+                        <div className="meta-ad-card" style={{
                           maxWidth: "92%",
                           width: "440px",
                           background: "linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%)",
@@ -3631,7 +3631,7 @@ export default function WhatsAppInboxComponent() {
                     <React.Fragment key={msg.id}>
                       {dateDividerNode}
                       <div style={{ display: "flex", justifyContent: "center", margin: "16px 0" }}>
-                        <div style={{
+                        <div className="website-visitor-card" style={{
                           maxWidth: "94%",
                           width: "480px",
                           background: cardTheme.bgGradient,
