@@ -623,6 +623,7 @@ export default function WhatsAppInboxComponent() {
   const [pushingToCrm, setPushingToCrm] = useState(false);
   const [showIntegrationsMenu, setShowIntegrationsMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // mobile bottom-sheet
 
   // Toggle Full Screen Mode (Overlay + Native Fullscreen API)
   const toggleFullScreenMode = () => {
@@ -3024,6 +3025,16 @@ export default function WhatsAppInboxComponent() {
                 </div>
               </div>
 
+              {/* Mobile-only: ⋮ button opens bottom sheet with tags + all action buttons */}
+              <button
+                type="button"
+                className="mobile-header-menu-btn"
+                onClick={() => setMobileMenuOpen(true)}
+                title="More options"
+              >
+                <MoreVertical size={18} />
+              </button>
+
               <div className="chat-header-actions">
                 <button className="chat-action-btn highlight-assign" onClick={() => setShowAssignModal(true)} title="Assign WhatsApp Lead">
                   <UserCheck size={13} />
@@ -3243,6 +3254,137 @@ export default function WhatsAppInboxComponent() {
                 </div>
               </div>
             </div>
+
+            {/* ── Mobile Bottom Sheet: tags + action buttons ─────────── */}
+            {mobileMenuOpen && (
+              <>
+                {/* Backdrop */}
+                <div
+                  className="mobile-sheet-backdrop"
+                  onClick={() => setMobileMenuOpen(false)}
+                />
+                {/* Sheet */}
+                <div className="mobile-sheet">
+                  {/* Sheet handle */}
+                  <div className="mobile-sheet-handle" />
+
+                  {/* Customer brief */}
+                  <div className="mobile-sheet-customer">
+                    <div className="chat-avatar-large" style={{ width: 40, height: 40, minWidth: 40, fontSize: 14, background: getAvatarGradient(activeConvDetail.customer?.contactPerson || activeConvDetail.customer?.whatsappNumber) }}>
+                      <span style={{ color: "#fff", fontWeight: 700 }}>{getCustomerAvatarInitials(activeConvDetail.customer)}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: 14, color: "#0f172a" }}>{getCustomerDisplayName(activeConvDetail.customer)}</div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>{formatWhatsAppPhone(activeConvDetail.customer?.whatsappNumber || activeConvDetail.customer?.mobile)}</div>
+                    </div>
+                    {!sessionStatus.neverMessaged && (
+                      <span className={`chat-header-session-badge ${sessionStatus.expired ? "expired" : "active"}`} style={{ marginLeft: "auto", fontSize: 10 }}>
+                        <Clock size={10} />
+                        <span>{sessionStatus.expired ? "Expired" : `24h: ${sessionStatus.hoursLeft?.toFixed(1)}h`}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Tags row */}
+                  <div className="mobile-sheet-tags">
+                    <span className={`stage-tag ${(activeConvDetail.leadStatus || activeConvDetail.customer?.leadStage || "New Lead").toLowerCase().replace(/\s+/g, "-")}`}>
+                      {activeConvDetail.leadStatus || activeConvDetail.customer?.leadStage || "New Lead"}
+                    </span>
+                    {activeTagsList.filter((t: string) => t && t !== "Auto Created" && t !== "WhatsApp Lead").map((tag: string) => (
+                      <span key={tag} className="chat-header-tag-pill">
+                        <Tag size={10} />
+                        <span>{tag}</span>
+                      </span>
+                    ))}
+                    <button type="button" className="chat-header-add-tag-btn" onClick={() => { setMobileMenuOpen(false); setShowTagsModal(true); }}>
+                      <Plus size={10} /><span>Tag</span>
+                    </button>
+                  </div>
+
+                  {/* Action buttons grid */}
+                  <div className="mobile-sheet-actions">
+                    <button className="mobile-sheet-action-btn highlight-assign" onClick={() => { setMobileMenuOpen(false); setShowAssignModal(true); }}>
+                      <UserCheck size={15} />
+                      <span>{activeConvDetail.assignedEmployee?.user?.name || "Assign"}</span>
+                    </button>
+
+                    {isModuleActive("AI_AGENT") && (
+                      <button
+                        className={`mobile-sheet-action-btn ${activeConvDetail.aiHandled ? "ai-active" : "ai-manual"}`}
+                        disabled={aiToggleLoading}
+                        onClick={async () => {
+                          if (!activeConvDetail?.id) return;
+                          setAiToggleLoading(true);
+                          const newVal = !activeConvDetail.aiHandled;
+                          const res = await toggleConversationAIAction(activeConvDetail.id, newVal);
+                          if (res.success) {
+                            setActiveConvDetail((prev: any) => ({ ...prev, aiHandled: newVal }));
+                            setToastMsg(newVal ? "AI enabled" : "Manual mode");
+                            setTimeout(() => setToastMsg(null), 3000);
+                          }
+                          setAiToggleLoading(false);
+                          setMobileMenuOpen(false);
+                        }}
+                      >
+                        <Bot size={15} />
+                        <span>{aiToggleLoading ? "..." : activeConvDetail.aiHandled ? "AI: ON" : "Manual"}</span>
+                      </button>
+                    )}
+
+                    <button
+                      className={`mobile-sheet-action-btn ${activeConvDetail.status === "CLOSED" ? "chat-closed" : ""}`}
+                      disabled={statusToggleLoading}
+                      onClick={async () => {
+                        if (!activeConvDetail?.id) return;
+                        setStatusToggleLoading(true);
+                        const newStatus = activeConvDetail.status === "CLOSED" ? "OPEN" : "CLOSED";
+                        const res = await toggleConversationStatusAction(activeConvDetail.id, newStatus);
+                        if (res.success) {
+                          setActiveConvDetail((prev: any) => ({ ...prev, status: newStatus }));
+                          setToastMsg(newStatus === "CLOSED" ? "Chat closed" : "Chat reopened");
+                          setTimeout(() => setToastMsg(null), 3000);
+                          fetchConversationsList(true);
+                        }
+                        setStatusToggleLoading(false);
+                        setMobileMenuOpen(false);
+                      }}
+                    >
+                      <CheckCircle2 size={15} />
+                      <span>{statusToggleLoading ? "..." : activeConvDetail.status === "CLOSED" ? "Reopen" : "Close"}</span>
+                    </button>
+
+                    <button
+                      className={`mobile-sheet-action-btn ${isLeadPushed ? "crm-synced-active" : "crm-push-action"}`}
+                      disabled={pushingToCrm}
+                      onClick={() => { handlePushToCrm(); setMobileMenuOpen(false); }}
+                    >
+                      <Activity size={15} className={pushingToCrm ? "spin-pulse" : ""} />
+                      <span>{pushingToCrm ? "Pushing..." : isLeadPushed ? "CRM Synced" : "Push to CRM"}</span>
+                    </button>
+
+                    <button
+                      className={`mobile-sheet-action-btn ${!isRightCollapsed ? "active-profile" : ""}`}
+                      onClick={() => { setIsRightCollapsed(prev => !prev); setMobileMenuOpen(false); }}
+                    >
+                      <User size={15} />
+                      <span>Profile</span>
+                    </button>
+
+                    {paymentConfigured && (
+                      <button className="mobile-sheet-action-btn" onClick={() => { setMobileMenuOpen(false); setShowPaymentModal(true); }}>
+                        <CreditCard size={15} />
+                        <span>Send Payment</span>
+                      </button>
+                    )}
+
+                    <button className="mobile-sheet-action-btn" onClick={() => { setMobileMenuOpen(false); setShowWebsiteTrackingDrawer(true); }}>
+                      <Globe size={15} />
+                      <span>Website Track</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Messages Scroll Area */}
             <div className="chat-messages-container" ref={chatMessagesContainerRef}>

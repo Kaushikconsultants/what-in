@@ -5893,3 +5893,323 @@ html.dark .tracking-timeline::before,
     margin-left: auto !important;
   }
 }
+/* =================================================================
+   MOBILE COMPACT CHAT HEADER + BOTTOM SHEET STYLES
+   On mobile (<=900px):
+   - chat-header shows only: [←] avatar · Name · Phone  [⋮]
+   - ALL other rows (session badge, tags, actions) are HIDDEN
+   - mobile-header-menu-btn (⋮) is shown
+   - mobile-sheet slides up with everything else
+   ================================================================= */
+@media (max-width: 900px) {
+
+  /* Override: compact single-row header */
+  .chat-header {
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 8px 10px !important;
+    gap: 0 !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+  }
+
+  /* User-info row: fills available space between back-btn and ⋮ */
+  .chat-header-user-info {
+    flex: 1 !important;
+    min-width: 0 !important;
+    gap: 8px !important;
+    overflow: hidden !important;
+  }
+
+  /* Avatar: slightly smaller */
+  .chat-avatar-large {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    font-size: 12px !important;
+  }
+
+  /* Name + phone stacked vertically in one block */
+  .chat-header-user-info > div:last-child {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+    gap: 1px !important;
+  }
+
+  /* Name: single line, truncated */
+  .chat-customer-name {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+    display: block !important;
+  }
+
+  /* Phone: inline, small, no copy icon visible in header */
+  .chat-sub-line {
+    font-size: 11px !important;
+    color: #64748b !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    margin-top: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+  }
+
+  /* Hide: edit icon, 24h session badge, tag pills row, action buttons row */
+  .chat-title-line button,
+  .chat-header-session-badge,
+  .chat-header-tags-row,
+  .chat-header-actions {
+    display: none !important;
+  }
+
+  /* Keep back button compact */
+  .mobile-back-to-chats-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 34px !important;
+    height: 34px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    border: none !important;
+    color: #4f46e5 !important;
+    font-size: 0 !important; /* hide text "Chats" */
+    margin-right: 6px !important;
+    flex-shrink: 0 !important;
+    cursor: pointer !important;
+  }
+
+  .mobile-back-to-chats-btn span {
+    display: none !important;
+  }
+
+  html.dark .mobile-back-to-chats-btn,
+  [data-theme="dark"] .mobile-back-to-chats-btn {
+    color: #818cf8 !important;
+  }
+
+  /* ⋮ mobile menu button: shown only on mobile */
+  .mobile-header-menu-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 50% !important;
+    border: none !important;
+    background: transparent !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    margin-left: 4px !important;
+    transition: background 0.15s;
+  }
+
+  .mobile-header-menu-btn:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+  }
+
+  html.dark .mobile-header-menu-btn,
+  [data-theme="dark"] .mobile-header-menu-btn {
+    color: #94a3b8 !important;
+  }
+
+  html.dark .mobile-header-menu-btn:hover,
+  [data-theme="dark"] .mobile-header-menu-btn:hover {
+    background: #1e293b !important;
+    color: #e2e8f0 !important;
+  }
+}
+
+/* ⋮ mobile menu button: hidden on desktop */
+.mobile-header-menu-btn {
+  display: none;
+}
+
+/* =================================================================
+   MOBILE BOTTOM SHEET
+   ================================================================= */
+.mobile-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: sheetFadeIn 0.18s ease;
+}
+
+.mobile-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1101;
+  background: #ffffff;
+  border-radius: 20px 20px 0 0;
+  padding: 10px 16px 28px;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+  animation: sheetSlideUp 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 85dvh;
+  overflow-y: auto;
+}
+
+html.dark .mobile-sheet,
+[data-theme="dark"] .mobile-sheet {
+  background: #0f172a;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.mobile-sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: #e2e8f0;
+  margin: 0 auto 14px;
+}
+
+html.dark .mobile-sheet-handle,
+[data-theme="dark"] .mobile-sheet-handle {
+  background: #334155;
+}
+
+/* Customer brief row at top of sheet */
+.mobile-sheet-customer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+html.dark .mobile-sheet-customer,
+[data-theme="dark"] .mobile-sheet-customer {
+  border-bottom-color: #1e293b;
+}
+
+/* Tags row inside sheet */
+.mobile-sheet-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+/* Action buttons grid inside sheet: 3-column grid */
+.mobile-sheet-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* Individual action button in sheet */
+.mobile-sheet-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+  min-height: 62px;
+}
+
+.mobile-sheet-action-btn:hover {
+  background: #f1f5f9;
+  transform: scale(0.97);
+}
+
+.mobile-sheet-action-btn:active {
+  transform: scale(0.94);
+}
+
+html.dark .mobile-sheet-action-btn,
+[data-theme="dark"] .mobile-sheet-action-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+html.dark .mobile-sheet-action-btn:hover,
+[data-theme="dark"] .mobile-sheet-action-btn:hover {
+  background: #273449;
+}
+
+/* Specific state styles reuse existing classes */
+.mobile-sheet-action-btn.highlight-assign {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+  color: #5b21b6;
+}
+html.dark .mobile-sheet-action-btn.highlight-assign,
+[data-theme="dark"] .mobile-sheet-action-btn.highlight-assign {
+  background: rgba(79, 70, 229, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #a78bfa;
+}
+
+.mobile-sheet-action-btn.ai-active {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+html.dark .mobile-sheet-action-btn.ai-active,
+[data-theme="dark"] .mobile-sheet-action-btn.ai-active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.mobile-sheet-action-btn.chat-closed {
+  background: #fef9c3;
+  border-color: #fde047;
+  color: #713f12;
+}
+
+.mobile-sheet-action-btn.crm-synced-active {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.mobile-sheet-action-btn.crm-push-action {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.mobile-sheet-action-btn.active-profile {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+@keyframes sheetFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes sheetSlideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
