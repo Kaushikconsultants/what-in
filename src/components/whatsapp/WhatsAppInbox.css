@@ -5772,9 +5772,9 @@ html.dark .tracking-timeline::before,
     width: fit-content !important;
   }
 
-  /* Rich payment card: fixed max 260px, scales down on very small screens */
+  /* Rich payment card: capped at 260px */
   .msg-payment-card {
-    max-width: min(260px, 85vw) !important;
+    max-width: min(260px, 88vw) !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
@@ -5790,27 +5790,45 @@ html.dark .tracking-timeline::before,
     margin: 0 auto !important;
   }
 
-  /* Template / catalog cards: fixed reasonable width */
-  .template-card,
-  .catalog-card,
-  .wa-rich-card,
-  .msg-template-card {
-    max-width: min(260px, 85vw) !important;
+  /* Catalog order card: capped at 300px (needs room for product images) */
+  .msg-order-card {
+    max-width: min(300px, 90vw) !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
-  /* Message row containing a rich card: fit to card width */
+  /* Product images inside order card: constrained */
+  .msg-order-item-img {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    object-fit: cover !important;
+    border-radius: 6px !important;
+  }
+
+  /* Template / catalog cards */
+  .template-card,
+  .catalog-card,
+  .wa-rich-card,
+  .msg-template-card {
+    max-width: min(280px, 88vw) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Bubble wrapping any rich card: transparent, no padding, fits the card */
   .message-row.outgoing .message-bubble:has(.msg-payment-card),
   .message-row.outgoing .message-bubble:has(.msg-template-card),
+  .message-row.outgoing .message-bubble:has(.msg-order-card),
   .message-row.incoming .message-bubble:has(.msg-payment-card),
-  .message-row.incoming .message-bubble:has(.msg-template-card) {
+  .message-row.incoming .message-bubble:has(.msg-template-card),
+  .message-row.incoming .message-bubble:has(.msg-order-card) {
     padding: 0 !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     width: fit-content !important;
-    max-width: min(260px, 85vw) !important;
+    max-width: min(300px, 90vw) !important;
   }
 
   .message-timestamp {
