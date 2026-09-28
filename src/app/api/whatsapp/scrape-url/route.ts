@@ -58,6 +58,16 @@ export async function POST(req: NextRequest) {
 
     const newText = '\n\n--- Source: Web Scrape (' + url + ') ---\n' + extractedText.trim().slice(0, 10000);
 
+    if (user?.clientId) {
+      const client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+      const updatedKnowledgeBase = (client?.aiKnowledgeBase || '') + newText;
+      await prisma.whatsAppClient.update({
+        where: { id: user.clientId },
+        data: { aiKnowledgeBase: updatedKnowledgeBase }
+      });
+      return NextResponse.json({ success: true, textExtracted: extractedText.length, newKnowledgeBase: updatedKnowledgeBase });
+    }
+
     let settings = await prisma.whatsAppSettings.findFirst();
     if (!settings) {
       settings = await prisma.whatsAppSettings.create({ data: {} });

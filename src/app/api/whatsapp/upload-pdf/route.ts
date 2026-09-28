@@ -98,6 +98,16 @@ export async function POST(req: NextRequest) {
 
     const newText = '\n\n--- Source: PDF Upload (' + file.name + ') ---\n' + extractedText.trim();
     
+    if (user?.clientId) {
+      const client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+      const updatedKnowledgeBase = (client?.aiKnowledgeBase || '') + newText;
+      await prisma.whatsAppClient.update({
+        where: { id: user.clientId },
+        data: { aiKnowledgeBase: updatedKnowledgeBase }
+      });
+      return NextResponse.json({ success: true, textExtracted: extractedText.length, newKnowledgeBase: updatedKnowledgeBase });
+    }
+
     let settings = await prisma.whatsAppSettings.findFirst();
     if (!settings) {
       settings = await prisma.whatsAppSettings.create({ data: {} });

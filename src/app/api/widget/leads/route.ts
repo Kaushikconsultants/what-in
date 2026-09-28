@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedUser } from "@/lib/authSession";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 async function resolveClient(req: NextRequest) {
+  const isOwner = isOwnerAuthenticated(req);
   const user = await getAuthenticatedUser(req);
+
+  if (!isOwner && !user) {
+    return null;
+  }
+
   if (user?.clientId) {
     const client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
     if (client) return client;
@@ -11,12 +17,12 @@ async function resolveClient(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const paramClientId = searchParams.get("clientId");
-  if (paramClientId) {
+  if (isOwner && paramClientId) {
     const client = await prisma.whatsAppClient.findUnique({ where: { id: paramClientId } });
     if (client) return client;
   }
 
-  // Fallback to active client on single-tenant / domain setups
+  // Fallback for authenticated user or owner
   return await prisma.whatsAppClient.findFirst({ where: { isActive: true } });
 }
 
@@ -36,9 +42,20 @@ function sanitizeRupeePrice(raw: any): number {
  */
 export async function GET(req: NextRequest) {
   try {
+    const isOwner = isOwnerAuthenticated(req);
+    const user = await getAuthenticatedUser(req);
+    if (!isOwner && !user) {
+      return NextResponse.json({ success: false, error: "Unauthorized access: Login required." }, { status: 401 });
+    }
+
     const client = await resolveClient(req);
     if (!client) {
-      return NextResponse.json({ success: false, error: "Client not found." }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Client workspace not found." }, { status: 404 });
+    }
+
+    // Strict tenant isolation: non-owners can only view their own leads
+    if (!isOwner && user?.clientId && client.id !== user.clientId) {
+      return NextResponse.json({ success: false, error: "Forbidden: Access denied to other workspaces." }, { status: 403 });
     }
 
     // 1. Fetch CRM Customers captured via website widget

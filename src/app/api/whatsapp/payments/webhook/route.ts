@@ -15,7 +15,10 @@ function verifyRazorpaySignature(rawBody: string, signature: string | null, secr
       .createHmac("sha256", secret)
       .update(rawBody)
       .digest("hex");
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+    const expBuf = Buffer.from(expected);
+    const sigBuf = Buffer.from(signature);
+    if (expBuf.length !== sigBuf.length) return false;
+    return crypto.timingSafeEqual(expBuf, sigBuf);
   } catch {
     return false;
   }
@@ -30,7 +33,10 @@ function verifyCashfreeSignature(rawBody: string, signature: string | null, time
       .createHmac("sha256", secret)
       .update(dataToSign)
       .digest("base64");
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+    const expBuf = Buffer.from(expected);
+    const sigBuf = Buffer.from(signature);
+    if (expBuf.length !== sigBuf.length) return false;
+    return crypto.timingSafeEqual(expBuf, sigBuf);
   } catch {
     return false;
   }

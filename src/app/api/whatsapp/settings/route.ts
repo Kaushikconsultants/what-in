@@ -77,10 +77,14 @@ export async function POST(req: NextRequest) {
       if (body.merchantUpiId !== undefined) clientData.merchantUpiId = body.merchantUpiId;
       if (body.merchantUpiName !== undefined) clientData.merchantUpiName = body.merchantUpiName;
 
-      await prisma.whatsAppClient.update({
+      const updatedClient = await prisma.whatsAppClient.update({
         where: { id: user.clientId },
         data: clientData
       });
+
+      if (!isOwner) {
+        return NextResponse.json({ success: true, settings: updatedClient });
+      }
     }
 
     let settings = await prisma.whatsAppSettings.findFirst();

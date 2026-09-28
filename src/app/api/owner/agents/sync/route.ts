@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
     if (!isOwner && (!user || (user.role !== "ADMIN" && user.role !== "OWNER"))) {
       return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
     }
-    const agents = await prisma.whatsAppAgentUser.findMany();
+    const whereClause = !isOwner && user?.clientId ? { clientId: user.clientId } : {};
+    const agents = await prisma.whatsAppAgentUser.findMany({ where: whereClause });
     let synced = 0;
 
     for (const agent of agents) {

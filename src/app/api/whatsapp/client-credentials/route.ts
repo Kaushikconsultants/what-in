@@ -120,8 +120,10 @@ export async function POST(req: NextRequest) {
     let client = null;
     if (targetClientId) {
       client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId } });
-    } else {
+    } else if (isOwner) {
       client = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" } });
+    } else {
+      return NextResponse.json({ error: "Forbidden: No associated client workspace found" }, { status: 403 });
     }
 
     if (!client) {

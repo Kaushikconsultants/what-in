@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedUser } from "@/lib/authSession";
+import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
 async function resolveClient(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -118,9 +118,21 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const isOwner = isOwnerAuthenticated(req);
+    const user = await getAuthenticatedUser(req);
+
+    if (!isOwner && (!user || (user.role !== "ADMIN" && user.role !== "OWNER" && user.role !== "SUPER_ADMIN"))) {
+      return NextResponse.json({ success: false, error: "Unauthorized access: Admin privileges required." }, { status: 401 });
+    }
+
     const client = await resolveClient(req);
     if (!client) {
       return NextResponse.json({ success: false, error: "Client not found." }, { status: 404 });
+    }
+
+    // Tenant isolation: non-owners can only modify their own workspace widget
+    if (!isOwner && user?.clientId && client.id !== user.clientId) {
+      return NextResponse.json({ success: false, error: "Forbidden: Cannot modify another workspace's widget." }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));

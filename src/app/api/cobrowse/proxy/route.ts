@@ -60,7 +60,36 @@ export async function GET(req: NextRequest) {
       targetUrl = "https://esponsports.com";
     }
 
-    const urlObj = new URL(targetUrl);
+    let urlObj: URL;
+    try {
+      urlObj = new URL(targetUrl);
+      if (urlObj.protocol !== "http:" && urlObj.protocol !== "https:") {
+        targetUrl = "https://esponsports.com";
+        urlObj = new URL(targetUrl);
+      }
+      const host = urlObj.hostname.toLowerCase();
+      if (
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host === "0.0.0.0" ||
+        host === "::1" ||
+        host.startsWith("10.") ||
+        host.startsWith("192.168.") ||
+        host.startsWith("169.254.") ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+        host.endsWith(".local") ||
+        host.endsWith(".internal")
+      ) {
+        return new NextResponse(
+          `<html><body style='font-family:sans-serif;padding:40px;text-align:center;color:#ef4444;'><h3>🔒 Access Restricted</h3><p>Access to internal network addresses is restricted.</p></body></html>`,
+          { status: 403, headers: { "Content-Type": "text/html; charset=utf-8" } }
+        );
+      }
+    } catch {
+      targetUrl = "https://esponsports.com";
+      urlObj = new URL(targetUrl);
+    }
+
     const origin = urlObj.origin;
     const deviceParam = searchParams.get("device") || "mobile";
     const isMobile = deviceParam.toLowerCase() === "mobile";

@@ -55,7 +55,9 @@ export function verifySessionToken(token: string | undefined | null): SessionUse
       .update(payloadBase64)
       .digest("base64url");
 
-    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+    const sigBuf = Buffer.from(signature);
+    const expBuf = Buffer.from(expectedSignature);
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
       return null;
     }
 
