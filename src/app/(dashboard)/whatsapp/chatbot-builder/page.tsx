@@ -403,6 +403,362 @@ const BOT_TEMPLATES = [
     ]
   },
   {
+    id: "shopify_cart_recovery",
+    name: "Shopify Abandoned Cart Recovery & 10% Off",
+    platform: "Shopify",
+    description: "Recovers dropped checkouts with a friendly reminder, personalized product preview, 10% coupon code (SAVE10), and direct 1-click checkout recovery link.",
+    triggerKeyword: "CART, RECOVER, CHECKOUT, DISCOUNT",
+    nodes: [
+      {
+        id: "node_cart_trigger",
+        type: "TRIGGER",
+        category: "trigger",
+        title: "FLOW TRIGGER",
+        x: 40,
+        y: 120,
+        text: "Incoming Message matches: CART, RECOVER, CHECKOUT, DISCOUNT",
+        outputPort: "node_cart_msg"
+      },
+      {
+        id: "node_cart_msg",
+        type: "TEXT",
+        category: "message",
+        title: "Cart Recovery Nudge",
+        x: 360,
+        y: 120,
+        imageUrl: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=600",
+        text: "Hey {{name}}! 👋 You left some premium items in your cart at Espon Clothing.\n\nWe reserved your bag for the next 24 hours. Would you like a special 10% discount code to complete your order today?",
+        outputPort: "node_cart_choice"
+      },
+      {
+        id: "node_cart_choice",
+        type: "CHOICE",
+        category: "choice",
+        title: "Discount Offer Options",
+        x: 700,
+        y: 120,
+        text: "Select an option below to proceed:",
+        choices: [
+          { id: "c_discount", text: "🎉 Claim 10% Off (SAVE10)", targetNode: "node_cart_apply_discount" },
+          { id: "c_review", text: "🛍️ View Cart Items", targetNode: "node_cart_catalog" },
+          { id: "c_help", text: "💬 Talk to Support", targetNode: "node_cart_agent" }
+        ]
+      },
+      {
+        id: "node_cart_apply_discount",
+        type: "END",
+        category: "end",
+        title: "Instant Checkout Link",
+        x: 1060,
+        y: 40,
+        text: "Awesome! Your coupon code *SAVE10* has been pre-applied to your cart. Click below to complete your order securely with instant dispatch:",
+        buttonText: "Complete Order (10% Off) 🛍️",
+        url: "https://esponsports.com/checkout?discount=SAVE10"
+      },
+      {
+        id: "node_cart_catalog",
+        type: "CATALOG",
+        category: "choice",
+        title: "Shopify Recommended Catalog",
+        x: 1060,
+        y: 180,
+        categoryName: "Trending Collections",
+        text: "Here are your saved cart items & top matching accessories:",
+        outputPort: "node_cart_apply_discount"
+      },
+      {
+        id: "node_cart_agent",
+        type: "CRM_ROUNDROBIN",
+        category: "crm",
+        title: "Assign Shopping Assistant",
+        x: 1060,
+        y: 320,
+        distributionMethod: "WORKLOAD_BALANCE",
+        roundRobinTarget: "TEAM",
+        text: "Connecting you with an active shopping specialist to assist with sizing or payments.",
+        outputPort: null
+      }
+    ]
+  },
+  {
+    id: "appointment_booking",
+    name: "Doctor / Salon Appointment Booking Bot",
+    platform: "Healthcare / Salon",
+    description: "Interactive scheduling assistant that collects patient/client requirements, preferred date & time slot, and confirms appointments with automated CRM tagging.",
+    triggerKeyword: "BOOK, APPOINTMENT, DOCTOR, SALON, CONSULT",
+    nodes: [
+      {
+        id: "node_app_trigger",
+        type: "TRIGGER",
+        category: "trigger",
+        title: "FLOW TRIGGER",
+        x: 40,
+        y: 120,
+        text: "Incoming Message matches: BOOK, APPOINTMENT, CONSULT",
+        outputPort: "node_app_welcome"
+      },
+      {
+        id: "node_app_welcome",
+        type: "CHOICE",
+        category: "choice",
+        title: "Select Service Category",
+        x: 360,
+        y: 120,
+        imageUrl: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=600",
+        text: "Welcome to PrimeCare Wellness! Please select the service you wish to schedule an appointment for:",
+        choices: [
+          { id: "s1", text: "🩺 General Consultation", targetNode: "node_app_name" },
+          { id: "s2", text: "💆 Hair & Spa Service", targetNode: "node_app_name" },
+          { id: "s3", text: "🧪 Lab Health Checkup", targetNode: "node_app_name" }
+        ]
+      },
+      {
+        id: "node_app_name",
+        type: "INPUT_NAME",
+        category: "input",
+        title: "Patient / Client Name",
+        x: 700,
+        y: 120,
+        variableName: "patient_name",
+        text: "Please enter your full name for the booking record:",
+        outputPort: "node_app_date"
+      },
+      {
+        id: "node_app_date",
+        type: "INPUT_DATE",
+        category: "input",
+        title: "Preferred Date",
+        x: 1040,
+        y: 120,
+        variableName: "booking_date",
+        text: "What is your preferred date? (e.g. Tomorrow, 15 Oct, or DD-MM-YYYY):",
+        outputPort: "node_app_slot"
+      },
+      {
+        id: "node_app_slot",
+        type: "CHOICE",
+        category: "choice",
+        title: "Time Slot Selection",
+        x: 1380,
+        y: 120,
+        text: "Please pick an available time slot:",
+        choices: [
+          { id: "t1", text: "🌅 Morning (10 AM - 1 PM)", targetNode: "node_app_crm" },
+          { id: "t2", text: "☀️ Afternoon (2 PM - 5 PM)", targetNode: "node_app_crm" },
+          { id: "t3", text: "🌙 Evening (6 PM - 9 PM)", targetNode: "node_app_crm" }
+        ]
+      },
+      {
+        id: "node_app_crm",
+        type: "CRM_CONTACT",
+        category: "crm",
+        title: "Update CRM Appointment Tag",
+        x: 1720,
+        y: 120,
+        leadStage: "Appointment Scheduled",
+        temperature: "HOT",
+        tags: "Appointment, High Priority",
+        text: "Update CRM Contact:\n• Lead Stage: Appointment Scheduled\n• Priority: HIGH",
+        outputPort: "node_app_confirm"
+      },
+      {
+        id: "node_app_confirm",
+        type: "END",
+        category: "end",
+        title: "Booking Confirmation",
+        x: 2060,
+        y: 120,
+        text: "✅ Booking Confirmed!\n\nPatient: {{patient_name}}\nDate: {{booking_date}}\n\nOur clinic representative will send a reminder 1 hour prior to your visit.",
+        buttonText: "Add to Calendar 📅",
+        url: "https://calendar.google.com"
+      }
+    ]
+  },
+  {
+    id: "order_pincode_tracker",
+    name: "Order Tracking & Pincode Serviceability Checker",
+    platform: "Logistics",
+    description: "Instant delivery assistant that checks courier pincode SLA, live order fulfillment status, and routes to agent if NDR / delivery exception occurs.",
+    triggerKeyword: "TRACK, PINCODE, DELIVERY, STATUS",
+    nodes: [
+      {
+        id: "node_trk_trigger",
+        type: "TRIGGER",
+        category: "trigger",
+        title: "FLOW TRIGGER",
+        x: 40,
+        y: 120,
+        text: "Incoming Message matches: TRACK, PINCODE, DELIVERY",
+        outputPort: "node_trk_menu"
+      },
+      {
+        id: "node_trk_menu",
+        type: "CHOICE",
+        category: "choice",
+        title: "Logistics Assistant Menu",
+        x: 360,
+        y: 120,
+        text: "Welcome to Express Logistics! How can we help with your shipment today?",
+        choices: [
+          { id: "p1", text: "📦 Track Active Order", targetNode: "node_trk_order_input" },
+          { id: "p2", text: "📍 Check Delivery Pincode", targetNode: "node_trk_pincode_input" },
+          { id: "p3", text: "⚠️ Delivery Issue / NDR", targetNode: "node_trk_ndr" }
+        ]
+      },
+      {
+        id: "node_trk_order_input",
+        type: "INPUT_PHONE",
+        category: "input",
+        title: "Order ID / AWB Input",
+        x: 700,
+        y: 40,
+        variableName: "tracking_id",
+        text: "Please enter your 10-digit mobile number or AWB Tracking ID:",
+        outputPort: "node_trk_live_status"
+      },
+      {
+        id: "node_trk_live_status",
+        type: "END",
+        category: "end",
+        title: "Live Courier Status",
+        x: 1040,
+        y: 40,
+        text: "🚚 *Shipment Update*\n\nStatus: *Out for Delivery*\nCarrier: Delhivery Express\nEst. Arrival: Today by 7:00 PM\n\nClick below for live GPS courier map:",
+        buttonText: "Live GPS Tracking 📍",
+        url: "https://delhivery.com/track"
+      },
+      {
+        id: "node_trk_pincode_input",
+        type: "INPUT_PHONE",
+        category: "input",
+        title: "Enter 6-Digit Pincode",
+        x: 700,
+        y: 180,
+        variableName: "pincode",
+        text: "Enter your 6-digit delivery pincode to check COD & Express availability:",
+        outputPort: "node_trk_pincode_result"
+      },
+      {
+        id: "node_trk_pincode_result",
+        type: "END",
+        category: "end",
+        title: "Serviceability Result",
+        x: 1040,
+        y: 180,
+        text: "✅ Pincode {{pincode}} is *100% Serviceable*!\n\n• Standard Delivery: 2-3 Days\n• Express Delivery: 24 Hours\n• Cash on Delivery (COD): Supported",
+        buttonText: "Shop New Arrivals 🛍️",
+        url: "https://esponsports.com"
+      },
+      {
+        id: "node_trk_ndr",
+        type: "CRM_ROUNDROBIN",
+        category: "crm",
+        title: "Route to NDR Support Team",
+        x: 700,
+        y: 320,
+        distributionMethod: "WORKLOAD_BALANCE",
+        roundRobinTarget: "TEAM",
+        text: "Transferring you to our dispatch escalation team to reschedule your delivery immediately.",
+        outputPort: null
+      }
+    ]
+  },
+  {
+    id: "prepaid_upi_collection",
+    name: "Pre-paid UPI & Cashfree Payment Collection Bot",
+    platform: "Fintech & Payments",
+    description: "Automated invoice settlement flow that generates dynamic UPI QR codes and secure Razorpay/Cashfree payment links with instant receipt dispatch.",
+    triggerKeyword: "PAY, INVOICE, PAYMENT, BILL",
+    nodes: [
+      {
+        id: "node_pay_trigger",
+        type: "TRIGGER",
+        category: "trigger",
+        title: "FLOW TRIGGER",
+        x: 40,
+        y: 120,
+        text: "Incoming Message matches: PAY, INVOICE, PAYMENT, BILL",
+        outputPort: "node_pay_welcome"
+      },
+      {
+        id: "node_pay_welcome",
+        type: "CHOICE",
+        category: "choice",
+        title: "Select Payment Method",
+        x: 360,
+        y: 120,
+        imageUrl: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=600",
+        text: "Welcome to Espon Billing Support! How would you like to complete your pending payment?",
+        choices: [
+          { id: "m1", text: "⚡ Instant UPI QR (0% Fee)", targetNode: "node_pay_upi_qr" },
+          { id: "m2", text: "💳 Card / NetBanking Link", targetNode: "node_pay_rzp_link" },
+          { id: "m3", text: "📄 Request Tax Invoice PDF", targetNode: "node_pay_invoice_pdf" }
+        ]
+      },
+      {
+        id: "node_pay_upi_qr",
+        type: "UPI_QR",
+        category: "payment",
+        title: "Dynamic UPI QR Dispatch",
+        x: 700,
+        y: 40,
+        upiId: "esponclothing@okaxis",
+        amount: "1499",
+        payeeName: "Espon Sports Wear",
+        text: "Scan the QR code above via GPay, PhonePe, or Paytm to pay ₹1,499 instantly with zero surcharge.",
+        outputPort: "node_pay_success_crm"
+      },
+      {
+        id: "node_pay_rzp_link",
+        type: "PAY_LINK",
+        category: "payment",
+        title: "Secure Payment Gateway Link",
+        x: 700,
+        y: 180,
+        amount: "1499",
+        currency: "INR",
+        paymentDescription: "Invoice Settlement #ESP-2026",
+        outputPort: "node_pay_success_crm"
+      },
+      {
+        id: "node_pay_invoice_pdf",
+        type: "FILE",
+        category: "message",
+        title: "Tax Invoice PDF",
+        x: 700,
+        y: 320,
+        filename: "Tax_Invoice_ESP_2026.pdf",
+        mediaUrl: "https://esponsports.com/sample_invoice.pdf",
+        text: "Here is a copy of your GST Tax Invoice for your records.",
+        outputPort: "node_pay_rzp_link"
+      },
+      {
+        id: "node_pay_success_crm",
+        type: "CRM_CONTACT",
+        category: "crm",
+        title: "Mark Lead as PAID in CRM",
+        x: 1040,
+        y: 120,
+        leadStage: "Payment Completed",
+        temperature: "WON",
+        tags: "Paid Customer, VIP",
+        text: "Update CRM Contact:\n• Lead Stage: Payment Completed\n• Temperature: WON",
+        outputPort: "node_pay_thankyou"
+      },
+      {
+        id: "node_pay_thankyou",
+        type: "END",
+        category: "end",
+        title: "Payment Confirmation Receipt",
+        x: 1380,
+        y: 120,
+        text: "🎉 Payment Received! Thank you for your business. Your order is queued for immediate packing and dispatch.",
+        buttonText: "Download Receipt 📄",
+        url: "https://esponsports.com/receipt"
+      }
+    ]
+  },
+  {
     id: "blank",
     name: "Blank Canvas Bot Flow",
     platform: "Custom",
