@@ -58,7 +58,13 @@ import {
   ExternalLink,
   ShieldCheck,
   Tag,
-  Lock
+  Lock,
+  AlertTriangle,
+  AlertCircle,
+  Terminal,
+  Activity,
+  RefreshCw,
+  Eye
 } from "lucide-react";
 import {
   getWhatsAppChatbotFlows,
@@ -70,7 +76,9 @@ import {
   getAllEmployeesAndTeams,
   getTeamsWithMembersAction,
   getProductsAction,
-  getWhatsAppTemplates
+  getWhatsAppTemplates,
+  getWhatsAppChatbotLogsAction,
+  clearWhatsAppChatbotLogsAction
 } from "@/app/actions/whatsAppPlatformActions";
 import { getWhatsAppIntegrationsAction } from "@/app/actions/whatsAppIntegrationActions";
 import { ModuleKey, ALL_MODULE_KEYS, MASTER_MODULES, getRequiredModuleForNodeType } from "@/lib/moduleRegistry";
@@ -545,9 +553,223 @@ export default function WhatsAppChatbotBuilderPage() {
   const [simMessages, setSimMessages] = useState<any[]>([]);
   const [isMounted, setIsMounted] = useState<boolean>(false);
 
+  // Diagnostics & Health Inspector State
+  const [showDiagnosticsDrawer, setShowDiagnosticsDrawer] = useState<boolean>(false);
+
+  // Execution Telemetry Logs State
+  const [showLogsModal, setShowLogsModal] = useState<boolean>(false);
+  const [flowLogs, setFlowLogs] = useState<any[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
+  const [logFilterType, setLogFilterType] = useState<string>("ALL");
+
   // Subscription Plan & Enabled Modules for Gating
   const [enabledModules, setEnabledModules] = useState<ModuleKey[]>(ALL_MODULE_KEYS);
   const [clientPlanInfo, setClientPlanInfo] = useState<any>(null);
+
+  const fetchFlowLogs = async () => {
+    setIsLoadingLogs(true);
+    const res = await getWhatsAppChatbotLogsAction({
+      flowId: currentFlowId || undefined,
+      nodeType: logFilterType === "ALL" ? undefined : logFilterType,
+      limit: 60
+    });
+    if (res.success && res.logs) {
+      setFlowLogs(res.logs);
+    }
+    setIsLoadingLogs(false);
+  };
+
+  const handleClearFlowLogs = async () => {
+    if (!confirm("Are you sure you want to clear all flow execution logs?")) return;
+    const res = await clearWhatsAppChatbotLogsAction();
+    if (res.success) {
+      setFlowLogs([]);
+      setToastMsg("✓ Flow execution logs cleared.");
+      setTimeout(() => setToastMsg(null), 3000);
+    }
+  };
+
+  const handleFocusNode = (nodeId: string) => {
+    const target = nodes.find((n) => n.id === nodeId);
+    if (!target) return;
+    setSelectedNodeId(nodeId);
+    setIsDrawerOpen(true);
+    const container = document.querySelector(".infinite-canvas-wrapper");
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const targetX = rect.width / 2 - (target.x + 130) * zoom;
+      const targetY = rect.height / 2 - (target.y + 100) * zoom;
+      setPan({ x: targetX, y: targetY });
+    }
+  };
+
+  const getFlowDiagnostics = () => {
+    const items: Array<{
+      id: string;
+      nodeId?: string;
+      severity: "error" | "warning" | "info";
+      title: string;
+      message: string;
+      category: "PLAN_LOCK" | "TRIGGER" | "CONTENT" | "CONNECTION" | "BEST_PRACTICE";
+    }> = [];
+
+    const triggerNode = nodes.find((n) => (n.type || "").toUpperCase() === "TRIGGER");
+
+    if (!triggerNode) {
+      items.push({
+        id: "err_no_trigger",
+        severity: "error",
+        category: "TRIGGER",
+        title: "Missing Flow Trigger Block",
+        message: "The flow requires a Flow Trigger block to activate on customer keywords."
+      });
+    } else {
+      if (!triggerKeyword || !triggerKeyword.trim()) {
+        items.push({
+          id: "err_empty_kw",
+          nodeId: triggerNode.id,
+          severity: "error",
+          category: "TRIGGER",
+          title: "Empty Trigger Keywords",
+          message: "Trigger keywords are blank. Enter comma-separated keywords (e.g. 'HI, HELLO, MENU')."
+        });
+      }
+      if (!triggerNode.outputPort) {
+        items.push({
+          id: "err_unconnected_trigger",
+          nodeId: triggerNode.id,
+          severity: "error",
+          category: "CONNECTION",
+          title: "Trigger Block Not Connected",
+          message: "Drag a connection wire from Flow Trigger to your first action block."
+        });
+      }
+    }
+
+    nodes.forEach((node) => {
+      const type = (node.type || "").toUpperCase();
+      const reqMod = getRequiredModuleForNodeType(node.type);
+
+      // Plan Lock Check
+      if (reqMod && !enabledModules.includes(reqMod)) {
+        items.push({
+          id: `err_locked_${node.id}`,
+          nodeId: node.id,
+          severity: "error",
+          category: "PLAN_LOCK",
+          title: `Locked Module: ${node.title || type}`,
+          message: `Requires the [${reqMod}] module which is locked on your current subscription plan.`
+        });
+      }
+
+      if (type === "TEXT" && (!node.text || !node.text.trim())) {
+        items.push({
+          id: `err_text_${node.id}`,
+          nodeId: node.id,
+          severity: "error",
+          category: "CONTENT",
+          title: `Empty Message: "${node.title || "Text"}"`,
+          message: "Message body text is blank."
+        });
+      }
+
+      if ((type === "IMAGE" || type === "VIDEO" || type === "FILE" || type === "AUDIO") && (!node.mediaUrl || !node.mediaUrl.trim())) {
+        items.push({
+          id: `warn_media_${node.id}`,
+          nodeId: node.id,
+          severity: "warning",
+          category: "CONTENT",
+          title: `Missing Media URL in "${node.title || type}"`,
+          message: "No media URL is configured for this block."
+        });
+      }
+
+      if (type === "CHOICE" || type === "BUTTONS" || type === "LIST_MENU") {
+        if (!node.choices || node.choices.length === 0) {
+          items.push({
+            id: `err_choice_${node.id}`,
+            nodeId: node.id,
+            severity: "error",
+            category: "CONTENT",
+            title: `No Options in "${node.title || "Interactive Buttons"}"`,
+            message: "Interactive buttons block has no clickable options configured."
+          });
+        } else {
+          node.choices.forEach((choice: any, index: number) => {
+            if (!choice.text || !choice.text.trim()) {
+              items.push({
+                id: `err_choice_text_${node.id}_${choice.id || index}`,
+                nodeId: node.id,
+                severity: "error",
+                category: "CONTENT",
+                title: `Blank Option ${index + 1} in "${node.title}"`,
+                message: "Option text is empty. Enter label."
+              });
+            } else if (choice.text.length > 20) {
+              items.push({
+                id: `warn_choice_len_${node.id}_${choice.id || index}`,
+                nodeId: node.id,
+                severity: "warning",
+                category: "BEST_PRACTICE",
+                title: `Option Text Too Long in "${node.title}"`,
+                message: `"${choice.text.slice(0, 15)}..." is ${choice.text.length} chars (WhatsApp max: 20 chars).`
+              });
+            }
+
+            if (!choice.targetNode) {
+              items.push({
+                id: `warn_choice_target_${node.id}_${choice.id || index}`,
+                nodeId: node.id,
+                severity: "warning",
+                category: "CONNECTION",
+                title: `Unconnected Option "${choice.text || "Option"}"`,
+                message: `Button "${choice.text}" in "${node.title}" is not connected to any next step.`
+              });
+            }
+          });
+        }
+      }
+
+      if (type === "CRM_ROUNDROBIN" && node.assignmentMode === "DIRECT" && !node.agentId) {
+        items.push({
+          id: `err_agent_${node.id}`,
+          nodeId: node.id,
+          severity: "error",
+          category: "CONTENT",
+          title: `Unassigned Agent in "${node.title}"`,
+          message: "Direct assignment mode is selected but no agent is chosen."
+        });
+      }
+
+      if (type === "WEBHOOK" && (!node.webhookUrl || !node.webhookUrl.trim())) {
+        items.push({
+          id: `err_webhook_${node.id}`,
+          nodeId: node.id,
+          severity: "error",
+          category: "CONTENT",
+          title: `Empty Webhook URL in "${node.title}"`,
+          message: "No target endpoint URL configured for API Webhook."
+        });
+      }
+
+      if (type.startsWith("PAY_") && (!node.amount || Number(node.amount) <= 0)) {
+        items.push({
+          id: `warn_pay_${node.id}`,
+          nodeId: node.id,
+          severity: "warning",
+          category: "CONTENT",
+          title: `Zero Amount in "${node.title}"`,
+          message: "Payment collection amount is not set or zero."
+        });
+      }
+    });
+
+    const errorCount = items.filter((i) => i.severity === "error").length;
+    const warningCount = items.filter((i) => i.severity === "warning").length;
+    const infoCount = items.filter((i) => i.severity === "info").length;
+
+    return { items, errorCount, warningCount, infoCount };
+  };
 
   useEffect(() => {
     fetch("/api/whatsapp/client-status")
@@ -1145,108 +1367,13 @@ export default function WhatsAppChatbotBuilderPage() {
   };
 
   const validateWorkflow = () => {
-    const errors: string[] = [];
-    const triggerNode = nodes.find((n) => (n.type || '').toUpperCase() === "TRIGGER");
-    
-    if (!triggerNode) {
-      errors.push("Missing 'Flow Trigger' block. You must have a trigger block to start the flow.");
-    } else {
-      if (!triggerKeyword || !triggerKeyword.trim()) {
-        errors.push("Flow Trigger keywords cannot be empty. Please configure keywords in the top bar.");
-      }
-      if (!triggerNode.outputPort) {
-        errors.push("Flow Trigger block is not connected to any starting block. Drag a wire from its output.");
-      }
-    }
-
-    // Node-specific validation
-    nodes.forEach(node => {
-      if (node.type === "TEXT" && (!node.text || !node.text.trim())) {
-        errors.push(`Text block "${node.title || 'Text'}" has no message content.`);
-      }
-      if (node.type === "IMAGE" || node.type === "VIDEO" || node.type === "FILE" || node.type === "AUDIO") {
-        if (!node.mediaUrl || !node.mediaUrl.trim()) {
-          errors.push(`Media block "${node.title || node.type}" is missing a valid URL.`);
-        }
-      }
-      if (node.type === "CHOICE" || node.type === "BUTTONS" || node.type === "LIST_MENU") {
-        if (!node.choices || node.choices.length === 0) {
-          errors.push(`Interactive block "${node.title || 'Choices'}" has no options configured.`);
-        } else {
-          node.choices.forEach((choice: any, index: number) => {
-            if (!choice.text || !choice.text.trim()) {
-              errors.push(`Option ${index + 1} in "${node.title}" has empty text.`);
-            }
-            if (!choice.targetNode) {
-              errors.push(`Option "${choice.text || 'Unnamed'}" in "${node.title}" is not connected to any next step.`);
-            }
-          });
-        }
-      }
-      const type = (node.type || "").toUpperCase();
-      if (type === "CRM_LEAD" || type === "CRM_CONTACT") {
-        if (!node.integrationId && !integrations.some(i => i.type === "CRM_LEAD" && i.isActive)) {
-          errors.push(`CRM node "${node.title || 'Create Lead'}" requires an active CRM/Webhook integration. Save integration settings first.`);
-        }
-      }
-      if (type === "META_CAPI") {
-        if (!node.integrationId && !integrations.some(i => i.type === "META_CAPI" && i.isActive)) {
-          errors.push(`Meta CAPI node "${node.title || 'Meta CAPI Event'}" requires an active Meta integration. Save Meta credentials in Integrations first.`);
-        }
-      }
-      if (type === "CRM_ROUNDROBIN") {
-        if (node.assignmentMode === "DIRECT") {
-          if (!node.agentId) {
-            errors.push(`Agent Routing block "${node.title}" has no specific agent selected.`);
-          }
-        } else {
-          if (!node.distributionMethod) {
-            errors.push(`Agent Routing block "${node.title}" has no distribution method selected.`);
-          }
-          if (node.roundRobinTarget === "AGENTS") {
-            if (!node.agentIds || node.agentIds.length === 0) {
-              errors.push(`Agent Routing block "${node.title}" has no agents selected.`);
-            }
-          } else {
-            // Default to TEAM
-            if (!node.teamId) {
-              errors.push(`Agent Routing block "${node.title}" has no team selected.`);
-            }
-          }
-        }
-      }
-    });
-
-    // Modular Plan Feature Gating Validation
-    nodes.forEach(node => {
-      const type = (node.type || "").toUpperCase();
-      if (type.startsWith("PAY_") && !enabledModules.includes("PAYMENT_GATEWAY")) {
-        errors.push(`Payment node "${node.title || type}" requires the [Payment Gateways & COD] module which is locked on your current subscription plan.`);
-      }
-      if ((type === "CATALOG" || type === "ORDER") && !enabledModules.includes("META_CATALOG") && !enabledModules.includes("SHOPIFY_INTEGRATION")) {
-        errors.push(`E-Commerce node "${node.title || type}" requires the [Meta Catalog] or [Shopify] module which is locked on your current subscription plan.`);
-      }
-      if (type === "WEBHOOK" && !enabledModules.includes("DEVELOPER_API")) {
-        errors.push(`API Webhook node "${node.title || type}" requires the [Developer APIs & Webhooks] module which is locked on your current subscription plan.`);
-      }
-      if (type === "AI_BOT" && !enabledModules.includes("AI_AGENT")) {
-        errors.push(`AI Intent node "${node.title || type}" requires the [AI Auto-Pilot & Knowledge Base] module which is locked on your current subscription plan.`);
-      }
-      if ((type === "META_CAPI" || type === "META_CTWA_AD" || type === "META_CUSTOM_AUDIENCE") && !enabledModules.includes("META_PIXEL_CAPI")) {
-        errors.push(`Meta Ads node "${node.title || type}" requires the [Meta Pixel & CAPI Ad Tracking] module which is locked on your current subscription plan.`);
-      }
-    });
-
-    return { isValid: errors.length === 0, errors };
+    const diag = getFlowDiagnostics();
+    const errors = diag.items.filter((i) => i.severity === "error").map((i) => `${i.title}: ${i.message}`);
+    return { isValid: errors.length === 0, errors, diagnostics: diag };
   };
 
   const handleRunValidation = () => {
-    const validation = validateWorkflow();
-    if (validation.isValid) {
-      alert("✅ Your Flow looks great! No errors found.");
-    } else {
-      alert(`⚠️ Flow Validation Failed:\n\n- ${validation.errors.join("\\n- ")}\n\nPlease fix these errors before publishing.`);
-    }
+    setShowDiagnosticsDrawer(true);
   };
 
   const handleSaveFlowWithStatus = async (wantsPublish: boolean) => {
@@ -2176,13 +2303,58 @@ export default function WhatsAppChatbotBuilderPage() {
             {isFullScreenStudio ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
 
-          <button className="studio-btn test-btn" onClick={handleStartSimTest} disabled={nodes.length === 0}>
+          <button className="studio-btn test-btn" onClick={handleStartSimTest} disabled={nodes.length === 0} title="Interactive Phone Simulator">
             <Play size={14} /> Preview & Test
           </button>
 
-          <button className="studio-btn" onClick={handleRunValidation} disabled={nodes.length === 0} style={{ background: "#475569", color: "white" }}>
-            <ShieldCheck size={14} /> Validate Flow
+          <button
+            className="studio-btn"
+            onClick={() => {
+              setShowLogsModal(true);
+              fetchFlowLogs();
+            }}
+            title="View Live Flow Execution Logs & Telemetry"
+            style={{ background: "#0f172a", color: "#38bdf8", border: "1px solid #1e293b", display: "inline-flex", alignItems: "center", gap: "5px" }}
+          >
+            <Activity size={14} /> Flow Logs
           </button>
+
+          {(() => {
+            const diag = getFlowDiagnostics();
+            const hasErrors = diag.errorCount > 0;
+            const hasWarnings = diag.warningCount > 0;
+            return (
+              <button
+                className="studio-btn"
+                onClick={() => setShowDiagnosticsDrawer(!showDiagnosticsDrawer)}
+                title="Open Flow Health & Diagnostics Inspector"
+                style={{
+                  background: hasErrors ? "#fef2f2" : hasWarnings ? "#fffbeb" : "#f0fdf4",
+                  color: hasErrors ? "#b91c1c" : hasWarnings ? "#b45309" : "#15803d",
+                  border: `1px solid ${hasErrors ? "#fca5a5" : hasWarnings ? "#fcd34d" : "#86efac"}`,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  fontWeight: 700
+                }}
+              >
+                {hasErrors ? (
+                  <AlertTriangle size={14} color="#ef4444" />
+                ) : hasWarnings ? (
+                  <AlertCircle size={14} color="#f59e0b" />
+                ) : (
+                  <ShieldCheck size={14} color="#10b981" />
+                )}
+                <span>
+                  {hasErrors
+                    ? `Issues (${diag.errorCount})`
+                    : hasWarnings
+                    ? `Warnings (${diag.warningCount})`
+                    : `✓ Flow Healthy`}
+                </span>
+              </button>
+            );
+          })()}
 
           <button 
             className="studio-btn" 
@@ -2522,10 +2694,16 @@ export default function WhatsAppChatbotBuilderPage() {
             {nodes.map((node) => {
               const isSelected = node.id === selectedNodeId;
               const isConnectingHover = hoveredTargetNodeId === node.id;
+              const reqMod = getRequiredModuleForNodeType(node.type);
+              const isNodeLocked = reqMod && !enabledModules.includes(reqMod);
+              const hasContentError =
+                (node.type === "TEXT" && (!node.text || !node.text.trim())) ||
+                ((node.type === "CHOICE" || node.type === "BUTTONS" || node.type === "LIST_MENU") && (!node.choices || node.choices.length === 0));
+
               return (
                 <div
                   key={node.id}
-                  className={`canvas-node-card ${isSelected ? "selected" : ""} ${isConnectingHover ? "connecting-target-hover" : ""}`}
+                  className={`canvas-node-card ${isSelected ? "selected" : ""} ${isConnectingHover ? "connecting-target-hover" : ""} ${isNodeLocked ? "locked-node" : ""} ${hasContentError ? "error-node" : ""}`}
                   style={{
                     left: `${node.x}px`,
                     top: `${node.y}px`
@@ -2564,6 +2742,22 @@ export default function WhatsAppChatbotBuilderPage() {
                       </span>
                     </div>
                   </div>
+
+                  {isNodeLocked && (
+                    <div style={{ padding: "4px 8px 0 8px" }}>
+                      <span className="node-lock-badge" title={`Requires [${reqMod}] module upgrade`}>
+                        <Lock size={10} /> Locked ({reqMod})
+                      </span>
+                    </div>
+                  )}
+
+                  {!isNodeLocked && hasContentError && (
+                    <div style={{ padding: "4px 8px 0 8px" }}>
+                      <span className="node-error-badge" title="Configure required message or options">
+                        <AlertTriangle size={10} /> Incomplete
+                      </span>
+                    </div>
+                  )}
 
                   <div className="node-card-body">
                     {/* TYPE-SPECIFIC VISUAL CONTENT BADGES & PREVIEWS */}
@@ -4491,6 +4685,199 @@ export default function WhatsAppChatbotBuilderPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDiagnosticsDrawer && (
+        <div className="diagnostics-drawer">
+          <div className="diagnostics-header">
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <ShieldCheck size={18} color="#10b981" />
+              <div>
+                <strong style={{ fontSize: "14px", display: "block" }}>Flow Health & Diagnostics</strong>
+                <span style={{ fontSize: "11px", color: "#64748b" }}>Real-time validation & plan compatibility inspector</span>
+              </div>
+            </div>
+            <button onClick={() => setShowDiagnosticsDrawer(false)} style={{ background: "none", border: "none", cursor: "pointer" }}>
+              <X size={18} color="#64748b" />
+            </button>
+          </div>
+
+          <div className="diagnostics-body">
+            {(() => {
+              const diag = getFlowDiagnostics();
+              if (diag.items.length === 0) {
+                return (
+                  <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                    <CheckCircle2 size={40} color="#10b981" style={{ margin: "0 auto 12px auto" }} />
+                    <h4 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 6px 0", color: "#166534" }}>Flow is 100% Healthy!</h4>
+                    <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                      No missing triggers, disconnected paths, empty content, or locked module violations detected. Ready to publish live!
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "4px" }}>
+                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", padding: "8px", borderRadius: "6px", textAlign: "center" }}>
+                      <span style={{ fontSize: "11px", color: "#991b1b", display: "block", fontWeight: 600 }}>Critical Errors</span>
+                      <strong style={{ fontSize: "16px", color: "#dc2626" }}>{diag.errorCount}</strong>
+                    </div>
+                    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", padding: "8px", borderRadius: "6px", textAlign: "center" }}>
+                      <span style={{ fontSize: "11px", color: "#92400e", display: "block", fontWeight: 600 }}>Warnings</span>
+                      <strong style={{ fontSize: "16px", color: "#d97706" }}>{diag.warningCount}</strong>
+                    </div>
+                    <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "8px", borderRadius: "6px", textAlign: "center" }}>
+                      <span style={{ fontSize: "11px", color: "#1e40af", display: "block", fontWeight: 600 }}>Total Steps</span>
+                      <strong style={{ fontSize: "16px", color: "#2563eb" }}>{nodes.length}</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#334155", marginTop: "4px" }}>Diagnostic Items ({diag.items.length}):</div>
+
+                  {diag.items.map((item) => (
+                    <div key={item.id} className={`diagnostic-item-card ${item.severity}`}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "6px", marginBottom: "4px" }}>
+                        <strong style={{ fontSize: "12.5px", color: item.severity === "error" ? "#991b1b" : item.severity === "warning" ? "#92400e" : "#1e40af" }}>
+                          {item.severity === "error" ? "🚨 " : item.severity === "warning" ? "⚠️ " : "ℹ️ "}
+                          {item.title}
+                        </strong>
+                        {item.nodeId && (
+                          <button
+                            className="focus-node-btn"
+                            onClick={() => handleFocusNode(item.nodeId!)}
+                            title="Center and focus on this node"
+                          >
+                            <Eye size={11} /> Locate
+                          </button>
+                        )}
+                      </div>
+                      <p style={{ fontSize: "11.5px", color: "#475569", margin: 0, lineHeight: 1.4 }}>
+                        {item.message}
+                      </p>
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
+          </div>
+
+          <div style={{ padding: "12px 18px", borderTop: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <button className="studio-btn" onClick={() => setShowDiagnosticsDrawer(false)}>Close Inspector</button>
+            <button className="studio-btn primary" onClick={() => handleSaveFlowWithStatus(true)}>
+              <CheckCircle2 size={13} /> Try Publish
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showLogsModal && (
+        <div className="bot-modal-backdrop" onClick={() => setShowLogsModal(false)}>
+          <div className="bot-modal-card" style={{ maxWidth: "880px" }} onClick={(e) => e.stopPropagation()}>
+            <div className="bot-modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Activity size={18} color="#0284c7" />
+                <div>
+                  <h3 className="bot-modal-title">Live Flow Telemetry & Execution Logs</h3>
+                  <span style={{ fontSize: "11px", color: "#64748b" }}>Audit trace of incoming messages, webhook dispatches, Meta CAPI events, and node executions</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  className="studio-btn"
+                  style={{ padding: "4px 8px", fontSize: "11px" }}
+                  onClick={fetchFlowLogs}
+                  disabled={isLoadingLogs}
+                >
+                  <RefreshCw size={11} className={isLoadingLogs ? "animate-spin" : ""} /> Refresh
+                </button>
+                <button
+                  className="studio-btn danger"
+                  style={{ padding: "4px 8px", fontSize: "11px" }}
+                  onClick={handleClearFlowLogs}
+                >
+                  Clear Logs
+                </button>
+                <button onClick={() => setShowLogsModal(false)} style={{ background: "none", border: "none", cursor: "pointer" }}>
+                  <X size={18} color="#64748b" />
+                </button>
+              </div>
+            </div>
+
+            <div className="bot-modal-body" style={{ padding: 0, maxHeight: "500px", overflowY: "auto" }}>
+              {isLoadingLogs ? (
+                <div style={{ textAlign: "center", padding: "40px" }}>
+                  <RefreshCw size={24} className="animate-spin text-sky-500" style={{ margin: "0 auto 8px auto" }} />
+                  <p style={{ fontSize: "12px", color: "#64748b" }}>Loading telemetry logs...</p>
+                </div>
+              ) : flowLogs.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                  <Terminal size={32} color="#94a3b8" style={{ margin: "0 auto 8px auto" }} />
+                  <h4 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 4px 0", color: "#334155" }}>No Execution Logs Recorded Yet</h4>
+                  <p style={{ fontSize: "12px", color: "#64748b", margin: 0 }}>
+                    When customers send trigger keywords or interact with flow buttons, live telemetry traces will appear here in real-time.
+                  </p>
+                </div>
+              ) : (
+                <table className="bot-manage-table" style={{ fontSize: "11.5px" }}>
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Phone</th>
+                      <th>Node Type</th>
+                      <th>Action Description</th>
+                      <th>Status</th>
+                      <th>Error / Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {flowLogs.map((log) => {
+                      const isOk = !log.responseStatus || (log.responseStatus >= 200 && log.responseStatus < 300);
+                      const isLocked = log.responseStatus === 403;
+                      return (
+                        <tr key={log.id}>
+                          <td style={{ whiteSpace: "nowrap", color: "#64748b" }}>
+                            {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </td>
+                          <td style={{ fontWeight: 600, color: "#0f172a" }}>+{log.phone}</td>
+                          <td>
+                            <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: "#f1f5f9", fontWeight: 700, color: "#475569" }}>
+                              {log.nodeType}
+                            </span>
+                          </td>
+                          <td style={{ maxWidth: "260px", color: "#334155" }}>{log.actionDesc}</td>
+                          <td>
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                background: isOk ? "#dcfce7" : isLocked ? "#fef3c7" : "#fee2e2",
+                                color: isOk ? "#166534" : isLocked ? "#92400e" : "#991b1b"
+                              }}
+                            >
+                              {log.responseStatus || (isOk ? "200 OK" : "FAILED")}
+                            </span>
+                          </td>
+                          <td style={{ maxWidth: "200px", color: log.errorMessage ? "#dc2626" : "#64748b", fontSize: "10.5px" }}>
+                            {log.errorMessage || "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="bot-modal-footer">
+              <span style={{ fontSize: "11.5px", color: "#64748b", marginRight: "auto" }}>Showing {flowLogs.length} recent executions</span>
+              <button className="studio-btn" onClick={() => setShowLogsModal(false)}>Close</button>
             </div>
           </div>
         </div>

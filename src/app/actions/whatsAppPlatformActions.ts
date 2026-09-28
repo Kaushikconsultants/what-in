@@ -9,17 +9,12 @@ import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 import { emitInboxEvent } from "@/lib/inboxEvents";
 import { getRecoveryAgentSettings } from "@/lib/paymentRecoveryAgent";
 
-export async function getWhatsAppChatbotLogsAction(phone: string) {
+async function resolveEffectiveClientId(): Promise<string | null> {
   try {
-    const whereClause = phone ? { phone } : {};
-    const logs = await prisma.whatsAppChatbotLog.findMany({
-      where: whereClause,
-      orderBy: { createdAt: 'desc' },
-      take: phone ? undefined : 50
-    });
-    return { success: true, logs };
-  } catch (e: any) {
-    return { success: false, error: e.message };
+    const creds = await getMetaApiCredentials();
+    return creds.clientId || null;
+  } catch {
+    return null;
   }
 }
 
@@ -4415,8 +4410,35 @@ export async function createWhatsAppBroadcastCampaign(data: {
       return { success: false, error: moduleCheck.error };
     }
 
-    const campaign = await prisma.whatsAppCampaign.create({
+    // Quota Pre-Flight Check for Broadcast Campaign
+    const activeClientId = await resolveEffectiveClientId();
+    if (activeClientId) {
+      const client = await prisma.whatsAppClient.findUnique({
+        where: { id: activeClientId },
+        select: { monthlyMessageQuota: true, messagesUsedCount: true, subscriptionStatus: true }
+      });
+      if (client) {
+        if (client.subscriptionStatus === "BLOCKED") {
+          return { success: false, error: "Broadcast disabled: Client subscription is currently blocked. Please contact admin." };
+        }
+        const quota = client.monthlyMessageQuota || 5000;
+        const used = client.messagesUsedCount || 0;
+        const remaining = Math.max(0, quota - used);
+        if (data.totalAudience > remaining) {
+          return {
+            success: false,
+            error: `Broadcast audience (${data.totalAudience}) exceeds your remaining monthly message quota (${remaining} of ${quota}). Please upgrade plan or top-up quota.`
+          };
+        }
+        // Increment message usage count
+        await prisma.whatsAppClient.update({
+          where: { id: activeClientId },
+          data: { messagesUsedCount: { increment: data.totalAudience } }
+        });
+      }
+    }
 
+    const campaign = await prisma.whatsAppCampaign.create({
       data: {
         name: data.name,
         templateId: data.templateId,
@@ -11569,3 +11591,56 @@ export async function searchAvailableCustomersForTagAction(params: {
     return { success: false, error: e.message, customers: [] };
   }
 }
+
+// ---------------------------------------------------------
+// 19. CHATBOT FLOW EXECUTION LOGS & TELEMETRY
+// ---------------------------------------------------------
+
+export async function getWhatsAppChatbotLogsAction(filters?: {
+  flowId?: string;
+  phone?: string;
+  nodeType?: string;
+  limit?: number;
+} | string) {
+  try {
+    const activeClientId = await resolveEffectiveClientId();
+    const filterObj = typeof filters === "string" ? { phone: filters } : (filters || {});
+    const limit = typeof filters === "string" ? 50 : Math.min(filterObj.limit || 50, 200);
+
+    const whereClause: any = {};
+    if (activeClientId) {
+      whereClause.clientId = activeClientId;
+    }
+    if (filterObj.phone) {
+      whereClause.phone = { contains: filterObj.phone.replace(/\D/g, '').slice(-10) };
+    }
+    if (filterObj.nodeType && filterObj.nodeType !== 'ALL') {
+      whereClause.nodeType = filterObj.nodeType;
+    }
+
+    const logs = await prisma.whatsAppChatbotLog.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      take: limit
+    });
+
+    return { success: true, logs };
+  } catch (e: any) {
+    return { success: false, error: e.message, logs: [] };
+  }
+}
+
+export async function clearWhatsAppChatbotLogsAction() {
+  try {
+    const activeClientId = await resolveEffectiveClientId();
+    const whereClause: any = {};
+    if (activeClientId) {
+      whereClause.clientId = activeClientId;
+    }
+    await prisma.whatsAppChatbotLog.deleteMany({ where: whereClause });
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
