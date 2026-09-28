@@ -93,22 +93,24 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
 
   const pricingTiers = [
     {
-      id: "STARTER",
-      name: "Starter",
-      badge: "Getting Started",
-      monthlyPrice: 999,
-      annualPrice: 799,
-      description: "Ideal for growing direct-to-consumer stores launching WhatsApp automations.",
+      id: "BASIC",
+      name: "Basic",
+      badge: "Starter Launch Offer",
+      monthlyPrice: 1999,
+      annualPrice: 1499,
+      couponNote: "Use code SAVE500 for ₹500 OFF",
+      description: "Perfect for small retailers & support teams launching multi-agent WhatsApp chat & visual chatbots.",
       messages: "5,000",
-      aiReplies: "500",
-      agents: "3 Agents",
+      aiReplies: "Included in Growth",
+      agents: "5 Agents (incl. Admin)",
       features: [
         "Official Meta Cloud API v21.0 WABA",
-        "Multi-Agent Unified Inbox",
-        "Pincode & Delivery Address Auto-Fetch",
-        "Basic WhatsApp Interactive Catalog",
-        "Automated Order Confirmation & Tracking",
-        "Canned Responses & Quick Replies"
+        "5 Multi-Agent Unified Team Inbox",
+        "Visual Drag-and-Drop Chatbot Builder",
+        "Keyword Triggers & Auto-Replies",
+        "Canned Responses & Quick Shortcuts",
+        "Meta Approved Template Messaging",
+        "Embeddable Website Chat Widget"
       ],
       popular: false
     },
@@ -116,61 +118,44 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
       id: "GROWTH",
       name: "Growth",
       badge: "Most Popular 🔥",
-      monthlyPrice: 2499,
-      annualPrice: 1999,
-      description: "Comprehensive AI sales agent, catalog checkout, and Shopify sync for scaling brands.",
+      monthlyPrice: 3499,
+      annualPrice: 2799,
+      couponNote: "All-in-one Commerce & AI",
+      description: "Complete WhatsApp E-Commerce powerhouse with autonomous AI sales agent, catalog checkout, and Shopify sync.",
       messages: "25,000",
-      aiReplies: "2,500",
+      aiReplies: "2,500 AI Replies",
       agents: "10 Agents",
       features: [
-        "Everything in Starter, plus:",
-        "Gemini 3.8 AI Autonomous Sales Copilot",
-        "Real-Time Shopify Bi-Directional Sync",
-        "Automated WhatsApp Abandoned Cart Recovery",
-        "Native WhatsApp Flows for COD Verification",
-        "Cashfree & Razorpay In-Chat UPI Links",
-        "Hyper-Targeted Broadcast Campaigns"
+        "Everything in Basic, plus:",
+        "Smart AI Auto-Pilot Sales Agent (Gemini 3.8)",
+        "Real-Time Shopify Bi-Directional Store Sync",
+        "Native WhatsApp Interactive Catalog Checkout",
+        "Cashfree & Razorpay In-Chat UPI QR & Links",
+        "Automated Token Advance Partial COD Engine",
+        "Hyper-Targeted Bulk Broadcast Campaigns",
+        "AI Message Copilot & Suggestion Engine"
       ],
       popular: true
     },
     {
-      id: "BUSINESS",
-      name: "Business",
-      badge: "High Velocity",
-      monthlyPrice: 4999,
-      annualPrice: 3999,
-      description: "High-volume D2C brands requiring advanced CTWA ad attribution and custom rules.",
-      messages: "75,000",
-      aiReplies: "7,500",
-      agents: "25 Agents",
+      id: "ENTERPRISE",
+      name: "Enterprise VIP",
+      badge: "Scale & High ROAS 🚀",
+      monthlyPrice: 7499,
+      annualPrice: 5999,
+      couponNote: "Full Suite & Dedicated VIP",
+      description: "Full scale for high-growth brands with server-side Meta CAPI, screen co-browsing, and developer APIs.",
+      messages: "100,000+",
+      aiReplies: "15,000 AI Replies",
+      agents: "100 / Unlimited Agents",
       features: [
         "Everything in Growth, plus:",
-        "Meta Click-to-WhatsApp (CTWA) Pixel CAPI",
-        "Partial COD Advance Payment Engine",
-        "Multi-Branch & Warehouse Routing",
-        "Custom Automated Drip Sequences",
-        "Dedicated Account Sentinel & Webhook Healing",
-        "Priority 24/7 SLA Support"
-      ],
-      popular: false
-    },
-    {
-      id: "ENTERPRISE",
-      name: "Enterprise",
-      badge: "Wholesale & Custom",
-      monthlyPrice: 9999,
-      annualPrice: 7999,
-      description: "Custom message throughput, custom ERP integrations, and dedicated account manager.",
-      messages: "250,000+",
-      aiReplies: "Unlimited",
-      agents: "Unlimited",
-      features: [
-        "Everything in Business, plus:",
-        "Custom System Prompts & Dedicated Fine-Tuning",
-        "Custom ERP / Tally / Unicommerce Sync",
-        "Dedicated Meta Direct Tier Management",
-        "Custom Multi-Tenant White-Label Options",
-        "Custom SLA & Dedicated Solutions Architect"
+        "Meta Pixel & Conversions API (CAPI) Tracking",
+        "Live Screen Co-Browsing & Real-Time Visitor Assist",
+        "Developer REST API & Outbound Webhooks",
+        "Automated Meta Custom Audience Sync",
+        "Custom CRM & ERP Webhook Integrations",
+        "Dedicated Account Manager & Priority 24/7 SLA"
       ],
       popular: false
     }
@@ -684,31 +669,31 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {pricingTiers.map((tier) => {
               const price = billingCycle === "ANNUALLY" ? tier.annualPrice : tier.monthlyPrice;
               return (
                 <div
                   key={tier.id}
-                  className={`p-6 rounded-3xl bg-slate-900 border flex flex-col justify-between transition-all relative ${
+                  className={`p-7 rounded-3xl bg-slate-900 border flex flex-col justify-between transition-all relative ${
                     tier.popular
-                      ? `${isWhatIn ? "border-emerald-500/80 shadow-emerald-500/10" : "border-indigo-500/80 shadow-indigo-500/10"} shadow-2xl scale-[1.02]`
+                      ? `${isWhatIn ? "border-emerald-500/80 shadow-emerald-500/10" : "border-indigo-500/80 shadow-indigo-500/10"} shadow-2xl scale-[1.03]`
                       : "border-slate-800 hover:border-slate-700"
                   }`}
                 >
                   {tier.popular && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white bg-gradient-to-r from-indigo-500 to-purple-600 shadow-md">
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white bg-gradient-to-r from-indigo-500 to-purple-600 shadow-md">
                       {tier.badge}
                     </div>
                   )}
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-black text-white">{tier.name}</h3>
-                      <span className="text-[11px] font-bold text-slate-400 font-mono">{tier.agents}</span>
+                      <h3 className="text-xl font-black text-white">{tier.name}</h3>
+                      <span className="text-xs font-bold text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-lg border border-indigo-500/20">{tier.agents}</span>
                     </div>
 
-                    <p className="text-[11px] text-slate-400 mb-4 min-h-[34px] leading-relaxed">
+                    <p className="text-xs text-slate-400 mb-4 min-h-[36px] leading-relaxed">
                       {tier.description}
                     </p>
 
@@ -717,8 +702,13 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
                         ₹{price.toLocaleString()}
                         <span className="text-xs font-normal text-slate-400">/month</span>
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        Includes <b>{tier.messages}</b> messages & <b>{tier.aiReplies}</b> AI tokens
+                      {tier.id === "BASIC" && (
+                        <div className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl mt-2 inline-block">
+                          🎟️ Launch Offer: Use <b>SAVE500</b> for ₹500 OFF (₹1,499)
+                        </div>
+                      )}
+                      <div className="text-[11px] text-slate-400 mt-1.5">
+                        Includes <b>{tier.messages}</b> messages & <b>{tier.aiReplies}</b>
                       </div>
                     </div>
 
