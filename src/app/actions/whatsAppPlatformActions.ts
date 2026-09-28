@@ -4088,6 +4088,40 @@ export async function getWhatsAppChatbotFlows() {
   }
 }
 
+export async function verifyClientModuleAccess(moduleKey: import("@/lib/moduleRegistry").ModuleKey, actionName?: string): Promise<{ allowed: boolean; clientId: string | null; error?: string }> {
+  const user = await getAuthenticatedUser().catch(() => null);
+  const isOwner = await isOwnerAuthenticated();
+
+  if (isOwner || user?.role === 'OWNER' || user?.role === 'SUPER_ADMIN') {
+    return { allowed: true, clientId: null };
+  }
+
+  const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+  const client = await prisma.whatsAppClient.findUnique({
+    where: { id: targetClientId },
+    select: { enabledModules: true, subscriptionStatus: true }
+  });
+
+  if (client?.subscriptionStatus === "BLOCKED") {
+    return { allowed: false, clientId: targetClientId, error: "Your organization account is suspended/blocked. Please contact support." };
+  }
+
+  const { parseEnabledModules, MASTER_MODULES } = await import("@/lib/moduleRegistry");
+  const enabledModules = parseEnabledModules(client?.enabledModules);
+
+  if (!enabledModules.includes(moduleKey)) {
+    const modDef = MASTER_MODULES[moduleKey];
+    const modName = modDef ? modDef.name : moduleKey;
+    return {
+      allowed: false,
+      clientId: targetClientId,
+      error: `Feature Locked: [${modName}] is disabled on your subscription plan. Please upgrade to access this functionality.`
+    };
+  }
+
+  return { allowed: true, clientId: targetClientId };
+}
+
 export async function saveWhatsAppChatbotFlowAction(data: {
   id?: string;
   name: string;
@@ -4096,6 +4130,65 @@ export async function saveWhatsAppChatbotFlowAction(data: {
   isActive?: boolean;
 }) {
   try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    const isOwner = await isOwnerAuthenticated();
+
+    if (!isOwner && (!user || (user.role !== 'ADMIN' && user.role !== 'OWNER' && user.role !== 'SUPER_ADMIN'))) {
+      return { success: false, error: "Unauthorized access: Admin privileges required" };
+    }
+
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const client = await prisma.whatsAppClient.findUnique({
+      where: { id: targetClientId },
+      select: { enabledModules: true, subscriptionStatus: true }
+    });
+
+    if (client?.subscriptionStatus === "BLOCKED") {
+      return { success: false, error: "Your organization account is suspended/blocked. Please contact support." };
+    }
+
+    const { parseEnabledModules, validateFlowNodesModules, ALL_MODULE_KEYS } = await import("@/lib/moduleRegistry");
+    const enabledModules = isOwner ? ALL_MODULE_KEYS : parseEnabledModules(client?.enabledModules);
+
+    // 1. Verify CHATBOT module is enabled
+    if (!enabledModules.includes("CHATBOT")) {
+      return { success: false, error: "Chatbot builder module is disabled on your subscription plan. Please upgrade." };
+    }
+
+    // 2. Parse nodes and validate node-level module permissions
+    let parsedNodes: any[] = [];
+    try {
+      parsedNodes = JSON.parse(data.nodesJson);
+    } catch {
+      return { success: false, error: "Invalid JSON format for flow nodes." };
+    }
+
+    if (!Array.isArray(parsedNodes)) {
+      return { success: false, error: "Chatbot nodes must be an array." };
+    }
+
+    const moduleValidation = validateFlowNodesModules(parsedNodes, enabledModules);
+    if (!moduleValidation.isValid) {
+      return {
+        success: false,
+        error: `Cannot save flow: ${moduleValidation.violations.join(" ")} Please upgrade your subscription plan.`
+      };
+    }
+
+    // 3. If publishing live (isActive = true), enforce structural integrity
+    if (data.isActive) {
+      const triggerNode = parsedNodes.find((n: any) => (n.type || '').toUpperCase() === "TRIGGER");
+      if (!triggerNode) {
+        return { success: false, error: "Cannot publish: Missing 'Flow Trigger' block. A trigger block is required." };
+      }
+      if (!data.triggerKeyword?.trim() && !triggerNode.triggerKeywords?.trim()) {
+        return { success: false, error: "Cannot publish: Trigger keywords cannot be empty." };
+      }
+      if (!triggerNode.outputPort) {
+        return { success: false, error: "Cannot publish: Flow Trigger block is not connected to any starting block." };
+      }
+    }
+
     let flow;
     if (data.id) {
       flow = await prisma.whatsAppChatbotFlow.update({
@@ -4111,6 +4204,7 @@ export async function saveWhatsAppChatbotFlowAction(data: {
     } else {
       flow = await prisma.whatsAppChatbotFlow.create({
         data: {
+          clientId: user?.clientId || null,
           name: data.name,
           triggerKeyword: data.triggerKeyword || "HI, HELLO, CATALOG",
           nodesJson: data.nodesJson,
@@ -4120,6 +4214,7 @@ export async function saveWhatsAppChatbotFlowAction(data: {
       });
     }
     revalidatePath('/whatsapp/chatbot-builder');
+    revalidatePath('/whatsapp/chatbots');
     return { success: true, flow };
   } catch (e: any) {
     return { success: false, error: e.message };
@@ -4158,6 +4253,11 @@ export async function renameWhatsAppChatbotFlowAction(id: string, name: string) 
 
 export async function duplicateWhatsAppChatbotFlowAction(id: string) {
   try {
+    const moduleCheck = await verifyClientModuleAccess("CHATBOT", "Duplicate Chatbot Flow");
+    if (!moduleCheck.allowed) {
+      return { success: false, error: moduleCheck.error };
+    }
+
     const existing = await prisma.whatsAppChatbotFlow.findUnique({
       where: { id }
     });
@@ -4168,6 +4268,7 @@ export async function duplicateWhatsAppChatbotFlowAction(id: string) {
 
     const cloned = await prisma.whatsAppChatbotFlow.create({
       data: {
+        clientId: existing.clientId || null,
         name: `${existing.name} (Copy)`,
         triggerKeyword: existing.triggerKeyword,
         nodesJson: existing.nodesJson,
@@ -4177,6 +4278,7 @@ export async function duplicateWhatsAppChatbotFlowAction(id: string) {
     });
 
     revalidatePath('/whatsapp/chatbot-builder');
+    revalidatePath('/whatsapp/chatbots');
     return { success: true, flow: cloned };
   } catch (e: any) {
     return { success: false, error: e.message };
@@ -4185,16 +4287,53 @@ export async function duplicateWhatsAppChatbotFlowAction(id: string) {
 
 export async function toggleWhatsAppChatbotFlowStatusAction(id: string, isActive: boolean) {
   try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    const isOwner = await isOwnerAuthenticated();
+
+    if (!isOwner && (!user || (user.role !== 'ADMIN' && user.role !== 'OWNER' && user.role !== 'SUPER_ADMIN'))) {
+      return { success: false, error: "Unauthorized access: Admin privileges required" };
+    }
+
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const client = await prisma.whatsAppClient.findUnique({
+      where: { id: targetClientId },
+      select: { enabledModules: true, subscriptionStatus: true }
+    });
+
+    const { parseEnabledModules, validateFlowNodesModules, ALL_MODULE_KEYS } = await import("@/lib/moduleRegistry");
+    const enabledModules = isOwner ? ALL_MODULE_KEYS : parseEnabledModules(client?.enabledModules);
+
+    if (!enabledModules.includes("CHATBOT")) {
+      return { success: false, error: "Chatbot module is disabled on your subscription plan." };
+    }
+
+    if (isActive) {
+      const existing = await prisma.whatsAppChatbotFlow.findUnique({ where: { id } });
+      if (!existing) return { success: false, error: "Chatbot flow not found" };
+
+      let parsedNodes: any[] = [];
+      try { parsedNodes = JSON.parse(existing.nodesJson); } catch {}
+      const moduleValidation = validateFlowNodesModules(parsedNodes, enabledModules);
+      if (!moduleValidation.isValid) {
+        return {
+          success: false,
+          error: `Cannot activate flow: ${moduleValidation.violations.join(" ")} Please upgrade your subscription plan.`
+        };
+      }
+    }
+
     const flow = await prisma.whatsAppChatbotFlow.update({
       where: { id },
       data: { isActive, updatedAt: new Date() }
     });
     revalidatePath('/whatsapp/chatbot-builder');
+    revalidatePath('/whatsapp/chatbots');
     return { success: true, flow };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
 }
+
 
 export async function getWhatsAppForms() {
   try {
@@ -4271,7 +4410,13 @@ export async function createWhatsAppBroadcastCampaign(data: {
   totalAudience: number;
 }) {
   try {
+    const moduleCheck = await verifyClientModuleAccess("BROADCASTS", "Create Broadcast Campaign");
+    if (!moduleCheck.allowed) {
+      return { success: false, error: moduleCheck.error };
+    }
+
     const campaign = await prisma.whatsAppCampaign.create({
+
       data: {
         name: data.name,
         templateId: data.templateId,
@@ -4792,7 +4937,13 @@ export async function launchWhatsAppBroadcastAction(data: {
   dripStepNumber?: number;
 }) {
   try {
+    const moduleCheck = await verifyClientModuleAccess("BROADCASTS", "Launch WhatsApp Broadcast Campaign");
+    if (!moduleCheck.allowed) {
+      return { success: false, error: moduleCheck.error };
+    }
+
     let contactsToQueue: Array<{
+
       toPhone: string;
       customerName: string;
       customerCity: string;
@@ -5321,6 +5472,31 @@ export async function saveWhatsAppSettingsAction(data: {
   metaCapiLeadValue?: number;
 }) {
   try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    const isOwner = await isOwnerAuthenticated();
+
+    if (!isOwner && (!user || (user.role !== 'ADMIN' && user.role !== 'OWNER' && user.role !== 'SUPER_ADMIN'))) {
+      return { success: false, error: "Unauthorized access: Admin privileges required" };
+    }
+
+    if (!isOwner) {
+      const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+      const client = await prisma.whatsAppClient.findUnique({
+        where: { id: targetClientId },
+        select: { enabledModules: true }
+      });
+      const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+      const enabledModules = parseEnabledModules(client?.enabledModules);
+
+      if ((data.geminiApiKey || data.aiSystemPrompt || data.aiModel) && !enabledModules.includes("AI_AGENT")) {
+        return { success: false, error: "AI Auto-Pilot & Knowledge Base module is disabled on your subscription plan." };
+      }
+
+      if (data.metaCapiLeadValue !== undefined && !enabledModules.includes("META_PIXEL_CAPI")) {
+        return { success: false, error: "Meta Pixel & CAPI Ad Tracking module is disabled on your subscription plan." };
+      }
+    }
+
     let settings = await prisma.whatsAppSettings.findFirst();
     if (!settings) {
       settings = await prisma.whatsAppSettings.create({ data });
@@ -5337,6 +5513,7 @@ export async function saveWhatsAppSettingsAction(data: {
     return { success: false, error: error.message };
   }
 }
+
 
 // ---------------------------------------------------------
 // 15. SECURE UPLOAD MEDIA TO META
@@ -6091,6 +6268,18 @@ export async function getActiveCatalogPlatformAction() {
 
 export async function switchActiveCatalogPlatformAction(targetPlatform: 'META' | 'SHOPIFY', cleanupMode: 'deactivate' | 'delete' = 'deactivate') {
   try {
+    if (targetPlatform === 'META') {
+      const moduleCheck = await verifyClientModuleAccess("META_CATALOG", "Switch to Meta Catalog");
+      if (!moduleCheck.allowed) {
+        return { success: false, error: moduleCheck.error };
+      }
+    } else if (targetPlatform === 'SHOPIFY') {
+      const moduleCheck = await verifyClientModuleAccess("SHOPIFY_INTEGRATION", "Switch to Shopify Store");
+      if (!moduleCheck.allowed) {
+        return { success: false, error: moduleCheck.error };
+      }
+    }
+
     const referencedQuotes = await prisma.quotationItem.findMany({ select: { productId: true } });
     const referencedOrders = await prisma.orderItem.findMany({ select: { productId: true } });
     const safeRefIds = new Set([
@@ -6219,12 +6408,18 @@ export async function getMetaCatalogStatusAction() {
 
 export async function syncMetaCatalogProductsAction(options?: { cleanupPrevious?: 'deactivate' | 'delete' | 'none' }) {
   try {
+    const moduleCheck = await verifyClientModuleAccess("META_CATALOG", "Sync Meta Catalog Products");
+    if (!moduleCheck.allowed) {
+      return { success: false, error: moduleCheck.error };
+    }
+
     const integration = await prisma.whatsAppIntegration.findFirst({
       where: { type: 'META_CATALOG', isActive: true }
     });
     if (!integration || !integration.url || !integration.token) {
       return { success: false, error: "No active Meta Product Catalog integration found. Connect it in Integrations first." };
     }
+
     const catalogId = integration.url.trim();
     const token = integration.token.trim();
 
@@ -6420,9 +6615,17 @@ export async function createAndPushCatalogProductAction(data: {
       pushToMeta = true
     } = data;
 
+    if (pushToMeta) {
+      const moduleCheck = await verifyClientModuleAccess("META_CATALOG", "Push Product to Meta Catalog");
+      if (!moduleCheck.allowed) {
+        return { success: false, error: moduleCheck.error };
+      }
+    }
+
     if (!title || !baseSku) {
       return { success: false, error: "Product title and Base SKU are required." };
     }
+
 
     const createdProducts: any[] = [];
     const itemsToCreate = variants && variants.length > 0 ? variants : [
@@ -6604,8 +6807,14 @@ export async function createAndPushCatalogProductAction(data: {
 
 export async function pushSingleProductToMetaAction(productId: string) {
   try {
+    const moduleCheck = await verifyClientModuleAccess("META_CATALOG", "Push Product to Meta Catalog");
+    if (!moduleCheck.allowed) {
+      return { success: false, error: moduleCheck.error };
+    }
+
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) return { success: false, error: "Product not found" };
+
 
     const integration = await prisma.whatsAppIntegration.findFirst({
       where: { type: 'META_CATALOG', isActive: true }
@@ -10342,10 +10551,16 @@ export async function getWhatsAppCommerceStatusAction() {
  */
 export async function linkMetaCatalogToWhatsAppAction(overrideCatalogId?: string) {
   try {
+    const moduleCheck = await verifyClientModuleAccess("META_CATALOG", "Link Meta WhatsApp Catalog");
+    if (!moduleCheck.allowed) {
+      return { success: false, error: moduleCheck.error };
+    }
+
     const account = await prisma.whatsAppAccount.findFirst();
     if (!account?.accessToken || !account?.phoneId) {
       return { success: false, error: "WhatsApp account credentials missing" };
     }
+
 
     let targetCatalogId = overrideCatalogId;
     if (!targetCatalogId) {

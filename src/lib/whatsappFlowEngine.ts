@@ -102,9 +102,16 @@ async function resolveMetaImageHeader(imageUrl: string, creds: { token: string; 
 }
 
 // Dispatch a single flow node as a WhatsApp message
-async function dispatchNode(toPhone: string, node: any, vars: Record<string, string>, conversationId?: string) {
+async function dispatchNode(toPhone: string, node: any, vars: Record<string, string>, conversationId?: string, enabledModules?: string[]) {
   const inter = (s: string) => interpolate(s, vars);
   const type = (node.type || '').toUpperCase();
+
+  // Modular Feature Gating Check for dispatchable nodes
+  if ((type === 'CATALOG' || type === 'PRODUCTS') && enabledModules && !enabledModules.includes('META_CATALOG') && !enabledModules.includes('SHOPIFY_INTEGRATION')) {
+    console.warn(`[FlowEngine] Catalog dispatch skipped: META_CATALOG module is locked on client subscription plan.`);
+    return;
+  }
+
 
   try {
     const creds = await getCreds();
@@ -403,7 +410,15 @@ async function getCreds() {
 }
 
 // Run nodes sequentially until a pause point or end
-async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, string>, toPhone: string, conversationId?: string, wasClosed: boolean = false) {
+async function runNodes(
+  nodes: any[], 
+  startNodeId: string, 
+  vars: Record<string, string>, 
+  toPhone: string, 
+  conversationId?: string, 
+  wasClosed: boolean = false,
+  enabledModules?: string[]
+) {
   let nextNodeId: string | null = startNodeId;
 
   while (nextNodeId) {
@@ -427,7 +442,7 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
       });
     } catch(e) {}
 
-    await dispatchNode(toPhone, node, vars, conversationId);
+    await dispatchNode(toPhone, node, vars, conversationId, enabledModules);
 
     // CRM Logic
     if (type === 'CRM_CONTACT' || type === 'CRM_LEAD') {
@@ -499,72 +514,89 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
           }
 
           if (type === 'CRM_LEAD' && finalWebhookUrl) {
-            try {
-              const headers: Record<string, string> = {
-                'Content-Type': 'application/json'
-              };
-              if (finalWebhookAuth) {
-                headers['Authorization'] = finalWebhookAuth;
-              }
-              
-              const payload = {
-                name: vars['name'] || customer?.contactPerson || customer?.businessName || 'Unknown',
-                whatsappNumber: cleanPhone,
-                shopName: vars['shopName'] || customer?.shopName || '',
-                agentEmail: conv?.assignedEmployee?.user?.email || ''
-              };
-
-              console.log(`[CRM_LEAD Webhook] Triggering webhook: ${finalWebhookUrl}`);
-              
-              // Helper to write DB logs
-              const writeLog = async (status: number | null, desc: string, errMsg: string | null) => {
-                await prisma.whatsAppChatbotLog.create({
-                  data: {
-                    phone: cleanPhone,
-                    conversationId: conv?.id || null,
-                    nodeId: node.id || "CRM_LEAD_NODE",
-                    nodeType: "CRM_LEAD",
-                    actionDesc: desc,
-                    payload: payload,
-                    responseStatus: status,
-                    errorMessage: errMsg
-                  }
-                });
-              };
-
-              const whRes = await fetch(finalWebhookUrl, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(payload)
-              });
-
-              if (whRes.status === 409) {
-                console.log(`[CRM_LEAD Webhook] 409 Conflict: Lead already exists in ERP. Continuing flow.`);
-                await writeLog(409, `CRM Webhook: Lead already exists in ERP (Continuing flow)`, null);
-                // Do NOT send internal error message to customer and do NOT break flow
-              } else if (whRes.status === 201 || whRes.status === 200) {
-                console.log(`[CRM_LEAD Webhook] ${whRes.status} Created.`);
-                await writeLog(whRes.status, `CRM Webhook Success`, null);
-              } else {
-                let responseBody = "";
-                try { responseBody = await whRes.text(); } catch(e) {}
-                console.log(`[CRM_LEAD Webhook] Status code: ${whRes.status}`);
-                await writeLog(whRes.status, `CRM Webhook Response (${whRes.status})`, responseBody.slice(0, 500));
-              }
-            } catch (err: any) {
-              console.error(`[CRM_LEAD Webhook] Error:`, err);
+            // Check DEVELOPER_API module
+            if (enabledModules && !enabledModules.includes('DEVELOPER_API')) {
+              console.warn(`[CRM_LEAD Webhook] Blocked at runtime: DEVELOPER_API module is locked on client subscription plan.`);
               await prisma.whatsAppChatbotLog.create({
                 data: {
-                  phone: toPhone.replace(/\D/g, '').slice(-10),
-                  conversationId: conversationId || null,
+                  phone: cleanPhone,
+                  conversationId: conv?.id || null,
                   nodeId: node.id || "CRM_LEAD_NODE",
                   nodeType: "CRM_LEAD",
-                  actionDesc: `CRM Webhook Network Error`,
+                  actionDesc: `CRM Webhook Skipped (DEVELOPER_API module locked)`,
                   payload: {},
-                  responseStatus: null,
-                  errorMessage: err.message
+                  responseStatus: 403,
+                  errorMessage: "DEVELOPER_API module locked on plan"
                 }
               });
+            } else {
+              try {
+                const headers: Record<string, string> = {
+                  'Content-Type': 'application/json'
+                };
+                if (finalWebhookAuth) {
+                  headers['Authorization'] = finalWebhookAuth;
+                }
+                
+                const payload = {
+                  name: vars['name'] || customer?.contactPerson || customer?.businessName || 'Unknown',
+                  whatsappNumber: cleanPhone,
+                  shopName: vars['shopName'] || customer?.shopName || '',
+                  agentEmail: conv?.assignedEmployee?.user?.email || ''
+                };
+
+                console.log(`[CRM_LEAD Webhook] Triggering webhook: ${finalWebhookUrl}`);
+                
+                // Helper to write DB logs
+                const writeLog = async (status: number | null, desc: string, errMsg: string | null) => {
+                  await prisma.whatsAppChatbotLog.create({
+                    data: {
+                      phone: cleanPhone,
+                      conversationId: conv?.id || null,
+                      nodeId: node.id || "CRM_LEAD_NODE",
+                      nodeType: "CRM_LEAD",
+                      actionDesc: desc,
+                      payload: payload,
+                      responseStatus: status,
+                      errorMessage: errMsg
+                    }
+                  });
+                };
+
+                const whRes = await fetch(finalWebhookUrl, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify(payload)
+                });
+
+                if (whRes.status === 409) {
+                  console.log(`[CRM_LEAD Webhook] 409 Conflict: Lead already exists in ERP. Continuing flow.`);
+                  await writeLog(409, `CRM Webhook: Lead already exists in ERP (Continuing flow)`, null);
+                  // Do NOT send internal error message to customer and do NOT break flow
+                } else if (whRes.status === 201 || whRes.status === 200) {
+                  console.log(`[CRM_LEAD Webhook] ${whRes.status} Created.`);
+                  await writeLog(whRes.status, `CRM Webhook Success`, null);
+                } else {
+                  let responseBody = "";
+                  try { responseBody = await whRes.text(); } catch(e) {}
+                  console.log(`[CRM_LEAD Webhook] Status code: ${whRes.status}`);
+                  await writeLog(whRes.status, `CRM Webhook Response (${whRes.status})`, responseBody.slice(0, 500));
+                }
+              } catch (err: any) {
+                console.error(`[CRM_LEAD Webhook] Error:`, err);
+                await prisma.whatsAppChatbotLog.create({
+                  data: {
+                    phone: toPhone.replace(/\D/g, '').slice(-10),
+                    conversationId: conversationId || null,
+                    nodeId: node.id || "CRM_LEAD_NODE",
+                    nodeType: "CRM_LEAD",
+                    actionDesc: `CRM Webhook Network Error`,
+                    payload: {},
+                    responseStatus: null,
+                    errorMessage: err.message
+                  }
+                });
+              }
             }
           }
 
@@ -572,162 +604,175 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
           console.error("CRM Update Node Error:", e);
         }
     } else if (type === 'META_CAPI') {
-      try {
-        const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
-        let integration = node.integrationId 
-          ? await prisma.whatsAppIntegration.findUnique({ where: { id: node.integrationId } })
-          : await prisma.whatsAppIntegration.findFirst({ where: { type: 'META_CAPI', isActive: true } });
+      if (enabledModules && !enabledModules.includes('META_PIXEL_CAPI')) {
+        console.warn(`[Meta CAPI Node] Blocked at runtime: META_PIXEL_CAPI module is locked on client subscription plan.`);
+      } else {
+        try {
+          const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
+          let integration = node.integrationId 
+            ? await prisma.whatsAppIntegration.findUnique({ where: { id: node.integrationId } })
+            : await prisma.whatsAppIntegration.findFirst({ where: { type: 'META_CAPI', isActive: true } });
 
-        if (integration && integration.isActive) {
-          const pixelId = integration.url ? integration.url.trim() : '';
-          const accessToken = integration.token ? integration.token.trim() : '';
-          const eventName = node.eventName || 'Lead';
-          const testCode = node.testEventCode ? node.testEventCode.trim() : '';
-          const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          if (integration && integration.isActive) {
+            const pixelId = integration.url ? integration.url.trim() : '';
+            const accessToken = integration.token ? integration.token.trim() : '';
+            const eventName = node.eventName || 'Lead';
+            const testCode = node.testEventCode ? node.testEventCode.trim() : '';
+            const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-          if (pixelId && accessToken) {
-            const crypto = require('crypto');
-            const hashedPhone = crypto.createHash('sha256').update(cleanPhone).digest('hex');
+            if (pixelId && accessToken) {
+              const crypto = require('crypto');
+              const hashedPhone = crypto.createHash('sha256').update(cleanPhone).digest('hex');
 
-            const queryParam = testCode ? `?test_event_code=${encodeURIComponent(testCode)}` : '';
-            const capiUrl = `https://graph.facebook.com/v20.0/${pixelId}/events${queryParam}`;
-            
-            const eventObj: any = {
-              event_name: eventName,
-              event_time: Math.floor(Date.now() / 1000),
-              event_id: eventId,
-              action_source: "business_messaging",
-              messaging_channel: "whatsapp",
-              user_data: {
-                ph: [hashedPhone]
-              },
-              custom_data: {
-                currency: node.currency || "INR",
-                value: node.eventValue !== undefined && node.eventValue !== null ? Number(node.eventValue) : 1000
+              const queryParam = testCode ? `?test_event_code=${encodeURIComponent(testCode)}` : '';
+              const capiUrl = `https://graph.facebook.com/v20.0/${pixelId}/events${queryParam}`;
+              
+              const eventObj: any = {
+                event_name: eventName,
+                event_time: Math.floor(Date.now() / 1000),
+                event_id: eventId,
+                action_source: "business_messaging",
+                messaging_channel: "whatsapp",
+                user_data: {
+                  ph: [hashedPhone]
+                },
+                custom_data: {
+                  currency: node.currency || "INR",
+                  value: node.eventValue !== undefined && node.eventValue !== null ? Number(node.eventValue) : 1000
+                }
+              };
+
+              const payload: any = {
+                data: [eventObj],
+                access_token: accessToken
+              };
+
+              if (testCode) {
+                payload.test_event_code = testCode;
               }
-            };
 
-            const payload: any = {
-              data: [eventObj],
-              access_token: accessToken
-            };
+              console.log(`[Meta CAPI Engine] Sending ${eventName} event (₹${eventObj.custom_data.value}) to Meta Pixel ${pixelId} (Business Messaging)...`);
+              const capiRes = await fetch(capiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
 
-            if (testCode) {
-              payload.test_event_code = testCode;
+              const resData = await capiRes.json();
+              console.log(`[Meta CAPI Engine] Response:`, resData);
+
+              await prisma.whatsAppChatbotLog.create({
+                data: {
+                  phone: cleanPhone,
+                  conversationId: conversationId || null,
+                  nodeId: node.id || "META_CAPI_NODE",
+                  nodeType: "META_CAPI",
+                  actionDesc: `Meta CAPI ${eventName} event sent (₹${eventObj.custom_data.value} INR)`,
+                  payload: payload,
+                  responseStatus: capiRes.status,
+                  errorMessage: capiRes.ok ? null : JSON.stringify(resData)
+                }
+              });
             }
-
-            console.log(`[Meta CAPI Engine] Sending ${eventName} event (₹${eventObj.custom_data.value}) to Meta Pixel ${pixelId} (Business Messaging)...`);
-            const capiRes = await fetch(capiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-
-            const resData = await capiRes.json();
-            console.log(`[Meta CAPI Engine] Response:`, resData);
-
-            await prisma.whatsAppChatbotLog.create({
-              data: {
-                phone: cleanPhone,
-                conversationId: conversationId || null,
-                nodeId: node.id || "META_CAPI_NODE",
-                nodeType: "META_CAPI",
-                actionDesc: `Meta CAPI ${eventName} event sent (₹${eventObj.custom_data.value} INR)`,
-                payload: payload,
-                responseStatus: capiRes.status,
-                errorMessage: capiRes.ok ? null : JSON.stringify(resData)
-              }
-            });
           }
+        } catch (err: any) {
+          console.error(`[Meta CAPI Node] Error:`, err);
         }
-      } catch (err: any) {
-        console.error(`[Meta CAPI Node] Error:`, err);
       }
     } else if (type === 'META_CTWA_AD') {
-      try {
-        const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
-        console.log(`[Meta CTWA Ad Node] Capturing Ad Attribution for ${cleanPhone}...`);
-        
-        await prisma.whatsAppChatbotLog.create({
-          data: {
-            phone: cleanPhone,
-            conversationId: conversationId || null,
-            nodeId: node.id || "META_CTWA_AD_NODE",
-            nodeType: "META_CTWA_AD",
-            actionDesc: `Meta CTWA Ad Attribution Captured (Ad ID & Headline)`,
-            payload: { phone: cleanPhone, nodeTitle: node.title || "CTWA Ad Attribution" },
-            responseStatus: 200,
-            errorMessage: null
-          }
-        });
-      } catch (err: any) {
-        console.error(`[Meta CTWA Ad Node] Error:`, err);
+      if (enabledModules && !enabledModules.includes('META_PIXEL_CAPI')) {
+        console.warn(`[Meta CTWA Ad Node] Blocked at runtime: META_PIXEL_CAPI module is locked on client subscription plan.`);
+      } else {
+        try {
+          const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
+          console.log(`[Meta CTWA Ad Node] Capturing Ad Attribution for ${cleanPhone}...`);
+          
+          await prisma.whatsAppChatbotLog.create({
+            data: {
+              phone: cleanPhone,
+              conversationId: conversationId || null,
+              nodeId: node.id || "META_CTWA_AD_NODE",
+              nodeType: "META_CTWA_AD",
+              actionDesc: `Meta CTWA Ad Attribution Captured (Ad ID & Headline)`,
+              payload: { phone: cleanPhone, nodeTitle: node.title || "CTWA Ad Attribution" },
+              responseStatus: 200,
+              errorMessage: null
+            }
+          });
+        } catch (err: any) {
+          console.error(`[Meta CTWA Ad Node] Error:`, err);
+        }
       }
     } else if (type === 'META_CUSTOM_AUDIENCE') {
-      try {
-        const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
-        const audienceName = (node.audienceName || node.title || "WhatsApp_Custom_Audience").trim();
-        console.log(`[Meta Audience Engine] Auto-creating & syncing user ${cleanPhone} to Meta Custom Audience "${audienceName}"...`);
-        
+      if (enabledModules && !enabledModules.includes('META_PIXEL_CAPI')) {
+        console.warn(`[Meta Custom Audience Node] Blocked at runtime: META_PIXEL_CAPI module is locked on client subscription plan.`);
+      } else {
         try {
-          const crypto = require('crypto');
-          const hashedPhone = crypto.createHash('sha256').update(cleanPhone).digest('hex');
-          const integration = await prisma.whatsAppIntegration.findFirst({ where: { type: 'META_CAPI', isActive: true } });
+          const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
+          const audienceName = (node.audienceName || node.title || "WhatsApp_Custom_Audience").trim();
+          console.log(`[Meta Audience Engine] Auto-creating & syncing user ${cleanPhone} to Meta Custom Audience "${audienceName}"...`);
           
-          if (integration && integration.token) {
-            let savedAudiences: Record<string, string> = {};
-            try { savedAudiences = JSON.parse((integration as any).metadata || "{}"); } catch (_) {}
+          try {
+            const crypto = require('crypto');
+            const hashedPhone = crypto.createHash('sha256').update(cleanPhone).digest('hex');
+            const integration = await prisma.whatsAppIntegration.findFirst({ where: { type: 'META_CAPI', isActive: true } });
             
-            let audienceId = node.existingAudienceId || savedAudiences[audienceName];
-            if (!audienceId) {
-              const targetAct = (integration.url || "").trim().replace(/^act_/, '');
-              const createRes = await fetch(`https://graph.facebook.com/v20.0/act_${targetAct}/customaudiences`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  name: audienceName,
-                  subtype: "CUSTOM",
-                  description: `Dynamic WhatsApp Lead Audience created via Whatmore Chatbot`,
-                  customer_file_source: "USER_PROVIDED_ONLY",
-                  access_token: integration.token.trim()
-                })
-              });
-              const createData = await createRes.json();
-              audienceId = createData.id || `aud_${audienceName.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
-              savedAudiences[audienceName] = audienceId;
-            }
+            if (integration && integration.token) {
+              let savedAudiences: Record<string, string> = {};
+              try { savedAudiences = JSON.parse((integration as any).metadata || "{}"); } catch (_) {}
+              
+              let audienceId = node.existingAudienceId || savedAudiences[audienceName];
+              if (!audienceId) {
+                const targetAct = (integration.url || "").trim().replace(/^act_/, '');
+                const createRes = await fetch(`https://graph.facebook.com/v20.0/act_${targetAct}/customaudiences`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    name: audienceName,
+                    subtype: "CUSTOM",
+                    description: `Dynamic WhatsApp Lead Audience created via Whatmore Chatbot`,
+                    customer_file_source: "USER_PROVIDED_ONLY",
+                    access_token: integration.token.trim()
+                  })
+                });
+                const createData = await createRes.json();
+                audienceId = createData.id || `aud_${audienceName.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+                savedAudiences[audienceName] = audienceId;
+              }
 
-            if (audienceId && !audienceId.startsWith("aud_")) {
-              await fetch(`https://graph.facebook.com/v20.0/${audienceId}/users`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  payload: { schema: ["PHONE"], data: [[hashedPhone]] },
-                  access_token: integration.token.trim()
-                })
-              });
+              if (audienceId && !audienceId.startsWith("aud_")) {
+                await fetch(`https://graph.facebook.com/v20.0/${audienceId}/users`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    payload: { schema: ["PHONE"], data: [[hashedPhone]] },
+                    access_token: integration.token.trim()
+                  })
+                });
+              }
             }
+          } catch (e: any) {
+            console.warn("[Meta Audience Sync Warning]:", e.message);
           }
-        } catch (e: any) {
-          console.warn("[Meta Audience Sync Warning]:", e.message);
+
+          await prisma.whatsAppChatbotLog.create({
+            data: {
+              phone: cleanPhone,
+              conversationId: conversationId || null,
+              nodeId: node.id || "META_AUDIENCE_NODE",
+              nodeType: "META_CUSTOM_AUDIENCE",
+              actionDesc: `Meta Custom Audience Auto-Created & Synced: ${audienceName}`,
+              payload: { phone: cleanPhone, audienceName, action: "AUTO_CREATE_AND_ADD" },
+              responseStatus: 200,
+              errorMessage: null
+            }
+          });
+        } catch (err: any) {
+          console.error(`[Meta Custom Audience Node] Error:`, err);
         }
-
-        await prisma.whatsAppChatbotLog.create({
-          data: {
-            phone: cleanPhone,
-            conversationId: conversationId || null,
-            nodeId: node.id || "META_AUDIENCE_NODE",
-            nodeType: "META_CUSTOM_AUDIENCE",
-            actionDesc: `Meta Custom Audience Auto-Created & Synced: ${audienceName}`,
-            payload: { phone: cleanPhone, audienceName, action: "AUTO_CREATE_AND_ADD" },
-            responseStatus: 200,
-            errorMessage: null
-          }
-        });
-      } catch (err: any) {
-        console.error(`[Meta Custom Audience Node] Error:`, err);
       }
     } else if (type === 'CRM_ROUNDROBIN' || type === 'START') {
+
         try {
           const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
           let conv = conversationId 
@@ -914,136 +959,144 @@ async function runNodes(nodes: any[], startNodeId: string, vars: Record<string, 
 
     // ── PAY_LINK / PAY_COLLECT: generate real payment link
     if (type === 'PAY_LINK' || type === 'PAY_COLLECT' || type === 'CATALOG_PAYMENT') {
-      try {
-        const creds = await prisma.whatsAppSettings.findFirst();
-        const gw = creds?.activeGateway;
-        const amount = parseFloat(node.amount) || 1500;
-        const desc = node.paymentDescription || 'Payment';
-        const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
-        const cust = await prisma.customer.findFirst({
-          where: { OR: [{ mobile: { contains: cleanPhone } }, { whatsappNumber: { contains: cleanPhone } }] }
-        });
-        let payUrl: string | null = null;
-
-        if (gw === 'RAZORPAY' && creds?.razorpayKeyId && creds?.razorpayKeySecret) {
-          const auth = Buffer.from(`${creds.razorpayKeyId}:${creds.razorpayKeySecret}`).toString('base64');
-          const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
-            method: 'POST',
-            headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              amount: Math.round(amount * 100), // paise
-              currency: node.currency || 'INR',
-              description: desc,
-              customer: { name: cust?.contactPerson || 'Customer', contact: `+91${cleanPhone}` },
-              notify: { sms: false, email: false },
-              reminder_enable: false
-            })
+      if (enabledModules && !enabledModules.includes('PAYMENT_GATEWAY')) {
+        console.warn(`[PAY_LINK] Blocked at runtime: PAYMENT_GATEWAY module is locked on client plan.`);
+      } else {
+        try {
+          const creds = await prisma.whatsAppSettings.findFirst();
+          const gw = creds?.activeGateway;
+          const amount = parseFloat(node.amount) || 1500;
+          const desc = node.paymentDescription || 'Payment';
+          const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
+          const cust = await prisma.customer.findFirst({
+            where: { OR: [{ mobile: { contains: cleanPhone } }, { whatsappNumber: { contains: cleanPhone } }] }
           });
-          const rzpData = await rzpRes.json();
-          if (rzpData.short_url) payUrl = rzpData.short_url;
-        } else if (gw === 'CASHFREE' && creds?.cashfreeAppId && creds?.cashfreeSecretKey) {
-          const cfRes = await fetch('https://api.cashfree.com/pg/links', {
-            method: 'POST',
-            headers: { 'x-api-version': '2023-08-01', 'x-client-id': creds.cashfreeAppId, 'x-client-secret': creds.cashfreeSecretKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              link_id: `wm_${Date.now()}`,
-              link_amount: amount,
-              link_currency: node.currency || 'INR',
-              link_purpose: desc,
-              customer_details: { customer_phone: cleanPhone, customer_name: cust?.contactPerson || 'Customer' }
-            })
-          });
-          const cfData = await cfRes.json();
-          if (cfData.link_url) payUrl = cfData.link_url;
-        } else if (gw === 'UPI' && creds?.merchantUpiId) {
-          const upiId = creds.merchantUpiId;
-          const payeeName = creds.merchantUpiName || 'Espon';
-          const domain = process.env.NEXTAUTH_URL || 'https://whatsapp.esponsports.com';
-          payUrl = `${domain}/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&tn=${encodeURIComponent(desc)}`;
+          let payUrl: string | null = null;
 
-          const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(desc)}`;
-          const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
-          const qrMsgText = `🏦 UPI ID: *${upiId}*\n\nScan this QR to pay, or click the Pay Now button below.`;
-
-          const acct = await getCreds();
-          if (acct) {
-            const imgPayload = {
-              messaging_product: 'whatsapp', to: `91${cleanPhone}`, type: 'image',
-              image: { link: qrApiUrl, caption: qrMsgText.slice(0, 1024) }
-            };
-            try {
-              await fetch(`https://graph.facebook.com/v20.0/${acct.phoneId}/messages`, {
-                method: 'POST', headers: { 'Authorization': `Bearer ${acct.token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(imgPayload)
-              });
-            } catch (e) {}
-          }
-        }
-
-        if (payUrl) {
-          // Send CTA button with payment link
-          const acct = await getCreds();
-          if (acct) {
-            const msgText = `💳 *Payment Request*\n\nAmount: ₹${amount}\nDescription: ${desc}\n\nClick below to pay securely:`;
-            const ctaPayload = {
-              messaging_product: 'whatsapp', recipient_type: 'individual',
-              to: `91${cleanPhone}`,
-              type: 'interactive',
-              interactive: {
-                type: 'cta_url',
-                body: { text: msgText },
-                action: { name: 'cta_url', parameters: { display_text: '💳 Pay Now', url: payUrl } }
-              }
-            };
-            await fetch(`https://graph.facebook.com/v20.0/${acct.phoneId}/messages`, {
+          if (gw === 'RAZORPAY' && creds?.razorpayKeyId && creds?.razorpayKeySecret) {
+            const auth = Buffer.from(`${creds.razorpayKeyId}:${creds.razorpayKeySecret}`).toString('base64');
+            const rzpRes = await fetch('https://api.razorpay.com/v1/payment_links', {
               method: 'POST',
-              headers: { 'Authorization': `Bearer ${acct.token}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify(ctaPayload)
+              headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: Math.round(amount * 100), // paise
+                currency: node.currency || 'INR',
+                description: desc,
+                customer: { name: cust?.contactPerson || 'Customer', contact: `+91${cleanPhone}` },
+                notify: { sms: false, email: false },
+                reminder_enable: false
+              })
             });
+            const rzpData = await rzpRes.json();
+            if (rzpData.short_url) payUrl = rzpData.short_url;
+          } else if (gw === 'CASHFREE' && creds?.cashfreeAppId && creds?.cashfreeSecretKey) {
+            const cfRes = await fetch('https://api.cashfree.com/pg/links', {
+              method: 'POST',
+              headers: { 'x-api-version': '2023-08-01', 'x-client-id': creds.cashfreeAppId, 'x-client-secret': creds.cashfreeSecretKey, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                link_id: `wm_${Date.now()}`,
+                link_amount: amount,
+                link_currency: node.currency || 'INR',
+                link_purpose: desc,
+                customer_details: { customer_phone: cleanPhone, customer_name: cust?.contactPerson || 'Customer' }
+              })
+            });
+            const cfData = await cfRes.json();
+            if (cfData.link_url) payUrl = cfData.link_url;
+          } else if (gw === 'UPI' && creds?.merchantUpiId) {
+            const upiId = creds.merchantUpiId;
+            const payeeName = creds.merchantUpiName || 'Espon';
+            const domain = process.env.NEXTAUTH_URL || 'https://whatsapp.esponsports.com';
+            payUrl = `${domain}/pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&tn=${encodeURIComponent(desc)}`;
 
-            // Log as BOT message
-            const resolvedConvId = conversationId || (await prisma.whatsAppConversation.findFirst({ where: { customer: { OR: [{ mobile: { contains: cleanPhone } }, { whatsappNumber: { contains: cleanPhone } }] } }, orderBy: { updatedAt: 'desc' } }))?.id;
-            if (resolvedConvId) {
-              await prisma.whatsAppMessage.create({
-                data: {
-                  conversationId: resolvedConvId, senderType: 'BOT', senderName: 'Chatbot',
-                  messageType: 'TEXT', content: `${msgText}\n\n${payUrl}`, status: 'SENT', sentAt: new Date()
-                }
-              });
+            const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(desc)}`;
+            const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
+            const qrMsgText = `🏦 UPI ID: *${upiId}*\n\nScan this QR to pay, or click the Pay Now button below.`;
+
+            const acct = await getCreds();
+            if (acct) {
+              const imgPayload = {
+                messaging_product: 'whatsapp', to: `91${cleanPhone}`, type: 'image',
+                image: { link: qrApiUrl, caption: qrMsgText.slice(0, 1024) }
+              };
+              try {
+                await fetch(`https://graph.facebook.com/v20.0/${acct.phoneId}/messages`, {
+                  method: 'POST', headers: { 'Authorization': `Bearer ${acct.token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify(imgPayload)
+                });
+              } catch (e) {}
             }
           }
-        } else if (gw !== 'UPI') {
-          console.warn(`[PAY_LINK] No active payment gateway configured. Set one in Settings > Integrations.`);
+
+          if (payUrl) {
+            // Send CTA button with payment link
+            const acct = await getCreds();
+            if (acct) {
+              const msgText = `💳 *Payment Request*\n\nAmount: ₹${amount}\nDescription: ${desc}\n\nClick below to pay securely:`;
+              const ctaPayload = {
+                messaging_product: 'whatsapp', recipient_type: 'individual',
+                to: `91${cleanPhone}`,
+                type: 'interactive',
+                interactive: {
+                  type: 'cta_url',
+                  body: { text: msgText },
+                  action: { name: 'cta_url', parameters: { display_text: '💳 Pay Now', url: payUrl } }
+                }
+              };
+              await fetch(`https://graph.facebook.com/v20.0/${acct.phoneId}/messages`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${acct.token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(ctaPayload)
+              });
+
+              // Log as BOT message
+              const resolvedConvId = conversationId || (await prisma.whatsAppConversation.findFirst({ where: { customer: { OR: [{ mobile: { contains: cleanPhone } }, { whatsappNumber: { contains: cleanPhone } }] } }, orderBy: { updatedAt: 'desc' } }))?.id;
+              if (resolvedConvId) {
+                await prisma.whatsAppMessage.create({
+                  data: {
+                    conversationId: resolvedConvId, senderType: 'BOT', senderName: 'Chatbot',
+                    messageType: 'TEXT', content: `${msgText}\n\n${payUrl}`, status: 'SENT', sentAt: new Date()
+                  }
+                });
+              }
+            }
+          } else if (gw !== 'UPI') {
+            console.warn(`[PAY_LINK] No active payment gateway configured. Set one in Settings > Integrations.`);
+          }
+        } catch (e: any) {
+          console.error('[PAY_LINK Error]:', e.message);
         }
-      } catch (e: any) {
-        console.error('[PAY_LINK Error]:', e.message);
       }
     }
 
     // ── UPI_QR: send UPI deep-link QR as text message
     if (type === 'UPI_QR') {
-      try {
-        const acct = await getCreds();
-        const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
-        const upiId = node.upiId || '';
-        const amount = node.amount || '';
-        const payeeName = node.payeeName || 'Espon';
-        const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR`;
-        const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
-        const msgText = `${node.text || 'Scan to pay via UPI'}\n\n🏦 UPI ID: *${upiId}*\n💰 Amount: ₹${amount}\n\nOr open GPay/PhonePe/Paytm and pay to:\n*${upiId}*`;
+      if (enabledModules && !enabledModules.includes('PAYMENT_GATEWAY')) {
+        console.warn(`[UPI_QR] Blocked at runtime: PAYMENT_GATEWAY module is locked on client plan.`);
+      } else {
+        try {
+          const acct = await getCreds();
+          const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
+          const upiId = node.upiId || '';
+          const amount = node.amount || '';
+          const payeeName = node.payeeName || 'Espon';
+          const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR`;
+          const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
+          const msgText = `${node.text || 'Scan to pay via UPI'}\n\n🏦 UPI ID: *${upiId}*\n💰 Amount: ₹${amount}\n\nOr open GPay/PhonePe/Paytm and pay to:\n*${upiId}*`;
 
-        if (acct) {
-          const imgPayload = {
-            messaging_product: 'whatsapp', to: `91${cleanPhone}`, type: 'image',
-            image: { link: qrApiUrl, caption: msgText.slice(0, 1024) }
-          };
-          await fetch(`https://graph.facebook.com/v20.0/${acct.phoneId}/messages`, {
-            method: 'POST', headers: { 'Authorization': `Bearer ${acct.token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(imgPayload)
-          });
+          if (acct) {
+            const imgPayload = {
+              messaging_product: 'whatsapp', to: `91${cleanPhone}`, type: 'image',
+              image: { link: qrApiUrl, caption: msgText.slice(0, 1024) }
+            };
+            await fetch(`https://graph.facebook.com/v20.0/${acct.phoneId}/messages`, {
+              method: 'POST', headers: { 'Authorization': `Bearer ${acct.token}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify(imgPayload)
+            });
+          }
+        } catch (e: any) {
+          console.error('[UPI_QR Error]:', e.message);
         }
-      } catch (e: any) {
-        console.error('[UPI_QR Error]:', e.message);
       }
     }
 
@@ -1081,17 +1134,21 @@ export async function executeFlowEngine(
     }
 
     // 0. Verify CHATBOT module is active on client's plan
+    let enabledModules: string[] = [];
     if (effectiveClientId) {
       const client = await prisma.whatsAppClient.findUnique({
         where: { id: effectiveClientId },
         select: { enabledModules: true, subscriptionStatus: true }
       });
       if (client?.subscriptionStatus === "BLOCKED") return false;
-      const enabledModules = parseEnabledModules(client?.enabledModules);
+      enabledModules = parseEnabledModules(client?.enabledModules);
       if (!enabledModules.includes("CHATBOT")) {
         console.log(`[FlowEngine] Chatbot flow trigger skipped: CHATBOT module is locked for client ${effectiveClientId}.`);
         return false;
       }
+    } else {
+      const { ALL_MODULE_KEYS } = await import("@/lib/moduleRegistry");
+      enabledModules = ALL_MODULE_KEYS;
     }
 
     // 1. Check active flow triggers first to see if a flow matches the keyword!
@@ -1169,7 +1226,7 @@ export async function executeFlowEngine(
         customerType: customerForVars?.customerType || '',
       };
       
-      const result = await runNodes(nodes, matchedNextNodeId, profileVars, senderPhone, conversationId, wasClosed);
+      const result = await runNodes(nodes, matchedNextNodeId, profileVars, senderPhone, conversationId, wasClosed, enabledModules);
 
       if (result.status === 'ended') {
         await prisma.whatsAppFlowState.deleteMany({
@@ -1266,7 +1323,7 @@ export async function executeFlowEngine(
         return true; 
       }
 
-      const result = await runNodes(nodes, nextNodeId, vars, senderPhone, conversationId);
+      const result = await runNodes(nodes, nextNodeId, vars, senderPhone, conversationId, false, enabledModules);
 
       if (result.status === 'ended') {
         await prisma.whatsAppFlowState.delete({ where: { id: userState.id } });
@@ -1286,3 +1343,4 @@ export async function executeFlowEngine(
     return false;
   }
 }
+

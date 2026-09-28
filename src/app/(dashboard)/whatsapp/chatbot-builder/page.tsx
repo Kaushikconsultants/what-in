@@ -73,8 +73,11 @@ import {
   getWhatsAppTemplates
 } from "@/app/actions/whatsAppPlatformActions";
 import { getWhatsAppIntegrationsAction } from "@/app/actions/whatsAppIntegrationActions";
-import { ModuleKey, ALL_MODULE_KEYS, MASTER_MODULES } from "@/lib/moduleRegistry";
+import { ModuleKey, ALL_MODULE_KEYS, MASTER_MODULES, getRequiredModuleForNodeType } from "@/lib/moduleRegistry";
 import "@/components/whatsapp/ChatbotBuilder.css";
+
+
+
 
 export interface BlockItem {
   id: string;
@@ -1282,9 +1285,11 @@ export default function WhatsAppChatbotBuilderPage() {
       await fetchFlows();
     } else {
       setToastMsg(`Error saving flow: ${res.error}`);
+      alert(`⚠️ Server Validation Error:\n\n${res.error}`);
     }
     setIsSaving(false);
-    setTimeout(() => setToastMsg(null), 4000);
+    setTimeout(() => setToastMsg(null), 5000);
+
   };
 
   // Choice Option handlers
@@ -2864,7 +2869,37 @@ export default function WhatsAppChatbotBuilderPage() {
               </button>
             </div>
 
+            {(() => {
+              const reqMod = getRequiredModuleForNodeType(selectedNode.type);
+              const isLocked = reqMod ? !enabledModules.includes(reqMod) : false;
+              if (!isLocked) return null;
+              const modDef = reqMod ? MASTER_MODULES[reqMod] : null;
+              return (
+                <div style={{
+                  margin: "12px 16px 4px 16px",
+                  background: "#fff1f2",
+                  border: "1.5px solid #fecdd3",
+                  borderRadius: "8px",
+                  padding: "10px 12px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px"
+                }}>
+                  <Lock size={16} style={{ color: "#e11d48", flexShrink: 0, marginTop: "2px" }} />
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 800, color: "#9f1239" }}>
+                      Module Locked ({modDef?.name || reqMod})
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#be123c", marginTop: "2px", lineHeight: "1.4" }}>
+                      This block requires an upgraded subscription plan. It will not execute on live customer chats and cannot be published.
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="drawer-section-block">
+
               <span className="drawer-section-title">BLOCK CONFIGURATION</span>
               <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div>

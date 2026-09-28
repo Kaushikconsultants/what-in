@@ -73,6 +73,23 @@ export async function savePaymentGatewaySettings(data: {
     return { success: false, error: "Unauthorized: Admin privileges required to update payment gateways" };
   }
 
+  // Validate PAYMENT_GATEWAY module if user is setting an active gateway or adding credentials
+  if (!isOwner && data.activeGateway && data.activeGateway !== 'NONE') {
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const clientRecord = await prisma.whatsAppClient.findUnique({
+      where: { id: targetClientId },
+      select: { enabledModules: true }
+    });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(clientRecord?.enabledModules);
+    if (!enabledModules.includes("PAYMENT_GATEWAY")) {
+      return {
+        success: false,
+        error: "Payment Gateways & UPI QR integration is disabled on your subscription plan. Please upgrade your plan."
+      };
+    }
+  }
+
   if (user?.clientId) {
     await prisma.whatsAppClient.update({
       where: { id: user.clientId },
@@ -88,6 +105,7 @@ export async function savePaymentGatewaySettings(data: {
     });
     return { success: true };
   }
+
 
   const existing = await prisma.whatsAppSettings.findFirst();
   if (existing) {

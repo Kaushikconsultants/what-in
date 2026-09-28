@@ -390,6 +390,14 @@ export async function testMetaCatalogConnectionAction(catalogId: string, accessT
       return { success: false, error: "Unauthorized access" };
     }
 
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId }, select: { enabledModules: true } });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(client?.enabledModules);
+    if (!enabledModules.includes("META_CATALOG")) {
+      return { success: false, error: "Meta Commerce Catalog module is disabled on your subscription plan. Please upgrade your plan." };
+    }
+
     if (!catalogId || !accessToken) {
       return { success: false, error: "Catalog ID and Access Token are required" };
     }
@@ -412,6 +420,14 @@ export async function fetchMetaCatalogsFromTokenAction(accessToken: string) {
     const isOwner = await isOwnerAuthenticated();
     if (!user && !isOwner) {
       return { success: false, error: "Unauthorized access" };
+    }
+
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId }, select: { enabledModules: true } });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(client?.enabledModules);
+    if (!enabledModules.includes("META_CATALOG")) {
+      return { success: false, error: "Meta Commerce Catalog module is disabled on your subscription plan. Please upgrade your plan." };
     }
 
     if (!accessToken || !accessToken.trim()) {
@@ -449,6 +465,14 @@ export async function fetchMetaPixelsFromTokenAction(accessToken: string) {
     const isOwner = await isOwnerAuthenticated();
     if (!user && !isOwner) {
       return { success: false, error: "Unauthorized access" };
+    }
+
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId }, select: { enabledModules: true } });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(client?.enabledModules);
+    if (!enabledModules.includes("META_PIXEL_CAPI")) {
+      return { success: false, error: "Meta Pixel & Conversions API (CAPI) module is disabled on your subscription plan. Please upgrade to Enterprise VIP." };
     }
 
     if (!accessToken || !accessToken.trim()) {
@@ -542,6 +566,14 @@ export async function testMetaPixelConnectionAction(pixelId: string, accessToken
     const isOwner = await isOwnerAuthenticated();
     if (!user && !isOwner) {
       return { success: false, error: "Unauthorized access" };
+    }
+
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId }, select: { enabledModules: true } });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(client?.enabledModules);
+    if (!enabledModules.includes("META_PIXEL_CAPI")) {
+      return { success: false, error: "Meta Pixel & Conversions API (CAPI) module is disabled on your subscription plan. Please upgrade to Enterprise VIP." };
     }
 
     if (!pixelId || !accessToken) {

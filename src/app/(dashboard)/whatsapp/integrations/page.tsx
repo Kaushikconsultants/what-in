@@ -738,7 +738,7 @@ const reloadTeams = async () => {
         )}
         {isModuleEnabled(["META_PIXEL_CAPI", "META_CATALOG"]) && (
           <button onClick={() => handleTabChange("facebook")} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transition-all border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === "facebook" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400" : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-white"}`}>
-            <Target size={16} /> Meta Ads, CAPI & Catalog
+            <Target size={16} /> {isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG") ? "Meta Ads, CAPI & Catalog" : isModuleEnabled("META_PIXEL_CAPI") ? "Meta Ads & CAPI" : "Meta WhatsApp Catalog"}
           </button>
         )}
       </nav>
@@ -1025,219 +1025,274 @@ const reloadTeams = async () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Target className="text-indigo-600 dark:text-indigo-400" size={22} /> Meta Ads, Conversions API & Commerce Catalog
+                  <Target className="text-indigo-600 dark:text-indigo-400" size={22} />{" "}
+                  {isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG")
+                    ? "Meta Ads, Conversions API & Commerce Catalog"
+                    : isModuleEnabled("META_PIXEL_CAPI")
+                    ? "Meta Ads & Conversions API (CAPI)"
+                    : "Meta Commerce Product Catalog"}
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Connect Meta Conversions API (CAPI) for Click-to-WhatsApp ads and Meta Commerce Product Catalogs for native WhatsApp in-chat shopping.
+                  {isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG")
+                    ? "Connect Meta Conversions API (CAPI) for Click-to-WhatsApp ads and Meta Commerce Product Catalogs for native WhatsApp in-chat shopping."
+                    : isModuleEnabled("META_PIXEL_CAPI")
+                    ? "Connect Meta Conversions API (CAPI) for Click-to-WhatsApp ads, instant lead conversions, and dynamic Custom Audiences."
+                    : "Connect Meta Commerce Product Catalogs for native WhatsApp in-chat browsing and shopping carts."}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={() => {
-                    handleOpenModal(null);
-                    setFormData({ name: '', type: 'META_CATALOG', url: '', token: '' });
-                  }}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all cursor-pointer"
-                >
-                  <ShoppingBag size={16} /> + Add Catalog API
-                </button>
-                <button
-                  onClick={() => {
-                    const existing = webhookIntegrations.find((w: any) => w.type === 'META_CAPI');
-                    if (existing) {
-                      handleOpenModal(existing);
-                    } else {
+                {isModuleEnabled("META_CATALOG") && (
+                  <button
+                    onClick={() => {
                       handleOpenModal(null);
-                      setFormData({ name: '', type: 'META_CAPI', url: '', token: '' });
-                    }
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all cursor-pointer"
-                >
-                  <Plus size={16} /> Configure CAPI Pixel
-                </button>
+                      setFormData({ name: '', type: 'META_CATALOG', url: '', token: '' });
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all cursor-pointer"
+                  >
+                    <ShoppingBag size={16} /> + Add Catalog API
+                  </button>
+                )}
+                {isModuleEnabled("META_PIXEL_CAPI") && (
+                  <button
+                    onClick={() => {
+                      const existing = webhookIntegrations.find((w: any) => w.type === 'META_CAPI');
+                      if (existing) {
+                        handleOpenModal(existing);
+                      } else {
+                        handleOpenModal(null);
+                        setFormData({ name: '', type: 'META_CAPI', url: '', token: '' });
+                      }
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 text-sm shadow-sm transition-all cursor-pointer"
+                  >
+                    <Plus size={16} /> Configure CAPI Pixel
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Quick Live Test & Status Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">CAPI</div>
-                    <h4 className="font-bold text-emerald-950 dark:text-emerald-300 text-sm">Conversions API Engine</h4>
-                  </div>
-                  <p className="text-xs text-emerald-800 dark:text-emerald-400/90 leading-relaxed mb-3">
-                    Click-to-WhatsApp (CTWA) campaigns fire conversions via <code className="bg-emerald-100 dark:bg-emerald-900/60 px-1 rounded text-emerald-950 dark:text-emerald-200 font-bold">business_messaging</code> action source.
-                  </p>
-                </div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/60 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60 w-fit">
-                  <CheckCircle2 size={13} /> Active & Syncing
-                </span>
-              </div>
-
-              <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 rounded-2xl p-5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-xs">
-                      <ShoppingBag size={15} />
+            <div className={`grid grid-cols-1 md:grid-cols-2 ${isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG") ? "lg:grid-cols-4" : isModuleEnabled("META_PIXEL_CAPI") ? "lg:grid-cols-3" : "lg:grid-cols-1"} gap-4 mb-8`}>
+              {isModuleEnabled("META_PIXEL_CAPI") && (
+                <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">CAPI</div>
+                      <h4 className="font-bold text-emerald-950 dark:text-emerald-300 text-sm">Conversions API Engine</h4>
                     </div>
-                    <h4 className="font-bold text-purple-950 dark:text-purple-300 text-sm">Commerce Catalog API</h4>
+                    <p className="text-xs text-emerald-800 dark:text-emerald-400/90 leading-relaxed mb-3">
+                      Click-to-WhatsApp (CTWA) campaigns fire conversions via <code className="bg-emerald-100 dark:bg-emerald-900/60 px-1 rounded text-emerald-950 dark:text-emerald-200 font-bold">business_messaging</code> action source.
+                    </p>
                   </div>
-                  <p className="text-xs text-purple-800 dark:text-purple-400/90 leading-relaxed mb-3">
-                    Sync {clientBrandName} Commerce Catalog directly with WhatsApp to send Single/Multi Product Messages and in-chat shopping carts.
-                  </p>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/60 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60 w-fit">
+                    <CheckCircle2 size={13} /> Active & Syncing
+                  </span>
                 </div>
-                <button
-                  onClick={() => {
-                    handleOpenModal(null);
-                    setFormData({ name: '', type: 'META_CATALOG', url: '', token: '' });
-                  }}
-                  className="w-full py-1.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
-                >
-                  <Plus size={13} /> + Add Catalog API
-                </button>
-              </div>
+              )}
 
-              <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">INBOX</div>
-                    <h4 className="font-bold text-indigo-950 dark:text-indigo-300 text-sm">Inbox Instant Conversion</h4>
+              {isModuleEnabled("META_CATALOG") && (
+                <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 rounded-2xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-xs">
+                        <ShoppingBag size={15} />
+                      </div>
+                      <h4 className="font-bold text-purple-950 dark:text-purple-300 text-sm">Commerce Catalog API</h4>
+                    </div>
+                    <p className="text-xs text-purple-800 dark:text-purple-400/90 leading-relaxed mb-3">
+                      Sync {clientBrandName} Commerce Catalog directly with WhatsApp to send Single/Multi Product Messages and in-chat shopping carts.
+                    </p>
                   </div>
-                  <p className="text-xs text-indigo-800 dark:text-indigo-400/90 leading-relaxed mb-3">
-                    Agents can click <strong>⚡ Mark Interested (₹10k Lead)</strong> in WhatsApp Agent Inbox to trigger high-value conversion to Meta.
-                  </p>
-                </div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-900/60 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800/60 w-fit">
-                  <Zap size={13} /> Ready (Default ₹10k)
-                </span>
-              </div>
-
-              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold text-xs">AUD</div>
-                    <h4 className="font-bold text-amber-950 dark:text-amber-300 text-sm">Meta Custom Audiences</h4>
-                  </div>
-                  <p className="text-xs text-amber-800 dark:text-amber-400/90 leading-relaxed mb-3">
-                    Create & connect dynamic retargeting audiences for any client niche (Ecommerce, B2B, Services).
-                  </p>
-                </div>
-                <div className="flex flex-col gap-1.5">
                   <button
-                    onClick={async () => {
-                      const inputName = window.prompt("Enter Custom Audience Name to Create in Meta Ads Manager:", "WhatsApp_Qualified_Leads");
-                      if (!inputName || !inputName.trim()) return;
-                      try {
-                        const res = await fetch("/api/whatsapp/meta-custom-audience", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "create_audience", audienceName: inputName.trim() })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          alert(`✨ Meta Custom Audience "${data.audienceName}" created successfully! Audience ID: ${data.audienceId}`);
-                        } else {
-                          alert("Error: " + (data.error || "Failed to create audience in Meta"));
-                        }
-                      } catch (e: any) {
-                        alert("Error creating audience: " + e.message);
-                      }
+                    onClick={() => {
+                      handleOpenModal(null);
+                      setFormData({ name: '', type: 'META_CATALOG', url: '', token: '' });
                     }}
-                    className="w-full py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                    className="w-full py-1.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
                   >
-                    <Plus size={13} /> Create Audience
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch("/api/whatsapp/meta-custom-audience", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "scan_and_sync_all_chatbot_audiences" })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          alert(`✨ Scanned Chatbot Flows & Auto-Created Meta Audiences!\n\nAudiences Connected:\n${Object.keys(data.audiences || {}).map(k => `• ${k}`).join("\n")}`);
-                        } else {
-                          alert("Note: " + (data.error || "Meta Audiences enabled for auto-sync"));
-                        }
-                      } catch (e: any) {
-                        alert("Chatbot Custom Audiences scanned and auto-connected!");
-                      }
-                    }}
-                    className="w-full py-1.5 px-3 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Users size={13} /> Auto-Sync Audiences
+                    <Plus size={13} /> + Add Catalog API
                   </button>
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Meta CAPI Lead Value Config */}
-            <div className="bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6 mb-8">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
-                <Zap className="text-blue-500" size={18} />
-                Meta Conversions API Default Lead Value
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                This is the default monetary value (in INR) that will be passed to Meta Ads Manager when an agent clicks ⚡ Mark Interested in the Inbox.
-              </p>
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="relative w-64">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-slate-500 dark:text-slate-400 sm:text-sm">₹</span>
+              {isModuleEnabled("META_PIXEL_CAPI") && (
+                <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">INBOX</div>
+                      <h4 className="font-bold text-indigo-950 dark:text-indigo-300 text-sm">Inbox Instant Conversion</h4>
+                    </div>
+                    <p className="text-xs text-indigo-800 dark:text-indigo-400/90 leading-relaxed mb-3">
+                      Agents can click <strong>⚡ Mark Interested (₹10k Lead)</strong> in WhatsApp Agent Inbox to trigger high-value conversion to Meta.
+                    </p>
                   </div>
-                  <input
-                    type="number"
-                    value={metaCapiLeadValue}
-                    onChange={(e) => setMetaCapiLeadValue(Number(e.target.value))}
-                    className="w-full pl-8 py-2 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder="10000"
-                  />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-900/60 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800/60 w-fit">
+                    <Zap size={13} /> Ready (Default ₹10k)
+                  </span>
                 </div>
-                <button
-                  onClick={handleSaveMetaCapi}
-                  disabled={savingCapi}
-                  className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer">
-                  {savingCapi ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Save size={16} />}
-                  Save Lead Value
-                </button>
-              </div>
-              {capiResultMsg && (
-                <div className={"mt-3 p-3 rounded-lg text-xs font-semibold " + (capiResultMsg.success ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60" : "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60")}>
-                  {capiResultMsg.text}
+              )}
+
+              {isModuleEnabled("META_PIXEL_CAPI") && (
+                <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center font-bold text-xs">AUD</div>
+                      <h4 className="font-bold text-amber-950 dark:text-amber-300 text-sm">Meta Custom Audiences</h4>
+                    </div>
+                    <p className="text-xs text-amber-800 dark:text-amber-400/90 leading-relaxed mb-3">
+                      Create & connect dynamic retargeting audiences for any client niche (Ecommerce, B2B, Services).
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      onClick={async () => {
+                        const inputName = window.prompt("Enter Custom Audience Name to Create in Meta Ads Manager:", "WhatsApp_Qualified_Leads");
+                        if (!inputName || !inputName.trim()) return;
+                        try {
+                          const res = await fetch("/api/whatsapp/meta-custom-audience", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "create_audience", audienceName: inputName.trim() })
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            alert(`✨ Meta Custom Audience "${data.audienceName}" created successfully! Audience ID: ${data.audienceId}`);
+                          } else {
+                            alert("Error: " + (data.error || "Failed to create audience in Meta"));
+                          }
+                        } catch (e: any) {
+                          alert("Error creating audience: " + e.message);
+                        }
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                    >
+                      <Plus size={13} /> Create Audience
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/whatsapp/meta-custom-audience", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "scan_and_sync_all_chatbot_audiences" })
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            alert(`✨ Scanned Chatbot Flows & Auto-Created Meta Audiences!\n\nAudiences Connected:\n${Object.keys(data.audiences || {}).map(k => `• ${k}`).join("\n")}`);
+                          } else {
+                            alert("Note: " + (data.error || "Meta Audiences enabled for auto-sync"));
+                          }
+                        } catch (e: any) {
+                          alert("Chatbot Custom Audiences scanned and auto-connected!");
+                        }
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Users size={13} /> Auto-Sync Audiences
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
+            {/* Meta CAPI Lead Value Config */}
+            {isModuleEnabled("META_PIXEL_CAPI") && (
+              <div className="bg-slate-50 dark:bg-slate-950/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6 mb-8">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
+                  <Zap className="text-blue-500" size={18} />
+                  Meta Conversions API Default Lead Value
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  This is the default monetary value (in INR) that will be passed to Meta Ads Manager when an agent clicks ⚡ Mark Interested in the Inbox.
+                </p>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="relative w-64">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-slate-500 dark:text-slate-400 sm:text-sm">₹</span>
+                    </div>
+                    <input
+                      type="number"
+                      value={metaCapiLeadValue}
+                      onChange={(e) => setMetaCapiLeadValue(Number(e.target.value))}
+                      className="w-full pl-8 py-2 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      placeholder="10000"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSaveMetaCapi}
+                    disabled={savingCapi}
+                    className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer">
+                    {savingCapi ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Save size={16} />}
+                    Save Lead Value
+                  </button>
+                </div>
+                {capiResultMsg && (
+                  <div className={"mt-3 p-3 rounded-lg text-xs font-semibold " + (capiResultMsg.success ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60" : "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60")}>
+                    {capiResultMsg.text}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Active Meta Integration Table */}
             <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-8">
               <div className="bg-slate-50 dark:bg-slate-800/80 px-4 py-3 border-b border-slate-200 dark:border-slate-700 font-bold text-xs text-slate-700 dark:text-slate-200 flex justify-between items-center">
-                <span>Active Meta Integrations (CAPI & Commerce Catalog)</span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Pixel ID / Catalog ID & System User Token</span>
+                <span>
+                  {isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG")
+                    ? "Active Meta Integrations (CAPI & Commerce Catalog)"
+                    : isModuleEnabled("META_PIXEL_CAPI")
+                    ? "Active Meta Conversions API (CAPI) & Pixels"
+                    : "Active Meta Commerce Product Catalogs"}
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">
+                  {isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG")
+                    ? "Pixel ID / Catalog ID & System User Token"
+                    : isModuleEnabled("META_PIXEL_CAPI")
+                    ? "Pixel ID & System User Token"
+                    : "Catalog ID & System User Token"}
+                </span>
               </div>
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-100/60 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 text-xs">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Name</th>
                     <th className="px-4 py-3 font-semibold">Type</th>
-                    <th className="px-4 py-3 font-semibold">Pixel / Catalog ID</th>
+                    <th className="px-4 py-3 font-semibold">
+                      {isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG") ? "Pixel / Catalog ID" : isModuleEnabled("META_PIXEL_CAPI") ? "Pixel ID" : "Catalog ID"}
+                    </th>
                     <th className="px-4 py-3 font-semibold">Access Token</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
                     <th className="px-4 py-3 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {webhookIntegrations.filter((w: any) => w.type === 'META_CAPI' || w.type === 'META_CATALOG').length === 0 ? (
+                  {webhookIntegrations.filter((w: any) => {
+                    if (isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG")) {
+                      return w.type === 'META_CAPI' || w.type === 'META_CATALOG';
+                    }
+                    if (isModuleEnabled("META_PIXEL_CAPI")) return w.type === 'META_CAPI';
+                    if (isModuleEnabled("META_CATALOG")) return w.type === 'META_CATALOG';
+                    return false;
+                  }).length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm">
-                        No Meta CAPI or Catalog credentials configured. Click <strong>+ Add Catalog API</strong> or <strong>Configure CAPI Pixel</strong> above to connect.
+                        {isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG")
+                          ? "No Meta CAPI or Catalog credentials configured. Click + Add Catalog API or Configure CAPI Pixel above to connect."
+                          : isModuleEnabled("META_PIXEL_CAPI")
+                          ? "No Meta CAPI credentials configured. Click Configure CAPI Pixel above to connect."
+                          : "No Meta Commerce Catalog credentials configured. Click + Add Catalog API above to connect."}
                       </td>
                     </tr>
                   ) : (
-                    webhookIntegrations.filter((w: any) => w.type === 'META_CAPI' || w.type === 'META_CATALOG').map((wh: any) => (
+                    webhookIntegrations.filter((w: any) => {
+                      if (isModuleEnabled("META_PIXEL_CAPI") && isModuleEnabled("META_CATALOG")) {
+                        return w.type === 'META_CAPI' || w.type === 'META_CATALOG';
+                      }
+                      if (isModuleEnabled("META_PIXEL_CAPI")) return w.type === 'META_CAPI';
+                      if (isModuleEnabled("META_CATALOG")) return w.type === 'META_CATALOG';
+                      return false;
+                    }).map((wh: any) => (
                       <React.Fragment key={wh.id}>
                         <tr className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                           <td className="px-4 py-3 font-bold text-slate-800 dark:text-white flex items-center gap-2">

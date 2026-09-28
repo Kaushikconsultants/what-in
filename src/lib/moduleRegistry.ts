@@ -363,6 +363,42 @@ export function parseEnabledModules(raw: string | null | undefined): ModuleKey[]
 }
 
 /**
+ * Maps a Chatbot Flow node type to its required module key (if restricted)
+ */
+export function getRequiredModuleForNodeType(nodeType: string): ModuleKey | null {
+  const type = (nodeType || "").toUpperCase();
+  if (type.startsWith("PAY_") || type === "CATALOG_PAYMENT" || type === "UPI_QR") return "PAYMENT_GATEWAY";
+  if (type === "CATALOG" || type === "ORDER" || type === "PRODUCTS") return "META_CATALOG";
+  if (type === "WEBHOOK") return "DEVELOPER_API";
+  if (type === "AI_BOT" || type === "AI_AGENT" || type === "AI_HANDOFF") return "AI_AGENT";
+  if (type === "META_CAPI" || type === "META_CTWA_AD" || type === "META_CUSTOM_AUDIENCE") return "META_PIXEL_CAPI";
+  if (type === "META_TEMPLATE") return "BROADCASTS";
+  return null;
+}
+
+/**
+ * Validates chatbot nodes against enabled subscription modules
+ */
+export function validateFlowNodesModules(nodes: any[], enabledModules: ModuleKey[]): { isValid: boolean; violations: string[] } {
+  const violations: string[] = [];
+  if (!Array.isArray(nodes)) return { isValid: false, violations: ["Invalid nodes data structure"] };
+
+  for (const node of nodes) {
+    const type = (node?.type || "").toUpperCase();
+    const reqModule = getRequiredModuleForNodeType(type);
+    if (reqModule && !enabledModules.includes(reqModule)) {
+      const moduleName = MASTER_MODULES[reqModule]?.name || reqModule;
+      violations.push(`Block "${node.title || type}" requires the [${moduleName}] module which is locked on your subscription plan.`);
+    }
+  }
+
+  return {
+    isValid: violations.length === 0,
+    violations
+  };
+}
+
+/**
  * Checks if a specific route is allowed for a client
  */
 export function isRouteAllowed(route: string, enabledModules: ModuleKey[]): boolean {
@@ -375,3 +411,4 @@ export function isRouteAllowed(route: string, enabledModules: ModuleKey[]): bool
   }
   return true;
 }
+
