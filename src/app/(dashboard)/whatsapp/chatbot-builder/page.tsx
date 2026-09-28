@@ -43,6 +43,7 @@ import {
   X,
   Save,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   Trash2,
   Copy,
