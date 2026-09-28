@@ -97,9 +97,13 @@ export default function OwnerPlansPage() {
                 
                 <div className="flex items-baseline gap-1.5 mb-3">
                   <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                    ₹{plan.monthlyFee.toLocaleString()}
+                    {plan.monthlyFee > 0 ? `₹${plan.monthlyFee.toLocaleString()}` : "Custom Quote"}
                   </span>
-                  <span className="text-xs text-slate-400 font-medium">/ month</span>
+                  {plan.monthlyFee > 0 ? (
+                    <span className="text-xs text-slate-400 font-medium">/ month</span>
+                  ) : (
+                    <span className="text-xs text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800/80">Client-Specific</span>
+                  )}
                 </div>
 
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
@@ -163,7 +167,9 @@ export default function OwnerPlansPage() {
                   {DEFAULT_PLAN_TIERS.map(p => (
                     <th key={p.id} className="py-4 px-4 text-center min-w-[120px]">
                       <div className="font-extrabold text-slate-900 dark:text-white text-xs">{p.name}</div>
-                      <div className="text-[10px] text-emerald-600 font-bold">₹{p.monthlyFee}/mo</div>
+                      <div className="text-[10px] text-emerald-600 font-bold">
+                        {p.monthlyFee > 0 ? `₹${p.monthlyFee}/mo` : "Custom Quote"}
+                      </div>
                     </th>
                   ))}
                 </tr>

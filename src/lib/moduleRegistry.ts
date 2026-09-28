@@ -205,7 +205,7 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
     monthlyMessageQuota: 5000,
     monthlyAiQuota: 0,
     maxAgents: 5,
-    modules: ["INBOX", "CHATBOT", "WIDGET"],
+    modules: ["INBOX", "CHATBOT"],
     tagline: "5 Team Agents, Live Team Inbox, Visual Chatbot, Quick Replies & Templates (₹1,499 w/ code)"
   },
   {
@@ -224,7 +224,6 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
       "CHATBOT",
       "AI_AGENT",
       "BROADCASTS",
-      "WIDGET",
       "SHOPIFY_INTEGRATION",
       "META_CATALOG",
       "PAYMENT_GATEWAY"
@@ -234,8 +233,8 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
   {
     id: "ENTERPRISE",
     name: "Enterprise VIP",
-    monthlyFee: 7499,
-    badge: "ALL-INCLUSIVE",
+    monthlyFee: 0,
+    badge: "CUSTOM QUOTE",
     color: "#7c3aed",
     bg: "#f5f3ff",
     border: "#ddd6fe",
@@ -243,7 +242,7 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
     monthlyAiQuota: 15000,
     maxAgents: 100,
     modules: ALL_MODULE_KEYS,
-    tagline: "Unlimited Agents, Server-Side Meta CAPI ROAS Booster, Co-Browsing & Developer REST APIs"
+    tagline: "Custom Client-Specific Pricing • Unlimited Agents, Live Website Tracking & Widget, Screen Co-Browsing, Meta CAPI & Developer REST APIs"
   }
 ];
 

@@ -1807,7 +1807,9 @@ export default function OwnerClientsPage() {
                       }`}
                     >
                       <div className="font-black text-xs">{plan.name}</div>
-                      <div className="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-0.5">₹{plan.monthlyFee}/mo</div>
+                      <div className="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        {plan.monthlyFee > 0 ? `₹${plan.monthlyFee}/mo` : "Custom Quote"}
+                      </div>
                       <div className="text-[10px] text-slate-400 mt-1">{plan.monthlyMessageQuota.toLocaleString()} msgs • {plan.modules.length} mods</div>
                     </div>
                   ))}

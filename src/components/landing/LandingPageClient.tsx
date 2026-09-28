@@ -109,8 +109,7 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
         "Visual Drag-and-Drop Chatbot Builder",
         "Keyword Triggers & Auto-Replies",
         "Canned Responses & Quick Shortcuts",
-        "Meta Approved Template Messaging",
-        "Embeddable Website Chat Widget"
+        "Meta Approved Template Messaging"
       ],
       popular: false
     },
@@ -140,18 +139,20 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
     {
       id: "ENTERPRISE",
       name: "Enterprise VIP",
-      badge: "Scale & High ROAS 🚀",
-      monthlyPrice: 7499,
-      annualPrice: 5999,
-      couponNote: "Full Suite & Dedicated VIP",
-      description: "Full scale for high-growth brands with server-side Meta CAPI, screen co-browsing, and developer APIs.",
-      messages: "100,000+",
-      aiReplies: "15,000 AI Replies",
+      badge: "Custom Scale & VIP 🚀",
+      monthlyPrice: 0,
+      annualPrice: 0,
+      isCustomQuote: true,
+      couponNote: "Client-Specific Tailored Setup",
+      description: "Full scale for high-growth brands with server-side Meta CAPI, live website tracking, screen co-browsing, and developer APIs.",
+      messages: "Custom / High Volume",
+      aiReplies: "Custom AI Quotas",
       agents: "100 / Unlimited Agents",
       features: [
         "Everything in Growth, plus:",
-        "Meta Pixel & Conversions API (CAPI) Tracking",
+        "Live Website Tracking & Embeddable Chat Widget",
         "Live Screen Co-Browsing & Real-Time Visitor Assist",
+        "Meta Pixel & Conversions API (CAPI) Tracking",
         "Developer REST API & Outbound Webhooks",
         "Automated Meta Custom Audience Sync",
         "Custom CRM & ERP Webhook Integrations",
@@ -698,18 +699,35 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
                     </p>
 
                     <div className="mb-6 pb-4 border-b border-slate-800">
-                      <div className="text-3xl sm:text-4xl font-black text-white">
-                        ₹{price.toLocaleString()}
-                        <span className="text-xs font-normal text-slate-400">/month</span>
-                      </div>
-                      {tier.id === "BASIC" && (
-                        <div className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl mt-2 inline-block">
-                          🎟️ Launch Offer: Use <b>SAVE500</b> for ₹500 OFF (₹1,499)
+                      {(tier as any).isCustomQuote ? (
+                        <div>
+                          <div className="text-3xl sm:text-4xl font-black text-white flex items-baseline gap-2">
+                            <span>Custom</span>
+                            <span className="text-xs font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded-lg">Client-Specific</span>
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-300 mt-2">
+                            💼 Tailored to Your Scale, Features & Custom Volume
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-1">
+                            Includes <b>Custom / Unlimited</b> messages & <b>AI Quotas</b>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-3xl sm:text-4xl font-black text-white">
+                            ₹{price.toLocaleString()}
+                            <span className="text-xs font-normal text-slate-400">/month</span>
+                          </div>
+                          {tier.id === "BASIC" && (
+                            <div className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-xl mt-2 inline-block">
+                              🎟️ Launch Offer: Use <b>SAVE500</b> for ₹500 OFF (₹1,499)
+                            </div>
+                          )}
+                          <div className="text-[11px] text-slate-400 mt-1.5">
+                            Includes <b>{tier.messages}</b> messages & <b>{tier.aiReplies}</b>
+                          </div>
                         </div>
                       )}
-                      <div className="text-[11px] text-slate-400 mt-1.5">
-                        Includes <b>{tier.messages}</b> messages & <b>{tier.aiReplies}</b>
-                      </div>
                     </div>
 
                     <div className="space-y-2.5 text-xs text-slate-300 mb-6">
@@ -727,10 +745,12 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
                     className={`w-full py-2.5 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                       tier.popular
                         ? `${isWhatIn ? "bg-emerald-600 hover:bg-emerald-700" : "bg-indigo-600 hover:bg-indigo-700"} text-white shadow-md`
+                        : (tier as any).isCustomQuote
+                        ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md border border-purple-500/30"
                         : "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700"
                     }`}
                   >
-                    <span>Choose {tier.name}</span>
+                    <span>{(tier as any).isCustomQuote ? "Talk to Us for Custom Plan" : `Choose ${tier.name}`}</span>
                     <ArrowRight size={13} />
                   </button>
                 </div>
@@ -884,10 +904,9 @@ export default function LandingPageClient({ brandOverride }: { brandOverride?: B
                     onChange={e => setForm({ ...form, selectedPlan: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
                   >
-                    <option value="STARTER">Starter Plan (₹999/mo • 5,000 Messages)</option>
-                    <option value="GROWTH">Growth Plan (₹2,499/mo • 25,000 Messages • Most Popular)</option>
-                    <option value="BUSINESS">Business Plan (₹4,999/mo • 75,000 Messages • Full Modules)</option>
-                    <option value="ENTERPRISE">Enterprise Plan (₹9,999/mo • Custom Throughput)</option>
+                    <option value="BASIC">Basic Plan (₹1,999/mo • 5,000 Messages • 5 Agents)</option>
+                    <option value="GROWTH">Growth Plan (₹3,499/mo • 25,000 Messages • 10 Agents • AI + Shopify)</option>
+                    <option value="ENTERPRISE">Enterprise VIP (Custom Quote • Live Tracking • Co-Browsing • APIs)</option>
                     <option value="CUSTOM">Custom High-Volume Consultation</option>
                   </select>
                 </div>
