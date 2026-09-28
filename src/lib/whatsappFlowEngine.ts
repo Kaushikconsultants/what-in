@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessageAction } from "@/app/actions/whatsAppPlatformActions";
+import { parseEnabledModules } from "@/lib/moduleRegistry";
 
 /**
  * WhatsApp Chatbot Flow Engine
@@ -1077,6 +1078,20 @@ export async function executeFlowEngine(
         select: { clientId: true }
       });
       if (conv?.clientId) effectiveClientId = conv.clientId;
+    }
+
+    // 0. Verify CHATBOT module is active on client's plan
+    if (effectiveClientId) {
+      const client = await prisma.whatsAppClient.findUnique({
+        where: { id: effectiveClientId },
+        select: { enabledModules: true, subscriptionStatus: true }
+      });
+      if (client?.subscriptionStatus === "BLOCKED") return false;
+      const enabledModules = parseEnabledModules(client?.enabledModules);
+      if (!enabledModules.includes("CHATBOT")) {
+        console.log(`[FlowEngine] Chatbot flow trigger skipped: CHATBOT module is locked for client ${effectiveClientId}.`);
+        return false;
+      }
     }
 
     // 1. Check active flow triggers first to see if a flow matches the keyword!

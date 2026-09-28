@@ -4,35 +4,55 @@ import { getAuthenticatedUser } from "@/lib/authSession";
 import { generateApiKeyPair, validateApiKey, logApiRequest } from "@/lib/apiKeyAuth";
 
 async function resolveTenantClient(req: NextRequest) {
+  let client: any = null;
+  let user: any = null;
+  let apiKey: any = null;
+
   // First check if user is logged into the dashboard via session cookie
-  const user = await getAuthenticatedUser(req);
+  user = await getAuthenticatedUser(req);
   if (user?.clientId) {
-    const client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
-    if (client) return { client, user };
+    client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
   } else if (user?.email) {
-    const client = await prisma.whatsAppClient.findFirst({
+    client = await prisma.whatsAppClient.findFirst({
       where: {
         OR: [{ contactEmail: user.email }, { adminEmail: user.email }],
       },
     });
-    if (client) return { client, user };
   }
 
   // Fallback: Check if request has an existing API key
-  const authRes = await validateApiKey(req);
-  if (authRes.authenticated && authRes.client) {
-    return { client: authRes.client, user: null, apiKey: authRes.apiKey };
+  if (!client) {
+    const authRes = await validateApiKey(req);
+    if (authRes.authenticated && authRes.client) {
+      client = authRes.client;
+      apiKey = authRes.apiKey;
+    }
   }
 
   // Last resort fallback for single-tenant / primary setup
-  const primaryClient = await prisma.whatsAppClient.findFirst({
-    orderBy: { createdAt: "asc" },
-  });
-  if (primaryClient) {
-    return { client: primaryClient, user };
+  if (!client) {
+    client = await prisma.whatsAppClient.findFirst({
+      orderBy: { createdAt: "asc" },
+    });
   }
 
-  return { client: null, user: null };
+  if (!client) {
+    return { client: null, user: null, apiKey: null, error: "Unauthorized. Please log in or provide valid credentials.", statusCode: 401 };
+  }
+
+  const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+  const enabledModules = parseEnabledModules(client.enabledModules);
+  if (!enabledModules.includes("DEVELOPER_API")) {
+    return {
+      client: null,
+      user: null,
+      apiKey: null,
+      error: "Developer REST APIs & Webhooks are disabled on your subscription plan. Please upgrade to Enterprise VIP.",
+      statusCode: 403,
+    };
+  }
+
+  return { client, user, apiKey, error: null, statusCode: 200 };
 }
 
 /**
@@ -42,13 +62,14 @@ async function resolveTenantClient(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const startTime = Date.now();
   try {
-    const { client } = await resolveTenantClient(req);
-    if (!client) {
+    const auth = await resolveTenantClient(req);
+    if (!auth.client || auth.error) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized. Please log in or provide valid credentials." },
-        { status: 401 }
+        { success: false, error: auth.error || "Unauthorized. Please log in or provide valid credentials." },
+        { status: auth.statusCode || 401 }
       );
     }
+    const { client } = auth;
 
     const keys = await prisma.whatsAppApiKey.findMany({
       where: { clientId: client.id },
@@ -107,13 +128,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
-    const { client, user } = await resolveTenantClient(req);
-    if (!client) {
+    const auth = await resolveTenantClient(req);
+    if (!auth.client || auth.error) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized. Please log in or provide valid credentials." },
-        { status: 401 }
+        { success: false, error: auth.error || "Unauthorized. Please log in or provide valid credentials." },
+        { status: auth.statusCode || 401 }
       );
     }
+    const { client, user } = auth;
 
     const body = await req.json().catch(() => ({}));
     const name = (body.name || "Default API Key").trim();
@@ -185,13 +207,14 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const startTime = Date.now();
   try {
-    const { client, user } = await resolveTenantClient(req);
-    if (!client) {
+    const auth = await resolveTenantClient(req);
+    if (!auth.client || auth.error) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized." },
-        { status: 401 }
+        { success: false, error: auth.error || "Unauthorized." },
+        { status: auth.statusCode || 401 }
       );
     }
+    const { client, user } = auth;
 
     const body = await req.json().catch(() => ({}));
     const keyId = body.keyId;
@@ -293,13 +316,14 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const startTime = Date.now();
   try {
-    const { client } = await resolveTenantClient(req);
-    if (!client) {
+    const auth = await resolveTenantClient(req);
+    if (!auth.client || auth.error) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized." },
-        { status: 401 }
+        { success: false, error: auth.error || "Unauthorized." },
+        { status: auth.statusCode || 401 }
       );
     }
+    const { client } = auth;
 
     const { searchParams } = new URL(req.url);
     let keyId = searchParams.get("keyId");

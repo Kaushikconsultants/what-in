@@ -55,7 +55,8 @@ import {
   Percent,
   SlidersHorizontal,
   ChevronRight as ArrowRight,
-  Wrench
+  Wrench,
+  Package
 } from "lucide-react";
 import {
   getOwnerClientsAction,
@@ -1585,22 +1586,65 @@ export default function OwnerClientsPage() {
               </button>
             </div>
 
-            {/* 1-Click Industry Presets */}
-            <div className="mb-6 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80">
-              <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
-                <Sparkles size={13} /> 1-Click Industry Presets
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {INDUSTRY_MODULE_PRESETS.map(preset => (
-                  <button
-                    key={preset.name}
-                    onClick={() => handleApplyPreset(preset.modules)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                  >
-                    <span>{preset.icon}</span>
-                    <span>{preset.name}</span>
-                  </button>
-                ))}
+            {/* 1-Click Standard Plan Tiers & Industry Presets */}
+            <div className="mb-6 space-y-3">
+              {/* Standard Plan Tier Presets */}
+              <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60">
+                <span className="text-[11px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+                  <Package size={13} /> Apply Standard Subscription Plan Modules
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {DEFAULT_PLAN_TIERS.map(plan => {
+                    const isFullyMatched = plan.modules.length === activeClientModules.length &&
+                      plan.modules.every(m => activeClientModules.includes(m));
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => handleApplyPreset(plan.modules)}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                          isFullyMatched
+                            ? "bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-500/20"
+                            : "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-black text-xs flex items-center gap-1.5">
+                            <span>{plan.name}</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isFullyMatched ? "bg-white/20 text-white" : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400"}`}>
+                              {plan.modules.length} Mods
+                            </span>
+                          </div>
+                          <div className={`text-[11px] mt-0.5 ${isFullyMatched ? "text-indigo-100" : "text-slate-500 dark:text-slate-400"}`}>
+                            {plan.monthlyFee > 0 ? `₹${plan.monthlyFee.toLocaleString()}/mo` : "Custom Quote"}
+                          </div>
+                        </div>
+                        <Check size={14} className={isFullyMatched ? "opacity-100" : "opacity-0"} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 1-Click Industry Presets */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80">
+                <span className="text-[11px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
+                  <Sparkles size={13} className="text-amber-500" /> 1-Click Industry Presets
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {INDUSTRY_MODULE_PRESETS.map(preset => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => handleApplyPreset(preset.modules)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <span>{preset.icon}</span>
+                      <span>{preset.name}</span>
+                      <span className="text-[10px] text-indigo-500 font-mono">({preset.modules.length})</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

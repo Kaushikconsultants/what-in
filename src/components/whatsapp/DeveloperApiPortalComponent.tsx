@@ -105,6 +105,11 @@ export default function DeveloperApiPortalComponent() {
     avgResponseTimeMs: 0,
   });
 
+  // Error States
+  const [keysError, setKeysError] = useState<string | null>(null);
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+
   // Outbound Webhook State
   const [outboundWebhooks, setOutboundWebhooks] = useState<any[]>([]);
   const [loadingWebhooks, setLoadingWebhooks] = useState(false);
@@ -124,11 +129,18 @@ export default function DeveloperApiPortalComponent() {
 
   const fetchOutboundWebhooks = async () => {
     setLoadingWebhooks(true);
+    setWebhookError(null);
     try {
       const res = await fetch("/api/v1/webhooks/outbound");
       const data = await res.json();
-      if (data.success) setOutboundWebhooks(data.data || []);
-    } catch {}
+      if (data.success) {
+        setOutboundWebhooks(data.data || []);
+      } else if (data.error) {
+        setWebhookError(data.error);
+      }
+    } catch (e: any) {
+      setWebhookError(e.message || "Failed to load outbound webhooks");
+    }
     finally { setLoadingWebhooks(false); }
   };
 
@@ -331,14 +343,17 @@ export default function DeveloperApiPortalComponent() {
   // Fetch API Keys
   const fetchKeys = async () => {
     setLoadingKeys(true);
+    setKeysError(null);
     try {
       const res = await fetch("/api/v1/keys");
       const data = await res.json();
       if (data.success && data.keys) {
         setKeys(data.keys);
+      } else if (data.error) {
+        setKeysError(data.error);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setKeysError(e.message || "Failed to load API keys");
     } finally {
       setLoadingKeys(false);
     }
@@ -347,6 +362,7 @@ export default function DeveloperApiPortalComponent() {
   // Fetch Logs
   const fetchLogs = async (statusFilter = "") => {
     setLoadingLogs(true);
+    setLogsError(null);
     try {
       const url = statusFilter ? `/api/v1/logs?status=${statusFilter}` : "/api/v1/logs";
       const res = await fetch(url);
@@ -354,9 +370,11 @@ export default function DeveloperApiPortalComponent() {
       if (data.success) {
         setLogs(data.logs || []);
         if (data.metrics) setLogStats(data.metrics);
+      } else if (data.error) {
+        setLogsError(data.error);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setLogsError(e.message || "Failed to load request logs");
     } finally {
       setLoadingLogs(false);
     }
@@ -923,6 +941,18 @@ echo $response;
             </button>
           </div>
 
+          {keysError && (
+            <div className="m-4 sm:m-6 p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl flex items-start gap-3">
+              <div className="p-2 bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-400 rounded-lg shrink-0">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-red-800 dark:text-red-300 m-0">API Key Error</h4>
+                <p className="text-xs text-red-700 dark:text-red-400 m-0 mt-0.5">{keysError}</p>
+              </div>
+            </div>
+          )}
+
           {loadingKeys ? (
             <div className="p-8 text-center text-xs text-gray-500">Loading API keys...</div>
           ) : keys.length === 0 ? (
@@ -1408,6 +1438,18 @@ echo $response;
             </div>
           </div>
 
+          {logsError && (
+            <div className="m-4 sm:m-6 p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-xl flex items-start gap-3">
+              <div className="p-2 bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-400 rounded-lg shrink-0">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-red-800 dark:text-red-300 m-0">Audit Logs Error</h4>
+                <p className="text-xs text-red-700 dark:text-red-400 m-0 mt-0.5">{logsError}</p>
+              </div>
+            </div>
+          )}
+
           {loadingLogs ? (
             <div className="p-8 text-center text-xs text-gray-500">Loading audit logs...</div>
           ) : logs.length === 0 ? (
@@ -1603,6 +1645,19 @@ app.post('/my-webhook', (req, res) => {
                     {creatingWebhook ? "Creating..." : "Create Webhook"}
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Webhook Error Banner */}
+          {webhookError && (
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-2xl p-5 flex items-start gap-3 shadow-xs">
+              <div className="p-2.5 bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-400 rounded-xl shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-red-800 dark:text-red-300 mb-0.5">Webhook API Stopped / Disabled</h4>
+                <p className="text-xs text-red-700 dark:text-red-400 m-0 leading-relaxed">{webhookError}</p>
               </div>
             </div>
           )}

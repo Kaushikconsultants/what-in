@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { parseEnabledModules } from "@/lib/moduleRegistry";
 
 export interface ApiKeyAuthResult {
   authenticated: boolean;
@@ -97,6 +98,16 @@ export async function validateApiKey(
         authenticated: false,
         statusCode: 403,
         error: "The account associated with this API key is inactive or blocked.",
+      };
+    }
+
+    // 2.1 Check if DEVELOPER_API module is enabled on client's subscription plan
+    const enabledModules = parseEnabledModules(apiKey.client.enabledModules);
+    if (!enabledModules.includes("DEVELOPER_API")) {
+      return {
+        authenticated: false,
+        statusCode: 403,
+        error: "Developer REST APIs & Webhooks are disabled on your subscription plan. Please upgrade to Enterprise VIP to activate Developer APIs.",
       };
     }
 

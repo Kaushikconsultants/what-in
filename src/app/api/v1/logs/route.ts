@@ -28,6 +28,23 @@ export async function GET(req: NextRequest) {
       if (fallbackClient) clientId = fallbackClient.id;
     }
 
+    if (!clientId) {
+      return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
+    }
+
+    const clientRecord = await prisma.whatsAppClient.findUnique({
+      where: { id: clientId },
+      select: { enabledModules: true },
+    });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(clientRecord?.enabledModules);
+    if (!enabledModules.includes("DEVELOPER_API")) {
+      return NextResponse.json(
+        { success: false, error: "Developer REST APIs & Webhooks are disabled on your subscription plan. Please upgrade to Enterprise VIP." },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50", 10), 1), 200);
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);

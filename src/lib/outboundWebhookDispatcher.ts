@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { parseEnabledModules } from "@/lib/moduleRegistry";
 
 export interface OutboundWebhookPayload {
   event: string;
@@ -26,6 +27,20 @@ export async function dispatchOutboundWebhook(
   // Run asynchronously in the background so caller is not blocked
   (async () => {
     try {
+      // 1. Verify Client Subscription Module Entitlement
+      const client = await prisma.whatsAppClient.findUnique({
+        where: { id: clientId },
+        select: { id: true, enabledModules: true, subscriptionStatus: true }
+      });
+
+      if (!client || client.subscriptionStatus === "BLOCKED") return;
+
+      const enabledModules = parseEnabledModules(client.enabledModules);
+      if (!enabledModules.includes("DEVELOPER_API")) {
+        console.warn(`[WebhookDispatcher] Outbound webhook dispatch skipped for client ${clientId}: DEVELOPER_API module is locked on plan.`);
+        return;
+      }
+
       const webhooks = await prisma.whatsAppOutboundWebhook.findMany({
         where: {
           clientId,

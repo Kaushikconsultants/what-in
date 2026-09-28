@@ -57,7 +57,8 @@ import {
   GripVertical,
   ExternalLink,
   ShieldCheck,
-  Tag
+  Tag,
+  Lock
 } from "lucide-react";
 import {
   getWhatsAppChatbotFlows,
@@ -72,13 +73,29 @@ import {
   getWhatsAppTemplates
 } from "@/app/actions/whatsAppPlatformActions";
 import { getWhatsAppIntegrationsAction } from "@/app/actions/whatsAppIntegrationActions";
+import { ModuleKey, ALL_MODULE_KEYS, MASTER_MODULES } from "@/lib/moduleRegistry";
 import "@/components/whatsapp/ChatbotBuilder.css";
 
-// Block Library Categories
-const blockCategories = [
+export interface BlockItem {
+  id: string;
+  name: string;
+  icon: any;
+  requiredModule?: ModuleKey;
+}
+
+export interface BlockCategoryConfig {
+  name: string;
+  count: number;
+  requiredModule?: ModuleKey;
+  blocks: BlockItem[];
+}
+
+// Block Library Categories with Explicit Module Entitlements
+const blockCategories: BlockCategoryConfig[] = [
   {
     name: "Messages",
     count: 11,
+    requiredModule: "CHATBOT",
     blocks: [
       { id: "text", name: "Text", icon: MessageSquare },
       { id: "image", name: "Image", icon: ImageIcon },
@@ -96,6 +113,7 @@ const blockCategories = [
   {
     name: "Choices",
     count: 2,
+    requiredModule: "CHATBOT",
     blocks: [
       { id: "buttons", name: "Buttons", icon: List },
       { id: "list_menu", name: "List Menu", icon: Layers }
@@ -104,6 +122,7 @@ const blockCategories = [
   {
     name: "Inputs",
     count: 5,
+    requiredModule: "CHATBOT",
     blocks: [
       { id: "input_name", name: "Name Input", icon: User },
       { id: "input_email", name: "Email Input", icon: Mail },
@@ -115,6 +134,7 @@ const blockCategories = [
   {
     name: "Logic",
     count: 5,
+    requiredModule: "CHATBOT",
     blocks: [
       { id: "set_var", name: "Set Variable", icon: Sliders },
       { id: "condition", name: "Condition (If/Else)", icon: GitBranch },
@@ -126,30 +146,34 @@ const blockCategories = [
   {
     name: "Payments",
     count: 3,
+    requiredModule: "PAYMENT_GATEWAY",
     blocks: [
-      { id: "pay_link", name: "Payment Link", icon: CreditCard },
-      { id: "pay_qr", name: "UPI QR Code", icon: QrCode },
-      { id: "pay_collect", name: "Collect Payment", icon: DollarSign }
+      { id: "pay_link", name: "Payment Link", icon: CreditCard, requiredModule: "PAYMENT_GATEWAY" },
+      { id: "pay_qr", name: "UPI QR Code", icon: QrCode, requiredModule: "PAYMENT_GATEWAY" },
+      { id: "pay_collect", name: "Collect Payment", icon: DollarSign, requiredModule: "PAYMENT_GATEWAY" }
     ]
   },
   {
     name: "E-Commerce",
     count: 2,
+    requiredModule: "META_CATALOG",
     blocks: [
-      { id: "catalog", name: "Product Catalog", icon: ShoppingBag },
-      { id: "order", name: "Multi-Item Order", icon: ShoppingCart }
+      { id: "catalog", name: "Product Catalog", icon: ShoppingBag, requiredModule: "META_CATALOG" },
+      { id: "order", name: "Multi-Item Order", icon: ShoppingCart, requiredModule: "META_CATALOG" }
     ]
   },
   {
     name: "API & Live Data",
     count: 1,
+    requiredModule: "DEVELOPER_API",
     blocks: [
-      { id: "webhook", name: "Webhook Fetch", icon: Globe }
+      { id: "webhook", name: "Webhook Fetch", icon: Globe, requiredModule: "DEVELOPER_API" }
     ]
   },
   {
     name: "Connect (CRM)",
     count: 3,
+    requiredModule: "INBOX",
     blocks: [
       { id: "crm_contact", name: "Update CRM Contact", icon: UserCheck },
       { id: "crm_lead", name: "Create Lead", icon: UserPlus },
@@ -159,18 +183,20 @@ const blockCategories = [
   {
     name: "Meta Suite & Ads",
     count: 4,
+    requiredModule: "META_PIXEL_CAPI",
     blocks: [
-      { id: "meta_capi", name: "Meta CAPI Event", icon: Target },
-      { id: "meta_ctwa_ad", name: "CTWA Ad Attribution", icon: Sparkles },
-      { id: "meta_custom_audience", name: "Meta Audience Sync", icon: Users },
-      { id: "meta_template", name: "Send Meta Template", icon: Bot }
+      { id: "meta_capi", name: "Meta CAPI Event", icon: Target, requiredModule: "META_PIXEL_CAPI" },
+      { id: "meta_ctwa_ad", name: "CTWA Ad Attribution", icon: Sparkles, requiredModule: "META_PIXEL_CAPI" },
+      { id: "meta_custom_audience", name: "Meta Audience Sync", icon: Users, requiredModule: "META_PIXEL_CAPI" },
+      { id: "meta_template", name: "Send Meta Template", icon: Bot, requiredModule: "BROADCASTS" }
     ]
   },
   {
     name: "AI Automation",
     count: 1,
+    requiredModule: "AI_AGENT",
     blocks: [
-      { id: "ai_bot", name: "AI GPT Intent", icon: Bot }
+      { id: "ai_bot", name: "AI GPT Intent", icon: Bot, requiredModule: "AI_AGENT" }
     ]
   }
 ];
@@ -515,6 +541,31 @@ export default function WhatsAppChatbotBuilderPage() {
   const [showSimModal, setShowSimModal] = useState<boolean>(false);
   const [simMessages, setSimMessages] = useState<any[]>([]);
   const [isMounted, setIsMounted] = useState<boolean>(false);
+
+  // Subscription Plan & Enabled Modules for Gating
+  const [enabledModules, setEnabledModules] = useState<ModuleKey[]>(ALL_MODULE_KEYS);
+  const [clientPlanInfo, setClientPlanInfo] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/whatsapp/client-status")
+      .then(r => r.json())
+      .then(d => {
+        if (d) {
+          setClientPlanInfo(d);
+          if (d.enabledModules && Array.isArray(d.enabledModules)) {
+            setEnabledModules(d.enabledModules);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const isBlockAllowed = (block: BlockItem, cat?: BlockCategoryConfig) => {
+    const reqMod = block.requiredModule || cat?.requiredModule;
+    if (!reqMod) return true;
+    return enabledModules.includes(reqMod);
+  };
+
   useEffect(() => {
     // Recalculate port coordinates after DOM layout updates
     updatePortCoords();
@@ -1163,6 +1214,26 @@ export default function WhatsAppChatbotBuilderPage() {
       }
     });
 
+    // Modular Plan Feature Gating Validation
+    nodes.forEach(node => {
+      const type = (node.type || "").toUpperCase();
+      if (type.startsWith("PAY_") && !enabledModules.includes("PAYMENT_GATEWAY")) {
+        errors.push(`Payment node "${node.title || type}" requires the [Payment Gateways & COD] module which is locked on your current subscription plan.`);
+      }
+      if ((type === "CATALOG" || type === "ORDER") && !enabledModules.includes("META_CATALOG") && !enabledModules.includes("SHOPIFY_INTEGRATION")) {
+        errors.push(`E-Commerce node "${node.title || type}" requires the [Meta Catalog] or [Shopify] module which is locked on your current subscription plan.`);
+      }
+      if (type === "WEBHOOK" && !enabledModules.includes("DEVELOPER_API")) {
+        errors.push(`API Webhook node "${node.title || type}" requires the [Developer APIs & Webhooks] module which is locked on your current subscription plan.`);
+      }
+      if (type === "AI_BOT" && !enabledModules.includes("AI_AGENT")) {
+        errors.push(`AI Intent node "${node.title || type}" requires the [AI Auto-Pilot & Knowledge Base] module which is locked on your current subscription plan.`);
+      }
+      if ((type === "META_CAPI" || type === "META_CTWA_AD" || type === "META_CUSTOM_AUDIENCE") && !enabledModules.includes("META_PIXEL_CAPI")) {
+        errors.push(`Meta Ads node "${node.title || type}" requires the [Meta Pixel & CAPI Ad Tracking] module which is locked on your current subscription plan.`);
+      }
+    });
+
     return { isValid: errors.length === 0, errors };
   };
 
@@ -1285,6 +1356,15 @@ export default function WhatsAppChatbotBuilderPage() {
   // RICH BLOCK INITIALIZATION FOR ALL 25+ BLOCK TYPES
   // ---------------------------------------------------------
   const handleAddBlockToCanvas = (block: any, x?: number, y?: number) => {
+    // 1. Subscription Plan & Modular Feature Gating Check
+    if (block.requiredModule && !enabledModules.includes(block.requiredModule)) {
+      const modDef = MASTER_MODULES[block.requiredModule as ModuleKey];
+      const modName = modDef ? modDef.name : block.requiredModule;
+      setToastMsg(`🔒 LOCKED: The "${block.name}" block requires the [${modName}] module. Please upgrade your plan in the Owner Portal to activate it.`);
+      setTimeout(() => setToastMsg(null), 4000);
+      return;
+    }
+
     if (block.id === "meta_capi") {
       const hasMeta = integrations.some(i => i.type === "META_CAPI" && i.isActive);
       if (!hasMeta) {
@@ -2152,6 +2232,7 @@ export default function WhatsAppChatbotBuilderPage() {
           {!isSidebarCollapsed && (
             <div className="library-scroll-area">
               {blockCategories.map((cat) => {
+                const isCatAllowed = !cat.requiredModule || enabledModules.includes(cat.requiredModule);
                 const isOpen = openCategories[cat.name] ?? false;
                 const filteredBlocks = cat.blocks.filter((b) =>
                   b.name.toLowerCase().includes(blockSearch.toLowerCase())
@@ -2159,9 +2240,16 @@ export default function WhatsAppChatbotBuilderPage() {
                 if (blockSearch && filteredBlocks.length === 0) return null;
 
                 return (
-                  <div key={cat.name} className="category-accordion">
+                  <div key={cat.name} className={`category-accordion ${!isCatAllowed ? "opacity-80" : ""}`}>
                     <div className="category-header-row" onClick={() => toggleCategory(cat.name)}>
-                      <span>{cat.name}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>{cat.name}</span>
+                        {!isCatAllowed && (
+                          <span style={{ fontSize: "10px", color: "#f59e0b", background: "#fef3c7", padding: "1px 6px", borderRadius: "6px", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                            <Lock size={10} /> Locked
+                          </span>
+                        )}
+                      </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span className="category-badge">{cat.count}</span>
                         {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -2172,18 +2260,29 @@ export default function WhatsAppChatbotBuilderPage() {
                       <div className="category-blocks-grid">
                         {filteredBlocks.map((b) => {
                           const Icon = b.icon;
+                          const allowed = isBlockAllowed(b, cat);
                           return (
                             <div
                               key={b.id}
-                              className="block-tile"
+                              className={`block-tile ${!allowed ? "opacity-60 border-amber-300 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20" : ""}`}
                               onClick={() => handleAddBlockToCanvas(b)}
-                              draggable={true}
+                              draggable={allowed}
                               onDragStart={(e) => {
+                                if (!allowed) {
+                                  e.preventDefault();
+                                  return;
+                                }
                                 e.dataTransfer.setData("text/plain", b.id);
                               }}
-                              style={{ cursor: "grab" }}
+                              style={{ cursor: allowed ? "grab" : "not-allowed", position: "relative" }}
+                              title={!allowed ? `Locked on Plan: Requires [${b.requiredModule || cat.requiredModule}] module` : `Add ${b.name}`}
                             >
-                              <Icon size={18} color="#10b981" />
+                              {!allowed && (
+                                <div style={{ position: "absolute", top: "5px", right: "5px", color: "#d97706" }}>
+                                  <Lock size={11} />
+                                </div>
+                              )}
+                              <Icon size={18} color={allowed ? "#10b981" : "#94a3b8"} />
                               <span>{b.name}</span>
                             </div>
                           );

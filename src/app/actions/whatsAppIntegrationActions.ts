@@ -83,6 +83,25 @@ export async function createWhatsAppIntegrationAction(data: { name: string, url:
       return { success: false, error: "Name and URL are required" };
     }
 
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId } });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(client?.enabledModules);
+
+    if (data.type === 'META_CAPI' || data.type === 'PIXEL') {
+      if (!enabledModules.includes('META_PIXEL_CAPI')) {
+        return { success: false, error: "Meta Pixel & Conversions API (CAPI) is disabled on your subscription plan. Please upgrade to Enterprise VIP." };
+      }
+    } else if (data.type === 'META_CATALOG') {
+      if (!enabledModules.includes('META_CATALOG')) {
+        return { success: false, error: "Meta Commerce Catalog is disabled on your subscription plan. Please upgrade your subscription." };
+      }
+    } else {
+      if (!enabledModules.includes('DEVELOPER_API')) {
+        return { success: false, error: "Developer REST APIs & Webhooks are disabled on your subscription plan. Please upgrade to Enterprise VIP." };
+      }
+    }
+
     if (!isValidPublicWebhookUrl(data.url) && data.type !== 'META_CAPI' && data.type !== 'PIXEL' && data.type !== 'META_CATALOG') {
       return { success: false, error: "Invalid webhook URL: Private network/loopback IP addresses are not permitted." };
     }
@@ -118,6 +137,25 @@ export async function updateWhatsAppIntegrationAction(id: string, data: { name: 
     const isOwner = await isOwnerAuthenticated();
     if (!isOwner && (!user || (user.role !== 'ADMIN' && user.role !== 'OWNER' && user.role !== 'SUPER_ADMIN'))) {
       return { success: false, error: "Unauthorized access: Admin privileges required" };
+    }
+
+    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId } });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(client?.enabledModules);
+
+    if (data.type === 'META_CAPI' || data.type === 'PIXEL') {
+      if (!enabledModules.includes('META_PIXEL_CAPI')) {
+        return { success: false, error: "Meta Pixel & Conversions API (CAPI) is disabled on your subscription plan. Please upgrade to Enterprise VIP." };
+      }
+    } else if (data.type === 'META_CATALOG') {
+      if (!enabledModules.includes('META_CATALOG')) {
+        return { success: false, error: "Meta Commerce Catalog is disabled on your subscription plan. Please upgrade your subscription." };
+      }
+    } else if (data.type) {
+      if (!enabledModules.includes('DEVELOPER_API')) {
+        return { success: false, error: "Developer REST APIs & Webhooks are disabled on your subscription plan. Please upgrade to Enterprise VIP." };
+      }
     }
 
     if (data.url && !isValidPublicWebhookUrl(data.url) && data.type !== 'META_CAPI' && data.type !== 'PIXEL' && data.type !== 'META_CATALOG') {
@@ -198,6 +236,20 @@ export async function pushLeadToIntegrationAction(conversationId: string, integr
       include: { customer: true, assignedEmployee: { include: { user: true } } }
     });
     if (!conv) throw new Error("Conversation not found");
+
+    const effectiveClientId = conv.clientId || user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const clientRecord = await prisma.whatsAppClient.findUnique({
+      where: { id: effectiveClientId },
+      select: { enabledModules: true }
+    });
+    const { parseEnabledModules } = await import("@/lib/moduleRegistry");
+    const enabledModules = parseEnabledModules(clientRecord?.enabledModules);
+    if (!enabledModules.includes("DEVELOPER_API")) {
+      return {
+        success: false,
+        error: "CRM Webhook Integration & Developer APIs are stopped/disabled on your subscription plan. Please upgrade to Enterprise VIP."
+      };
+    }
 
     // 2. Ensure customer record exists and is linked
     let customer: any = conv.customer;

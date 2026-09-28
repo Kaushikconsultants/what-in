@@ -5,24 +5,40 @@ import { validateApiKey, logApiRequest } from "@/lib/apiKeyAuth";
 import { getAuthenticatedUser } from "@/lib/authSession";
 import { checkRateLimit, withRateLimitHeaders } from "@/lib/rateLimiter";
 import { generateWebhookSignature } from "@/lib/outboundWebhookDispatcher";
+import { parseEnabledModules } from "@/lib/moduleRegistry";
 
 async function resolveClient(req: NextRequest) {
   // 1. Try API Key
   const auth = await validateApiKey(req);
   if (auth.authenticated && auth.client) {
-    return { client: auth.client, apiKey: auth.apiKey };
+    return { client: auth.client, apiKey: auth.apiKey, error: null };
+  }
+  if (!auth.authenticated && auth.error && auth.statusCode === 403) {
+    return { client: null, apiKey: null, error: auth.error, statusCode: 403 };
   }
 
   // 2. Try User Session
   const user = await getAuthenticatedUser(req);
   if (user?.clientId) {
     const client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
-    if (client) return { client, apiKey: null };
+    if (client) {
+      const enabledModules = parseEnabledModules(client.enabledModules);
+      if (!enabledModules.includes("DEVELOPER_API")) {
+        return { client: null, apiKey: null, error: "Outbound Webhooks & Developer APIs are disabled on your subscription plan. Please upgrade to Enterprise VIP.", statusCode: 403 };
+      }
+      return { client, apiKey: null, error: null };
+    }
   }
 
   // 3. Fallback to primary client
   const fallback = await prisma.whatsAppClient.findFirst({ orderBy: { createdAt: "asc" } });
-  return { client: fallback, apiKey: null };
+  if (fallback) {
+    const enabledModules = parseEnabledModules(fallback.enabledModules);
+    if (!enabledModules.includes("DEVELOPER_API")) {
+      return { client: null, apiKey: null, error: "Outbound Webhooks & Developer APIs are disabled on your subscription plan. Please upgrade to Enterprise VIP.", statusCode: 403 };
+    }
+  }
+  return { client: fallback, apiKey: null, error: null };
 }
 
 /**
@@ -31,10 +47,10 @@ async function resolveClient(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   const startTime = Date.now();
-  const { client, apiKey } = await resolveClient(req);
+  const { client, apiKey, error, statusCode } = await resolveClient(req);
 
-  if (!client) {
-    return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+  if (error || !client) {
+    return NextResponse.json({ success: false, error: error || "Unauthorized.", code: "MODULE_DISABLED" }, { status: statusCode || 401 });
   }
 
   const rateLimit = checkRateLimit(apiKey?.id || client.id, 120, 60);
@@ -84,10 +100,10 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
-  const { client, apiKey } = await resolveClient(req);
+  const { client, apiKey, error, statusCode } = await resolveClient(req);
 
-  if (!client) {
-    return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
+  if (error || !client) {
+    return NextResponse.json({ success: false, error: error || "Unauthorized.", code: "MODULE_DISABLED" }, { status: statusCode || 401 });
   }
 
   const rateLimit = checkRateLimit(apiKey?.id || client.id, 120, 60);
@@ -265,8 +281,8 @@ export async function POST(req: NextRequest) {
  * Update webhook status, URL, or events
  */
 export async function PUT(req: NextRequest) {
-  const { client } = await resolveClient(req);
-  if (!client) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  const { client, error, statusCode } = await resolveClient(req);
+  if (error || !client) return NextResponse.json({ success: false, error: error || "Unauthorized", code: "MODULE_DISABLED" }, { status: statusCode || 401 });
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -301,8 +317,8 @@ export async function PUT(req: NextRequest) {
  * Delete a webhook subscription
  */
 export async function DELETE(req: NextRequest) {
-  const { client } = await resolveClient(req);
-  if (!client) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  const { client, error, statusCode } = await resolveClient(req);
+  if (error || !client) return NextResponse.json({ success: false, error: error || "Unauthorized", code: "MODULE_DISABLED" }, { status: statusCode || 401 });
 
   try {
     const { searchParams } = new URL(req.url);
