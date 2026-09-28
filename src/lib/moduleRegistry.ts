@@ -195,30 +195,30 @@ export interface PlanTierConfig {
 
 export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
   {
-    id: "STARTER",
-    name: "Starter",
-    monthlyFee: 999,
-    badge: "ESSENTIAL",
+    id: "BASIC",
+    name: "Basic",
+    monthlyFee: 1999,
+    badge: "STARTER",
     color: "#059669",
     bg: "#ecfdf5",
     border: "#a7f3d0",
     monthlyMessageQuota: 5000,
-    monthlyAiQuota: 500,
-    maxAgents: 3,
-    modules: ["INBOX", "CHATBOT", "WIDGET", "PAYMENT_GATEWAY"],
-    tagline: "Perfect for local businesses starting with WhatsApp support & payments"
+    monthlyAiQuota: 0,
+    maxAgents: 5,
+    modules: ["INBOX", "CHATBOT", "WIDGET"],
+    tagline: "5 Team Agents, Live Team Inbox, Visual Chatbot, Quick Replies & Templates (₹1,499 w/ code)"
   },
   {
     id: "GROWTH",
     name: "Growth",
-    monthlyFee: 2499,
-    badge: "POPULAR",
+    monthlyFee: 3499,
+    badge: "MOST POPULAR",
     color: "#4f46e5",
     bg: "#eef2ff",
     border: "#c7d2fe",
     monthlyMessageQuota: 25000,
     monthlyAiQuota: 2500,
-    maxAgents: 8,
+    maxAgents: 10,
     modules: [
       "INBOX",
       "CHATBOT",
@@ -229,49 +229,40 @@ export const DEFAULT_PLAN_TIERS: PlanTierConfig[] = [
       "META_CATALOG",
       "PAYMENT_GATEWAY"
     ],
-    tagline: "Built for scaling Shopify & D2C brands with catalog sales & AI auto-pilot"
-  },
-  {
-    id: "BUSINESS",
-    name: "Business Pro",
-    monthlyFee: 4999,
-    badge: "POWER",
-    color: "#d97706",
-    bg: "#fffbeb",
-    border: "#fde68a",
-    monthlyMessageQuota: 75000,
-    monthlyAiQuota: 10000,
-    maxAgents: 20,
-    modules: [
-      "INBOX",
-      "CHATBOT",
-      "AI_AGENT",
-      "BROADCASTS",
-      "WIDGET",
-      "COBROWSE",
-      "DEVELOPER_API",
-      "SHOPIFY_INTEGRATION",
-      "META_CATALOG",
-      "META_PIXEL_CAPI",
-      "PAYMENT_GATEWAY"
-    ],
-    tagline: "Full powerhouse with Meta CAPI ad tracking, Co-Browsing & developer APIs"
+    tagline: "10 Agents, Smart AI Auto-Pilot, Shopify Sync, WhatsApp Catalog, Gateways & Broadcasts"
   },
   {
     id: "ENTERPRISE",
     name: "Enterprise VIP",
-    monthlyFee: 9999,
-    badge: "UNLIMITED",
+    monthlyFee: 7499,
+    badge: "ALL-INCLUSIVE",
     color: "#7c3aed",
     bg: "#f5f3ff",
     border: "#ddd6fe",
-    monthlyMessageQuota: 250000,
-    monthlyAiQuota: 50000,
+    monthlyMessageQuota: 100000,
+    monthlyAiQuota: 15000,
     maxAgents: 100,
     modules: ALL_MODULE_KEYS,
-    tagline: "All 11 modules & integrations with maximum quotas and VIP dedicated support"
+    tagline: "Unlimited Agents, Server-Side Meta CAPI ROAS Booster, Co-Browsing & Developer REST APIs"
   }
 ];
+
+/**
+ * Resolves a plan tier by ID with backwards-compatibility aliases
+ */
+export function resolvePlanTier(planId: string | null | undefined): PlanTierConfig {
+  const norm = (planId || "").trim().toUpperCase();
+  if (norm === "STARTER" || norm === "BASIC") {
+    return DEFAULT_PLAN_TIERS[0];
+  }
+  if (norm === "GROWTH") {
+    return DEFAULT_PLAN_TIERS[1];
+  }
+  if (norm === "ENTERPRISE" || norm === "BUSINESS" || norm === "PRO" || norm === "CUSTOM") {
+    return DEFAULT_PLAN_TIERS[2];
+  }
+  return DEFAULT_PLAN_TIERS[0];
+}
 
 /**
  * Industry-Specific Presets for 1-Click Setup in Owner Portal

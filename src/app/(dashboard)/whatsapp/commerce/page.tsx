@@ -7,6 +7,7 @@ import {
   Upload, Trash2, Check, Sliders, ChevronDown, CheckSquare, Square, Edit3, Trash
 } from "lucide-react";
 import Link from "next/link";
+import ModuleGatedView from "@/components/whatsapp/ModuleGatedView";
 import { 
   getShopifyCredentialsAction, 
   syncShopifyProductsAction, 
@@ -1067,8 +1068,9 @@ export default function ProductsCommercePage() {
   });
 
   return (
-    <div className="p-8 w-full max-w-none flex flex-col gap-6">
-      {/* Toast Notification */}
+    <ModuleGatedView moduleKey={["META_CATALOG", "SHOPIFY_INTEGRATION"]}>
+      <div className="p-8 w-full max-w-none flex flex-col gap-6">
+        {/* Toast Notification */}
       {toast && (
         <div className={`p-4 rounded-xl shadow-lg border flex items-center justify-between transition-all animate-in fade-in slide-in-from-top-3 duration-200 ${
           toast.type === "success" 
@@ -2889,6 +2891,7 @@ export default function ProductsCommercePage() {
           }
         }}
       />
-    </div>
+      </div>
+    </ModuleGatedView>
   );
 }

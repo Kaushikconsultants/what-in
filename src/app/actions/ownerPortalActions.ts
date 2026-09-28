@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { isOwnerAuthenticated, getAuthenticatedUser } from "@/lib/authSession";
-import { DEFAULT_PLAN_TIERS, ALL_MODULE_KEYS, ModuleKey } from "@/lib/moduleRegistry";
+import { DEFAULT_PLAN_TIERS, resolvePlanTier, ALL_MODULE_KEYS, ModuleKey } from "@/lib/moduleRegistry";
 
 const OWNER_SECRET = process.env.OWNER_PORTAL_SECRET || "whatin-owner-2026";
 
@@ -146,7 +146,7 @@ export async function createClientAction(data: {
     // Resolve default modules if not explicitly passed
     let modulesToSet = (data as any).enabledModules;
     if (!modulesToSet || !Array.isArray(modulesToSet) || modulesToSet.length === 0) {
-      const plan = DEFAULT_PLAN_TIERS.find(p => p.id === data.subscriptionPlan);
+      const plan = resolvePlanTier(data.subscriptionPlan);
       modulesToSet = plan ? plan.modules : ALL_MODULE_KEYS;
     }
 
@@ -1317,7 +1317,7 @@ export async function updateClientPlanTierAction(clientId: string, planId: strin
     if (!(await isOwnerAuthenticated())) {
       return { success: false, error: "Unauthorized access: Owner login required" };
     }
-    const plan = DEFAULT_PLAN_TIERS.find(p => p.id === planId);
+    const plan = resolvePlanTier(planId);
     if (!plan) return { success: false, error: "Plan not found" };
 
     const client = await prisma.whatsAppClient.update({

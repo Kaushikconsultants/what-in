@@ -1,5 +1,6 @@
 import React from "react";
 import ShopifyHubComponent from "@/components/whatsapp/ShopifyHubComponent";
+import ModuleGatedView from "@/components/whatsapp/ModuleGatedView";
 
 export const metadata = {
   title: "Shopify E-Commerce WhatsApp Hub | Whatmore",
@@ -7,5 +8,9 @@ export const metadata = {
 };
 
 export default function ShopifyPage() {
-  return <ShopifyHubComponent />;
+  return (
+    <ModuleGatedView moduleKey="SHOPIFY_INTEGRATION">
+      <ShopifyHubComponent />
+    </ModuleGatedView>
+  );
 }

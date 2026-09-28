@@ -9,6 +9,7 @@ import WhatsAppFlowsComponent from "@/components/whatsapp/WhatsAppFlowsComponent
 import WhatsAppChatbotsComponent from "@/components/whatsapp/WhatsAppChatbotsComponent";
 import WhatsAppContactsComponent from "@/components/whatsapp/WhatsAppContactsComponent";
 import WhatsAppTagManagerComponent from "@/components/whatsapp/WhatsAppTagManagerComponent";
+import ModuleGatedView from "@/components/whatsapp/ModuleGatedView";
 import { getMetaPhoneHealthAndLimitsAction } from "@/app/actions/whatsAppPlatformActions";
 
 interface WhatsAppHubProps {
@@ -240,9 +241,21 @@ function WhatsAppHubContent({ initialTab = "templates" }: WhatsAppHubProps) {
       {/* Tab Panels */}
       <div className="w-full">
         {activeTab === "templates" && <WhatsAppTemplatesComponent />}
-        {activeTab === "broadcasts" && <WhatsAppBroadcastsComponent />}
-        {activeTab === "flows" && <WhatsAppFlowsComponent />}
-        {activeTab === "chatbots" && <WhatsAppChatbotsComponent />}
+        {activeTab === "broadcasts" && (
+          <ModuleGatedView moduleKey="BROADCASTS">
+            <WhatsAppBroadcastsComponent />
+          </ModuleGatedView>
+        )}
+        {activeTab === "flows" && (
+          <ModuleGatedView moduleKey="CHATBOT">
+            <WhatsAppFlowsComponent />
+          </ModuleGatedView>
+        )}
+        {activeTab === "chatbots" && (
+          <ModuleGatedView moduleKey="CHATBOT">
+            <WhatsAppChatbotsComponent />
+          </ModuleGatedView>
+        )}
         {activeTab === "contacts" && <WhatsAppContactsComponent />}
         {activeTab === "tags" && <WhatsAppTagManagerComponent />}
       </div>
