@@ -2590,11 +2590,6 @@ export default function WhatsAppInboxComponent() {
 
           {!isLeftCollapsed && (
             <>
-              {/* Mobile Push Alert & PWA Banner */}
-              <div style={{ padding: '0 8px 4px 8px' }}>
-                <MobilePushAlertBanner context="inbox" compact={true} />
-              </div>
-
               {/* Search Bar & Folder Tabs */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: showFilters ? '8px' : '0px' }}>
                 {/* Search Bar */}

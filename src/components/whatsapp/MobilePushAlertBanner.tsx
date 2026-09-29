@@ -33,6 +33,12 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    try {
+      if (localStorage.getItem("wm_push_banner_dismissed") === "1") {
+        setDismissed(true);
+      }
+    } catch {}
+
     // Check standalone mode (PWA installed)
     const isPWA = window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone === true;
     setIsStandalone(isPWA);
@@ -242,6 +248,13 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
     }
   };
 
+  const handleDismiss = () => {
+    setDismissed(true);
+    try {
+      localStorage.setItem("wm_push_banner_dismissed", "1");
+    } catch {}
+  };
+
   if (!isSupported || dismissed) return null;
 
   const isOrder = context === "orders";
@@ -251,6 +264,40 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
   const descText = isOrder
     ? "Get a native lock-screen buzz on your phone whenever a customer places an order via WhatsApp or Shopify."
     : "Never miss a lead: Receive instant lock-screen notifications for every inbound customer message.";
+
+  // ── Compact Mode: Ultra-sleek single-line strip ─────────────────────
+  if (compact) {
+    if (permission === "granted" && isSubscribed) {
+      return null; // Don't take space in sidebar if already active
+    }
+    return (
+      <div className="w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-50/80 dark:bg-slate-800/80 border border-indigo-200/60 dark:border-slate-700/60 mb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Smartphone size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">
+            {isOrder ? "Order Alerts" : "Message Alerts"}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handleSubscribe}
+            disabled={subscribing}
+            className="px-2 py-0.5 rounded-md text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 cursor-pointer disabled:opacity-50"
+          >
+            {subscribing ? "..." : "Enable"}
+          </button>
+          <button
+            onClick={handleDismiss}
+            className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            title="Dismiss"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ── Active State: ultra-compact single-line pill strip ──────────────
   if (permission === "granted" && isSubscribed) {
     return (
@@ -277,7 +324,7 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
             {testing ? <RefreshCw size={9} className="animate-spin" /> : <Zap size={9} />}
             <span>Test Buzz</span>
           </button>
-          <button onClick={() => setDismissed(true)} className="p-0.5 text-slate-400 hover:text-slate-600 rounded" title="Hide">
+          <button onClick={handleDismiss} className="p-0.5 text-slate-400 hover:text-slate-600 rounded" title="Hide">
             <X size={12} />
           </button>
         </div>
@@ -301,7 +348,7 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
             <strong>Alerts Blocked:</strong> Allow notifications in browser settings for lock-screen alerts.
           </span>
         </div>
-        <button onClick={() => setDismissed(true)} className="text-slate-400 hover:text-slate-600 p-1 shrink-0">
+        <button onClick={handleDismiss} className="text-slate-400 hover:text-slate-600 p-1 shrink-0">
           <X size={13} />
         </button>
       </div>
@@ -361,7 +408,7 @@ export default function MobilePushAlertBanner({ context, compact = false }: Mobi
           </button>
 
           <button
-            onClick={() => setDismissed(true)}
+            onClick={handleDismiss}
             className="p-1 rounded text-slate-400 hover:text-slate-200 transition-colors"
             title="Dismiss banner"
           >
