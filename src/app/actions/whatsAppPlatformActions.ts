@@ -3790,7 +3790,7 @@ MANDATORY INSTRUCTION: You MUST set templateType to "CAROUSEL" with category "MA
 
     const comboDealsSummary = activeCombos.length > 0
       ? activeCombos.map((c: any) => `• ${c.product_title || c.combo_name || 'Combo Pack'} @ ₹${c.combo_price || 'Special'} (Promo Code: ${c.discount_code || 'COMBO'})`).join('\n')
-      : `• Festive Mega Pack (Promo Code: FLAT30)\n• Buy 2 Get 1 Free (Promo Code: B2G1)`;
+      : `• No active promotional codes. Fixed catalog rates apply.`;
 
     const cannedFaqsSummary = cannedResponses.length > 0
       ? cannedResponses.map(r => `• [${r.title || r.shortcut}]: ${r.content}`).join('\n')

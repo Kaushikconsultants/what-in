@@ -56,7 +56,9 @@ import {
   SlidersHorizontal,
   ChevronRight as ArrowRight,
   Wrench,
-  Package
+  Package,
+  Send,
+  Share2
 } from "lucide-react";
 import {
   getOwnerClientsAction,
@@ -72,6 +74,8 @@ import {
   syncSubscriptionStatusesAction,
   registerWebhookForClientAction,
   loginAsClientAction,
+  resetClientPasswordAction,
+  getClientCredentialsAction,
   updateClientModulesAction,
   updateClientPlanTierAction,
   topUpClientQuotaAction,
@@ -131,6 +135,20 @@ export default function OwnerClientsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [addSuccessInfo, setAddSuccessInfo] = useState<any | null>(null);
   const [showAddPassword, setShowAddPassword] = useState(false);
+
+  // Share Credentials & Welcome Message Modal
+  const [shareCredsModal, setShareCredsModal] = useState<{
+    isOpen: boolean;
+    client: any;
+    password?: string;
+    isNewClient?: boolean;
+  } | null>(null);
+  const [credsPassword, setCredsPassword] = useState<string>("");
+  const [credsPhone, setCredsPhone] = useState<string>("");
+  const [showPasswordText, setShowPasswordText] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [savePasswordFeedback, setSavePasswordFeedback] = useState<string | null>(null);
 
   // Edit modal
   const [editClient, setEditClient] = useState<any | null>(null);
@@ -331,16 +349,26 @@ export default function OwnerClientsPage() {
 
     if (res.success && res.client) {
       setShowAdd(false);
-      setAddSuccessInfo({
-        businessName: form.businessName,
-        email: form.contactEmail,
-        password: form.adminPassword,
-        plan: form.subscriptionPlan,
-        loginUrl: `${window.location.origin}/login`,
-        webhookClientId: res.client.webhookClientId,
-        webhookUrl: `${window.location.origin}/api/whatsapp/webhook/${res.client.webhookClientId}`,
-        verifyToken: res.client.webhookVerifyToken
+      const generatedPass = res.defaultPassword || form.adminPassword || "WhatMore@123456";
+      const cleanPhone = (form.ownerWhatsApp || form.contactPhone || "").replace(/[^0-9]/g, "");
+
+      setCredsPassword(generatedPass);
+      setCredsPhone(cleanPhone);
+      setShowPasswordText(true);
+      setCopyFeedback("✓ Credentials & Welcome Message auto-copied to clipboard!");
+
+      const fullMsg = generateWelcomeMessage(res.client, generatedPass);
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        navigator.clipboard.writeText(fullMsg).catch(() => {});
+      }
+
+      setShareCredsModal({
+        isOpen: true,
+        client: res.client,
+        password: generatedPass,
+        isNewClient: true
       });
+
       load();
     } else {
       alert("Error creating client: " + (res.error || "Unknown error"));
@@ -552,12 +580,81 @@ export default function OwnerClientsPage() {
     else alert("Error deleting: " + res.error);
   };
 
+  const generateWelcomeMessage = (client: any, pass: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://whatmore.in";
+    const email = client?.contactEmail || client?.adminEmail || "";
+    const plan = client?.subscriptionPlan || "STANDARD";
+    const webhookId = client?.webhookClientId || "";
+    const cleanPass = pass?.trim() || "[Set upon login]";
+
+    return `🎉 *Welcome to WhatMore WhatsApp Business Platform!*
+
+Dear *${client?.businessName || "Business"}* Team,
+Your WhatsApp Cloud API & AI Automation account has been configured and is active!
+
+🔗 *Login Portal:* ${origin}/login
+📧 *Email / Username:* ${email}
+🔑 *Password:* ${cleanPass}
+📦 *Subscription Plan:* ${plan}
+💬 *Webhook ID:* ${webhookId}
+
+⚡ *What You Can Do Right Now:*
+• Shared Team Inbox & Live Multi-Agent WhatsApp Chat
+• AI Auto-Responder & Visual Chatbot Builder
+• Bulk Broadcasts, Contact Segmentation & Tags
+• Shopify / CRM Auto Sync & Live Order Tracking
+
+🚀 *Next Steps:*
+1. Visit ${origin}/login and log in with your credentials above.
+2. Complete your WhatsApp profile & verify your business phone number.
+3. If you need any onboarding or setup help, reply directly to this message.
+
+— *Team WhatMore Support*`;
+  };
+
+  const copyCredsToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback(label);
+      setTimeout(() => setCopyFeedback(null), 3500);
+    } catch {
+      alert("Failed to copy to clipboard.");
+    }
+  };
+
+  const handleOpenShareCreds = (client: any) => {
+    setActiveActionDropdown(null);
+    setCopyFeedback(null);
+    setSavePasswordFeedback(null);
+    setShowPasswordText(false);
+
+    const phone = (client.ownerWhatsApp || client.contactPhone || "").replace(/[^0-9]/g, "");
+    setCredsPhone(phone);
+
+    // Initial suggested password for existing client
+    const suggestedPass = "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
+    setCredsPassword(suggestedPass);
+
+    setShareCredsModal({
+      isOpen: true,
+      client,
+      password: suggestedPass,
+      isNewClient: false
+    });
+  };
+
   const handleGhostLogin = async (client: any) => {
     setActiveActionDropdown(null);
     setImpersonating(client.id);
     const res = await loginAsClientAction(client.id);
     if (res.success && res.user) {
-      document.cookie = `wm_user=${encodeURIComponent(JSON.stringify(res.user))}; path=/; max-age=86400; SameSite=Lax`;
+      if (res.token) {
+        document.cookie = `wm_token=${res.token}; path=/; max-age=604800; SameSite=Lax`;
+      }
+      if (res.sessionSecret) {
+        document.cookie = `wm_session=${res.sessionSecret}; path=/; max-age=604800; SameSite=Lax`;
+      }
+      document.cookie = `wm_user=${encodeURIComponent(JSON.stringify(res.user))}; path=/; max-age=604800; SameSite=Lax`;
       window.open("/whatsapp/inbox", "_blank");
     } else {
       alert("Could not switch to client: " + (res.error || "No admin agent found"));
@@ -1130,6 +1227,16 @@ export default function OwnerClientsPage() {
                                   <span>Collect</span>
                                 </button>
 
+                                {/* Share Credentials & Welcome Message */}
+                                <button
+                                  onClick={() => handleOpenShareCreds(client)}
+                                  title="Copy Credentials & Welcome Message"
+                                  className="px-2.5 py-1.5 rounded-xl font-bold text-xs text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800/70 hover:bg-sky-100 dark:hover:bg-sky-900 transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                                >
+                                  <Key size={12} />
+                                  <span>Creds</span>
+                                </button>
+
                                 {/* More Actions Dropdown Menu */}
                                 <div className="relative">
                                   <button
@@ -1141,7 +1248,15 @@ export default function OwnerClientsPage() {
                                   </button>
 
                                   {activeActionDropdown === client.id && (
-                                    <div className="absolute right-0 top-full mt-2 w-60 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-1.5 z-50 space-y-0.5 text-left animate-fade-in">
+                                    <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-1.5 z-50 space-y-0.5 text-left animate-fade-in">
+                                      <button
+                                        onClick={() => handleOpenShareCreds(client)}
+                                        className="w-full px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-sky-50 dark:hover:bg-sky-950/60 hover:text-sky-600 dark:hover:text-sky-300 flex items-center gap-2 cursor-pointer transition-colors"
+                                      >
+                                        <Key size={14} className="text-sky-500" />
+                                        <span>Share Credentials & Welcome Msg</span>
+                                      </button>
+
                                       <button
                                         onClick={() => handleOpenModules(client)}
                                         className="w-full px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-2 cursor-pointer transition-colors"
@@ -1315,8 +1430,16 @@ export default function OwnerClientsPage() {
                                       >
                                         Settings
                                       </button>
-                                    </div>               </div>
+                                    </div>
+                                    <button
+                                      onClick={() => handleOpenShareCreds(client)}
+                                      className="w-full mt-2 py-1.5 px-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 font-bold text-[11px] hover:bg-sky-100 dark:hover:bg-sky-900 border border-sky-200 dark:border-sky-800 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                                    >
+                                      <Key size={12} />
+                                      <span>Send Credentials & Welcome Msg</span>
+                                    </button>
                                   </div>
+                                </div>
 
                                 </div>
                               </td>
@@ -1461,6 +1584,14 @@ export default function OwnerClientsPage() {
                       </button>
 
                       <button
+                        onClick={() => handleOpenShareCreds(client)}
+                        title="Copy Credentials & Welcome Message"
+                        className="p-2 rounded-xl text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800/70 hover:bg-sky-100 dark:hover:bg-sky-900 transition-all cursor-pointer"
+                      >
+                        <Key size={15} />
+                      </button>
+
+                      <button
                         onClick={() => handleOpenEdit(client)}
                         title="Edit Settings"
                         className="p-2 rounded-xl text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
@@ -1538,6 +1669,14 @@ export default function OwnerClientsPage() {
                           className="px-2.5 py-1.5 rounded-xl font-bold text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 cursor-pointer"
                         >
                           Collect
+                        </button>
+                        <button
+                          onClick={() => handleOpenShareCreds(client)}
+                          title="Copy Credentials & Welcome Message"
+                          className="px-2.5 py-1.5 rounded-xl font-bold text-xs text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900 cursor-pointer flex items-center gap-1"
+                        >
+                          <Key size={11} />
+                          <span>Creds</span>
                         </button>
                         <button
                           onClick={() => handleOpenEdit(client)}
@@ -1969,54 +2108,308 @@ export default function OwnerClientsPage() {
       )}
 
       {/* ========================================================= */}
-      {/* 🎉 MODAL 3: ONBOARD SUCCESS DIALOG                        */}
+      {/* 🔑 MODAL 3: CLIENT CREDENTIALS & WELCOME MESSAGE          */}
       {/* ========================================================= */}
-      {addSuccessInfo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center mx-auto mb-3">
-                <CheckCircle2 size={32} />
+      {shareCredsModal && shareCredsModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className="w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl my-auto text-left relative max-h-[92vh] overflow-y-auto">
+            
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setShareCredsModal(null);
+                setCopyFeedback(null);
+                setSavePasswordFeedback(null);
+              }}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5 pr-8">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center shrink-0">
+                <Key size={24} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                Client Successfully Onboarded!
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Share these credentials with the client admin for their initial login.
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                    {shareCredsModal.isNewClient ? "🎉 Client Created & Credentials" : "🔑 Credentials & Welcome Message"}
+                  </h3>
+                  {shareCredsModal.isNewClient && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      NEW
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Share or copy login credentials and welcome message for <strong className="text-slate-800 dark:text-slate-200">{shareCredsModal.client.businessName}</strong>.
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs mb-6">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Business:</span>
-                <span className="font-black text-slate-900 dark:text-white">{addSuccessInfo.businessName}</span>
+            {copyFeedback && (
+              <div className="mb-4 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2 animate-fade-in">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                <span>{copyFeedback}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Admin Email:</span>
-                <span className="font-bold text-slate-900 dark:text-white">{addSuccessInfo.email}</span>
+            )}
+
+            {savePasswordFeedback && (
+              <div className="mb-4 p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 text-indigo-800 dark:text-indigo-200 text-xs font-bold flex items-center gap-2 animate-fade-in">
+                <Sparkles size={16} className="text-indigo-600 shrink-0" />
+                <span>{savePasswordFeedback}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Password:</span>
-                <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{addSuccessInfo.password}</span>
+            )}
+
+            {/* Credential Details Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-3 mb-4 text-xs">
+              
+              {/* Login Portal URL */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 font-semibold w-28 shrink-0">Portal URL:</span>
+                <span className="font-mono text-slate-900 dark:text-white truncate flex-1 font-semibold">
+                  {typeof window !== "undefined" ? window.location.origin : ""}/login
+                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => copyCredsToClipboard(`${typeof window !== "undefined" ? window.location.origin : ""}/login`, "Portal URL copied!")}
+                    title="Copy Login URL"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    <Copy size={13} />
+                  </button>
+                  <a
+                    href={`${typeof window !== "undefined" ? window.location.origin : ""}/login`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open Login Page"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    <ExternalLink size={13} />
+                  </a>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Plan:</span>
-                <span className="font-black text-emerald-600">{addSuccessInfo.plan}</span>
+
+              {/* Login Email / Username */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 font-semibold w-28 shrink-0">Username / Email:</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white truncate flex-1">
+                  {shareCredsModal.client.contactEmail || shareCredsModal.client.adminEmail || "No email registered"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => copyCredsToClipboard(shareCredsModal.client.contactEmail || shareCredsModal.client.adminEmail || "", "Login Email copied!")}
+                  title="Copy Username"
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer shrink-0"
+                >
+                  <Copy size={13} />
+                </button>
               </div>
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex flex-col gap-1">
-                <span className="text-slate-500">Webhook URL:</span>
-                <span className="font-mono text-[10px] break-all bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
-                  {addSuccessInfo.webhookUrl}
+
+              {/* Password Row with show/hide and copy */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-500 font-semibold w-28 shrink-0">Password:</span>
+                <div className="flex-1 relative flex items-center">
+                  <input
+                    type={showPasswordText ? "text" : "password"}
+                    value={credsPassword}
+                    onChange={(e) => setCredsPassword(e.target.value)}
+                    placeholder="Enter or reset password"
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs pr-14"
+                  />
+                  <div className="absolute right-1 flex items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordText(!showPasswordText)}
+                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      title={showPasswordText ? "Hide password" : "Show password"}
+                    >
+                      {showPasswordText ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => copyCredsToClipboard(credsPassword, "Password copied!")}
+                      className="p-1 text-slate-400 hover:text-indigo-600 cursor-pointer"
+                      title="Copy password"
+                    >
+                      <Copy size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Password Action Buttons: Reset or Save */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsResettingPassword(true);
+                    const newPass = "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
+                    const res = await resetClientPasswordAction(shareCredsModal.client.id, newPass);
+                    setIsResettingPassword(false);
+                    if (res.success && res.password) {
+                      setCredsPassword(res.password);
+                      setShowPasswordText(true);
+                      setSavePasswordFeedback(`✓ New password generated & saved to database: ${res.password}`);
+                      setTimeout(() => setSavePasswordFeedback(null), 4000);
+                    } else {
+                      alert("Error setting password: " + (res.error || "Failed"));
+                    }
+                  }}
+                  disabled={isResettingPassword}
+                  className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <RefreshCw size={11} className={isResettingPassword ? "animate-spin" : ""} />
+                  <span>{isResettingPassword ? "Updating..." : "⚡ Generate & Reset Password"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!credsPassword.trim()) {
+                      alert("Please type a password to save.");
+                      return;
+                    }
+                    setIsResettingPassword(true);
+                    const res = await resetClientPasswordAction(shareCredsModal.client.id, credsPassword.trim());
+                    setIsResettingPassword(false);
+                    if (res.success) {
+                      setSavePasswordFeedback("✓ Custom password saved to database for client login!");
+                      setTimeout(() => setSavePasswordFeedback(null), 4000);
+                    } else {
+                      alert("Error updating password: " + res.error);
+                    }
+                  }}
+                  disabled={isResettingPassword || !credsPassword.trim()}
+                  className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/80 hover:bg-indigo-100 transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Lock size={11} />
+                  <span>💾 Save Password to DB</span>
+                </button>
+              </div>
+
+              {/* Plan & Webhook */}
+              <div className="flex justify-between items-center pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-slate-500 font-semibold">Subscription Plan:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  {shareCredsModal.client.subscriptionPlan || "BASIC"}
                 </span>
               </div>
             </div>
 
+            {/* Direct WhatsApp Send Box */}
+            <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-800/60 mb-4">
+              <label className="block text-[11px] font-bold text-emerald-900 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
+                <Smartphone size={13} className="text-emerald-600" />
+                <span>Send Directly to Client via WhatsApp:</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={credsPhone}
+                  onChange={(e) => setCredsPhone(e.target.value)}
+                  placeholder="e.g. 919876543210 (country code + number)"
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleanPhone = credsPhone.replace(/[^0-9]/g, "");
+                    if (!cleanPhone) {
+                      alert("Please provide client WhatsApp phone number (with country code, e.g. 91...)");
+                      return;
+                    }
+                    const msg = generateWelcomeMessage(shareCredsModal.client, credsPassword);
+                    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+                    window.open(waUrl, "_blank");
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl font-bold text-xs text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs shadow-emerald-600/30 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                >
+                  <Send size={12} />
+                  <span>Send via WhatsApp</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Message Preview Box */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <MessageSquare size={13} className="text-indigo-500" />
+                  <span>Welcome Message Preview:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const msg = generateWelcomeMessage(shareCredsModal.client, credsPassword);
+                    copyCredsToClipboard(msg, "✓ Full welcome message copied to clipboard!");
+                  }}
+                  className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Copy size={11} />
+                  <span>Copy Message</span>
+                </button>
+              </div>
+              <textarea
+                readOnly
+                rows={5}
+                value={generateWelcomeMessage(shareCredsModal.client, credsPassword)}
+                className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-mono text-[11px] leading-relaxed text-slate-700 dark:text-slate-300 resize-none select-all"
+              />
+            </div>
+
+            {/* Action Buttons Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const msg = generateWelcomeMessage(shareCredsModal.client, credsPassword);
+                  copyCredsToClipboard(msg, "✓ Full welcome message copied to clipboard!");
+                }}
+                className="w-full py-2.5 px-3 rounded-xl font-black text-xs text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Copy size={13} />
+                <span>Copy Full Message</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const origin = typeof window !== "undefined" ? window.location.origin : "";
+                  const email = shareCredsModal.client.contactEmail || shareCredsModal.client.adminEmail || "";
+                  const quickCreds = `Portal: ${origin}/login\nUsername: ${email}\nPassword: ${credsPassword}`;
+                  copyCredsToClipboard(quickCreds, "✓ Credentials copied to clipboard!");
+                }}
+                className="w-full py-2.5 px-3 rounded-xl font-bold text-xs text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Key size={13} />
+                <span>Copy Creds Only</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleGhostLogin(shareCredsModal.client)}
+                className="w-full py-2.5 px-3 rounded-xl font-bold text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 hover:bg-amber-100 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Zap size={13} className="text-amber-500" />
+                <span>1-Click Test Login</span>
+              </button>
+            </div>
+
             <button
-              onClick={() => setAddSuccessInfo(null)}
-              className="w-full py-3 rounded-2xl font-black text-xs text-white bg-indigo-600 hover:bg-indigo-700 transition-all cursor-pointer"
+              type="button"
+              onClick={() => {
+                setShareCredsModal(null);
+                setCopyFeedback(null);
+                setSavePasswordFeedback(null);
+              }}
+              className="w-full py-2 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Done & Close
             </button>
+
           </div>
         </div>
       )}

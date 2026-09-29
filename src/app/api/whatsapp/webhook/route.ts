@@ -1807,7 +1807,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Helper: Web Push to tenant-specific agents
+// Helper: Web Push — ONLY to assigned agent + ADMIN users
 async function sendPushNotificationToAgents(
   title: string,
   body: string,
@@ -1815,50 +1815,58 @@ async function sendPushNotificationToAgents(
   assignedEmployeeId?: string | null,
   clientId?: string | null
 ) {
-  let targetEmails: string[] = [];
+  const targetEmails = new Set<string>();
 
+  // 1. Always include ADMIN-role users (platform owners / super admins)
+  const adminUsers = await prisma.user.findMany({
+    where: { role: 'ADMIN' },
+    select: { email: true }
+  });
+  adminUsers.forEach((u) => targetEmails.add(u.email));
+
+  // 2. Also include the specifically assigned agent (if any)
   if (assignedEmployeeId) {
     const emp = await prisma.employee.findUnique({
       where: { id: assignedEmployeeId },
-      include: { user: true }
+      include: { user: { select: { email: true } } }
     });
-    if (emp && emp.user) {
-      targetEmails.push(emp.user.email);
+    if (emp?.user?.email) {
+      targetEmails.add(emp.user.email);
     }
-  } else if (clientId) {
-    // Tenant unassigned: notify only agents of this client
-    const clientAgents = await prisma.whatsAppAgentUser.findMany({
-      where: { clientId: clientId, isActive: true },
-      select: { email: true }
-    });
-    targetEmails = clientAgents.map(a => a.email);
-  } else {
-    // Global unassigned chat: only notify Super ADMINs
-    const adminUsers = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { email: true } });
-    targetEmails = adminUsers.map((u) => u.email);
   }
 
-  const subs = await prisma.whatsAppPushSubscription.findMany();
+  // 3. If no one is assigned, also notify WhatsAppAgentUsers with ADMIN/OWNER role for this client
+  if (!assignedEmployeeId && clientId) {
+    const clientAdmins = await prisma.whatsAppAgentUser.findMany({
+      where: { clientId, isActive: true, role: { in: ['ADMIN', 'OWNER'] } },
+      select: { email: true }
+    });
+    clientAdmins.forEach((a) => targetEmails.add(a.email));
+  }
+
+  if (targetEmails.size === 0) return;
+
+  const subs = await prisma.whatsAppPushSubscription.findMany({
+    where: { userId: { in: Array.from(targetEmails) } }
+  });
   if (subs.length === 0) return;
 
   const payload = JSON.stringify({ title, body, data: { url } });
 
-  for (const sub of subs) {
-    if (!targetEmails.includes(sub.userId)) {
-      continue; 
-    }
-
-    try {
-      const subscription = {
-        endpoint: sub.endpoint,
-        keys: { p256dh: sub.p256dh, auth: sub.auth }
-      };
-
-      await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/push/send`, {
+  await Promise.allSettled(
+    subs.map((sub) =>
+      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/push/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.INTERNAL_API_SECRET || 'crm_internal_2026' },
-        body: JSON.stringify({ subscription, payload })
-      });
-    } catch (_) {}
-  }
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': process.env.INTERNAL_API_SECRET || 'crm_internal_2026'
+        },
+        body: JSON.stringify({
+          subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        })
+      }).catch((e) => console.error('[Push] Send failed for', sub.userId, e.message))
+    )
+  );
 }
+

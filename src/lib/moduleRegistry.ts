@@ -64,7 +64,7 @@ export const MASTER_MODULES: Record<ModuleKey, ModuleDefinition> = {
     badgeColor: "#8b5cf6",
     tagline: "Autonomous Gemini / OpenAI customer agent",
     description: "Smart 24/7 AI agent trained on store catalog, PDFs, business FAQs, and intent-aware contextual conversation.",
-    routes: ["/whatsapp/ai-automation"],
+    routes: ["/whatsapp/ai-automation", "/whatsapp/silent-listener"],
     industryFit: ["D2C Brands", "Real Estate", "Consultancies", "Healthcare"]
   },
 

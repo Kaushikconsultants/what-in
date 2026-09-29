@@ -2071,6 +2071,45 @@ model WhatsAppClient {
   websiteWidget      WhatsAppWebsiteWidget?
   googleSheetSync    WhatsAppGoogleSheetSync?
   outboundWebhooks   WhatsAppOutboundWebhook[]
+  silentListenerEntries SilentListenerEntry[]
+}
+
+// ---------------------------------------------------------
+// 🎙️ Silent Listener Mode — AI Auto-Training from Human Agents
+// AI silently observes closed human conversations, scores each Q&A
+// pair on quality, and surfaces top pairs for 1-click KB injection.
+// ---------------------------------------------------------
+model SilentListenerEntry {
+  id                String          @id @default(uuid())
+  clientId          String
+  client            WhatsAppClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  conversationId    String          // Source conversation
+
+  customerQuestion  String          // Extracted customer question/intent
+  agentAnswer       String          // The exact agent reply that was excellent
+
+  qualityScore      Float           // 0.0 – 1.0  (AI-rated helpfulness)
+  toneScore         Float           @default(0.8) // Friendly, Professional
+  resolutionScore   Float           @default(0.8) // Did it resolve the issue?
+  overallScore      Float           // Composite weighted score
+
+  aiReasoning       String?         // Why AI rated this highly
+  category          String?         // FAQ, Pricing, Returns, Shipping, Product, etc.
+  agentName         String?         // Which agent's response was captured
+  agentId           String?
+
+  status            String          @default("PENDING") // PENDING, APPROVED, REJECTED, INJECTED
+  reviewedAt        DateTime?
+  reviewedBy        String?         // Admin/Owner email who reviewed
+
+  // Once APPROVED → this text is appended to aiKnowledgeBase
+  kbEntry           String?         // Formatted "Q: ... A: ..." string ready to inject
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([clientId, status])
+  @@index([clientId, overallScore])
 }
 
 model WhatsAppAuditLog {

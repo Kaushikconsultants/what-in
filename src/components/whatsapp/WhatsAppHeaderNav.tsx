@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  MessageSquare, LayoutDashboard, Bot, ShoppingBag, ShoppingCart, Key, Activity, Box, GitBranch, FileCode, Zap, Bell, Sun, Moon, LogOut, CreditCard
+  MessageSquare, LayoutDashboard, Bot, ShoppingBag, ShoppingCart, Key, Activity, Box, GitBranch, FileCode, Zap, Bell, Sun, Moon, LogOut, CreditCard, Mic
 } from "lucide-react";
 import "./WhatsAppHeaderNav.css";
 import { getWhatsAppDashboardMetrics, syncSessionRoleAction } from "@/app/actions/whatsAppPlatformActions";

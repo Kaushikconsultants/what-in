@@ -162,24 +162,40 @@ export async function getUnifiedOrdersAction(filters?: {
       }
 
       // Address parsing
-      const fullAddress = cust?.shippingAddress || cust?.billingAddress || custNotes || "Address Pending";
-      let city = "";
-      let state = "";
-      let pincode = "";
+      const fullAddress = orderData.customerAddress || cust?.shippingAddress || cust?.billingAddress || custNotes || "Address Pending";
+      let city = orderData.customerCity || "";
+      let state = orderData.customerState || "";
+      let pincode = orderData.customerPincode || "";
 
       const pinMatch = fullAddress.match(/\b\d{6}\b/);
-      if (pinMatch) pincode = pinMatch[0];
+      if (pinMatch && !pincode) pincode = pinMatch[0];
 
-      if (custNotes) {
+      if (!city && custNotes) {
         const cityMatch = custNotes.match(/City:\s*([^,\n]+)/i);
         if (cityMatch) city = cityMatch[1].trim();
+      }
+      if (!state && custNotes) {
         const stateMatch = custNotes.match(/State:\s*([^,\n]+)/i);
         if (stateMatch) state = stateMatch[1].trim();
+      }
+      if (!pincode && custNotes) {
         const pinMatchNotes = custNotes.match(/Pincode:\s*(\d{6})/i);
         if (pinMatchNotes) pincode = pinMatchNotes[1];
       }
 
       const shortId = msg.id.slice(-6).toUpperCase();
+
+      const itemsTotal = items.reduce((s, it) => s + it.total, 0);
+      const computedSubtotal = orderData.subtotal !== undefined ? Number(orderData.subtotal) : (itemsTotal || totalAmt + discountAmount);
+      const computedDiscountAmount = orderData.discountAmount !== undefined ? Number(orderData.discountAmount) : discountAmount;
+      const computedDiscountPercent = orderData.discountPercent !== undefined ? Number(orderData.discountPercent) : discountPercent;
+      const computedDiscountCode = orderData.discountCode !== undefined ? orderData.discountCode : (computedDiscountAmount > 0 ? "DISCOUNT" : undefined);
+      const computedShippingFee = orderData.shippingFee !== undefined ? Number(orderData.shippingFee) : 0;
+      const computedTotal = orderData.totalAmount !== undefined ? Number(orderData.totalAmount) : (totalAmt || Math.max(0, computedSubtotal - computedDiscountAmount + computedShippingFee));
+      const computedPaymentMode = orderData.paymentMode || paymentMode;
+      const computedAdvancePaid = orderData.advanceAmountPaid !== undefined ? Number(orderData.advanceAmountPaid) : advancePaid;
+      const computedCodBalance = orderData.codBalanceDue !== undefined ? Number(orderData.codBalanceDue) : (computedPaymentMode === "PREPAID" ? 0 : Math.max(0, computedTotal - computedAdvancePaid));
+      const computedPaymentStatus = orderData.paymentStatus || (computedPaymentMode === "PREPAID" ? (isPaid ? "PAID" : "PENDING") : (computedAdvancePaid > 0 ? "PARTIALLY_PAID" : "PENDING"));
 
       orders.push({
         id: msg.id,
@@ -188,10 +204,10 @@ export async function getUnifiedOrdersAction(filters?: {
         createdAt: msg.sentAt ? msg.sentAt.toISOString() : new Date().toISOString(),
         customer: {
           id: cust?.id,
-          name: cust?.contactPerson || cust?.businessName || "WhatsApp Customer",
-          phone: cust?.mobile || cust?.whatsappNumber || "",
+          name: orderData.customerName || cust?.contactPerson || cust?.businessName || "WhatsApp Customer",
+          phone: orderData.customerPhone || cust?.mobile || cust?.whatsappNumber || "",
           email: "",
-          whatsappPhone: cust?.whatsappNumber || cust?.mobile || "",
+          whatsappPhone: cust?.whatsappNumber || cust?.mobile || orderData.customerPhone || "",
           conversationId: conv?.id,
           fullAddress,
           city,
@@ -206,22 +222,26 @@ export async function getUnifiedOrdersAction(filters?: {
           total: totalAmt
         }],
         financials: {
-          subtotal: totalAmt + discountAmount,
-          discountPercent,
-          discountCode: discountPercent > 0 ? "PREPAID_OFF" : undefined,
-          discountAmount,
-          shippingFee: 0,
-          tax: 0,
-          totalAmount: totalAmt,
-          paymentMode,
-          advanceAmountPaid: advancePaid,
-          codBalanceDue: codBalance,
-          paymentStatus,
+          subtotal: computedSubtotal,
+          discountPercent: computedDiscountPercent,
+          discountCode: computedDiscountCode,
+          discountAmount: computedDiscountAmount,
+          shippingFee: computedShippingFee,
+          tax: Number(orderData.tax) || 0,
+          totalAmount: computedTotal,
+          paymentMode: computedPaymentMode,
+          advanceAmountPaid: computedAdvancePaid,
+          codBalanceDue: computedCodBalance,
+          paymentStatus: computedPaymentStatus,
           paymentLinkUrl: pLink?.paymentUrl,
           transactionId: pLink?.transactionId || undefined
         },
         fulfillment: {
-          status: "PROCESSING"
+          status: orderData.fulfillmentStatus || "PROCESSING",
+          courierName: orderData.courierName || undefined,
+          awbNumber: orderData.awbNumber || undefined,
+          trackingUrl: orderData.trackingUrl || undefined,
+          dispatchDate: orderData.dispatchDate || undefined
         },
         notes: orderData.customerNote || custNotes || undefined
       });
@@ -379,6 +399,29 @@ export async function updateOrderStatusAction(params: {
           dispatchDate: status === "DISPATCHED" ? new Date() : dbOrder.dispatchDate
         }
       });
+    } else {
+      // Check if it's a WhatsApp catalog order message
+      const msg = await prisma.whatsAppMessage.findUnique({
+        where: { id: orderId }
+      });
+      if (msg) {
+        let meta: any = {};
+        try {
+          meta = JSON.parse(msg.metadata || "{}");
+        } catch (_) {}
+        meta.order = {
+          ...(meta.order || {}),
+          fulfillmentStatus: status,
+          courierName: courierName || meta.order?.courierName,
+          awbNumber: awbNumber || meta.order?.awbNumber,
+          trackingUrl: trackingUrl || meta.order?.trackingUrl,
+          dispatchDate: status === "DISPATCHED" ? new Date().toISOString() : meta.order?.dispatchDate
+        };
+        await prisma.whatsAppMessage.update({
+          where: { id: orderId },
+          data: { metadata: JSON.stringify(meta) }
+        });
+      }
     }
 
     // If sendWhatsAppNotification is checked, send dispatch or update message
@@ -397,6 +440,13 @@ export async function updateOrderStatusAction(params: {
             }
           });
           if (conv) convId = conv.id;
+        }
+      } else {
+        const msg = await prisma.whatsAppMessage.findUnique({
+          where: { id: orderId }
+        });
+        if (msg?.conversationId) {
+          convId = msg.conversationId;
         }
       }
 
@@ -450,5 +500,214 @@ export async function sendOrderWhatsAppMessageAction(params: {
     return res;
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+}
+
+export interface UpdateUnifiedOrderInput {
+  orderId: string;
+  source: "WHATSAPP_CATALOG" | "SHOPIFY" | "DIRECT_CRM";
+  items: UnifiedOrderItem[];
+  customer?: {
+    name?: string;
+    phone?: string;
+    fullAddress?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    landmark?: string;
+  };
+  financials: {
+    subtotal: number;
+    discountPercent?: number;
+    discountCode?: string;
+    discountAmount: number;
+    shippingFee: number;
+    tax?: number;
+    totalAmount: number;
+    paymentMode?: "PREPAID" | "PARTIAL_COD" | "FULL_COD" | "ONLINE";
+    advanceAmountPaid?: number;
+    codBalanceDue?: number;
+    paymentStatus?: "PAID" | "PARTIALLY_PAID" | "PENDING" | "FAILED" | "REFUNDED";
+  };
+  notes?: string;
+}
+
+/**
+ * Shopify-Style Edit Order Action:
+ * Persists modifications to order items, prices, quantities, discounts, shipping fees,
+ * payment splits (advance/COD balance), and customer shipping details.
+ */
+export async function updateUnifiedOrderAction(params: UpdateUnifiedOrderInput) {
+  try {
+    const { orderId, items, customer, financials, notes } = params;
+
+    // 1. Try finding in WhatsApp catalog message
+    const msg = await prisma.whatsAppMessage.findUnique({
+      where: { id: orderId },
+      include: { conversation: { include: { customer: true } } }
+    });
+
+    if (msg) {
+      let meta: any = {};
+      try {
+        meta = JSON.parse(msg.metadata || "{}");
+      } catch (_) {}
+
+      meta.order = {
+        ...(meta.order || {}),
+        items: items.map(it => ({
+          retailer_id: it.id || it.sku || it.name,
+          name: it.name,
+          quantity: Number(it.quantity) || 1,
+          price: Number(it.price) || 0,
+          item_price: Number(it.price) || 0,
+          total: (Number(it.quantity) || 1) * (Number(it.price) || 0),
+          sku: it.sku || "",
+          image: it.image || ""
+        })),
+        subtotal: financials.subtotal,
+        discountAmount: financials.discountAmount,
+        discountPercent: financials.discountPercent || 0,
+        discountCode: financials.discountCode || "",
+        shippingFee: financials.shippingFee || 0,
+        tax: financials.tax || 0,
+        totalAmount: financials.totalAmount,
+        totalQuantity: items.reduce((s, it) => s + (Number(it.quantity) || 1), 0),
+        paymentMode: financials.paymentMode,
+        advanceAmountPaid: financials.advanceAmountPaid,
+        codBalanceDue: financials.codBalanceDue,
+        paymentStatus: financials.paymentStatus,
+        customerName: customer?.name,
+        customerPhone: customer?.phone,
+        customerAddress: customer?.fullAddress,
+        customerCity: customer?.city,
+        customerState: customer?.state,
+        customerPincode: customer?.pincode,
+        customerNote: notes ?? meta.order?.customerNote
+      };
+
+      await prisma.whatsAppMessage.update({
+        where: { id: orderId },
+        data: { metadata: JSON.stringify(meta) }
+      });
+
+      if (msg.conversation?.customer && customer) {
+        await prisma.customer.update({
+          where: { id: msg.conversation.customer.id },
+          data: {
+            contactPerson: customer.name || msg.conversation.customer.contactPerson,
+            shippingAddress: customer.fullAddress || msg.conversation.customer.shippingAddress
+          }
+        }).catch(() => null);
+      }
+
+      return { success: true, message: "Order updated successfully." };
+    }
+
+    // 2. Try finding in Database Order (prisma.order)
+    const dbOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { customer: true }
+    });
+
+    if (dbOrder) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          subtotal: financials.subtotal,
+          discount: financials.discountAmount,
+          tax: financials.tax || 0,
+          totalValue: financials.totalAmount,
+          paymentReceived: financials.advanceAmountPaid ?? dbOrder.paymentReceived,
+          outstandingAmount: financials.codBalanceDue ?? Math.max(0, financials.totalAmount - (financials.advanceAmountPaid || 0)),
+          paymentStatus: financials.paymentStatus === "PAID" ? "Paid" : (financials.paymentStatus === "PARTIALLY_PAID" ? "Partially Paid" : "Unpaid"),
+          notes: notes ?? dbOrder.notes,
+          placeOfSupply: customer?.state || dbOrder.placeOfSupply
+        }
+      });
+
+      if (dbOrder.customer && customer) {
+        await prisma.customer.update({
+          where: { id: dbOrder.customer.id },
+          data: {
+            contactPerson: customer.name || dbOrder.customer.contactPerson,
+            shippingAddress: customer.fullAddress || dbOrder.customer.shippingAddress
+          }
+        }).catch(() => null);
+      }
+
+      // Recreate order items in DB
+      await prisma.orderItem.deleteMany({ where: { orderId } }).catch(() => null);
+      const defaultProduct = await prisma.product.findFirst();
+      if (defaultProduct) {
+        for (const it of items) {
+          await prisma.orderItem.create({
+            data: {
+              orderId,
+              productId: defaultProduct.id,
+              quantity: Number(it.quantity) || 1,
+              rate: Number(it.price) || 0,
+              total: (Number(it.quantity) || 1) * (Number(it.price) || 0),
+              hsnCode: "6109"
+            }
+          }).catch(() => null);
+        }
+      }
+
+      return { success: true, message: "Order updated successfully." };
+    }
+
+    return { success: false, error: "Order record not found." };
+  } catch (err: any) {
+    console.error("[updateUnifiedOrderAction Error]:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetch company and store branding details for Tax Invoice and Packing Slip
+ */
+export async function getStoreDetailsAction() {
+  try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    const org = await prisma.organization.findFirst({
+      where: user?.clientId ? { id: user.clientId } : undefined
+    });
+
+    return {
+      success: true,
+      store: {
+        name: org?.name || org?.tradeName || "Espon Clothing",
+        tradeName: org?.tradeName || org?.name || "Espon Clothing Pvt Ltd",
+        gstin: org?.gstin || "07AAACE1234F1Z5",
+        pan: org?.pan || "AAACE1234F",
+        phone: org?.phone || "+91 98765 43210",
+        email: org?.email || "support@esponclothing.com",
+        website: org?.website || "www.esponclothing.com",
+        address: org?.address || "Plot No 42, Garment Hub, Industrial Area",
+        city: org?.city || "New Delhi",
+        state: org?.state || "Delhi",
+        pincode: org?.pincode || "110020",
+        country: org?.country || "India"
+      }
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      store: {
+        name: "Espon Clothing",
+        tradeName: "Espon Clothing Pvt Ltd",
+        gstin: "07AAACE1234F1Z5",
+        pan: "AAACE1234F",
+        phone: "+91 98765 43210",
+        email: "support@esponclothing.com",
+        website: "www.esponclothing.com",
+        address: "Plot No 42, Garment Hub, Industrial Area",
+        city: "New Delhi",
+        state: "Delhi",
+        pincode: "110020",
+        country: "India"
+      }
+    };
   }
 }

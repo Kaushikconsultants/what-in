@@ -584,7 +584,22 @@ export async function handleIncomingAILogic(
     toolContext += `\n${sizeInfo}`;
   }
 
-  const systemRules = clientRecord?.aiSystemPrompt || settings?.aiSystemPrompt || "You are an elite sales, customer service, and stylist assistant.";
+  let systemRules = clientRecord?.aiSystemPrompt || settings?.aiSystemPrompt || "You are an elite sales, customer service, and stylist assistant.";
+
+  // Dynamic AI Council Swarm Injection
+  if (clientRecord?.customLimitsJson) {
+    try {
+      const parsedLimits = JSON.parse(clientRecord.customLimitsJson);
+      if (parsedLimits.aiCouncil?.enabled && Array.isArray(parsedLimits.aiCouncil.agents)) {
+        const activeAgents = parsedLimits.aiCouncil.agents.filter((a: any) => a.isEnabled);
+        if (activeAgents.length > 0) {
+          const councilDirectives = activeAgents.map((a: any) => `• [${a.name} (${a.avatar}) - ${a.role}]: Rules: ${a.rules}. Personality: ${a.personality}`).join('\n');
+          systemRules += `\n\n=== 🏛️ AUTONOMOUS AI COUNCIL SQUAD & GUARDRAILS ===\nCouncil Synthesizer Boss: "${parsedLimits.aiCouncil.bossAgentName || 'Chief Council Boss'}"\nActive Agents:\n${councilDirectives}\nConsensus Directive: Strictly respect the floor prices and policy guardrails of all active agents while maintaining a compelling, natural tone.`;
+        }
+      }
+    } catch (_) {}
+  }
+
   const kbPieces: string[] = [];
   if (clientRecord?.aiKnowledgeBase) kbPieces.push(clientRecord.aiKnowledgeBase);
   if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
@@ -594,9 +609,13 @@ export async function handleIncomingAILogic(
 
   const activeCombosStr = activeCombos.length > 0 
     ? activeCombos.map(c => `• ${c.combo_name || 'Combo Pack'} @ ₹${c.combo_price || 'Special Price'} (Code: ${c.discount_code || 'COMBO'})`).join('\n')
-    : "• Festive Pack: Use code FLAT30 at checkout.";
+    : "No active discount codes available. All pricing is strictly fixed net wholesale rate with zero discounts.";
 
   const systemPrompt = `Tum "${brandName} AI Stylist & Sales Assistant" ho!
+
+=== 🚫 STRICT ZERO-DISCOUNT & ZERO-COUPON POLICY ===
+- NEVER invent, hallucinate, or issue any discount coupons or promo codes (such as FLAT30, SAVE10, etc.) under ANY circumstances.
+- You are NOT authorized to issue discounts. If a customer asks for a discount or coupon or free sample, politely explain that prices are already direct net factory rates with zero extra markup.
 
 === 🏢 DYNAMIC BRAND IDENTITY & CONTACT DETAILS ===
 - Brand Name: "${brandName}"

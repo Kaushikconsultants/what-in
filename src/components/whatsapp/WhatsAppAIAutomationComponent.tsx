@@ -4,19 +4,42 @@ import React, { useState, useEffect } from "react";
 import { 
   Bot, Save, Sparkles, AlertCircle, Database, Globe, Settings2, 
   Cpu, KeyRound, CheckCircle2, RefreshCw, Eye, EyeOff, ShieldCheck, 
-  ExternalLink, HelpCircle
+  ExternalLink, HelpCircle, Mic, Users
 } from "lucide-react";
+import SilentListenerComponent from "./SilentListenerComponent";
+import AICouncilStudioComponent from "./AICouncilStudioComponent";
 
 interface WhatsAppAIAutomationComponentProps {
   embedded?: boolean;
+  initialSubTab?: "config" | "silent-listener" | "ai-council";
 }
 
-export default function WhatsAppAIAutomationComponent({ embedded = false }: WhatsAppAIAutomationComponentProps) {
+export default function WhatsAppAIAutomationComponent({ embedded = false, initialSubTab = "config" }: WhatsAppAIAutomationComponentProps) {
+  const [activeSubTab, setActiveSubTab] = useState<"config" | "silent-listener" | "ai-council">(initialSubTab);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const sub = params.get("subtab");
+      if (sub === "silent-listener" || sub === "config" || sub === "ai-council") {
+        setActiveSubTab(sub as any);
+      }
+    }
+  }, []);
+
+  const handleSubTabChange = (tab: "config" | "silent-listener" | "ai-council") => {
+    setActiveSubTab(tab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("subtab", tab);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
 
   const [settings, setSettings] = useState({
     aiModel: "gemini-flash-lite-latest",
@@ -214,34 +237,79 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
   return (
     <div className={`w-full max-w-[1100px] ${embedded ? "p-0 m-0" : "mx-auto py-6 px-4 sm:px-8"} font-sans text-gray-900 dark:text-gray-100`}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2.5 text-gray-900 dark:text-white m-0">
             <Bot size={26} className="text-purple-600 dark:text-purple-400" />
-            AI Assistant Configuration
+            AI Automation &amp; Intelligence
           </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 max-w-2xl">
-            Configure real Google Gemini intelligence for WhatsApp auto-replies, lead qualification, and customer support.
+            Configure Google Gemini intelligence, train your knowledge base, and auto-learn from top human agents.
           </p>
         </div>
-        <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
-          {saveSuccess && (
-            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-xs sm:text-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg">
-              <CheckCircle2 size={16} /> Settings Saved & Verified!
-            </span>
-          )}
-          <button
-            onClick={saveSettings}
-            disabled={saving}
-            className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-            {saving ? "Validating & Saving..." : "Save Settings"}
-          </button>
-        </div>
+        {activeSubTab === "config" && (
+          <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+            {saveSuccess && (
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-xs sm:text-sm bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-lg">
+                <CheckCircle2 size={16} /> Settings Saved & Verified!
+              </span>
+            )}
+            <button
+              onClick={saveSettings}
+              disabled={saving}
+              className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
+              {saving ? "Validating & Saving..." : "Save Settings"}
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+      {/* Subtab Navigation Pills */}
+      <div className="flex items-center gap-2 mb-6 border-b border-gray-200 dark:border-slate-700 pb-3 flex-wrap">
+        <button
+          onClick={() => handleSubTabChange("config")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+            activeSubTab === "config"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700"
+          }`}
+        >
+          <Settings2 size={16} />
+          AI Settings &amp; Simulator
+        </button>
+        <button
+          onClick={() => handleSubTabChange("silent-listener")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+            activeSubTab === "silent-listener"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700"
+          }`}
+        >
+          <Mic size={16} />
+          Silent Listener (Auto-Learn)
+        </button>
+        <button
+          onClick={() => handleSubTabChange("ai-council")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+            activeSubTab === "ai-council"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700"
+          }`}
+        >
+          <Users size={16} />
+          🏛️ AI Council (Multi-Agent Swarm)
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeSubTab === "silent-listener" ? (
+        <SilentListenerComponent embedded onInjected={fetchSettings} />
+      ) : activeSubTab === "ai-council" ? (
+        <AICouncilStudioComponent embedded />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
         {/* Main Editor Section */}
         <div className="flex flex-col gap-6">
 
@@ -574,6 +642,7 @@ export default function WhatsAppAIAutomationComponent({ embedded = false }: What
 
         </div>
       </div>
+      )}
     </div>
   );
 }
