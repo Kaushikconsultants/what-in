@@ -36,25 +36,17 @@ export async function POST(req: NextRequest) {
       if (client?.aiModel) model = client.aiModel;
     }
 
-    if (!apiKey) {
-      const firstClientWithKey = await prisma.whatsAppClient.findFirst({
-        where: { geminiApiKey: { not: null } },
-        select: { geminiApiKey: true, aiKnowledgeBase: true, aiModel: true },
-      });
-      if (firstClientWithKey?.geminiApiKey) {
-        apiKey = firstClientWithKey.geminiApiKey.trim();
-        if (!knowledgeBase && firstClientWithKey.aiKnowledgeBase) knowledgeBase = firstClientWithKey.aiKnowledgeBase;
-        if (firstClientWithKey.aiModel) model = firstClientWithKey.aiModel;
-      }
-    }
-
-    if (!apiKey) {
+    if (!apiKey && isOwner) {
       const settings = await prisma.whatsAppSettings.findFirst({
         select: { geminiApiKey: true, aiKnowledgeBase: true, aiModel: true },
       });
       if (settings?.geminiApiKey) apiKey = settings.geminiApiKey.trim();
       if (settings?.aiKnowledgeBase && !knowledgeBase) knowledgeBase = settings.aiKnowledgeBase;
       if (settings?.aiModel && !model) model = settings.aiModel;
+    }
+
+    if (!apiKey) {
+      apiKey = process.env.GEMINI_API_KEY?.trim() || "";
     }
 
     if (!apiKey) {

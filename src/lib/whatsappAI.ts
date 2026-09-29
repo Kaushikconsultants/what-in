@@ -507,27 +507,25 @@ export async function handleIncomingAILogic(
     };
 
     // 1. Dynamic Brand Name
-    brandName = clientRecord?.businessName || company?.companyName || acc?.name || "Espon Clothing Private Limited";
+    brandName = clientRecord?.businessName || company?.companyName || acc?.name || "Official Store";
 
     // 2. Dynamic Brand Domain
-    // Direct website (e.g. www.esponsports.com) set in Settings takes top precedence,
-    // followed by tenant shopify domain, custom brand slug, shopifyStoreDomain, and fallback.
     const resolvedDomain = 
-      cleanDomain(company?.website) ||
       cleanDomain(clientRecord?.shopifyDomain) ||
+      cleanDomain(company?.website) ||
       (clientRecord?.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : null) ||
       cleanDomain(company?.shopifyStoreDomain) ||
-      "www.esponsports.com";
+      "";
     if (resolvedDomain) brandDomain = resolvedDomain;
 
-    // 3. Dynamic Support Phone (Support & Sales Contact Phone)
-    // CRITICAL: Prioritize human support contactPhone / mobile over the WABA Meta sending number!
+    // 3. Dynamic Support Phone
     const rawPhone = 
       clientRecord?.contactPhone || 
-      company?.mobile || 
+      clientRecord?.ownerWhatsApp || 
       clientRecord?.phoneNumber || 
+      company?.mobile || 
       acc?.phoneNumber || 
-      "+91 7206066678";
+      "";
     if (rawPhone) {
       const trimmed = String(rawPhone).trim();
       brandPhone = trimmed.startsWith('+') || trimmed.startsWith('91') || trimmed.length > 10 
@@ -536,7 +534,7 @@ export async function handleIncomingAILogic(
     }
 
     // 4. Dynamic Email
-    brandEmail = clientRecord?.contactEmail || company?.email || "clothingespon@gmail.com";
+    brandEmail = clientRecord?.contactEmail || clientRecord?.adminEmail || company?.email || "";
 
     // 5. Dynamic Address & GSTIN
     if (company?.address) {
@@ -582,7 +580,7 @@ export async function handleIncomingAILogic(
     toolContext += `\n${sizeInfo}`;
   }
 
-  let systemRules = clientRecord?.aiSystemPrompt || settings?.aiSystemPrompt || "You are an elite sales, customer service, and stylist assistant.";
+  let systemRules = clientRecord?.aiSystemPrompt || (clientRecord ? `You are the AI Assistant for ${brandName}.` : (settings?.aiSystemPrompt || "You are a helpful customer service assistant."));
 
   // Dynamic AI Council Swarm Injection
   if (clientRecord?.customLimitsJson) {
@@ -599,11 +597,14 @@ export async function handleIncomingAILogic(
   }
 
   const kbPieces: string[] = [];
-  if (clientRecord?.aiKnowledgeBase) kbPieces.push(clientRecord.aiKnowledgeBase);
-  if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
-  if (legacySetting?.knowledge_base) kbPieces.push(legacySetting.knowledge_base);
-  if (legacySetting?.inst_brand_policies) kbPieces.push(`Policies: ${legacySetting.inst_brand_policies}`);
-  const knowledgeBase = kbPieces.join('\n\n') || "Leading apparel brand with premium fabrics, fast nationwide delivery, GST invoicing, and easy returns.";
+  if (clientRecord) {
+    if (clientRecord.aiKnowledgeBase) kbPieces.push(clientRecord.aiKnowledgeBase);
+  } else {
+    if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
+    if (legacySetting?.knowledge_base) kbPieces.push(legacySetting.knowledge_base);
+    if (legacySetting?.inst_brand_policies) kbPieces.push(`Policies: ${legacySetting.inst_brand_policies}`);
+  }
+  const knowledgeBase = kbPieces.join('\n\n') || `Leading official WhatsApp store for ${brandName}. Direct inquiry support, quick ordering, and dedicated customer service.`;
 
   const activeCombosStr = activeCombos.length > 0 
     ? activeCombos.map(c => `• ${c.combo_name || 'Combo Pack'} @ ₹${c.combo_price || 'Special Price'} (Code: ${c.discount_code || 'COMBO'})`).join('\n')

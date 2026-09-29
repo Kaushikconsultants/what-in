@@ -34,16 +34,16 @@ export async function POST(req: NextRequest) {
       return d.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     };
 
-    let brandName = clientRecord?.businessName || company?.companyName || account?.name || "Espon Clothing Private Limited";
+    let brandName = clientRecord?.businessName || company?.companyName || account?.name || "Official Store";
     let brandDomain = 
-      cleanDomain(company?.website) ||
       cleanDomain(clientRecord?.shopifyDomain) ||
+      cleanDomain(company?.website) ||
       (clientRecord?.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : null) ||
       cleanDomain(company?.shopifyStoreDomain) ||
-      "www.esponsports.com";
+      "";
 
-    const rawPhone = clientRecord?.contactPhone || company?.mobile || clientRecord?.phoneNumber || account?.phoneNumber || "+91 7206066678";
-    let brandPhone = "+91 7206066678";
+    const rawPhone = clientRecord?.contactPhone || clientRecord?.ownerWhatsApp || clientRecord?.phoneNumber || company?.mobile || account?.phoneNumber || "";
+    let brandPhone = "";
     if (rawPhone) {
       const trimmed = String(rawPhone).trim();
       brandPhone = trimmed.startsWith('+') || trimmed.startsWith('91') || trimmed.length > 10 
@@ -51,12 +51,12 @@ export async function POST(req: NextRequest) {
         : `+91 ${trimmed}`;
     }
 
-    let brandEmail = clientRecord?.contactEmail || company?.email || `clothingespon@gmail.com`;
+    let brandEmail = clientRecord?.contactEmail || clientRecord?.adminEmail || company?.email || "";
 
-    const aiKnowledgeBase = clientRecord?.aiKnowledgeBase || settings?.aiKnowledgeBase || "";
-    const aiSystemPrompt = clientRecord?.aiSystemPrompt || settings?.aiSystemPrompt || "You are a helpful customer service assistant for our business.";
+    const aiKnowledgeBase = clientRecord ? (clientRecord.aiKnowledgeBase || "") : (settings?.aiKnowledgeBase || "");
+    const aiSystemPrompt = clientRecord?.aiSystemPrompt || `You are the helpful customer service assistant for ${brandName}.`;
     const fallbackLanguage = settings?.aiFallbackLanguage || "English";
-    const aiModel = clientRecord?.aiModel || settings?.aiModel || "gemini-2.5-flash";
+    const aiModel = clientRecord?.aiModel || settings?.aiModel || "gemini-flash-lite-latest";
 
     // 2. Fetch the conversation and its messages
     const conversation = await prisma.whatsAppConversation.findUnique({

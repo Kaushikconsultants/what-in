@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       settings = await prisma.whatsAppSettings.create({ data: {} });
     }
 
-    // If client tenant user, merge client-specific AI and gateway configurations
+    // If client tenant user, strictly isolate client-specific AI and gateway configurations
     if (user?.clientId) {
       const client = await prisma.whatsAppClient.findUnique({
         where: { id: user.clientId }
@@ -24,20 +24,20 @@ export async function GET(req: NextRequest) {
       if (client) {
         settings = {
           ...settings,
-          geminiApiKey: client.geminiApiKey || settings.geminiApiKey,
+          geminiApiKey: client.geminiApiKey || "",
           aiModel: "gemini-flash-lite-latest",
-          aiSystemPrompt: client.aiSystemPrompt || settings.aiSystemPrompt,
-          aiKnowledgeBase: client.aiKnowledgeBase || settings.aiKnowledgeBase,
-          welcomeMessage: client.welcomeMessage || settings.welcomeMessage,
-          workingHoursStart: client.workingHoursStart || settings.workingHoursStart,
-          workingHoursEnd: client.workingHoursEnd || settings.workingHoursEnd,
-          activeGateway: client.activeGateway || settings.activeGateway,
-          razorpayKeyId: client.razorpayKeyId || settings.razorpayKeyId,
-          razorpayKeySecret: client.razorpayKeySecret || settings.razorpayKeySecret,
-          cashfreeAppId: client.cashfreeAppId || settings.cashfreeAppId,
-          cashfreeSecretKey: client.cashfreeSecretKey || settings.cashfreeSecretKey,
-          merchantUpiId: client.merchantUpiId || settings.merchantUpiId,
-          merchantUpiName: client.merchantUpiName || settings.merchantUpiName
+          aiSystemPrompt: client.aiSystemPrompt || `You are the helpful AI customer service assistant for ${client.businessName}.`,
+          aiKnowledgeBase: client.aiKnowledgeBase || "",
+          welcomeMessage: client.welcomeMessage || `Welcome to ${client.businessName}! How can we help you today?`,
+          workingHoursStart: client.workingHoursStart || settings.workingHoursStart || "09:00",
+          workingHoursEnd: client.workingHoursEnd || settings.workingHoursEnd || "19:00",
+          activeGateway: client.activeGateway || null,
+          razorpayKeyId: client.razorpayKeyId || "",
+          razorpayKeySecret: client.razorpayKeySecret || "",
+          cashfreeAppId: client.cashfreeAppId || "",
+          cashfreeSecretKey: client.cashfreeSecretKey || "",
+          merchantUpiId: client.merchantUpiId || "",
+          merchantUpiName: client.merchantUpiName || client.businessName
         };
       }
     }
