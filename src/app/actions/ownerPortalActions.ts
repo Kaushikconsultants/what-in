@@ -137,6 +137,7 @@ export async function createClientAction(data: {
       return { success: false, error: "Unauthorized access: Owner login required" };
     }
 
+    const cleanEmail = String(data.contactEmail || "").trim().toLowerCase();
     const rawPassword = data.adminPassword?.trim() || "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const initialStatus = data.initialStatus || "ACTIVE";
@@ -153,11 +154,11 @@ export async function createClientAction(data: {
 
     const client = await prisma.whatsAppClient.create({
       data: {
-        businessName: data.businessName,
-        contactEmail: data.contactEmail,
-        adminEmail: data.contactEmail,
+        businessName: data.businessName.trim(),
+        contactEmail: cleanEmail,
+        adminEmail: cleanEmail,
         adminPassword: hashedPassword,
-        contactPhone: data.contactPhone,
+        contactPhone: data.contactPhone?.trim() || "",
         subscriptionPlan: data.subscriptionPlan,
         monthlyFee: Number(data.monthlyFee) || 0,
         maxAgents: Number(data.maxAgents) || 1,
@@ -181,7 +182,7 @@ export async function createClientAction(data: {
 
     // Create the primary Admin user in whatsAppAgentUser with bcrypt hashed password
     await prisma.whatsAppAgentUser.upsert({
-      where: { email: data.contactEmail },
+      where: { email: cleanEmail },
       update: {
         clientId: client.id,
         name: data.businessName + " Admin",
@@ -192,7 +193,7 @@ export async function createClientAction(data: {
       create: {
         clientId: client.id,
         name: data.businessName + " Admin",
-        email: data.contactEmail,
+        email: cleanEmail,
         password: hashedPassword,
         role: "ADMIN",
         isActive: true
@@ -393,17 +394,50 @@ export async function updateClientAdminPasswordAction(clientId: string, newPassw
 
     const cleanPass = newPassword.trim();
     const hashedPassword = await bcrypt.hash(cleanPass, 10);
+    const clientEmail = (client.contactEmail || client.adminEmail || "").trim().toLowerCase();
 
     await prisma.whatsAppClient.update({
       where: { id: clientId },
-      data: { adminPassword: hashedPassword }
+      data: {
+        adminPassword: hashedPassword,
+        adminEmail: clientEmail || undefined
+      }
     });
 
-    // Also update in WhatsAppAgentUser if exists
-    await prisma.whatsAppAgentUser.updateMany({
-      where: { clientId, email: client.contactEmail },
-      data: { password: hashedPassword }
+    // Also update in WhatsAppAgentUser if exists or upsert admin agent
+    const updatedCount = await prisma.whatsAppAgentUser.updateMany({
+      where: {
+        OR: [
+          { clientId },
+          ...(clientEmail ? [
+            { email: { equals: clientEmail, mode: "insensitive" as const } },
+            { email: clientEmail }
+          ] : [])
+        ]
+      },
+      data: { password: hashedPassword, isActive: true }
     });
+
+    if (updatedCount.count === 0 && clientEmail) {
+      await prisma.whatsAppAgentUser.upsert({
+        where: { email: clientEmail },
+        update: {
+          clientId,
+          name: client.businessName + " Admin",
+          password: hashedPassword,
+          role: "ADMIN",
+          isActive: true
+        },
+        create: {
+          clientId,
+          name: client.businessName + " Admin",
+          email: clientEmail,
+          password: hashedPassword,
+          role: "ADMIN",
+          isActive: true
+        }
+      });
+    }
 
     return { success: true };
   } catch (e: any) {
@@ -767,25 +801,44 @@ export async function resetClientPasswordAction(clientId: string, newPassword?: 
 
     const rawPassword = newPassword?.trim() || "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const clientEmail = (client.contactEmail || client.adminEmail || "").trim().toLowerCase();
 
-    // Update client record
+    // 1. Update client record with normalized email and new password
     await prisma.whatsAppClient.update({
       where: { id: clientId },
-      data: { adminPassword: hashedPassword }
+      data: {
+        adminPassword: hashedPassword,
+        adminEmail: clientEmail || undefined
+      }
     });
 
-    // Update or create primary admin agent in whatsAppAgentUser
+    // 2. Update or create primary admin agent in whatsAppAgentUser
     let adminAgent = await prisma.whatsAppAgentUser.findFirst({
-      where: { clientId: client.id, role: "ADMIN" }
+      where: {
+        OR: [
+          { clientId: client.id, role: "ADMIN" },
+          { clientId: client.id },
+          ...(clientEmail ? [
+            { email: { equals: clientEmail, mode: "insensitive" as const } },
+            { email: clientEmail }
+          ] : [])
+        ]
+      }
     });
 
     if (adminAgent) {
       await prisma.whatsAppAgentUser.update({
         where: { id: adminAgent.id },
-        data: { password: hashedPassword, isActive: true }
+        data: {
+          clientId: client.id,
+          email: clientEmail || adminAgent.email,
+          password: hashedPassword,
+          role: "ADMIN",
+          isActive: true
+        }
       });
     } else {
-      const email = client.contactEmail || client.adminEmail || `admin@${client.id.slice(0, 8)}.local`;
+      const email = clientEmail || `admin@${client.id.slice(0, 8)}.local`;
       adminAgent = await prisma.whatsAppAgentUser.create({
         data: {
           clientId: client.id,
@@ -798,10 +851,19 @@ export async function resetClientPasswordAction(clientId: string, newPassword?: 
       });
     }
 
+    // Also update all other agents for this client to ensure password matches if they shared credentials
+    await prisma.whatsAppAgentUser.updateMany({
+      where: {
+        clientId: client.id,
+        role: "ADMIN"
+      },
+      data: { password: hashedPassword, isActive: true }
+    });
+
     return {
       success: true,
       password: rawPassword,
-      email: adminAgent.email,
+      email: clientEmail || adminAgent.email,
       businessName: client.businessName
     };
   } catch (e: any) {

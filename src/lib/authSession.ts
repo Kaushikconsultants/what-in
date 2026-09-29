@@ -155,12 +155,22 @@ export async function getAuthenticatedUser(req?: NextRequest): Promise<SessionUs
           const cleanEmail = String(parsed.email).trim().toLowerCase();
 
           try {
-            const agentUser = await prisma.whatsAppAgentUser.findUnique({
-              where: { email: cleanEmail },
+            const agentUser = await prisma.whatsAppAgentUser.findFirst({
+              where: {
+                OR: [
+                  { email: { equals: cleanEmail, mode: "insensitive" } },
+                  { email: cleanEmail }
+                ]
+              },
               select: { id: true, name: true, email: true, role: true, clientId: true, isActive: true }
             });
-            const dbUser = !agentUser ? await prisma.user.findUnique({
-              where: { email: cleanEmail },
+            const dbUser = !agentUser ? await prisma.user.findFirst({
+              where: {
+                OR: [
+                  { email: { equals: cleanEmail, mode: "insensitive" } },
+                  { email: cleanEmail }
+                ]
+              },
               select: { id: true, name: true, email: true, role: true, isActive: true }
             }) : null;
 
@@ -198,8 +208,14 @@ export async function getAuthenticatedUser(req?: NextRequest): Promise<SessionUs
 
     // Auto-enrich latest role, employeeId, and clientId from database
     try {
-      const agentUser = await prisma.whatsAppAgentUser.findUnique({
-        where: { email: resolvedUser.email },
+      const cleanUserEmail = String(resolvedUser.email).trim().toLowerCase();
+      const agentUser = await prisma.whatsAppAgentUser.findFirst({
+        where: {
+          OR: [
+            { email: { equals: cleanUserEmail, mode: "insensitive" } },
+            { email: cleanUserEmail }
+          ]
+        },
         select: { id: true, clientId: true, role: true }
       });
 
@@ -212,8 +228,10 @@ export async function getAuthenticatedUser(req?: NextRequest): Promise<SessionUs
         const matchedClient = await prisma.whatsAppClient.findFirst({
           where: {
             OR: [
-              { adminEmail: resolvedUser.email },
-              { contactEmail: resolvedUser.email }
+              { adminEmail: { equals: cleanUserEmail, mode: "insensitive" } },
+              { contactEmail: { equals: cleanUserEmail, mode: "insensitive" } },
+              { adminEmail: cleanUserEmail },
+              { contactEmail: cleanUserEmail }
             ]
           },
           select: { id: true }

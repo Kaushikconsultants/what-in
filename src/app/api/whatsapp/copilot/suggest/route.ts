@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { getAuthenticatedUser, isOwnerAuthenticated } from "@/lib/authSession";
 
-const prisma = new PrismaClient();
 const GROQ_API_KEY = process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY || '';
 
 export async function POST(req: NextRequest) {

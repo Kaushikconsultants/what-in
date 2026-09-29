@@ -622,11 +622,11 @@ Your WhatsApp Cloud API & AI Automation account has been configured and is activ
     }
   };
 
-  const handleOpenShareCreds = (client: any) => {
+  const handleOpenShareCreds = async (client: any) => {
     setActiveActionDropdown(null);
     setCopyFeedback(null);
     setSavePasswordFeedback(null);
-    setShowPasswordText(false);
+    setShowPasswordText(true);
 
     const phone = (client.ownerWhatsApp || client.contactPhone || "").replace(/[^0-9]/g, "");
     setCredsPhone(phone);
@@ -641,6 +641,12 @@ Your WhatsApp Cloud API & AI Automation account has been configured and is activ
       password: suggestedPass,
       isNewClient: false
     });
+
+    // Auto-save and sync to DB so this exact password is active immediately
+    const res = await resetClientPasswordAction(client.id, suggestedPass);
+    if (res.success && res.password) {
+      setSavePasswordFeedback(`✓ Active & saved in database: ${res.password}`);
+    }
   };
 
   const handleGhostLogin = async (client: any) => {

@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 // Temporary axios replacement using fetch
 async function fetchApi(url: string, options: any = {}) {
