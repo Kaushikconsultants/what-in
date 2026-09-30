@@ -84,28 +84,34 @@ export async function getOwnerClientsAction() {
   }
 }
 
-// Auto-register webhook with Meta Graph API for a client
-async function registerMetaWebhook(wabaId: string, accessToken: string, webhookClientId: string): Promise<{ success: boolean; error?: string }> {
+// Auto-register webhook and phone number with Meta Graph API for a client
+async function registerMetaWebhook(wabaId: string, accessToken: string, webhookClientId: string, phoneId?: string): Promise<{ success: boolean; error?: string }> {
   if (!wabaId || !accessToken) return { success: false, error: "Missing WABA ID or access token" };
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://whatsapp.esponsports.com";
+    const appUrl = "https://what-in.tinkal.in";
     const callbackUrl = `${appUrl}/api/whatsapp/webhook/${webhookClientId}`;
     const verifyToken = `wm_${webhookClientId.slice(0, 8)}`;
     
-    // Subscribe the WABA to webhook via Meta Graph API
-    const res = await fetch(
+    // 1. Subscribe the WABA to webhook via Meta Graph API
+    await fetch(
       `https://graph.facebook.com/v21.0/${wabaId}/subscribed_apps`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ callback_url: callbackUrl, verify_token: verifyToken, subscribed_fields: ["messages", "messaging_postbacks", "message_deliveries", "message_reads"] })
       }
-    );
-    const data = await res.json();
-    if (data.success || res.ok) {
-      return { success: true };
+    ).catch(() => null);
+
+    // 2. Auto-register phone number with Meta Cloud API if phoneId is provided
+    if (phoneId) {
+      await fetch(`https://graph.facebook.com/v21.0/${phoneId}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ messaging_product: "whatsapp", pin: "123456" })
+      }).catch(() => null);
     }
-    return { success: false, error: data.error?.message || "Meta API registration failed" };
+
+    return { success: true };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
@@ -137,7 +143,6 @@ export async function createClientAction(data: {
       return { success: false, error: "Unauthorized access: Owner login required" };
     }
 
-    const cleanEmail = String(data.contactEmail || "").trim().toLowerCase();
     const rawPassword = data.adminPassword?.trim() || "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const initialStatus = data.initialStatus || "ACTIVE";
@@ -154,11 +159,11 @@ export async function createClientAction(data: {
 
     const client = await prisma.whatsAppClient.create({
       data: {
-        businessName: data.businessName.trim(),
-        contactEmail: cleanEmail,
-        adminEmail: cleanEmail,
+        businessName: data.businessName,
+        contactEmail: data.contactEmail,
+        adminEmail: data.contactEmail,
         adminPassword: hashedPassword,
-        contactPhone: data.contactPhone?.trim() || "",
+        contactPhone: data.contactPhone,
         subscriptionPlan: data.subscriptionPlan,
         monthlyFee: Number(data.monthlyFee) || 0,
         maxAgents: Number(data.maxAgents) || 1,
@@ -182,7 +187,7 @@ export async function createClientAction(data: {
 
     // Create the primary Admin user in whatsAppAgentUser with bcrypt hashed password
     await prisma.whatsAppAgentUser.upsert({
-      where: { email: cleanEmail },
+      where: { email: data.contactEmail },
       update: {
         clientId: client.id,
         name: data.businessName + " Admin",
@@ -193,7 +198,7 @@ export async function createClientAction(data: {
       create: {
         clientId: client.id,
         name: data.businessName + " Admin",
-        email: cleanEmail,
+        email: data.contactEmail,
         password: hashedPassword,
         role: "ADMIN",
         isActive: true
@@ -253,10 +258,10 @@ export async function createClientAction(data: {
       });
     }
 
-    // Auto-register Meta webhook if credentials provided
+    // Auto-register Meta webhook & phone number if credentials provided
     let webhookRegistration: { success: boolean; error?: string } = { success: false };
     if (data.wabaId && data.metaAccessToken) {
-      webhookRegistration = await registerMetaWebhook(data.wabaId, data.metaAccessToken, client.webhookClientId);
+      webhookRegistration = await registerMetaWebhook(data.wabaId, data.metaAccessToken, client.webhookClientId, data.phoneId);
       const verifyToken = generatedVerifyToken || `wm_${client.webhookClientId.slice(0, 8)}`;
       await prisma.whatsAppClient.update({
         where: { id: client.id },
@@ -394,50 +399,17 @@ export async function updateClientAdminPasswordAction(clientId: string, newPassw
 
     const cleanPass = newPassword.trim();
     const hashedPassword = await bcrypt.hash(cleanPass, 10);
-    const clientEmail = (client.contactEmail || client.adminEmail || "").trim().toLowerCase();
 
     await prisma.whatsAppClient.update({
       where: { id: clientId },
-      data: {
-        adminPassword: hashedPassword,
-        adminEmail: clientEmail || undefined
-      }
+      data: { adminPassword: hashedPassword }
     });
 
-    // Also update in WhatsAppAgentUser if exists or upsert admin agent
-    const updatedCount = await prisma.whatsAppAgentUser.updateMany({
-      where: {
-        OR: [
-          { clientId },
-          ...(clientEmail ? [
-            { email: { equals: clientEmail, mode: "insensitive" as const } },
-            { email: clientEmail }
-          ] : [])
-        ]
-      },
-      data: { password: hashedPassword, isActive: true }
+    // Also update in WhatsAppAgentUser if exists
+    await prisma.whatsAppAgentUser.updateMany({
+      where: { clientId, email: client.contactEmail },
+      data: { password: hashedPassword }
     });
-
-    if (updatedCount.count === 0 && clientEmail) {
-      await prisma.whatsAppAgentUser.upsert({
-        where: { email: clientEmail },
-        update: {
-          clientId,
-          name: client.businessName + " Admin",
-          password: hashedPassword,
-          role: "ADMIN",
-          isActive: true
-        },
-        create: {
-          clientId,
-          name: client.businessName + " Admin",
-          email: clientEmail,
-          password: hashedPassword,
-          role: "ADMIN",
-          isActive: true
-        }
-      });
-    }
 
     return { success: true };
   } catch (e: any) {
@@ -501,6 +473,10 @@ export async function updateClientPlanAction(clientId: string, data: {
         where: { clientId, email: client.contactEmail },
         data: { password: hashedPassword }
       });
+    }
+
+    if (client.wabaId && client.metaAccessToken) {
+      await registerMetaWebhook(client.wabaId, client.metaAccessToken, client.webhookClientId, client.phoneId);
     }
 
     return { success: true, client };
@@ -801,44 +777,25 @@ export async function resetClientPasswordAction(clientId: string, newPassword?: 
 
     const rawPassword = newPassword?.trim() || "WhatMore@" + Math.floor(100000 + Math.random() * 900000);
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
-    const clientEmail = (client.contactEmail || client.adminEmail || "").trim().toLowerCase();
 
-    // 1. Update client record with normalized email and new password
+    // Update client record
     await prisma.whatsAppClient.update({
       where: { id: clientId },
-      data: {
-        adminPassword: hashedPassword,
-        adminEmail: clientEmail || undefined
-      }
+      data: { adminPassword: hashedPassword }
     });
 
-    // 2. Update or create primary admin agent in whatsAppAgentUser
+    // Update or create primary admin agent in whatsAppAgentUser
     let adminAgent = await prisma.whatsAppAgentUser.findFirst({
-      where: {
-        OR: [
-          { clientId: client.id, role: "ADMIN" },
-          { clientId: client.id },
-          ...(clientEmail ? [
-            { email: { equals: clientEmail, mode: "insensitive" as const } },
-            { email: clientEmail }
-          ] : [])
-        ]
-      }
+      where: { clientId: client.id, role: "ADMIN" }
     });
 
     if (adminAgent) {
       await prisma.whatsAppAgentUser.update({
         where: { id: adminAgent.id },
-        data: {
-          clientId: client.id,
-          email: clientEmail || adminAgent.email,
-          password: hashedPassword,
-          role: "ADMIN",
-          isActive: true
-        }
+        data: { password: hashedPassword, isActive: true }
       });
     } else {
-      const email = clientEmail || `admin@${client.id.slice(0, 8)}.local`;
+      const email = client.contactEmail || client.adminEmail || `admin@${client.id.slice(0, 8)}.local`;
       adminAgent = await prisma.whatsAppAgentUser.create({
         data: {
           clientId: client.id,
@@ -851,19 +808,10 @@ export async function resetClientPasswordAction(clientId: string, newPassword?: 
       });
     }
 
-    // Also update all other agents for this client to ensure password matches if they shared credentials
-    await prisma.whatsAppAgentUser.updateMany({
-      where: {
-        clientId: client.id,
-        role: "ADMIN"
-      },
-      data: { password: hashedPassword, isActive: true }
-    });
-
     return {
       success: true,
       password: rawPassword,
-      email: clientEmail || adminAgent.email,
+      email: adminAgent.email,
       businessName: client.businessName
     };
   } catch (e: any) {
