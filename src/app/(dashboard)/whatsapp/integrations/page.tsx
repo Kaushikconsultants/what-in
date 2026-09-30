@@ -10,6 +10,7 @@ import {
   saveShopifyCredentialsAction, 
   sendWhatsAppHelloWorldAction, 
   registerWhatsAppPhoneNumberAction,
+  checkMetaPhoneNumberStatusAction,
   getWhatsAppSettingsAction,
   saveWhatsAppSettingsAction,
   getTeamMembersAction,
@@ -157,6 +158,11 @@ export default function IntegrationsHubPage() {
 
   // Facebook Register state
   const [registering, setRegistering] = useState(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [registerPin, setRegisterPin] = useState("123456");
+  const [registerModalResult, setRegisterModalResult] = useState<{ success: boolean; text: string } | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [metaLiveDetails, setMetaLiveDetails] = useState<any | null>(null);
 
   const [currentUserRole, setCurrentUserRole] = useState("");
   const [currentUserEmail, setCurrentUserEmail] = useState("");
@@ -545,21 +551,60 @@ const reloadTeams = async () => {
     setSendingTest(false);
   };
 
-  const handleFacebookLogin = async () => {
-    const pin = window.prompt("Enter the 6-digit Registration PIN to register this phone number with Meta Cloud API:");
-    if (!pin) return;
-    if (pin.length !== 6) {
-      alert("PIN must be exactly 6 digits.");
+  const handleOpenRegisterModal = async () => {
+    setIsRegisterModalOpen(true);
+    setRegisterModalResult(null);
+    if (phoneId && token) {
+      handleCheckMetaLiveStatus();
+    }
+  };
+
+  const handleCheckMetaLiveStatus = async () => {
+    if (!phoneId || !token) {
+      setRegisterModalResult({ success: false, text: "Please enter Phone ID and Permanent Access Token first." });
+      return;
+    }
+    setCheckingStatus(true);
+    try {
+      const res = await checkMetaPhoneNumberStatusAction(phoneId, token);
+      if (res.success && res.data) {
+        setMetaLiveDetails(res.data);
+      } else {
+        setRegisterModalResult({ success: false, text: res.error || "Failed to fetch live status from Meta." });
+      }
+    } catch (e: any) {
+      setRegisterModalResult({ success: false, text: e.message || "Error checking Meta status." });
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  const handleExecuteRegister = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!registerPin || registerPin.length !== 6) {
+      setRegisterModalResult({ success: false, text: "PIN must be exactly 6 numeric digits (e.g. 123456)." });
       return;
     }
     setRegistering(true);
-    const res = await registerWhatsAppPhoneNumberAction(pin);
-    setRegistering(false);
-    if (res.success) {
-      alert(res.message);
-    } else {
-      alert("Registration Error: " + res.error);
+    setRegisterModalResult(null);
+    try {
+      const res = await registerWhatsAppPhoneNumberAction(registerPin, phoneId, token, wabaId);
+      if (res.success) {
+        setRegisterModalResult({ success: true, text: res.message || "Phone number successfully registered with Meta Cloud API!" });
+        setIsConnected(true);
+        handleCheckMetaLiveStatus();
+      } else {
+        setRegisterModalResult({ success: false, text: res.error || "Failed to register number." });
+      }
+    } catch (err: any) {
+      setRegisterModalResult({ success: false, text: err.message || "Unexpected error during registration." });
+    } finally {
+      setRegistering(false);
     }
+  };
+
+  const handleFacebookLogin = async () => {
+    handleOpenRegisterModal();
   };
 
   const handleSaveAISettings = async (e: React.FormEvent) => {
@@ -763,9 +808,12 @@ const reloadTeams = async () => {
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white m-0">WhatsApp Business API</h2>
                 <p className="text-sm text-gray-500 m-0 mt-1">Manage Meta Cloud API tokens and Webhook configuration.</p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                 <button onClick={handleFacebookLogin} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#1877F2] hover:bg-[#166FE5] text-white rounded-lg text-sm font-bold shadow-sm transition-all">
-                    {registering ? <RefreshCw size={16} className="animate-spin" /> : <MessageSquare size={16} />} {registering ? "Registering..." : "Register New Number"}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                 <button type="button" onClick={handleOpenRegisterModal} className="inline-flex items-center justify-center gap-2 px-3.5 py-2 bg-[#1877F2] hover:bg-[#166FE5] text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all">
+                    <Smartphone size={15} /> Register / Activate Number
+                 </button>
+                 <button type="button" onClick={handleCheckMetaLiveStatus} disabled={checkingStatus} className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-xl text-xs sm:text-sm font-semibold transition-all">
+                    <RefreshCw size={14} className={checkingStatus ? "animate-spin" : ""} /> Check Status
                  </button>
                 <span className={`px-3 py-2 text-xs font-bold rounded-lg flex items-center gap-1 ${isConnected ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
                   {isConnected ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />} {isConnected ? "CONNECTED" : "NOT CONNECTED"}
@@ -1750,6 +1798,113 @@ const reloadTeams = async () => {
                 <button type="submit" className="px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-2xs">Save</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Meta Phone Number 2FA Registration & Live Status Modal */}
+      {isRegisterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-slate-800/50 dark:to-slate-900/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-[#1877F2]/10 dark:bg-[#1877F2]/20 text-[#1877F2] rounded-xl">
+                  <Smartphone size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white m-0">Register & Activate WhatsApp Number</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 m-0 mt-0.5">Meta Cloud API 2-Step Verification & Registration</p>
+                </div>
+              </div>
+              <button onClick={() => setIsRegisterModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {registerModalResult && (
+                <div className={`p-4 rounded-xl text-xs sm:text-sm font-medium flex items-start gap-2.5 ${registerModalResult.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800' : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800'}`}>
+                  {registerModalResult.success ? <CheckCircle2 className="shrink-0 mt-0.5" size={16} /> : <AlertTriangle className="shrink-0 mt-0.5" size={16} />}
+                  <div className="flex-1">{registerModalResult.text}</div>
+                </div>
+              )}
+
+              {/* Meta Live Diagnostic Card */}
+              {metaLiveDetails && (
+                <div className="bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Meta Live Status</span>
+                    <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${metaLiveDetails.status === 'CONNECTED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300' : 'bg-amber-100 text-amber-700'}`}>
+                      {metaLiveDetails.status}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Display Name</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{metaLiveDetails.verifiedName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Phone Number</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{metaLiveDetails.displayPhoneNumber}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">OTP Verification</span>
+                      <span className={`font-semibold ${metaLiveDetails.codeVerificationStatus === 'VERIFIED' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {metaLiveDetails.codeVerificationStatus}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px]">Account Mode</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{metaLiveDetails.accountMode}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-blue-50/70 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-xl p-3.5 text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+                💡 <strong>Why Register?</strong> Meta requires a 6-digit Two-Factor Authentication PIN to register a phone number before it can send/receive live messages. If your number shows "Pending" in Meta Manager, registering your 6-digit PIN here activates it immediately.
+              </div>
+
+              <form onSubmit={handleExecuteRegister} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    6-Digit Registration PIN <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    pattern="\d{6}"
+                    value={registerPin}
+                    onChange={(e) => setRegisterPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 123456"
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-center text-lg tracking-widest outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-[11px] text-slate-400 mt-1 block">
+                    Choose any 6-digit PIN (e.g. 123456) to set your permanent two-factor authentication PIN with Meta.
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCheckMetaLiveStatus}
+                    disabled={checkingStatus}
+                    className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={14} className={checkingStatus ? "animate-spin" : ""} /> Check Meta Status
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={registering}
+                    className="flex-1 px-4 py-2.5 bg-[#1877F2] hover:bg-[#166FE5] disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+                  >
+                    {registering ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                    {registering ? "Registering..." : "Register & Activate PIN"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

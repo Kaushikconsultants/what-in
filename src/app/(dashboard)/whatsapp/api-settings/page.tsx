@@ -337,17 +337,18 @@ export default function WhatsAppAPISettingsPage() {
   };
 
   const handleFacebookLogin = async () => {
-    const pin = window.prompt("Enter the 6-digit Registration PIN to register this phone number with Meta Cloud API:");
+    const pin = window.prompt("Enter the 6-digit Registration PIN to register this phone number with Meta Cloud API (e.g. 123456):");
     if (!pin) return;
-    if (pin.length !== 6) {
-      alert("PIN must be exactly 6 digits.");
+    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+      alert("PIN must be exactly 6 numeric digits.");
       return;
     }
     setRegistering(true);
-    const res = await registerWhatsAppPhoneNumberAction(pin);
+    const res = await registerWhatsAppPhoneNumberAction(pin, phoneId, token, wabaId);
     setRegistering(false);
     if (res.success) {
       alert(res.message);
+      setIsConnected(true);
     } else {
       alert("Registration Error: " + res.error);
     }

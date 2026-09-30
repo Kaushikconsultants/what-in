@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const isOwner = isOwnerAuthenticated(req);
     const user = await getAuthenticatedUser(req);
 
-    if (!isOwner && (!user || (user.role !== "ADMIN" && user.role !== "OWNER"))) {
+    if (!isOwner && (!user || (user.role !== "ADMIN" && user.role !== "OWNER" && user.role !== "SUPER_ADMIN" && !user.clientId))) {
       return NextResponse.json({ success: false, error: "Unauthorized access" }, { status: 401 });
     }
 
@@ -17,37 +17,69 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing phoneNumberId or pin" }, { status: 400 });
     }
 
-    // Securely update or fetch the Access Token in the DB
-    let account = await prisma.whatsAppAccount.findFirst();
-    
-    if (accessToken) {
-      if (account) {
-        account = await prisma.whatsAppAccount.update({
-          where: { id: account.id },
-          data: { accessToken, phoneId: phoneNumberId, businessAccountId: wabaId || account.businessAccountId }
-        });
-      } else {
-        account = await prisma.whatsAppAccount.create({
+    let token = accessToken;
+    let effectivePhoneId = phoneNumberId;
+
+    let client: any = null;
+    if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email }
+          ]
+        }
+      });
+    }
+
+    if (client) {
+      if (accessToken) {
+        await prisma.whatsAppClient.update({
+          where: { id: client.id },
           data: {
-            accessToken,
+            metaAccessToken: accessToken,
             phoneId: phoneNumberId,
-            businessAccountId: wabaId || "",
-            phoneNumber: "",
-            name: "Main WhatsApp Account",
+            wabaId: wabaId || client.wabaId
           }
         });
       }
+      token = token || client.metaAccessToken;
+      effectivePhoneId = effectivePhoneId || client.phoneId;
+    } else {
+      let account = await prisma.whatsAppAccount.findFirst();
+      if (accessToken) {
+        if (account) {
+          account = await prisma.whatsAppAccount.update({
+            where: { id: account.id },
+            data: { accessToken, phoneId: phoneNumberId, businessAccountId: wabaId || account.businessAccountId }
+          });
+        } else {
+          account = await prisma.whatsAppAccount.create({
+            data: {
+              accessToken,
+              phoneId: phoneNumberId,
+              businessAccountId: wabaId || "",
+              phoneNumber: "",
+              name: "Main WhatsApp Account",
+            }
+          });
+        }
+      }
+      token = token || account?.accessToken;
+      effectivePhoneId = effectivePhoneId || account?.phoneId;
     }
 
-    if (!account || !account.accessToken) {
-      return NextResponse.json({ success: false, error: "No Meta Access Token found in the database. Please configure your Meta App credentials first." }, { status: 400 });
+    if (!token || !effectivePhoneId) {
+      return NextResponse.json({ success: false, error: "No Meta Access Token or Phone ID found. Please configure your Meta credentials first." }, { status: 400 });
     }
 
-    const url = `https://graph.facebook.com/v20.0/${phoneNumberId}/register`;
+    const url = `https://graph.facebook.com/v21.0/${effectivePhoneId}/register`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${account.accessToken}`,
+        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -60,6 +92,16 @@ export async function POST(req: NextRequest) {
 
     if (data.error) {
       return NextResponse.json({ success: false, error: data.error.message, details: data.error }, { status: 400 });
+    }
+
+    // Auto-subscribe WABA if provided
+    if (wabaId) {
+      try {
+        await fetch(`https://graph.facebook.com/v21.0/${wabaId}/subscribed_apps`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (_) {}
     }
 
     return NextResponse.json({ success: true, data });

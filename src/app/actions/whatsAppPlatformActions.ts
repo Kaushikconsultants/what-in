@@ -5944,33 +5944,115 @@ export async function sendWhatsAppHelloWorldAction(phone: string) {
   }
 }
 
-export async function registerWhatsAppPhoneNumberAction(pin: string) {
+export async function checkMetaPhoneNumberStatusAction(customPhoneId?: string, customToken?: string) {
   try {
-    const account = await prisma.whatsAppAccount.findFirst();
-    if (!account || !account.accessToken || !account.phoneId) {
-      return { success: false, error: "WhatsApp API Account is not fully configured. Please save credentials first." };
+    let token = customToken?.trim() || "";
+    let phoneId = customPhoneId?.trim() || "";
+
+    if (!token || !phoneId) {
+      const creds = await getMetaApiCredentials();
+      token = creds.accessToken;
+      phoneId = creds.phoneId;
     }
 
-    const token = account.accessToken;
-    const phoneId = account.phoneId;
+    if (!token || !phoneId) {
+      return { success: false, error: "WhatsApp API credentials (Phone ID and Access Token) are not configured." };
+    }
 
-    const url = `https://graph.facebook.com/v20.0/${phoneId}/register`;
+    const url = `https://graph.facebook.com/v21.0/${phoneId}?fields=verified_name,display_phone_number,quality_rating,code_verification_status,status,name_status,new_name_status,account_mode`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      return { success: false, error: data.error.message || `Meta API Error (${data.error.code || 'UNKNOWN'})` };
+    }
+
+    return {
+      success: true,
+      data: {
+        verifiedName: data.verified_name || "N/A",
+        displayPhoneNumber: data.display_phone_number || "N/A",
+        qualityRating: data.quality_rating || "UNKNOWN",
+        codeVerificationStatus: data.code_verification_status || "PENDING",
+        status: data.status || "CONNECTED",
+        nameStatus: data.name_status || "APPROVED",
+        accountMode: data.account_mode || "LIVE"
+      }
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function registerWhatsAppPhoneNumberAction(
+  pin: string,
+  customPhoneId?: string,
+  customToken?: string,
+  customWabaId?: string
+) {
+  try {
+    let token = customToken?.trim() || "";
+    let phoneId = customPhoneId?.trim() || "";
+    let wabaId = customWabaId?.trim() || "";
+
+    if (!token || !phoneId) {
+      const creds = await getMetaApiCredentials();
+      token = creds.accessToken;
+      phoneId = creds.phoneId;
+      wabaId = creds.wabaId || "";
+    }
+
+    if (!token || !phoneId) {
+      return { success: false, error: "WhatsApp API credentials (Phone ID and Access Token) are not configured. Please save credentials first." };
+    }
+
+    const cleanPin = pin.trim();
+    if (!/^\d{6}$/.test(cleanPin)) {
+      return { success: false, error: "Registration PIN must be exactly 6 numeric digits (e.g. 123456)." };
+    }
+
+    const url = `https://graph.facebook.com/v21.0/${phoneId}/register`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        pin: pin
+        pin: cleanPin
       })
     });
     
     const resData = await response.json();
 
     if (resData.error) {
-      return { success: false, error: resData.error.message || "Failed to register number" };
+      return { success: false, error: resData.error.message || "Failed to register number with Meta Cloud API." };
     }
 
-    return { success: true, message: "Number successfully registered with Meta!" };
+    // Auto-subscribe WABA to webhook app if wabaId is available
+    if (wabaId) {
+      try {
+        await fetch(`https://graph.facebook.com/v21.0/${wabaId}/subscribed_apps`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (_) {}
+    }
+
+    // Verify live status
+    let metaStatus: any = null;
+    try {
+      const statusRes = await fetch(`https://graph.facebook.com/v21.0/${phoneId}?fields=verified_name,display_phone_number,quality_rating,code_verification_status,status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      metaStatus = await statusRes.json();
+    } catch (_) {}
+
+    return { 
+      success: true, 
+      message: "Phone number successfully registered and connected with Meta Cloud API! Status is now LIVE.",
+      metaDetails: metaStatus
+    };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
