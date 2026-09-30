@@ -35,17 +35,17 @@ export default function WhatsAppAPISettingsPage() {
   const [activeTab, setActiveTab] = useState("brand-profile");
 
   // Dynamic Brand Profile & AI Intelligence State
-  const [brandName, setBrandName] = useState("Espon Clothing Private Limited");
-  const [brandDomain, setBrandDomain] = useState("www.esponsports.com");
-  const [brandPhone, setBrandPhone] = useState("+91 7206066678");
-  const [brandEmail, setBrandEmail] = useState("clothingespon@gmail.com");
-  const [brandAddress, setBrandAddress] = useState("Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road");
-  const [city, setCity] = useState("Rohtak");
-  const [state, setState] = useState("Haryana");
-  const [pincode, setPincode] = useState("124001");
-  const [country, setCountry] = useState("India");
-  const [gstin, setGstin] = useState("06AAHCE7721Q1Z4");
-  const [pan, setPan] = useState("AAHCE7721Q");
+  const [brandName, setBrandName] = useState("");
+  const [brandDomain, setBrandDomain] = useState("");
+  const [brandPhone, setBrandPhone] = useState("");
+  const [brandEmail, setBrandEmail] = useState("");
+  const [brandAddress, setBrandAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [country, setCountry] = useState("");
+  const [gstin, setGstin] = useState("");
+  const [pan, setPan] = useState("");
   const [aiKnowledgeBase, setAiKnowledgeBase] = useState("");
   const [aiSystemPrompt, setAiSystemPrompt] = useState("");
   const [welcomeMessage, setWelcomeMessage] = useState("Welcome! How can we help you today?");
@@ -174,20 +174,20 @@ export default function WhatsAppAPISettingsPage() {
         setSystemPrompt(resSettings.settings.aiSystemPrompt || "");
       }
       if (resBrand && resBrand.success) {
-        if (resBrand.brandName) setBrandName(resBrand.brandName);
-        if (resBrand.brandDomain) setBrandDomain(resBrand.brandDomain);
-        if (resBrand.brandPhone || resBrand.phoneNumber) setBrandPhone(resBrand.brandPhone || resBrand.phoneNumber);
-        if (resBrand.brandEmail) setBrandEmail(resBrand.brandEmail);
-        if (resBrand.address) setBrandAddress(resBrand.address);
-        if (resBrand.city) setCity(resBrand.city);
-        if (resBrand.state) setState(resBrand.state);
-        if (resBrand.pincode) setPincode(resBrand.pincode);
-        if (resBrand.country) setCountry(resBrand.country);
-        if (resBrand.gstin) setGstin(resBrand.gstin);
-        if (resBrand.pan) setPan(resBrand.pan);
-        if (resBrand.aiKnowledgeBase) setAiKnowledgeBase(resBrand.aiKnowledgeBase);
-        if (resBrand.aiSystemPrompt) setAiSystemPrompt(resBrand.aiSystemPrompt);
-        if (resBrand.welcomeMessage) setWelcomeMessage(resBrand.welcomeMessage);
+        setBrandName(resBrand.brandName || "");
+        setBrandDomain(resBrand.brandDomain || "");
+        setBrandPhone(resBrand.brandPhone || resBrand.phoneNumber || "");
+        setBrandEmail(resBrand.brandEmail || "");
+        setBrandAddress(resBrand.address || "");
+        setCity(resBrand.city || "");
+        setState(resBrand.state || "");
+        setPincode(resBrand.pincode || "");
+        setCountry(resBrand.country || "");
+        setGstin(resBrand.gstin || "");
+        setPan(resBrand.pan || "");
+        setAiKnowledgeBase(resBrand.aiKnowledgeBase || "");
+        setAiSystemPrompt(resBrand.aiSystemPrompt || "");
+        setWelcomeMessage(resBrand.welcomeMessage || "Welcome! How can we help you today?");
       }
       if (resTeams.success && resTeams.teams) setTeams(resTeams.teams);
       if (resAgents.success && resAgents.employees) setAllAgents(resAgents.employees);

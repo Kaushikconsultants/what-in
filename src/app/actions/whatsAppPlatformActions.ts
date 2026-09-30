@@ -3740,13 +3740,28 @@ export async function generateAITemplateAction(prompt: string, context?: {
   currentDraft?: any;
 }) {
   try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    let clientRec: any = null;
+    if (user?.clientId) {
+      clientRec = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } }).catch(() => null);
+    } else if (user?.email) {
+      clientRec = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email },
+            { agents: { some: { email: user.email } } }
+          ]
+        }
+      }).catch(() => null);
+    }
+
     const [
       settings,
       company,
       account,
       legacySetting,
       organization,
-      clientRec,
       activeProducts,
       activeCombos,
       cannedResponses
@@ -3756,9 +3771,8 @@ export async function generateAITemplateAction(prompt: string, context?: {
       prisma.whatsAppAccount.findFirst().catch(() => null),
       prisma.whatsAppLegacySetting.findFirst().catch(() => null),
       prisma.organization.findFirst().catch(() => null),
-      prisma.whatsAppClient.findFirst().catch(() => null),
       prisma.product.findMany({ 
-        where: { status: 'Active' }, 
+        where: clientRec ? { status: 'Active', clientId: clientRec.id } : { status: 'Active' }, 
         take: 30, 
         orderBy: [{ stockQuantity: 'desc' }, { createdAt: 'desc' }],
         select: { id: true, name: true, sku: true, sellingPrice: true, mrp: true, category: true, subCategory: true, images: true, stockQuantity: true, description: true } 
@@ -3767,16 +3781,23 @@ export async function generateAITemplateAction(prompt: string, context?: {
       prisma.whatsAppCannedResponse.findMany({ take: 6, select: { title: true, shortcut: true, content: true, category: true } }).catch(() => [])
     ]);
 
-    const brandName = context?.brandName || company?.companyName || organization?.name || account?.name || "Espon Clothing";
-    const brandDomain = context?.brandDomain || (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.shopifyStoreDomain ? (company.shopifyStoreDomain.includes('esponsports') ? 'esponsports.com' : company.shopifyStoreDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()) : "esponsports.com"));
-    const brandPhone = company?.mobile || (company as any)?.phone || account?.phoneNumber || "+91 7206066678";
-    const brandEmail = company?.email || organization?.email || `support@${brandDomain}`;
-    const brandAddress = company?.address 
+    let customLimits: any = {};
+    if (clientRec?.customLimitsJson) {
+      try { customLimits = JSON.parse(clientRec.customLimitsJson); } catch {}
+    }
+    const bDetails = customLimits.brandDetails || {};
+
+    const brandName = context?.brandName || clientRec?.businessName || company?.companyName || organization?.name || account?.name || "Our Brand";
+    const brandDomain = context?.brandDomain || bDetails.website || (clientRec?.shopifyDomain ? clientRec.shopifyDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim() : "ourbrand.com"));
+    const brandPhone = clientRec?.contactPhone || clientRec?.phoneNumber || company?.mobile || (company as any)?.phone || account?.phoneNumber || "";
+    const brandEmail = clientRec?.contactEmail || clientRec?.adminEmail || company?.email || organization?.email || `support@${brandDomain}`;
+    const brandAddress = bDetails.address ? [bDetails.address, bDetails.city, bDetails.state, bDetails.pincode, bDetails.country].filter(Boolean).join(", ") : (company?.address 
       ? `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}, ${company.country || 'India'}`.replace(/\s+,/g, ',').trim()
-      : (company?.city || "Rohtak, Haryana, India");
-    const gstin = company?.gstin || organization?.gstin || "06AAHCE7721Q1Z4";
+      : (company?.city || ""));
+    const gstin = bDetails.gstin || company?.gstin || organization?.gstin || "";
 
     const kbPieces: string[] = [];
+    if (clientRec?.aiKnowledgeBase) kbPieces.push(clientRec.aiKnowledgeBase);
     if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
     if (legacySetting?.knowledge_base) kbPieces.push(legacySetting.knowledge_base);
     if (legacySetting?.inst_brand_policies) kbPieces.push(`Brand Policies: ${legacySetting.inst_brand_policies}`);
@@ -3784,7 +3805,7 @@ export async function generateAITemplateAction(prompt: string, context?: {
     if (legacySetting?.inst_order_security) kbPieces.push(`Order & Payment Rules: ${legacySetting.inst_order_security}`);
 
     const aiKnowledgeBase = kbPieces.join('\n\n') || "Leading apparel manufacturer & B2B wholesale brand with premium fabrics, fast nationwide delivery, GST invoicing, and easy exchanges.";
-    const aiSystemRules = settings?.aiSystemPrompt || "Be polite, high-converting, professional, and Meta compliant.";
+    const aiSystemRules = clientRec?.aiSystemPrompt || settings?.aiSystemPrompt || "Be polite, high-converting, professional, and Meta compliant.";
     const fallbackLanguage = settings?.aiFallbackLanguage || "English";
 
     const cleanPrompt = (prompt || '').trim();
@@ -5501,6 +5522,40 @@ export async function exportWhatsAppConversationsCSV() {
 // ---------------------------------------------------------
 export async function getWhatsAppSettingsAction() {
   try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    let client: any = null;
+    if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } }).catch(() => null);
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email },
+            { agents: { some: { email: user.email } } }
+          ]
+        }
+      }).catch(() => null);
+    }
+
+    if (client) {
+      return {
+        success: true,
+        settings: {
+          id: client.id,
+          geminiApiKey: client.geminiApiKey || "",
+          aiModel: client.aiModel || "gemini-2.5-flash",
+          aiSystemPrompt: client.aiSystemPrompt || "",
+          welcomeMessage: client.welcomeMessage || "Welcome! How can we help you today?",
+          workingHoursStart: client.workingHoursStart || "09:00",
+          workingHoursEnd: client.workingHoursEnd || "19:00",
+          slaWarningMinutes: 15,
+          autoAssignStrategy: "ROUND_ROBIN",
+          metaCapiLeadValue: 0
+        }
+      };
+    }
+
     let settings = await prisma.whatsAppSettings.findFirst();
     if (!settings) {
       settings = await prisma.whatsAppSettings.create({
@@ -5532,12 +5587,22 @@ export async function saveWhatsAppSettingsAction(data: {
       return { success: false, error: "Unauthorized access: Admin privileges required" };
     }
 
-    if (!isOwner) {
-      const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
-      const client = await prisma.whatsAppClient.findUnique({
-        where: { id: targetClientId },
-        select: { enabledModules: true }
-      });
+    let client: any = null;
+    if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } }).catch(() => null);
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email },
+            { agents: { some: { email: user.email } } }
+          ]
+        }
+      }).catch(() => null);
+    }
+
+    if (!isOwner && client) {
       const { parseEnabledModules } = await import("@/lib/moduleRegistry");
       const enabledModules = parseEnabledModules(client?.enabledModules);
 
@@ -5548,6 +5613,25 @@ export async function saveWhatsAppSettingsAction(data: {
       if (data.metaCapiLeadValue !== undefined && !enabledModules.includes("META_PIXEL_CAPI")) {
         return { success: false, error: "Meta Pixel & CAPI Ad Tracking module is disabled on your subscription plan." };
       }
+    }
+
+    if (client) {
+      const clientUpdate: any = {};
+      if (data.geminiApiKey !== undefined) clientUpdate.geminiApiKey = data.geminiApiKey;
+      if (data.aiModel !== undefined) clientUpdate.aiModel = data.aiModel;
+      if (data.aiSystemPrompt !== undefined) clientUpdate.aiSystemPrompt = data.aiSystemPrompt;
+      if (data.welcomeMessage !== undefined) clientUpdate.welcomeMessage = data.welcomeMessage;
+      if (data.workingHoursStart !== undefined) clientUpdate.workingHoursStart = data.workingHoursStart;
+      if (data.workingHoursEnd !== undefined) clientUpdate.workingHoursEnd = data.workingHoursEnd;
+
+      await prisma.whatsAppClient.update({
+        where: { id: client.id },
+        data: clientUpdate
+      });
+
+      revalidatePath("/whatsapp/settings");
+      revalidatePath("/whatsapp/integrations");
+      return { success: true, settings: { ...client, ...clientUpdate } };
     }
 
     let settings = await prisma.whatsAppSettings.findFirst();
@@ -10102,7 +10186,8 @@ export async function exportAllWhatsAppContactsAction() {
 }
 
 // ---------------------------------------------------------
-// GET WHATSAPP BRAND & ACCOUNT DETAILS
+// ---------------------------------------------------------
+// GET WHATSAPP BRAND & ACCOUNT DETAILS (100% TENANT ISOLATED)
 // ---------------------------------------------------------
 export async function getWhatsAppBrandDetailsAction() {
   try {
@@ -10121,10 +10206,114 @@ export async function getWhatsAppBrandDetailsAction() {
         }
       }).catch(() => null);
     }
-    if (!client) {
-      client = await prisma.whatsAppClient.findFirst().catch(() => null);
+
+    // 1. IF CLIENT TENANT IS AUTHENTICATED
+    if (client) {
+      let customLimits: any = {};
+      if (client.customLimitsJson) {
+        try {
+          customLimits = JSON.parse(client.customLimitsJson);
+        } catch {}
+      }
+      const bDetails = customLimits.brandDetails || {};
+
+      const brandName = client.businessName || "";
+      let whatsAppDisplayName = client.businessName || "";
+      let metaCatalogId: string | null = null;
+      let isCartEnabled = true;
+      let isCatalogVisible = true;
+
+      if (client.phoneId && client.metaAccessToken) {
+        try {
+          const [phoneRes, commerceRes] = await Promise.all([
+            fetch(
+              `https://graph.facebook.com/v21.0/${client.phoneId}?fields=verified_name,display_phone_number,is_official_business_account`,
+              { headers: { Authorization: `Bearer ${client.metaAccessToken}` } }
+            ).catch(() => null),
+            fetch(
+              `https://graph.facebook.com/v21.0/${client.phoneId}/whatsapp_commerce_settings`,
+              { headers: { Authorization: `Bearer ${client.metaAccessToken}` } }
+            ).catch(() => null)
+          ]);
+
+          if (phoneRes && phoneRes.ok) {
+            const pData = await phoneRes.json();
+            if (pData.verified_name) whatsAppDisplayName = pData.verified_name;
+          }
+
+          if (commerceRes && commerceRes.ok) {
+            const cData = await commerceRes.json();
+            const setting = cData?.data?.[0];
+            if (setting?.id) {
+              metaCatalogId = setting.id;
+              isCartEnabled = setting.is_cart_enabled ?? true;
+              isCatalogVisible = setting.is_catalog_visible ?? true;
+            }
+          }
+        } catch {}
+      }
+
+      let brandDomain = bDetails.website || "";
+      if (!brandDomain && client.shopifyDomain) {
+        brandDomain = client.shopifyDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+      }
+
+      const phoneNumber = client.contactPhone || client.phoneNumber || "";
+      const brandEmail = client.contactEmail || client.adminEmail || "";
+      const address = bDetails.address || "";
+      const city = bDetails.city || "";
+      const state = bDetails.state || "";
+      const pincode = bDetails.pincode || "";
+      const country = bDetails.country || (address ? "India" : "");
+      const gstin = bDetails.gstin || "";
+      const pan = bDetails.pan || "";
+      const brandAddress = [address, city, state, pincode, country].filter(Boolean).join(", ");
+
+      const aiKnowledgeBase = client.aiKnowledgeBase || "";
+      const aiSystemPrompt = client.aiSystemPrompt || "";
+      const welcomeMessage = client.welcomeMessage || "Welcome! How can we help you today?";
+
+      const hasAiKnowledge = Boolean(aiKnowledgeBase && aiKnowledgeBase.trim().length > 0);
+      const knowledgeLength = aiKnowledgeBase.length;
+
+      const [productsCount, combosCount] = await Promise.all([
+        prisma.product.count({ where: { status: 'Active', clientId: client.id } }).catch(() => 
+          prisma.product.count({ where: { status: 'Active' } }).catch(() => 0)
+        ),
+        prisma.shopifyCombo.count({ where: { is_active: true } }).catch(() => 0)
+      ]);
+
+      return {
+        success: true,
+        brandName,
+        verifiedName: whatsAppDisplayName,
+        whatsAppDisplayName,
+        brandDomain,
+        metaCatalogId: metaCatalogId || null,
+        isCartEnabled,
+        isCatalogVisible,
+        phoneNumber,
+        brandPhone: phoneNumber,
+        brandEmail,
+        brandAddress,
+        address,
+        city,
+        state,
+        pincode,
+        country,
+        gstin,
+        pan,
+        aiKnowledgeBase,
+        aiSystemPrompt,
+        welcomeMessage,
+        hasAiKnowledge,
+        knowledgeLength,
+        productsCount,
+        combosCount
+      };
     }
 
+    // 2. PLATFORM OWNER / ROOT ADMIN FALLBACK (NO TENANT)
     const [settings, company, account, legacySetting, org, productsCount, combosCount] = await Promise.all([
       prisma.whatsAppSettings.findFirst().catch(() => null),
       prisma.companySettings.findFirst().catch(() => null),
@@ -10135,8 +10324,8 @@ export async function getWhatsAppBrandDetailsAction() {
       prisma.shopifyCombo.count({ where: { is_active: true } }).catch(() => 0)
     ]);
 
-    const brandName = company?.companyName || client?.businessName || org?.name || account?.name || "Espon Clothing Private Limited";
-    let whatsAppDisplayName = account?.name || client?.businessName || "Espon";
+    const brandName = company?.companyName || org?.name || account?.name || "";
+    let whatsAppDisplayName = account?.name || brandName || "";
 
     let metaCatalogId: string | null = null;
     let isCartEnabled = true;
@@ -10148,15 +10337,11 @@ export async function getWhatsAppBrandDetailsAction() {
         const [phoneRes, commerceRes] = await Promise.all([
           fetch(
             `https://graph.facebook.com/v21.0/${creds.phoneId}?fields=verified_name,display_phone_number,is_official_business_account`,
-            {
-              headers: { Authorization: `Bearer ${creds.accessToken}` }
-            }
+            { headers: { Authorization: `Bearer ${creds.accessToken}` } }
           ).catch(() => null),
           fetch(
             `https://graph.facebook.com/v21.0/${creds.phoneId}/whatsapp_commerce_settings`,
-            {
-              headers: { Authorization: `Bearer ${creds.accessToken}` }
-            }
+            { headers: { Authorization: `Bearer ${creds.accessToken}` } }
           ).catch(() => null)
         ]);
 
@@ -10176,33 +10361,29 @@ export async function getWhatsAppBrandDetailsAction() {
         }
       }
     } catch {}
-    
-    // Resolve public storefront domain (prioritize direct website over internal myshopify domain)
-    let brandDomain = "www.esponsports.com";
+
+    let brandDomain = "";
     if (company?.website) {
       brandDomain = company.website.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
-    } else if (client?.shopifyDomain) {
-      brandDomain = client.shopifyDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     } else if (company?.shopifyStoreDomain) {
-      const rawDomain = company.shopifyStoreDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
-      brandDomain = rawDomain.includes("esponsports") ? "esponsports.com" : rawDomain;
+      brandDomain = company.shopifyStoreDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     }
 
-    const phoneNumber = company?.mobile || client?.contactPhone || client?.phoneNumber || (company as any)?.phone || account?.phoneNumber || "+91 7206066678";
-    const brandEmail = company?.email || client?.contactEmail || org?.email || `clothingespon@gmail.com`;
-    const address = company?.address || "Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road";
-    const city = company?.city || "Rohtak";
-    const state = company?.state || "Haryana";
-    const pincode = company?.pincode || "124001";
-    const country = company?.country || "India";
-    const gstin = company?.gstin || org?.gstin || "06AAHCE7721Q1Z4";
-    const pan = company?.pan || org?.pan || "AAHCE7721Q";
+    const phoneNumber = company?.mobile || (company as any)?.phone || account?.phoneNumber || "";
+    const brandEmail = company?.email || org?.email || "";
+    const address = company?.address || "";
+    const city = company?.city || "";
+    const state = company?.state || "";
+    const pincode = company?.pincode || "";
+    const country = company?.country || (address ? "India" : "");
+    const gstin = company?.gstin || org?.gstin || "";
+    const pan = company?.pan || org?.pan || "";
 
     const brandAddress = [address, city, state, pincode, country].filter(Boolean).join(", ");
 
-    const aiKnowledgeBase = settings?.aiKnowledgeBase || client?.aiKnowledgeBase || legacySetting?.knowledge_base || "";
-    const aiSystemPrompt = settings?.aiSystemPrompt || client?.aiSystemPrompt || "";
-    const welcomeMessage = settings?.welcomeMessage || client?.welcomeMessage || "Welcome! How can we help you today?";
+    const aiKnowledgeBase = settings?.aiKnowledgeBase || legacySetting?.knowledge_base || "";
+    const aiSystemPrompt = settings?.aiSystemPrompt || "";
+    const welcomeMessage = settings?.welcomeMessage || "Welcome! How can we help you today?";
 
     const hasAiKnowledge = Boolean(aiKnowledgeBase && aiKnowledgeBase.trim().length > 0);
     const knowledgeLength = aiKnowledgeBase.length;
@@ -10213,7 +10394,7 @@ export async function getWhatsAppBrandDetailsAction() {
       verifiedName: whatsAppDisplayName,
       whatsAppDisplayName,
       brandDomain,
-      metaCatalogId: metaCatalogId || "2959185064427355",
+      metaCatalogId,
       isCartEnabled,
       isCatalogVisible,
       phoneNumber,
@@ -10238,19 +10419,19 @@ export async function getWhatsAppBrandDetailsAction() {
   } catch (e: any) {
     return { 
       success: false, 
-      brandName: "Espon Clothing Private Limited", 
-      brandDomain: "www.esponsports.com", 
-      phoneNumber: "+91 7206066678", 
-      brandPhone: "+91 7206066678",
-      brandEmail: "clothingespon@gmail.com",
-      brandAddress: "Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road, Rohtak, Haryana 124001, India",
-      address: "Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road",
-      city: "Rohtak",
-      state: "Haryana",
-      pincode: "124001",
-      country: "India",
-      gstin: "06AAHCE7721Q1Z4",
-      pan: "AAHCE7721Q",
+      brandName: "", 
+      brandDomain: "", 
+      phoneNumber: "", 
+      brandPhone: "",
+      brandEmail: "",
+      brandAddress: "",
+      address: "",
+      city: "",
+      state: "",
+      pincode: "",
+      country: "",
+      gstin: "",
+      pan: "",
       aiKnowledgeBase: "",
       aiSystemPrompt: "",
       welcomeMessage: "Welcome! How can we help you today?",
@@ -10263,7 +10444,7 @@ export async function getWhatsAppBrandDetailsAction() {
 }
 
 // ---------------------------------------------------------
-// SAVE WHATSAPP BRAND & AI DETAILS
+// SAVE WHATSAPP BRAND & AI DETAILS (100% TENANT ISOLATED)
 // ---------------------------------------------------------
 export async function saveWhatsAppBrandDetailsAction(data: {
   brandName?: string;
@@ -10283,8 +10464,73 @@ export async function saveWhatsAppBrandDetailsAction(data: {
 }) {
   try {
     const user = await getAuthenticatedUser().catch(() => null);
+    let client: any = null;
+    if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } }).catch(() => null);
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email },
+            { agents: { some: { email: user.email } } }
+          ]
+        }
+      }).catch(() => null);
+    }
 
-    // 1. Update or create CompanySettings (where id: 'default')
+    // 1. IF CLIENT TENANT: SAVE STRICTLY TO WHATSAPPCLIENT RECORD
+    if (client) {
+      let customLimits: any = {};
+      if (client.customLimitsJson) {
+        try {
+          customLimits = JSON.parse(client.customLimitsJson);
+        } catch {}
+      }
+      customLimits.brandDetails = {
+        ...(customLimits.brandDetails || {}),
+        ...(data.brandAddress !== undefined ? { address: data.brandAddress.trim() } : {}),
+        ...(data.city !== undefined ? { city: data.city.trim() } : {}),
+        ...(data.state !== undefined ? { state: data.state.trim() } : {}),
+        ...(data.pincode !== undefined ? { pincode: data.pincode.trim() } : {}),
+        ...(data.country !== undefined ? { country: data.country.trim() } : {}),
+        ...(data.gstin !== undefined ? { gstin: data.gstin.trim() } : {}),
+        ...(data.pan !== undefined ? { pan: data.pan.trim() } : {}),
+        ...(data.brandDomain !== undefined ? { website: data.brandDomain.trim() } : {}),
+      };
+
+      const clientData: any = {
+        customLimitsJson: JSON.stringify(customLimits),
+      };
+      if (data.brandName !== undefined) clientData.businessName = data.brandName.trim();
+      if (data.brandEmail !== undefined) clientData.contactEmail = data.brandEmail.trim();
+      if (data.brandPhone !== undefined) clientData.contactPhone = data.brandPhone.trim();
+      if (data.brandDomain !== undefined) {
+        clientData.shopifyDomain = data.brandDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+      }
+      if (data.aiKnowledgeBase !== undefined) clientData.aiKnowledgeBase = data.aiKnowledgeBase;
+      if (data.aiSystemPrompt !== undefined) clientData.aiSystemPrompt = data.aiSystemPrompt;
+      if (data.welcomeMessage !== undefined) clientData.welcomeMessage = data.welcomeMessage;
+
+      await prisma.whatsAppClient.update({
+        where: { id: client.id },
+        data: clientData
+      });
+
+      revalidatePath("/whatsapp/api-settings");
+      revalidatePath("/whatsapp/templates");
+      revalidatePath("/whatsapp/ai-automation");
+      revalidatePath("/whatsapp/dashboard");
+      revalidatePath("/whatsapp/chatbots");
+      revalidatePath("/whatsapp/inbox");
+
+      return { 
+        success: true, 
+        message: "✓ Brand profile & AI identity successfully saved and synchronized across your account!" 
+      };
+    }
+
+    // 2. PLATFORM OWNER / ROOT ADMIN: UPDATE GLOBAL COMPANY & SETTINGS
     let company = await prisma.companySettings.findFirst();
     const companyData: any = {};
     if (data.brandName !== undefined) companyData.companyName = data.brandName.trim();
@@ -10316,7 +10562,7 @@ export async function saveWhatsAppBrandDetailsAction(data: {
       });
     }
 
-    // 2. Update or create WhatsAppSettings for AI knowledge & tone
+    // Update WhatsAppSettings for AI knowledge & tone
     let settings = await prisma.whatsAppSettings.findFirst();
     const settingsData: any = {};
     if (data.aiKnowledgeBase !== undefined) settingsData.aiKnowledgeBase = data.aiKnowledgeBase;
@@ -10334,44 +10580,7 @@ export async function saveWhatsAppBrandDetailsAction(data: {
       });
     }
 
-    // 3. Update WhatsAppClient (tenant isolation if present)
-    let client: any = null;
-    if (user?.clientId) {
-      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } }).catch(() => null);
-    } else if (user?.email) {
-      client = await prisma.whatsAppClient.findFirst({
-        where: {
-          OR: [
-            { contactEmail: user.email },
-            { adminEmail: user.email },
-            { agents: { some: { email: user.email } } }
-          ]
-        }
-      }).catch(() => null);
-    }
-    if (!client) {
-      client = await prisma.whatsAppClient.findFirst().catch(() => null);
-    }
-
-    if (client) {
-      const clientData: any = {};
-      if (data.brandName) clientData.businessName = data.brandName.trim();
-      if (data.brandEmail) clientData.contactEmail = data.brandEmail.trim();
-      if (data.brandPhone) clientData.contactPhone = data.brandPhone.trim();
-      if (data.brandDomain) {
-        clientData.shopifyDomain = data.brandDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
-      }
-      if (data.aiKnowledgeBase !== undefined) clientData.aiKnowledgeBase = data.aiKnowledgeBase;
-      if (data.aiSystemPrompt !== undefined) clientData.aiSystemPrompt = data.aiSystemPrompt;
-      if (data.welcomeMessage !== undefined) clientData.welcomeMessage = data.welcomeMessage;
-      
-      await prisma.whatsAppClient.update({
-        where: { id: client.id },
-        data: clientData
-      }).catch(() => null);
-    }
-
-    // 4. Update Organization if present
+    // Update Organization if present
     const org = await prisma.organization.findFirst().catch(() => null);
     if (org) {
       const orgData: any = {};
