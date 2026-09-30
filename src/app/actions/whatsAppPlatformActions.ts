@@ -3842,8 +3842,8 @@ MANDATORY INSTRUCTION: You MUST set templateType to "CAROUSEL" with category "MA
       cannedFaqs: cannedFaqsSummary
     };
 
-    let apiKey = clientRec?.geminiApiKey || settings?.geminiApiKey || process.env.GEMINI_API_KEY || '';
-    let preferredModel = clientRec?.aiModel || settings?.aiModel || "gemini-2.5-flash";
+    let apiKey = clientRec ? (clientRec.geminiApiKey?.trim() || '') : (settings?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || '');
+    let preferredModel = clientRec?.aiModel || settings?.aiModel || "gemini-flash-lite-latest";
 
     let generatedJson: any = null;
 

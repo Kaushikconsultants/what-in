@@ -30,31 +30,21 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanDomain = (d?: string | null) => {
-      if (!d) return null;
+      if (!d) return "";
       return d.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     };
 
-    let brandName = clientRecord?.businessName || company?.companyName || account?.name || "Official Store";
-    let brandDomain = 
-      cleanDomain(clientRecord?.shopifyDomain) ||
-      cleanDomain(company?.website) ||
-      (clientRecord?.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : null) ||
-      cleanDomain(company?.shopifyStoreDomain) ||
-      "";
+    const isClient = Boolean(clientRecord);
 
-    const rawPhone = clientRecord?.contactPhone || clientRecord?.ownerWhatsApp || clientRecord?.phoneNumber || company?.mobile || account?.phoneNumber || "";
-    let brandPhone = "";
-    if (rawPhone) {
-      const trimmed = String(rawPhone).trim();
-      brandPhone = trimmed.startsWith('+') || trimmed.startsWith('91') || trimmed.length > 10 
-        ? (trimmed.startsWith('+') ? trimmed : `+${trimmed}`) 
-        : `+91 ${trimmed}`;
-    }
+    let brandName = isClient ? (clientRecord.businessName || "Our Company") : (company?.companyName || account?.name || "Our Company");
+    let brandDomain = isClient ? cleanDomain(clientRecord.shopifyDomain) : (cleanDomain(company?.website) || cleanDomain(company?.shopifyStoreDomain));
+    let brandPhone = isClient ? (clientRecord.contactPhone || clientRecord.phoneNumber || "") : (company?.mobile || account?.phoneNumber || "");
+    let brandEmail = isClient ? (clientRecord.contactEmail || clientRecord.adminEmail || "") : (company?.email || "");
 
-    let brandEmail = clientRecord?.contactEmail || clientRecord?.adminEmail || company?.email || "";
-
-    const aiKnowledgeBase = clientRecord ? (clientRecord.aiKnowledgeBase || "") : (settings?.aiKnowledgeBase || "");
-    const aiSystemPrompt = clientRecord?.aiSystemPrompt || `You are the helpful customer service assistant for ${brandName}.`;
+    const aiKnowledgeBase = isClient ? (clientRecord.aiKnowledgeBase || "") : (settings?.aiKnowledgeBase || "");
+    const aiSystemPrompt = isClient 
+      ? (clientRecord.aiSystemPrompt || `You are a helpful customer service assistant for ${brandName}.`)
+      : (settings?.aiSystemPrompt || "You are a helpful customer service assistant for our business.");
     const fallbackLanguage = settings?.aiFallbackLanguage || "English";
     const aiModel = clientRecord?.aiModel || settings?.aiModel || "gemini-flash-lite-latest";
 
@@ -86,12 +76,12 @@ ${aiSystemPrompt}
 
 Brand Identity & Contact Details:
 - Brand Name: ${brandName}
-- Official Website: https://${brandDomain}
-- Support Phone: ${brandPhone}
-- Support Email: ${brandEmail}
+${brandDomain ? `- Official Website: https://${brandDomain}` : ''}
+${brandPhone ? `- Support Phone: ${brandPhone}` : ''}
+${brandEmail ? `- Support Email: ${brandEmail}` : ''}
 
-Knowledge Base (Company Information & FAQs):
-${aiKnowledgeBase || "We offer premium apparel with quick delivery and easy exchanges."}
+Knowledge Base:
+${aiKnowledgeBase || `Welcome to ${brandName}. Provide polite and helpful customer assistance.`}
 
 Rules:
 - Start the conversation in ${fallbackLanguage}. If the customer speaks another language (like Hindi/Hinglish), smoothly adapt and respond in their language.
@@ -107,10 +97,14 @@ Rules:
 
     fullPrompt += `\n--- Chat History ---\n${chatHistory}\n\nAgent (Your suggested reply):`;
 
-    // 5. Call Gemini API
-    const apiKey = clientRecord?.geminiApiKey || settings?.geminiApiKey || process.env.GEMINI_API_KEY;
+    // 5. Call Gemini API - STRICT TENANT ISOLATION
+    const apiKey = isClient ? clientRecord?.geminiApiKey?.trim() : (settings?.geminiApiKey?.trim() || process.env.GEMINI_API_KEY?.trim());
     if (!apiKey) {
-      return NextResponse.json({ error: "Gemini API Key is not configured." }, { status: 500 });
+      return NextResponse.json({ 
+        error: isClient 
+          ? "Gemini API Key is not configured for this client. Please enter your Gemini API Key in Settings -> AI Automation." 
+          : "Gemini API Key is not configured in platform settings." 
+      }, { status: 400 });
     }
 
     const { callGeminiRest, GEMINI_MODEL_CASCADE, HARDCODED_PRIMARY_MODEL } = await import('@/lib/whatsappAI');

@@ -1,5 +1,7 @@
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 import { sendWhatsAppMessageAction } from '@/app/actions/whatsAppPlatformActions';
+
+const prisma = new PrismaClient();
 
 const SHOPIFY_STORE_URL = process.env.VITE_SHOPIFY_STORE_URL || 'i2tu0d-jc.myshopify.com';
 const SHOPIFY_ACCESS_TOKEN = process.env.VITE_SHOPIFY_ACCESS_TOKEN || '';
@@ -60,17 +62,28 @@ export async function callGeminiRest(apiKey: string, modelName: string, prompt: 
   return text.trim();
 }
 
-async function callAIEngine(messages: any[], preferredModel: string, jsonMode = false, maxTokens = 600, customApiKey?: string) {
-  let apiKey = customApiKey || process.env.GEMINI_API_KEY || '';
-  if (!apiKey) {
-    try {
-      const settings = await prisma.whatsAppSettings.findFirst();
-      if (settings?.geminiApiKey) apiKey = settings.geminiApiKey;
-    } catch (_) {}
-  }
+async function callAIEngine(messages: any[], preferredModel: string, jsonMode = false, maxTokens = 600, customApiKey?: string, isClientTenant = false) {
+  let apiKey = customApiKey?.trim() || '';
 
-  if (!apiKey) {
-    throw new Error('No Gemini API Key found in client settings, platform settings or environment.');
+  // For client tenants: strictly ONLY use the client's own key. NEVER leak platform key or another client's key!
+  if (isClientTenant) {
+    if (!apiKey) {
+      throw new Error('CLIENT_NO_AI_KEY: Client has not configured a Gemini API Key. AI generation skipped.');
+    }
+  } else {
+    // Only for platform root owner: fallback to system settings or env
+    if (!apiKey) {
+      try {
+        const settings = await prisma.whatsAppSettings.findFirst();
+        if (settings?.geminiApiKey) apiKey = settings.geminiApiKey.trim();
+      } catch (_) {}
+    }
+    if (!apiKey) {
+      apiKey = process.env.GEMINI_API_KEY?.trim() || '';
+    }
+    if (!apiKey) {
+      throw new Error('No Gemini API Key found in platform settings or environment.');
+    }
   }
 
   const systemMsg = messages.find((m: any) => m.role === 'system')?.content || '';
@@ -464,16 +477,6 @@ export async function handleIncomingAILogic(
   conversationId?: string,
   clientId?: string | null
 ) {
-  let brandName = "Espon Clothing Private Limited";
-  let brandDomain = "www.esponsports.com";
-  let brandPhone = "+91 7206066678";
-  let brandEmail = "clothingespon@gmail.com";
-  let brandAddress = "Sco 71A , 2nd Floor , Ashoka Plaza Delhi Road, Rohtak, Haryana 124001, India";
-  let gstin = "06AAHCE7721Q1Z4";
-
-  let settings: any = null;
-  let legacySetting: any = null;
-  let activeCombos: any[] = [];
   let clientRecord: any = null;
 
   try {
@@ -488,99 +491,94 @@ export async function handleIncomingAILogic(
         clientRecord = await prisma.whatsAppClient.findUnique({ where: { id: conv.clientId } }).catch(() => null);
       }
     }
+  } catch (_) {}
 
-    const [company, s, acc, legacy, combos] = await Promise.all([
+  const isClientTenant = Boolean(clientRecord);
+  const clientApiKey = clientRecord?.geminiApiKey?.trim();
+
+  // CRITICAL MULTI-TENANT GUARD:
+  // If this message belongs to a client tenant, and the client has NOT configured their Gemini API key,
+  // DO NOT reply with AI, DO NOT burn platform API keys, and DO NOT hallucinate.
+  if (isClientTenant && !clientApiKey) {
+    console.log(`[WhatsApp AI Skipped] Client "${clientRecord?.businessName || clientId}" has no Gemini API Key configured in Settings -> AI Automation.`);
+    return null;
+  }
+
+  let brandName = "Our Company";
+  let brandDomain = "";
+  let brandPhone = "";
+  let brandEmail = "";
+  let brandAddress = "";
+  let gstin = "";
+  let knowledgeBase = "";
+  let systemRules = "You are a professional customer support and sales assistant.";
+  let activeCombosStr = "No active discount codes available.";
+
+  if (isClientTenant && clientRecord) {
+    brandName = clientRecord.businessName || "Our Company";
+    brandDomain = clientRecord.shopifyDomain || (clientRecord.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : "");
+    brandPhone = clientRecord.contactPhone || clientRecord.phoneNumber || "";
+    brandEmail = clientRecord.contactEmail || clientRecord.adminEmail || "";
+    brandAddress = clientRecord.businessAddress || "";
+    gstin = clientRecord.gstNumber || "";
+    knowledgeBase = clientRecord.aiKnowledgeBase?.trim() || `Welcome to ${brandName}. We are dedicated to providing excellent service and quality products.`;
+    systemRules = clientRecord.aiSystemPrompt?.trim() || `You are the official AI Assistant for ${brandName}. Assist customers politely and accurately.`;
+  } else {
+    // Root Platform Account Fallback
+    const [company, settings, acc, legacy] = await Promise.all([
       prisma.companySettings.findFirst().catch(() => null),
       prisma.whatsAppSettings.findFirst().catch(() => null),
       prisma.whatsAppAccount.findFirst().catch(() => null),
-      prisma.whatsAppLegacySetting.findFirst().catch(() => null),
-      prisma.shopifyCombo.findMany({ where: { is_active: true }, take: 4 }).catch(() => [])
+      prisma.whatsAppLegacySetting.findFirst().catch(() => null)
     ]);
-    settings = s;
-    legacySetting = legacy;
-    activeCombos = combos;
-
-    // Helper to sanitize domain
-    const cleanDomain = (d?: string | null) => {
-      if (!d) return null;
-      return d.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
-    };
-
-    // 1. Dynamic Brand Name
-    brandName = clientRecord?.businessName || company?.companyName || acc?.name || "Official Store";
-
-    // 2. Dynamic Brand Domain
-    const resolvedDomain = 
-      cleanDomain(clientRecord?.shopifyDomain) ||
-      cleanDomain(company?.website) ||
-      (clientRecord?.brandSlug ? `${clientRecord.brandSlug}.what-in.tinkal.in` : null) ||
-      cleanDomain(company?.shopifyStoreDomain) ||
-      "";
-    if (resolvedDomain) brandDomain = resolvedDomain;
-
-    // 3. Dynamic Support Phone
-    const rawPhone = 
-      clientRecord?.contactPhone || 
-      clientRecord?.ownerWhatsApp || 
-      clientRecord?.phoneNumber || 
-      company?.mobile || 
-      acc?.phoneNumber || 
-      "";
-    if (rawPhone) {
-      const trimmed = String(rawPhone).trim();
-      brandPhone = trimmed.startsWith('+') || trimmed.startsWith('91') || trimmed.length > 10 
-        ? (trimmed.startsWith('+') ? trimmed : `+${trimmed}`) 
-        : `+91 ${trimmed}`;
-    }
-
-    // 4. Dynamic Email
-    brandEmail = clientRecord?.contactEmail || clientRecord?.adminEmail || company?.email || "";
-
-    // 5. Dynamic Address & GSTIN
-    if (company?.address) {
-      brandAddress = `${company.address}, ${company.city || ''}, ${company.state || ''} ${company.pincode || ''}`.replace(/\s+,/g, ',').trim();
-    }
-    if (company?.gstin) gstin = company.gstin;
-  } catch (_) {}
+    brandName = company?.companyName || acc?.name || "Our Company";
+    brandDomain = company?.website || company?.shopifyStoreDomain || "";
+    brandPhone = company?.mobile || acc?.phoneNumber || "";
+    brandEmail = company?.email || "";
+    brandAddress = company?.address ? `${company.address}, ${company.city || ''}, ${company.state || ''}`.trim() : "";
+    gstin = company?.gstin || "";
+    knowledgeBase = settings?.aiKnowledgeBase || legacy?.knowledge_base || "";
+    systemRules = settings?.aiSystemPrompt || "You are an elite sales and customer service assistant.";
+  }
 
   const history = historyLines.join('\n');
   let toolContext = '';
   let carouselCards: any[] = [];
-  
-  const digitsOnly = userText.replace(/[^0-9]/g, '');
-  let orderNumToLookup = null;
-  if (digitsOnly.length >= 10) {
-    const historyOrderMatch = history.match(/(?:#|order\s*)([12]\d{3})\b/i) || history.match(/\b([12]\d{3})\b/);
-    if (historyOrderMatch) orderNumToLookup = historyOrderMatch[1];
-  } else {
-    const explicitOrderMatch = userText.match(/(?:order|#)\s*([12]\d{3})\b/i);
-    if (explicitOrderMatch) orderNumToLookup = explicitOrderMatch[1];
-    else {
-      const standaloneMatch = userText.match(/(?:^|\D)([12]\d{3})(?:\D|$)/);
-      if (standaloneMatch) orderNumToLookup = standaloneMatch[1];
+
+  // Only run Shopify search / order lookup if client has Shopify configured or if root company
+  const hasShopify = isClientTenant 
+    ? Boolean(clientRecord?.shopifyDomain && clientRecord?.shopifyToken)
+    : Boolean(SHOPIFY_ACCESS_TOKEN);
+
+  if (hasShopify) {
+    const digitsOnly = userText.replace(/[^0-9]/g, '');
+    let orderNumToLookup = null;
+    if (digitsOnly.length >= 10) {
+      const historyOrderMatch = history.match(/(?:#|order\s*)([12]\d{3})\b/i) || history.match(/\b([12]\d{3})\b/);
+      if (historyOrderMatch) orderNumToLookup = historyOrderMatch[1];
+    } else {
+      const explicitOrderMatch = userText.match(/(?:order|#)\s*([12]\d{3})\b/i);
+      if (explicitOrderMatch) orderNumToLookup = explicitOrderMatch[1];
+      else {
+        const standaloneMatch = userText.match(/(?:^|\D)([12]\d{3})(?:\D|$)/);
+        if (standaloneMatch) orderNumToLookup = standaloneMatch[1];
+      }
+    }
+
+    if (orderNumToLookup) {
+      const orderInfo = await lookupOrder(orderNumToLookup, senderPhone, userText, history);
+      toolContext += `\n[ORDER RESULT FOR #${orderNumToLookup}]: ${JSON.stringify(orderInfo)}`;
+    }
+
+    const productKeywords = /short|combo|trio|pack|t\-?shirt|shirt|oversize|tee|pant|track|lower|trouser|clothes|dikhao|price|offer|deal|discount|buy|link|item|product|collection|catalog|sell|shop|store|show/i;
+    if (productKeywords.test(userText)) {
+      const productsInfo = await searchProducts(userText, brandDomain);
+      if (productsInfo && productsInfo.textLines) {
+        toolContext += `\n[PRODUCTS RESULT]: ${JSON.stringify(productsInfo.textLines)}`;
+        carouselCards = productsInfo.carouselCards || [];
+      }
     }
   }
-
-  if (orderNumToLookup) {
-    const orderInfo = await lookupOrder(orderNumToLookup, senderPhone, userText, history);
-    toolContext += `\n[SHOPIFY ORDER RESULT FOR #${orderNumToLookup}]: ${JSON.stringify(orderInfo)}`;
-  }
-
-  const productKeywords = /short|combo|trio|pack|t\-?shirt|shirt|oversize|tee|pant|track|lower|trouser|clothes|dikhao|price|offer|deal|discount|buy|link|item|product|collection|catalog|sell|shop|store|show/i;
-  if (productKeywords.test(userText)) {
-    const productsInfo = await searchProducts(userText, brandDomain);
-    if (productsInfo && productsInfo.textLines) {
-      toolContext += `\n[SHOPIFY GRAPHQL PRODUCTS RESULT]: ${JSON.stringify(productsInfo.textLines)}`;
-      carouselCards = productsInfo.carouselCards || [];
-    }
-  }
-
-  if (/size|fit|height|weight|wt\b|lamba|inch|cm|kg|kilo|medium|large|small|xl|xxl|5['']?\d|6['']?\d|waist|kamar|seena|chest/i.test(userText)) {
-    const sizeInfo = recommendSize(userText);
-    toolContext += `\n${sizeInfo}`;
-  }
-
-  let systemRules = clientRecord?.aiSystemPrompt || (clientRecord ? `You are the AI Assistant for ${brandName}.` : (settings?.aiSystemPrompt || "You are a helpful customer service assistant."));
 
   // Dynamic AI Council Swarm Injection
   if (clientRecord?.customLimitsJson) {
@@ -596,33 +594,19 @@ export async function handleIncomingAILogic(
     } catch (_) {}
   }
 
-  const kbPieces: string[] = [];
-  if (clientRecord) {
-    if (clientRecord.aiKnowledgeBase) kbPieces.push(clientRecord.aiKnowledgeBase);
-  } else {
-    if (settings?.aiKnowledgeBase) kbPieces.push(settings.aiKnowledgeBase);
-    if (legacySetting?.knowledge_base) kbPieces.push(legacySetting.knowledge_base);
-    if (legacySetting?.inst_brand_policies) kbPieces.push(`Policies: ${legacySetting.inst_brand_policies}`);
-  }
-  const knowledgeBase = kbPieces.join('\n\n') || `Leading official WhatsApp store for ${brandName}. Direct inquiry support, quick ordering, and dedicated customer service.`;
-
-  const activeCombosStr = activeCombos.length > 0 
-    ? activeCombos.map(c => `• ${c.combo_name || 'Combo Pack'} @ ₹${c.combo_price || 'Special Price'} (Code: ${c.discount_code || 'COMBO'})`).join('\n')
-    : "No active discount codes available. All pricing is strictly fixed net wholesale rate with zero discounts.";
-
-  const systemPrompt = `Tum "${brandName} AI Stylist & Sales Assistant" ho!
+  const systemPrompt = `Tum "${brandName} AI Assistant" ho!
 
 === 🚫 STRICT ZERO-DISCOUNT & ZERO-COUPON POLICY ===
-- NEVER invent, hallucinate, or issue any discount coupons or promo codes (such as FLAT30, SAVE10, etc.) under ANY circumstances.
-- You are NOT authorized to issue discounts. If a customer asks for a discount or coupon or free sample, politely explain that prices are already direct net factory rates with zero extra markup.
+- NEVER invent, hallucinate, or issue any discount coupons or promo codes under ANY circumstances.
+- You are NOT authorized to issue discounts. If a customer asks for a discount or coupon, politely explain that prices are fixed net rates.
 
 === 🏢 DYNAMIC BRAND IDENTITY & CONTACT DETAILS ===
 - Brand Name: "${brandName}"
-- Official Website / Online Store: "https://${brandDomain}"
-- Customer Support Phone / WhatsApp: "${brandPhone}"
-- Support Email: "${brandEmail}"
-- Business Location: "${brandAddress}"
-- GSTIN: "${gstin}"
+${brandDomain ? `- Official Website: "https://${brandDomain}"` : ''}
+${brandPhone ? `- Customer Support Phone / WhatsApp: "${brandPhone}"` : ''}
+${brandEmail ? `- Support Email: "${brandEmail}"` : ''}
+${brandAddress ? `- Business Location: "${brandAddress}"` : ''}
+${gstin ? `- GSTIN: "${gstin}"` : ''}
 
 === 🤖 AI PERSONA & SYSTEM RULES ===
 ${systemRules}
@@ -631,18 +615,12 @@ ${systemRules}
 - Start the conversation in Professional English. If the customer speaks another language (like Hindi/Hinglish), smoothly adapt and respond in their language.
 - Provide a helpful, natural, and complete response without suddenly cutting off. Do NOT output any internal thoughts, markdown formatting, bullet points, or prefixes (like "Reply:" or "2-4 lines:"). Output ONLY the final raw text to be sent.
 
-=== 🏢 B2B FOCUS (WHOLESALE & RETAIL) ===
-- We cater to B2B wholesalers, retailers, boutique owners as well as direct retail shoppers. Provide GST invoicing and bulk discounts when asked.
-
-=== 🔥 ACTIVE PROMOTIONS & DISCOUNT CODES ===
-${activeCombosStr}
-
 === 🔐 CUSTOMER LIVE WHATSAPP NUMBER ===
 Customer ka Current WhatsApp Number: ${senderPhone}
 
 === 🚨 CRITICAL CHAT RULES ===
 1. NEVER output JSON or bracketed tool results directly.
-2. If you are showing or suggesting products from the tools data, you MUST append exactly the string "[SEND_PRODUCT_CAROUSEL]" at the very end of your message. Do not forget this tag!
+2. If you are showing or suggesting products from the tools data, you MUST append exactly the string "[SEND_PRODUCT_CAROUSEL]" at the very end of your message.
 
 === 📚 BUSINESS KNOWLEDGE BASE ===
 ${knowledgeBase}
@@ -650,22 +628,21 @@ ${knowledgeBase}
 RECENT CONVERSATION HISTORY:
 ${history}
 
-TOOLS DATA (USE THIS TO ANSWER):
-${toolContext}
-
+${toolContext ? `TOOLS DATA (USE THIS TO ANSWER):\n${toolContext}\n` : ''}
 CUSTOMER NEW MESSAGE:
 ${userText}`;
 
   try {
-    const preferredModel = clientRecord?.aiModel || settings?.aiModel || "gemini-2.5-flash";
-    const customApiKey = clientRecord?.geminiApiKey || settings?.geminiApiKey;
+    const preferredModel = clientRecord?.aiModel || "gemini-flash-lite-latest";
     let aiReply = await callAIEngine(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userText }
       ],
-      preferredModel, false, 2000, customApiKey
+      preferredModel, false, 2000, clientApiKey, isClientTenant
     );
+
+    if (!aiReply) return null;
 
     let sendCarousel = carouselCards.length > 0;
     if (aiReply.includes('[SEND_PRODUCT_CAROUSEL]')) {
@@ -678,6 +655,7 @@ ${userText}`;
       const cleanPhone = senderPhone.replace(/\D/g, '');
       const conversation = await prisma.whatsAppConversation.findFirst({
         where: {
+          ...(isClientTenant && clientRecord?.id ? { clientId: clientRecord.id } : {}),
           customer: {
             OR: [
               { whatsappNumber: { contains: cleanPhone } },
@@ -709,16 +687,10 @@ ${userText}`;
       await sendWhatsAppProductCards(senderPhone, carouselCards);
     }
     
-    // Background Tagging Task
-    callAIEngine([{ role: 'system', content: 'Output exactly one tag describing the customer intent: [VIP, Angry, Inquiry, Looking to Buy]' }, { role: 'user', content: userText }], preferredModel, false, 15)
-      .then(async tag => {
-        // Tagging logic can be attached to Customer or Conversation 
-      }).catch(()=>{});
-
     return aiReply;
   } catch (err: any) {
-    console.error("[WhatsApp AI] Generation failed:", err.message);
-    throw err;
+    console.error("[WhatsApp AI] Generation failed or skipped:", err.message);
+    return null;
   }
 }
 

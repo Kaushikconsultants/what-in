@@ -26,9 +26,8 @@ export async function POST(req: NextRequest) {
       where: { id: clientId },
       select: { geminiApiKey: true, aiModel: true },
     });
-    const settings = await prisma.whatsAppSettings.findFirst({ select: { geminiApiKey: true } }).catch(() => null);
-    const apiKey = clientRecord?.geminiApiKey || settings?.geminiApiKey || process.env.GEMINI_API_KEY;
-    if (!apiKey) return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
+    const apiKey = clientRecord?.geminiApiKey?.trim();
+    if (!apiKey) return NextResponse.json({ error: 'Gemini API key is not configured for this client. Please configure your API key in Settings -> AI Automation.' }, { status: 400 });
 
     // For CLOSED conversations: skip ones already fully scanned
     // For OPEN conversations: always re-scan (new messages may have arrived)
