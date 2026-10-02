@@ -1182,7 +1182,8 @@ export default function WhatsAppOrdersComponent() {
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText("https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint");
+                      const origin = typeof window !== "undefined" ? window.location.origin : "https://what-in.tinkal.in";
+                      navigator.clipboard.writeText(`${origin}/api/whatsapp/flows/endpoint`);
                       setCopiedEndpoint(true);
                       setTimeout(() => setCopiedEndpoint(false), 2000);
                     }}
@@ -1193,7 +1194,7 @@ export default function WhatsAppOrdersComponent() {
                   </button>
                 </div>
                 <code className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-900 font-mono text-[10.5px] text-slate-800 dark:text-slate-300 select-all overflow-x-auto">
-                  https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint
+                  {typeof window !== "undefined" ? window.location.origin : "https://what-in.tinkal.in"}/api/whatsapp/flows/endpoint
                 </code>
               </div>
             </div>
@@ -2019,7 +2020,7 @@ export default function WhatsAppOrdersComponent() {
 
               <div className="flex items-center justify-between pt-2">
                 <span className="text-[11px] text-slate-500 font-mono">
-                  Endpoint: https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint
+                  Endpoint: {typeof window !== "undefined" ? window.location.origin : "https://what-in.tinkal.in"}/api/whatsapp/flows/endpoint
                 </span>
                 <div className="flex gap-2">
                   <button

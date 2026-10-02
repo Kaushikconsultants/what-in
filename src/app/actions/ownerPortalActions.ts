@@ -595,7 +595,16 @@ export async function getClientMetaCredentialsAction(clientId?: string) {
       phoneNumber: client.phoneNumber || "",
       shopifyDomain: client.shopifyDomain || "",
       shopifyToken: client.shopifyToken || "",
-      webhookUrl: client.customWebhookUrl || `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://whatsapp.esponsports.com"}/api/whatsapp/webhook/${client.webhookClientId}`,
+      webhookUrl: client.customWebhookUrl || `${await (async () => {
+        try {
+          const { headers } = await import("next/headers");
+          const h = await headers();
+          const host = h.get("x-forwarded-host") || h.get("host");
+          const proto = h.get("x-forwarded-proto") || (host?.includes("localhost") ? "http" : "https");
+          if (host) return `${proto}://${host}`;
+        } catch {}
+        return process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://what-in.tinkal.in";
+      })()}/api/whatsapp/webhook/${client.webhookClientId}`,
       clientId: client.id,
       webhookClientId: client.webhookClientId,
     };
@@ -653,7 +662,15 @@ export async function registerWebhookForClientAction(clientId: string) {
       await prisma.whatsAppClient.update({ where: { id: clientId }, data: { webhookVerifyToken: verifyToken } });
     }
     
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://whatsapp.esponsports.com";
+    let appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://what-in.tinkal.in";
+    try {
+      const { headers } = await import("next/headers");
+      const h = await headers();
+      const host = h.get("x-forwarded-host") || h.get("host");
+      const proto = h.get("x-forwarded-proto") || (host?.includes("localhost") ? "http" : "https");
+      if (host) appUrl = `${proto}://${host}`;
+    } catch {}
+
     return {
       ...result,
       webhookUrl: `${appUrl}/api/whatsapp/webhook/${client.webhookClientId}`,

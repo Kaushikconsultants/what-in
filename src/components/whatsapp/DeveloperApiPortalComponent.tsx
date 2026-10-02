@@ -193,7 +193,7 @@ export default function DeveloperApiPortalComponent() {
     );
   };
 
-  const appBaseUrl = typeof window !== "undefined" ? window.location.origin : "https://whatsapp.esponsports.com";
+  const appBaseUrl = typeof window !== "undefined" ? window.location.origin : "https://what-in.tinkal.in";
 
 
   // Template Component Presets (Body variables, Documents, Images, Interactive Buttons, Shorthand)

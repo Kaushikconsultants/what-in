@@ -100,7 +100,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
     allowDiscount: false,
     discountPercent: 5,
     discountCode: "SPECIAL5",
-    productValuePitch: "Each piece is crafted from 100% premium combed cotton with heavy GSM durability, reinforced stitching, and a 7-day hassle-free exchange promise.",
+    productValuePitch: "",
     autoCatalogPaymentEnabled: true,
     autoCatalogDeliveryMethod: "both",
     flowCheckoutEnabled: true,
@@ -215,7 +215,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
   });
 
   // Client Webhook URL
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://whatsapp.esponsports.com";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://what-in.tinkal.in";
   const globalWebhookUrl = `${origin}/api/whatsapp/payments/webhook`;
   const clientWebhookUrl = gatewaySettings.webhookClientId
     ? `${origin}/api/whatsapp/payments/webhook/${gatewaySettings.webhookClientId}`
@@ -1870,7 +1870,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                             <button
                               type="button"
                               onClick={() => {
-                                navigator.clipboard.writeText("https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint");
+                                navigator.clipboard.writeText(`${origin}/api/whatsapp/flows/endpoint`);
                                 setCopiedFlowEndpoint(true);
                                 setTimeout(() => setCopiedFlowEndpoint(false), 2000);
                               }}
@@ -1881,7 +1881,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                             </button>
                           </div>
                           <code className="px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-900 font-mono text-[10.5px] text-slate-800 dark:text-slate-300 select-all overflow-x-auto">
-                            https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint
+                            {origin}/api/whatsapp/flows/endpoint
                           </code>
                           <p className="m-0 text-[10.5px] text-slate-500 dark:text-slate-400">
                             When customer inputs 6-digit Pincode, Meta Flow calls this endpoint to automatically populate <strong>State</strong> &amp; <strong>District</strong> and return a selectable dropdown list of <strong>Cities / Post Offices</strong>.
@@ -1943,7 +1943,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                     rows={4}
                     value={recoverySettings.productValuePitch}
                     onChange={(e) => setRecoverySettings({ ...recoverySettings, productValuePitch: e.target.value })}
-                    placeholder="Describe your premium fabric, heavy GSM, durability, fast delivery, or guarantee..."
+                    placeholder="Describe your authentic product quality, warranty, fast delivery, or satisfaction guarantee..."
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 resize-none leading-relaxed"
                   />
                   <span className="text-[10.5px] text-slate-500 dark:text-slate-400 block mt-1">
@@ -1990,13 +1990,13 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
                     ) : (
                       <div className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 text-[11px] text-slate-700 dark:text-slate-300">
                         <span className="font-bold block mb-0.5">Why you'll love it:</span>
-                        <span>{recoverySettings.productValuePitch || "Crafted from 100% premium combed cotton with heavy GSM durability and fast dispatch."}</span>
+                        <span>{recoverySettings.productValuePitch || "100% authentic, premium quality products with verified standards and dedicated support."}</span>
                       </div>
                     )}
 
                     <div className="pt-1 text-[11px]">
                       <span>Click here to complete payment: </span>
-                      <span className="text-blue-600 dark:text-blue-400 underline font-mono">https://pay.esponsports.com/link_1042</span>
+                      <span className="text-blue-600 dark:text-blue-400 underline font-mono">{origin}/pay/link_1042</span>
                     </div>
 
                     <span className="text-[9px] text-slate-400 text-right self-end mt-1 font-mono">
@@ -2288,7 +2288,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
 
               <div className="flex items-center justify-between pt-2">
                 <span className="text-[11px] text-slate-500 font-mono">
-                  Endpoint: https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint
+                  Endpoint: {origin}/api/whatsapp/flows/endpoint
                 </span>
                 <div className="flex gap-2">
                   <button

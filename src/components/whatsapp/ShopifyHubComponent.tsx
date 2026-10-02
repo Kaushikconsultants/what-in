@@ -964,7 +964,7 @@ export default function ShopifyHubComponent() {
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
               Webhook Target URL:{" "}
               <code className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md text-[11px] font-mono text-slate-800 dark:text-slate-200">
-                https://whatsapp.esponsports.com/api/shopify/webhook
+                {typeof window !== "undefined" ? window.location.origin : "https://what-in.tinkal.in"}/api/shopify/webhook
               </code>
             </p>
 

@@ -508,7 +508,8 @@ export default function WebsiteWidgetBuilderComponent() {
 
   // Helper to format platform-specific snippet
   const getPlatformSnippet = (platform: "shopify" | "wordpress" | "html" | "gtm") => {
-    const rawTag = embedSnippet || `<script src="https://whatsapp.esponsports.com/api/widget/script.js" async></script>`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://what-in.tinkal.in";
+    const rawTag = embedSnippet || `<script src="${origin}/api/widget/script.js" async></script>`;
     switch (platform) {
       case "shopify":
         return `<!-- Whatmore WhatsApp Widget for Shopify -->\n<!-- Paste into Layout/theme.liquid right above </body> -->\n${rawTag}`;

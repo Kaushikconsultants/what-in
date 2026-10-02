@@ -33,7 +33,7 @@ const DEFAULT_SETTINGS: RecoveryAgentSettings = {
   allowDiscount: false, // OFF by default
   discountPercent: 5,
   discountCode: "SPECIAL5",
-  productValuePitch: "Each piece is crafted from 100% premium combed cotton with heavy GSM durability, reinforced stitching, and a 7-day hassle-free exchange promise. Our limited-edition batches sell out quickly, ensuring exclusivity.",
+  productValuePitch: "",
   autoCatalogPaymentEnabled: true, // Enabled by default
   autoCatalogDeliveryMethod: "both",
 
@@ -51,7 +51,20 @@ const DEFAULT_SETTINGS: RecoveryAgentSettings = {
 export async function getRecoveryAgentSettings(clientId?: string): Promise<RecoveryAgentSettings> {
   try {
     if (clientId) {
-      const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } }).catch(() => null);
+      const client = await prisma.whatsAppClient.findUnique({ 
+        where: { id: clientId },
+        select: { customLimitsJson: true, aiKnowledgeBase: true }
+      }).catch(() => null);
+
+      if (client?.customLimitsJson) {
+        try {
+          const parsed = JSON.parse(client.customLimitsJson);
+          if (parsed.recoverySettings) {
+            return { ...DEFAULT_SETTINGS, ...parsed.recoverySettings };
+          }
+        } catch (_) {}
+      }
+
       if (client?.aiKnowledgeBase) {
         try {
           const parsed = JSON.parse(client.aiKnowledgeBase);
@@ -60,12 +73,14 @@ export async function getRecoveryAgentSettings(clientId?: string): Promise<Recov
           }
         } catch (_) {}
       }
+
+      return { ...DEFAULT_SETTINGS };
     }
 
     const dbSettings = await prisma.whatsAppSettings.findFirst().catch(() => null);
-    if (dbSettings && (dbSettings as any).aiKnowledgeBase) {
+    if (dbSettings && (dbSettings as any).customLimitsJson) {
       try {
-        const parsed = JSON.parse((dbSettings as any).aiKnowledgeBase || "{}");
+        const parsed = JSON.parse((dbSettings as any).customLimitsJson || "{}");
         if (parsed.recoverySettings) {
           return { ...DEFAULT_SETTINGS, ...parsed.recoverySettings };
         }
@@ -73,7 +88,7 @@ export async function getRecoveryAgentSettings(clientId?: string): Promise<Recov
     }
   } catch (_) {}
 
-  return globalThis.__recoverySettings || DEFAULT_SETTINGS;
+  return { ...DEFAULT_SETTINGS };
 }
 
 export async function saveRecoveryAgentSettings(settings: Partial<RecoveryAgentSettings>, clientId?: string): Promise<RecoveryAgentSettings> {
@@ -94,38 +109,23 @@ export async function saveRecoveryAgentSettings(settings: Partial<RecoveryAgentS
     flowHeaderTitle: settings.flowHeaderTitle || current.flowHeaderTitle || "Confirm Delivery & Payment"
   };
 
-  globalThis.__recoverySettings = updated;
-
   try {
     if (clientId) {
       const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
       if (client) {
         let existingObj: any = {};
-        try { existingObj = JSON.parse(client.aiKnowledgeBase || "{}"); } catch (_) {}
+        try { existingObj = JSON.parse(client.customLimitsJson || "{}"); } catch (_) {}
         await prisma.whatsAppClient.update({
           where: { id: clientId },
           data: {
-            aiKnowledgeBase: JSON.stringify({ ...existingObj, recoverySettings: updated })
+            customLimitsJson: JSON.stringify({ ...existingObj, recoverySettings: updated })
           }
         });
       }
     }
-
-    const dbSettings = await prisma.whatsAppSettings.findFirst();
-    if (dbSettings) {
-      let existingObj: any = {};
-      try {
-        existingObj = JSON.parse((dbSettings as any).aiKnowledgeBase || "{}");
-      } catch (_) {}
-
-      await prisma.whatsAppSettings.update({
-        where: { id: dbSettings.id },
-        data: {
-          aiKnowledgeBase: JSON.stringify({ ...existingObj, recoverySettings: updated })
-        }
-      });
-    }
-  } catch (_) {}
+  } catch (err: any) {
+    console.error("[saveRecoveryAgentSettings] Error:", err);
+  }
 
   return updated;
 }
@@ -140,8 +140,9 @@ export async function generateRecoveryReply(params: {
   amount: number;
   paymentUrl: string;
   customerObjectionType: "PRICE" | "SIZING" | "SHIPPING" | "GENERAL_CHECKIN";
+  clientId?: string;
 }): Promise<{ replyText: string; offeredDiscount: boolean; finalAmount: number }> {
-  const settings = await getRecoveryAgentSettings();
+  const settings = await getRecoveryAgentSettings(params.clientId);
   const name = params.customerName ? params.customerName.trim() : "there";
   const desc = params.orderDescription || "your order";
 
@@ -159,9 +160,9 @@ export async function generateRecoveryReply(params: {
     }
 
     // 2. IF Admin did NOT authorize discount: NO discount, promote craftsmanship and quality
-    const pitch = settings.productValuePitch || DEFAULT_SETTINGS.productValuePitch;
+    const pitch = settings.productValuePitch || "We offer 100% authentic, premium quality products with verified standards, fast nationwide dispatch, and dedicated customer support.";
     return {
-      replyText: `Hi ${name}! I completely understand your perspective. We price each piece thoughtfully so we never have to compromise on quality:\n\n✨ ${pitch}\n\nEvery order includes direct shipment tracking and our dedicated customer support. Since this collection is produced in small, limited batches to maintain high standards, would you like me to hold your reserved piece for the next 30 minutes?`,
+      replyText: `Hi ${name}! I completely understand your perspective. We price each item thoughtfully to maintain exceptional quality:\n\n✨ ${pitch}\n\nEvery order includes direct shipment tracking and our dedicated customer support. Since stock is in high demand, would you like me to reserve your order for you?`,
       offeredDiscount: false,
       finalAmount: params.amount
     };
@@ -169,7 +170,7 @@ export async function generateRecoveryReply(params: {
 
   if (params.customerObjectionType === "SIZING") {
     return {
-      replyText: `Hi ${name}! Sizing is super easy — our garments are tailored to standard true-to-size Indian regular/oversized fits with pre-shrunk premium fabric. Plus, we provide a 100% free, 7-day hassle-free size exchange if it doesn't fit like a glove! Would you like me to guide you on measurements?`,
+      replyText: `Hi ${name}! Sizing is super easy — we provide standard true-to-size specifications with easy hassle-free exchange if needed. Would you like me to guide you with details?`,
       offeredDiscount: false,
       finalAmount: params.amount
     };
@@ -177,7 +178,7 @@ export async function generateRecoveryReply(params: {
 
   if (params.customerObjectionType === "SHIPPING") {
     return {
-      replyText: `Hi ${name}! Orders are dispatched within 24–48 hours via premium express couriers (Bluedart, Delhivery) with live SMS and WhatsApp tracking. Typical delivery takes 2–4 business days across India!`,
+      replyText: `Hi ${name}! Orders are dispatched quickly via premium express couriers with live SMS and WhatsApp tracking. Typical delivery takes 2–4 business days across India!`,
       offeredDiscount: false,
       finalAmount: params.amount
     };

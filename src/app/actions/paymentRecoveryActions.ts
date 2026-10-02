@@ -11,6 +11,17 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessageAction } from "@/app/actions/whatsAppPlatformActions";
 import { getAuthenticatedUser } from "@/lib/authSession";
 
+async function getAppBaseUrl(): Promise<string> {
+  try {
+    const { headers } = await import("next/headers");
+    const headersList = await headers();
+    const host = headersList.get("x-forwarded-host") || headersList.get("host");
+    const proto = headersList.get("x-forwarded-proto") || (host?.includes("localhost") ? "http" : "https");
+    if (host) return `${proto}://${host}`;
+  } catch {}
+  return process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://what-in.tinkal.in";
+}
+
 export async function getPaymentRecoverySettingsAction(clientOverrideId?: string) {
   try {
     const user = await getAuthenticatedUser().catch(() => null);
@@ -57,10 +68,11 @@ export async function sendConversationalPaymentRecoveryAction(params: {
       return { success: false, error: "Payment is already marked as PAID." };
     }
 
+    const appBaseUrl = await getAppBaseUrl();
     const customer = link.conversation?.customer;
     const customerName = customer?.contactPerson || customer?.businessName || "Customer";
     const amount = Number(link.amount) || 0;
-    const paymentUrl = link.paymentUrl || "https://whatsapp.esponsports.com/pay";
+    const paymentUrl = link.paymentUrl || `${appBaseUrl}/pay?id=${link.id}`;
     const desc = link.orderId ? `Order #${link.orderId}` : (link.invoiceId ? `Invoice #${link.invoiceId}` : "your order");
 
     const { replyText, offeredDiscount, finalAmount } = await generateRecoveryReply({
@@ -68,7 +80,8 @@ export async function sendConversationalPaymentRecoveryAction(params: {
       orderDescription: desc,
       amount,
       paymentUrl,
-      customerObjectionType: params.objectionType || "GENERAL_CHECKIN"
+      customerObjectionType: params.objectionType || "GENERAL_CHECKIN",
+      clientId: link.clientId || undefined
     });
 
     // Send the WhatsApp recovery message
@@ -95,7 +108,7 @@ export async function sendConversationalPaymentRecoveryAction(params: {
 }
 
 /**
- * Server Action: Generate official Meta Flow JSON (v3.1) with Pincode auto-fill
+ * Server Action: Generate official Meta Flow JSON (v7.3) with Pincode auto-fill
  */
 export async function generateMetaCheckoutFlowJson(settings?: any) {
   return generateMetaCheckoutFlowJsonLib(settings);
@@ -107,7 +120,8 @@ export async function getCheckoutFlowDetailsAction(clientOverrideId?: string) {
     const clientId = clientOverrideId || user?.clientId;
     const settings = await getRecoveryAgentSettings(clientId);
     const flowJsonObj = generateMetaCheckoutFlowJson(settings);
-    const endpointUrl = "https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint";
+    const appBaseUrl = await getAppBaseUrl();
+    const endpointUrl = `${appBaseUrl}/api/whatsapp/flows/endpoint`;
 
     return {
       success: true,
@@ -150,6 +164,8 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
       };
     }
 
+    const appBaseUrl = await getAppBaseUrl();
+    const endpointUrl = `${appBaseUrl}/api/whatsapp/flows/endpoint`;
     const flowJson = generateMetaCheckoutFlowJson(settings);
 
     // Auto-configure 2048-bit RSA Business Encryption for client phoneId if not already set
@@ -157,7 +173,7 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
     if (phoneId && accessToken) {
       try {
         let kb: any = {};
-        try { kb = JSON.parse(client.aiKnowledgeBase || "{}"); } catch (_) {}
+        try { kb = JSON.parse(client.customLimitsJson || "{}"); } catch (_) {}
 
         if (!kb.metaFlowPrivateKey) {
           const crypto = await import("crypto");
@@ -180,7 +196,7 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
             kb.metaFlowPrivateKey = privateKey;
             await prisma.whatsAppClient.update({
               where: { id: client.id },
-              data: { aiKnowledgeBase: JSON.stringify(kb) }
+              data: { customLimitsJson: JSON.stringify(kb) }
             });
           }
         }
@@ -200,7 +216,7 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
       body: JSON.stringify({
         name: `checkout_address_flow_${Date.now().toString().slice(-6)}`,
         categories: ["OTHER"],
-        endpoint_uri: "https://whatsapp.esponsports.com/api/whatsapp/flows/endpoint"
+        endpoint_uri: endpointUrl
       })
     });
 
@@ -208,7 +224,14 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
     let flowId = createData.id;
 
     if (!flowId) {
-      throw new Error(createData.error?.message || "Failed to create Flow on Meta Graph API");
+      const errMsg = createData.error?.message || "Failed to create Flow on Meta Graph API";
+      if (errMsg.includes("API access blocked") || createData.error?.code === 200) {
+        return {
+          success: false,
+          error: "Meta API Access Blocked: Your Meta System User token does not have 'whatsapp_business_management' permission, or Flow creation is restricted in this Meta WABA. Please copy the Flow JSON via 'View Flow JSON' and paste it directly into Meta Business Suite > WhatsApp Manager > Flows > JSON Editor."
+        };
+      }
+      return { success: false, error: errMsg };
     }
 
     // 2. Upload Flow Asset (flow.json)
