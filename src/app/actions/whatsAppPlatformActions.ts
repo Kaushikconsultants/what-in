@@ -4130,8 +4130,21 @@ export async function getWhatsAppAutomationRules() {
 
 export async function getWhatsAppChatbotFlows() {
   try {
-    await ensureSeeded();
-    const flows = await prisma.whatsAppChatbotFlow.findMany({ orderBy: { updatedAt: 'desc' } });
+    const user = await getAuthenticatedUser().catch(() => null);
+    const isOwner = await isOwnerAuthenticated();
+
+    let whereClause: any = {};
+    if (!isOwner && user?.role !== 'OWNER' && user?.role !== 'SUPER_ADMIN') {
+      const targetClientId = user?.clientId;
+      if (targetClientId) {
+        whereClause = { clientId: targetClientId };
+      }
+    }
+
+    const flows = await prisma.whatsAppChatbotFlow.findMany({
+      where: whereClause,
+      orderBy: { updatedAt: 'desc' }
+    });
     return { success: true, flows };
   } catch (e: any) {
     return { success: false, error: e.message, flows: [] };

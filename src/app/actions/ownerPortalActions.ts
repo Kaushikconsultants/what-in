@@ -212,22 +212,25 @@ export async function createClientAction(data: {
         name: "Welcome & FAQ Flow",
         triggerKeyword: "HI, HELLO, START, MENU",
         nodesJson: JSON.stringify([
-          { id: "node_1", type: "TRIGGER", title: "Trigger Keyword", text: "HI, HELLO, START, MENU", outputPort: "node_2" },
-          { id: "node_2", type: "TEXT", title: "Welcome Greeting", text: `Welcome to ${data.businessName}! 👋 How can we help you today?`, outputPort: "node_3" },
+          { id: "node_1", type: "TRIGGER", category: "trigger", title: "Trigger Keyword", text: "HI, HELLO, START, MENU", x: 30, y: 100, outputPort: "node_2" },
+          { id: "node_2", type: "TEXT", category: "message", title: "Welcome Greeting", text: `Welcome to ${data.businessName}! 👋 How can we help you today?`, x: 370, y: 100, outputPort: "node_3" },
           {
             id: "node_3",
             type: "CHOICE",
+            category: "choice",
             title: "Main Options",
             text: "Please select an option below:",
+            x: 710,
+            y: 100,
             choices: [
               { id: "c1", text: "Explore Products", targetNode: "node_4" },
               { id: "c2", text: "Track My Order", targetNode: "node_5" },
               { id: "c3", text: "Talk to Agent", targetNode: "node_6" }
             ]
           },
-          { id: "node_4", type: "TEXT", title: "Catalog", text: "Check out our latest collections and offers!", outputPort: null },
-          { id: "node_5", type: "TEXT", title: "Order Help", text: "Please share your order number so we can look it up.", outputPort: null },
-          { id: "node_6", type: "TEXT", title: "Agent Connecting", text: "Connecting you with an agent right away. Please hold on.", outputPort: null }
+          { id: "node_4", type: "TEXT", category: "message", title: "Catalog", text: "Check out our latest collections and offers!", x: 1050, y: 40, outputPort: null },
+          { id: "node_5", type: "TEXT", category: "message", title: "Order Help", text: "Please share your order number so we can look it up.", x: 1050, y: 200, outputPort: null },
+          { id: "node_6", type: "TEXT", category: "message", title: "Agent Connecting", text: "Connecting you with an agent right away. Please hold on.", x: 1050, y: 360, outputPort: null }
         ]),
         isActive: true,
         executionCount: 0

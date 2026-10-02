@@ -217,10 +217,10 @@ const blockCategories: BlockCategoryConfig[] = [
 const BOT_TEMPLATES = [
   {
     id: "wati_lead_gen",
-    name: "WATI Style Lead Qualification & Menu Bot",
+    name: "Lead Qualification & Main Menu Bot",
     platform: "WATI",
-    description: "Inquiry router that auto-categorizes incoming messages into Retailer/Wholesaler, tags contacts in CRM, and assigns agents via Round-Robin.",
-    triggerKeyword: "HI, HELLO, INQUIRY, PRICING",
+    description: "Inquiry router that auto-categorizes incoming messages into Retail / Wholesale / Support, tags contacts in CRM, and assigns agents via Round-Robin.",
+    triggerKeyword: "HI, HELLO, INQUIRY, START",
     nodes: [
       {
         id: "node_trigger",
@@ -239,7 +239,7 @@ const BOT_TEMPLATES = [
         title: "Start / Auto Assign",
         x: 330,
         y: 100,
-        text: "Assign via Round-Robin distribution to Sales Team",
+        text: "Assign via Round-Robin distribution to Support Team",
         outputPort: "node_menu"
       },
       {
@@ -250,49 +250,49 @@ const BOT_TEMPLATES = [
         x: 630,
         y: 100,
         imageUrl: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=500",
-        text: "Welcome to Espon Clothing Wholesale! Please select your inquiry category below:",
+        text: "Welcome! 👋 How can we assist you today? Please select an option below:",
         choices: [
-          { id: "c1", text: "1. Retailer / Shop Owner", targetNode: "node_crm_retail" },
-          { id: "c2", text: "2. Wholesaler / Bulk Buyer", targetNode: "node_crm_wholesale" },
-          { id: "c3", text: "3. Personal Inquiry", targetNode: "node_end_personal" }
+          { id: "c1", text: "1. Product Inquiry", targetNode: "node_crm_retail" },
+          { id: "c2", text: "2. Bulk / Wholesale", targetNode: "node_crm_wholesale" },
+          { id: "c3", text: "3. General Support", targetNode: "node_end_personal" }
         ]
       },
       {
         id: "node_crm_retail",
         type: "CRM_CONTACT",
         category: "crm",
-        title: "Update CRM Contact (Retailer)",
+        title: "Update CRM Contact (Inquiry)",
         x: 970,
         y: 40,
-        leadStage: "Qualified Retailer",
+        leadStage: "Qualified Inquiry",
         temperature: "WARM",
-        tags: "Retailer, Qualified",
-        text: "Update CRM Contact:\n• Lead Stage: Qualified Retailer\n• Priority: MEDIUM",
+        tags: "Inquiry, Qualified",
+        text: "Update CRM Contact:\n• Lead Stage: Qualified Inquiry\n• Priority: MEDIUM",
         outputPort: "node_end_b2b"
       },
       {
         id: "node_crm_wholesale",
         type: "CRM_CONTACT",
         category: "crm",
-        title: "Update CRM Contact (Wholesale)",
+        title: "Update CRM Contact (Bulk)",
         x: 970,
         y: 200,
-        leadStage: "Wholesale Inquiry",
+        leadStage: "Bulk Inquiry",
         temperature: "HOT",
-        tags: "Wholesale, Hot Lead",
-        text: "Update CRM Contact:\n• Lead Stage: Wholesale Inquiry\n• Priority: HIGH",
+        tags: "Bulk, Hot Lead",
+        text: "Update CRM Contact:\n• Lead Stage: Bulk Inquiry\n• Priority: HIGH",
         outputPort: "node_end_b2b"
       },
       {
         id: "node_end_personal",
         type: "END",
         category: "end",
-        title: "Personal Store Link",
+        title: "Official Website Link",
         x: 970,
         y: 360,
-        text: "For personal use, visit our online retail store directly:",
+        text: "For direct online purchases and catalog browsing, visit our website:",
         buttonText: "Visit Online Store 🛍️",
-        url: "https://esponsports.com/shop"
+        url: "https://example.com"
       },
       {
         id: "node_end_b2b",
@@ -301,15 +301,15 @@ const BOT_TEMPLATES = [
         title: "Confirmation & Callback",
         x: 1300,
         y: 120,
-        text: "Thank you! Our wholesale specialist will call you shortly with catalog & pricing details.",
-        buttonText: "View Catalog 📄",
-        url: "https://esponsports.com/catalog.pdf"
+        text: "Thank you! Our specialist will call you shortly with full catalog & pricing details.",
+        buttonText: "Learn More 📄",
+        url: "https://example.com"
       }
     ]
   },
   {
     id: "galabox_ecom",
-    name: "Galabox E-Commerce & Order Tracking Bot",
+    name: "E-Commerce & Order Tracking Bot",
     platform: "Galabox",
     description: "Multi-option e-commerce bot supporting product catalog browsing, live order tracking by AWB, and quick UPI payment collection.",
     triggerKeyword: "CATALOG, ORDER, TRACK, PAYMENT",
@@ -331,9 +331,9 @@ const BOT_TEMPLATES = [
         title: "E-Commerce Main Menu",
         x: 330,
         y: 100,
-        text: "Welcome to Espon Apparel Direct! How can we assist your order today?",
+        text: "Welcome! How can we assist your order today?",
         choices: [
-          { id: "g1", text: "🛍️ Browse Apparel Catalog", targetNode: "node_catalog" },
+          { id: "g1", text: "🛍️ Browse Product Catalog", targetNode: "node_catalog" },
           { id: "g2", text: "🚚 Track Existing Order", targetNode: "node_track_input" },
           { id: "g3", text: "💳 Pay Pending Invoice", targetNode: "node_payment_qr" }
         ]
@@ -345,8 +345,8 @@ const BOT_TEMPLATES = [
         title: "Product Catalog Carousel",
         x: 680,
         y: 40,
-        categoryName: "Wholesale Activewear",
-        text: "Here are our top trending wholesale categories for 2026. Select item to request quotation.",
+        categoryName: "Featured Products",
+        text: "Here are our trending categories. Select an item to request quotation.",
         outputPort: "node_catalog_end"
       },
       {
@@ -369,8 +369,8 @@ const BOT_TEMPLATES = [
         x: 680,
         y: 360,
         amount: 2500,
-        upiId: "7206066678@OKBIZAXIS",
-        payeeName: "Espon Clothing Pvt Ltd",
+        upiId: "pay@upi",
+        payeeName: "Customer Support",
         text: "Scan QR code or click payment link below to complete payment instantly via GooglePay / PhonePe:",
         outputPort: "node_pay_end"
       },
@@ -381,7 +381,7 @@ const BOT_TEMPLATES = [
         title: "Catalog Request Shared",
         x: 1000,
         y: 40,
-        text: "Catalog PDF downloaded. Our representative will contact you for custom manufacturing orders."
+        text: "Catalog shared. Our representative will contact you for details."
       },
       {
         id: "node_track_result",
@@ -390,7 +390,7 @@ const BOT_TEMPLATES = [
         title: "Tracking Details",
         x: 1000,
         y: 200,
-        text: "Your order status: IN TRANSIT (Delhivery Courier AWB #7890123). Expected Delivery: Tomorrow 5 PM."
+        text: "Your order status: IN TRANSIT (Courier AWB #7890123). Expected Delivery: Tomorrow 5 PM."
       },
       {
         id: "node_pay_end",
@@ -405,7 +405,7 @@ const BOT_TEMPLATES = [
   },
   {
     id: "shopify_cart_recovery",
-    name: "Shopify Abandoned Cart Recovery & 10% Off",
+    name: "Abandoned Cart Recovery & 10% Off",
     platform: "Shopify",
     description: "Recovers dropped checkouts with a friendly reminder, personalized product preview, 10% coupon code (SAVE10), and direct 1-click checkout recovery link.",
     triggerKeyword: "CART, RECOVER, CHECKOUT, DISCOUNT",
@@ -428,7 +428,7 @@ const BOT_TEMPLATES = [
         x: 360,
         y: 120,
         imageUrl: "https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=600",
-        text: "Hey {{name}}! 👋 You left some premium items in your cart at Espon Clothing.\n\nWe reserved your bag for the next 24 hours. Would you like a special 10% discount code to complete your order today?",
+        text: "Hey {{name}}! 👋 You left some items in your cart.\n\nWe reserved your bag for the next 24 hours. Would you like a special 10% discount code to complete your order today?",
         outputPort: "node_cart_choice"
       },
       {
@@ -454,13 +454,13 @@ const BOT_TEMPLATES = [
         y: 40,
         text: "Awesome! Your coupon code *SAVE10* has been pre-applied to your cart. Click below to complete your order securely with instant dispatch:",
         buttonText: "Complete Order (10% Off) 🛍️",
-        url: "https://esponsports.com/checkout?discount=SAVE10"
+        url: "https://example.com/checkout?discount=SAVE10"
       },
       {
         id: "node_cart_catalog",
         type: "CATALOG",
         category: "choice",
-        title: "Shopify Recommended Catalog",
+        title: "Recommended Catalog",
         x: 1060,
         y: 180,
         categoryName: "Trending Collections",
@@ -506,7 +506,7 @@ const BOT_TEMPLATES = [
         x: 360,
         y: 120,
         imageUrl: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=600",
-        text: "Welcome to PrimeCare Wellness! Please select the service you wish to schedule an appointment for:",
+        text: "Welcome! Please select the service you wish to schedule an appointment for:",
         choices: [
           { id: "s1", text: "🩺 General Consultation", targetNode: "node_app_name" },
           { id: "s2", text: "💆 Hair & Spa Service", targetNode: "node_app_name" },
@@ -569,7 +569,7 @@ const BOT_TEMPLATES = [
         title: "Booking Confirmation",
         x: 2060,
         y: 120,
-        text: "✅ Booking Confirmed!\n\nPatient: {{patient_name}}\nDate: {{booking_date}}\n\nOur clinic representative will send a reminder 1 hour prior to your visit.",
+        text: "✅ Booking Confirmed!\n\nPatient: {{patient_name}}\nDate: {{booking_date}}\n\nOur representative will send a reminder 1 hour prior to your visit.",
         buttonText: "Add to Calendar 📅",
         url: "https://calendar.google.com"
       }
@@ -599,7 +599,7 @@ const BOT_TEMPLATES = [
         title: "Logistics Assistant Menu",
         x: 360,
         y: 120,
-        text: "Welcome to Express Logistics! How can we help with your shipment today?",
+        text: "Welcome to Logistics & Order Support! How can we help with your shipment today?",
         choices: [
           { id: "p1", text: "📦 Track Active Order", targetNode: "node_trk_order_input" },
           { id: "p2", text: "📍 Check Delivery Pincode", targetNode: "node_trk_pincode_input" },
@@ -624,9 +624,9 @@ const BOT_TEMPLATES = [
         title: "Live Courier Status",
         x: 1040,
         y: 40,
-        text: "🚚 *Shipment Update*\n\nStatus: *Out for Delivery*\nCarrier: Delhivery Express\nEst. Arrival: Today by 7:00 PM\n\nClick below for live GPS courier map:",
-        buttonText: "Live GPS Tracking 📍",
-        url: "https://delhivery.com/track"
+        text: "🚚 *Shipment Update*\n\nStatus: *Out for Delivery*\nEst. Arrival: Today by 7:00 PM\n\nClick below for live GPS courier map:",
+        buttonText: "Live Tracking 📍",
+        url: "https://example.com/track"
       },
       {
         id: "node_trk_pincode_input",
@@ -647,14 +647,14 @@ const BOT_TEMPLATES = [
         x: 1040,
         y: 180,
         text: "✅ Pincode {{pincode}} is *100% Serviceable*!\n\n• Standard Delivery: 2-3 Days\n• Express Delivery: 24 Hours\n• Cash on Delivery (COD): Supported",
-        buttonText: "Shop New Arrivals 🛍️",
-        url: "https://esponsports.com"
+        buttonText: "Shop Online 🛍️",
+        url: "https://example.com"
       },
       {
         id: "node_trk_ndr",
         type: "CRM_ROUNDROBIN",
         category: "crm",
-        title: "Route to NDR Support Team",
+        title: "Route to Support Team",
         x: 700,
         y: 320,
         distributionMethod: "WORKLOAD_BALANCE",
@@ -666,9 +666,9 @@ const BOT_TEMPLATES = [
   },
   {
     id: "prepaid_upi_collection",
-    name: "Pre-paid UPI & Cashfree Payment Collection Bot",
+    name: "Pre-paid UPI & Payment Collection Bot",
     platform: "Fintech & Payments",
-    description: "Automated invoice settlement flow that generates dynamic UPI QR codes and secure Razorpay/Cashfree payment links with instant receipt dispatch.",
+    description: "Automated invoice settlement flow that generates dynamic UPI QR codes and secure payment links with instant receipt dispatch.",
     triggerKeyword: "PAY, INVOICE, PAYMENT, BILL",
     nodes: [
       {
@@ -689,7 +689,7 @@ const BOT_TEMPLATES = [
         x: 360,
         y: 120,
         imageUrl: "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=600",
-        text: "Welcome to Espon Billing Support! How would you like to complete your pending payment?",
+        text: "Welcome to Billing Support! How would you like to complete your pending payment?",
         choices: [
           { id: "m1", text: "⚡ Instant UPI QR (0% Fee)", targetNode: "node_pay_upi_qr" },
           { id: "m2", text: "💳 Card / NetBanking Link", targetNode: "node_pay_rzp_link" },
@@ -703,9 +703,9 @@ const BOT_TEMPLATES = [
         title: "Dynamic UPI QR Dispatch",
         x: 700,
         y: 40,
-        upiId: "esponclothing@okaxis",
+        upiId: "pay@upi",
         amount: "1499",
-        payeeName: "Espon Sports Wear",
+        payeeName: "Customer Billing",
         text: "Scan the QR code above via GPay, PhonePe, or Paytm to pay ₹1,499 instantly with zero surcharge.",
         outputPort: "node_pay_success_crm"
       },
@@ -718,7 +718,7 @@ const BOT_TEMPLATES = [
         y: 180,
         amount: "1499",
         currency: "INR",
-        paymentDescription: "Invoice Settlement #ESP-2026",
+        paymentDescription: "Invoice Settlement",
         outputPort: "node_pay_success_crm"
       },
       {
@@ -728,9 +728,9 @@ const BOT_TEMPLATES = [
         title: "Tax Invoice PDF",
         x: 700,
         y: 320,
-        filename: "Tax_Invoice_ESP_2026.pdf",
-        mediaUrl: "https://esponsports.com/sample_invoice.pdf",
-        text: "Here is a copy of your GST Tax Invoice for your records.",
+        filename: "Tax_Invoice.pdf",
+        mediaUrl: "https://example.com/sample_invoice.pdf",
+        text: "Here is a copy of your Tax Invoice for your records.",
         outputPort: "node_pay_rzp_link"
       },
       {
@@ -753,9 +753,9 @@ const BOT_TEMPLATES = [
         title: "Payment Confirmation Receipt",
         x: 1380,
         y: 120,
-        text: "🎉 Payment Received! Thank you for your business. Your order is queued for immediate packing and dispatch.",
+        text: "🎉 Payment Received! Thank you for your business. Your order is queued for immediate dispatch.",
         buttonText: "Download Receipt 📄",
-        url: "https://esponsports.com/receipt"
+        url: "https://example.com/receipt"
       }
     ]
   },
@@ -1012,7 +1012,7 @@ export default function WhatsAppChatbotBuilderPage() {
   };
 
   // Canvas Node State
-  const [nodes, setNodes] = useState<any[]>(BOT_TEMPLATES[0].nodes);
+  const [nodes, setNodes] = useState<any[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [copiedNodesBuffer, setCopiedNodesBuffer] = useState<any[]>([]);
@@ -1041,9 +1041,9 @@ export default function WhatsAppChatbotBuilderPage() {
   const [isFullScreenStudio, setIsFullScreenStudio] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [historyStack, setHistoryStack] = useState<any[]>([BOT_TEMPLATES[0].nodes]);
+  const [historyStack, setHistoryStack] = useState<any[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState("builder"); 
+  const [activeTab, setActiveTab] = useState("builder");
 
   // Zoom & Pan State
   const [zoom, setZoom] = useState<number>(0.75);
@@ -1051,7 +1051,7 @@ export default function WhatsAppChatbotBuilderPage() {
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
-  const [portCoords, setPortCoords] = useState<{[key: string]: {x: number, y: number}}>({});
+  const [portCoords, setPortCoords] = useState<{ [key: string]: { x: number, y: number } }>({});
 
   const updatePortCoords = () => {
     if (typeof window === "undefined") return;
@@ -1060,7 +1060,7 @@ export default function WhatsAppChatbotBuilderPage() {
     const containerRect = container.getBoundingClientRect();
     const currentZoom = zoom || 1;
 
-    const coords: {[key: string]: {x: number, y: number}} = {};
+    const coords: { [key: string]: { x: number, y: number } } = {};
     const ports = document.querySelectorAll('.node-input-port, .node-output-port, .choice-option-port');
     ports.forEach(el => {
       if (!el.id) return;
@@ -1310,7 +1310,7 @@ export default function WhatsAppChatbotBuilderPage() {
           }
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const isBlockAllowed = (block: BlockItem, cat?: BlockCategoryConfig) => {
@@ -1367,7 +1367,7 @@ export default function WhatsAppChatbotBuilderPage() {
           const graph = parsed.flow.graph;
           const groups = graph.groups || [];
           const edges = graph.edges || [];
-          
+
           const mappedNodes: any[] = [];
 
           // Helper to resolve the first block ID of a group
@@ -1434,8 +1434,8 @@ export default function WhatsAppChatbotBuilderPage() {
           mappedNodes.forEach((node: any) => {
             if (node.type === "CHOICE" && node.choices) {
               node.choices = node.choices.map((choice: any) => {
-                const matchingEdge = edges.find((edge: any) => 
-                  edge.from?.blockId === node.id && 
+                const matchingEdge = edges.find((edge: any) =>
+                  edge.from?.blockId === node.id &&
                   (edge.from?.portKey === `button:${choice.id}` || edge.from?.portKey === choice.id)
                 );
                 if (matchingEdge) {
@@ -1624,19 +1624,19 @@ export default function WhatsAppChatbotBuilderPage() {
 
   // Fetch Live Data for Dropdowns
   const fetchLiveData = async () => {
-      // Fetch WhatsApp Templates for Meta block
-      const tRes = await getWhatsAppTemplates();
-      if (tRes.success && tRes.templates) {
-        setTemplates(tRes.templates);
-      }
-      
-      // Fetch Integrations for CRM blocks
-      const iRes = await getWhatsAppIntegrationsAction();
-      if (iRes.success && iRes.integrations) {
-        setIntegrations(iRes.integrations);
-      }
+    // Fetch WhatsApp Templates for Meta block
+    const tRes = await getWhatsAppTemplates();
+    if (tRes.success && tRes.templates) {
+      setTemplates(tRes.templates);
+    }
 
-      try {
+    // Fetch Integrations for CRM blocks
+    const iRes = await getWhatsAppIntegrationsAction();
+    if (iRes.success && iRes.integrations) {
+      setIntegrations(iRes.integrations);
+    }
+
+    try {
       const agentsRes = await getAllEmployeesAndTeams();
       if (agentsRes.success && agentsRes.employees) setAvailableAgents(agentsRes.employees);
 
@@ -1841,7 +1841,7 @@ export default function WhatsAppChatbotBuilderPage() {
       const flowToToggle = savedFlows.find((f) => f.id === flowId);
       if (flowToToggle) {
         let flowNodes: any[] = [];
-        try { flowNodes = JSON.parse(flowToToggle.nodesJson); } catch (_) {}
+        try { flowNodes = JSON.parse(flowToToggle.nodesJson); } catch (_) { }
         const triggerNode = flowNodes.find((n: any) => (n.type || '').toUpperCase() === "TRIGGER");
         const hasTrigger = !!triggerNode;
         const hasKeyword = !!flowToToggle.triggerKeyword?.trim();
@@ -2050,31 +2050,31 @@ export default function WhatsAppChatbotBuilderPage() {
 
     switch (block.id) {
       case "text":
-        newNode = { ...newNode, category: "choice", text: "Hi {{customer_name}}, thank you for reaching out to Espon Apparel!" };
+        newNode = { ...newNode, category: "choice", text: "Hi {{customer_name}}, thank you for reaching out to us!" };
         break;
       case "image":
-        newNode = { ...newNode, category: "choice", imageUrl: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=500", caption: "Check out our latest 2026 Wholesale Activewear Collection!" };
+        newNode = { ...newNode, category: "choice", imageUrl: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=500", caption: "Check out our featured products & latest offers!" };
         break;
       case "video":
-        newNode = { ...newNode, category: "choice", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", caption: "Watch our apparel production demo video." };
+        newNode = { ...newNode, category: "choice", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", caption: "Watch our product demo video." };
         break;
       case "youtube":
-        newNode = { ...newNode, category: "choice", youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", caption: "Espon Factory Tour & Manufacturing Demo" };
+        newNode = { ...newNode, category: "choice", youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", caption: "Product Demo & Overview Video" };
         break;
       case "file":
-        newNode = { ...newNode, category: "choice", fileUrl: "https://esponsports.com/catalog.pdf", filename: "Espon_Apparel_Catalog_2026.pdf" };
+        newNode = { ...newNode, category: "choice", fileUrl: "https://example.com/catalog.pdf", filename: "Product_Catalog.pdf" };
         break;
       case "audio":
-        newNode = { ...newNode, category: "choice", audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", isVoiceNote: true, text: "Audio Note: Welcome message from Ikra Sales Manager" };
+        newNode = { ...newNode, category: "choice", audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", isVoiceNote: true, text: "Audio Note: Welcome message from support representative" };
         break;
       case "location":
-        newNode = { ...newNode, category: "choice", locationName: "Espon Apparel HQ Factory", address: "SCO 71A, Ashoka Plaza, Rohtak, Haryana 124001", lat: 28.8955, lng: 76.6066 };
+        newNode = { ...newNode, category: "choice", locationName: "Office Headquarters", address: "Commercial Plaza, City Center", lat: 28.6139, lng: 77.2090 };
         break;
       case "contact":
-        newNode = { ...newNode, category: "choice", contactName: "Ikra Sales Manager", contactPhone: "+91 7206066678", contactOrg: "Espon Apparel Direct" };
+        newNode = { ...newNode, category: "choice", contactName: "Support Manager", contactPhone: "+91 9876543210", contactOrg: "Customer Support" };
         break;
       case "link":
-        newNode = { ...newNode, category: "choice", text: "Click below to visit our B2B wholesale store:", buttonText: "Visit Portal 🌐", url: "https://esponsports.com" };
+        newNode = { ...newNode, category: "choice", text: "Click below to visit our official store:", buttonText: "Visit Portal 🌐", url: "https://example.com" };
         break;
       case "carousel":
         newNode = {
@@ -2082,8 +2082,8 @@ export default function WhatsAppChatbotBuilderPage() {
           category: "choice",
           text: "Featured Categories Carousel:",
           items: [
-            { id: "item_1", title: "Polo T-Shirts", subtitle: "₹290/pc · Min 100 pcs", imageUrl: "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=400", buttonText: "Inquire Now" },
-            { id: "item_2", title: "Track Pants", subtitle: "₹340/pc · Min 50 pcs", imageUrl: "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=400", buttonText: "Inquire Now" }
+            { id: "item_1", title: "Product Category A", subtitle: "Special Offer Available", imageUrl: "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=400", buttonText: "Inquire Now" },
+            { id: "item_2", title: "Product Category B", subtitle: "Top Trending Item", imageUrl: "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=400", buttonText: "Inquire Now" }
           ]
         };
         break;
@@ -2096,8 +2096,8 @@ export default function WhatsAppChatbotBuilderPage() {
           category: "choice",
           text: "Select your inquiry topic below:",
           choices: [
-            { id: `c_${Date.now()}_1`, text: "1. Wholesale Catalog", targetNode: null },
-            { id: `c_${Date.now()}_2`, text: "2. Custom Manufacturing", targetNode: null }
+            { id: `c_${Date.now()}_1`, text: "1. Product Catalog", targetNode: null },
+            { id: `c_${Date.now()}_2`, text: "2. Customer Support", targetNode: null }
           ]
         };
         break;
@@ -2108,8 +2108,8 @@ export default function WhatsAppChatbotBuilderPage() {
           text: "Select from our service options menu:",
           menuTitle: "Main Menu Options",
           choices: [
-            { id: `c_${Date.now()}_1`, text: "1. View Bulk Pricing", description: "Tiered wholesale slabs", targetNode: null },
-            { id: `c_${Date.now()}_2`, text: "2. Track Order Status", description: "Live AWB status", targetNode: null }
+            { id: `c_${Date.now()}_1`, text: "1. View Pricing", description: "Pricing and plans", targetNode: null },
+            { id: `c_${Date.now()}_2`, text: "2. Track Order Status", description: "Live tracking details", targetNode: null }
           ]
         };
         break;
@@ -2144,37 +2144,37 @@ export default function WhatsAppChatbotBuilderPage() {
         newNode = { ...newNode, category: "logic", title: "Jump to Block", targetNodeId: null };
         break;
       case "pay_link":
-        newNode = { ...newNode, category: "payment", title: "Send Payment Link", amount: 1500, currency: "INR", paymentDescription: "Order Deposit Payment", paymentUrl: "https://pay.esponsports.com/dep1092" };
+        newNode = { ...newNode, category: "payment", title: "Send Payment Link", amount: 1500, currency: "INR", paymentDescription: "Order Deposit Payment", paymentUrl: "https://example.com/pay" };
         break;
       case "pay_qr":
-        newNode = { ...newNode, category: "payment", title: "UPI QR Code", amount: 2500, upiId: "7206066678@OKBIZAXIS", payeeName: "Espon Clothing Pvt Ltd", text: "Scan QR via GPay / PhonePe / Paytm:" };
+        newNode = { ...newNode, category: "payment", title: "UPI QR Code", amount: 2500, upiId: "pay@upi", payeeName: "Customer Support", text: "Scan QR via GPay / PhonePe / Paytm:" };
         break;
       case "pay_collect":
         newNode = { ...newNode, category: "payment", title: "Collect Payment", amount: 5000, paymentModes: ["UPI", "Cards", "NetBanking"] };
         break;
       case "catalog":
-        newNode = { ...newNode, category: "choice", title: "Product Catalog Carousel", categoryName: "Wholesale Activewear", text: "Browse ready stock catalog below:" };
+        newNode = { ...newNode, category: "choice", title: "Product Catalog Carousel", categoryName: "Featured Products", text: "Browse product catalog below:" };
         break;
       case "order":
-        newNode = { ...newNode, category: "choice", title: "Multi-Item Order", text: "Order Summary: 100 pcs Polo T-Shirts (₹29,000)" };
+        newNode = { ...newNode, category: "choice", title: "Multi-Item Order", text: "Order Summary: 100 pcs Items (₹29,000)" };
         break;
       case "webhook":
-        newNode = { ...newNode, category: "api", title: "Webhook Fetch (API)", webhookUrl: "https://api.esponsports.com/v1/inventory", method: "POST", headers: "Content-Type: application/json", requestBody: '{"sku": "ESP-902"}' };
+        newNode = { ...newNode, category: "api", title: "Webhook Fetch (API)", webhookUrl: "https://api.example.com/v1/data", method: "POST", headers: "Content-Type: application/json", requestBody: '{"action": "lookup"}' };
         break;
       case "crm_contact":
-        newNode = { ...newNode, category: "crm", title: "Update CRM Contact", leadStage: "Qualified Lead", temperature: "HOT", tags: "Hot Lead, Wholesale" };
+        newNode = { ...newNode, category: "crm", title: "Update CRM Contact", leadStage: "Qualified Lead", temperature: "HOT", tags: "Hot Lead, Priority" };
         break;
       case "crm_lead":
-        newNode = { ...newNode, category: "crm", title: "Create Lead", leadSource: "WhatsApp Bot", customerType: "Wholesaler" };
+        newNode = { ...newNode, category: "crm", title: "Create Lead", leadSource: "WhatsApp Bot", customerType: "Customer" };
         break;
       case "meta_capi":
         newNode = { ...newNode, category: "crm", title: "Meta CAPI Event", eventName: "Lead", integrationId: integrations.find(i => i.type === "META_CAPI" && i.isActive)?.id };
         break;
       case "crm_roundrobin":
-        newNode = { ...newNode, category: "crm", title: "Assign Sales Rep", assignmentMode: "ROUND_ROBIN", department: "Wholesale Sales" };
+        newNode = { ...newNode, category: "crm", title: "Assign Sales Rep", assignmentMode: "ROUND_ROBIN", department: "Sales" };
         break;
       case "ai_bot":
-        newNode = { ...newNode, category: "ai", title: "AI GPT Intent Auto-Answer", systemPrompt: "You are Espon AI Assistant. Answer product catalog and pricing inquiries politely.", confidenceThreshold: 85 };
+        newNode = { ...newNode, category: "ai", title: "AI GPT Intent Auto-Answer", systemPrompt: "You are a helpful AI Assistant. Answer product catalog and pricing inquiries politely.", confidenceThreshold: 85 };
         break;
       case "meta_template":
         newNode = { ...newNode, category: "ai", title: "Send Meta Template", templateName: "order_confirmation_v2", language: "en_US" };
@@ -2595,7 +2595,7 @@ export default function WhatsAppChatbotBuilderPage() {
             sourceData = parsed.nodes;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
 
       if (sourceData.length === 0 && copiedNodesBuffer.length > 0) {
         sourceData = copiedNodesBuffer;
@@ -2703,7 +2703,7 @@ export default function WhatsAppChatbotBuilderPage() {
           }
           const jsonStr = JSON.stringify(nodesToCopy, null, 2);
           setCopiedNodesBuffer(nodesToCopy);
-          navigator.clipboard.writeText(jsonStr).catch(() => {});
+          navigator.clipboard.writeText(jsonStr).catch(() => { });
           setToastMsg(`✓ Copied ${nodesToCopy.length} node(s) to clipboard!`);
           setTimeout(() => setToastMsg(null), 2500);
         }
@@ -2753,7 +2753,7 @@ export default function WhatsAppChatbotBuilderPage() {
 
   const getBezierPath = (sourceNode: any, targetNode: any, optionIndex?: number) => {
     if (!sourceNode || !targetNode) return "";
-    
+
     let startFallback = { x: sourceNode.x + 260, y: sourceNode.y + 40 };
     let portId = `port-out-${sourceNode.id}`;
     if (typeof optionIndex === "number" && sourceNode.choices && sourceNode.choices[optionIndex]) {
@@ -2827,12 +2827,12 @@ export default function WhatsAppChatbotBuilderPage() {
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
-  const hasUnsavedChanges = 
-    currentFlowId !== null && 
+  const hasUnsavedChanges =
+    currentFlowId !== null &&
     (lastSavedNodesJson !== JSON.stringify(nodes) ||
-     lastSavedFlowName !== flowName ||
-     lastSavedTriggerKeyword !== triggerKeyword ||
-     lastSavedIsBotActive !== isBotActive);
+      lastSavedFlowName !== flowName ||
+      lastSavedTriggerKeyword !== triggerKeyword ||
+      lastSavedIsBotActive !== isBotActive);
 
   return (
     <div className={`studio-container ${isFullScreenStudio ? "fullscreen-studio" : ""}`}>
@@ -2865,16 +2865,16 @@ export default function WhatsAppChatbotBuilderPage() {
             ⚠️ Unsaved changes in "${flowName}"
           </span>
           <div style={{ display: "flex", gap: "12px" }}>
-            <button 
-              className="studio-btn" 
-              onClick={handleDiscardChanges} 
+            <button
+              className="studio-btn"
+              onClick={handleDiscardChanges}
               style={{ background: "rgba(255, 255, 255, 0.1)", color: "#ffffff", border: "1px solid rgba(255, 255, 255, 0.15)", padding: "7px 16px", cursor: "pointer", borderRadius: "8px", fontSize: "12.5px" }}
             >
               Discard
             </button>
-            <button 
-              className="studio-btn primary" 
-              onClick={() => handleSaveFlowWithStatus(isBotActive)} 
+            <button
+              className="studio-btn primary"
+              onClick={() => handleSaveFlowWithStatus(isBotActive)}
               disabled={isSaving}
               style={{ padding: "7px 20px", cursor: "pointer", borderRadius: "8px", fontSize: "12.5px" }}
             >
@@ -3021,25 +3021,25 @@ export default function WhatsAppChatbotBuilderPage() {
                   {hasErrors
                     ? `Issues (${diag.errorCount})`
                     : hasWarnings
-                    ? `Warnings (${diag.warningCount})`
-                    : `✓ Flow Healthy`}
+                      ? `Warnings (${diag.warningCount})`
+                      : `✓ Flow Healthy`}
                 </span>
               </button>
             );
           })()}
 
-          <button 
-            className="studio-btn" 
-            style={{ background: "#64748b", color: "#fff", display: "flex", alignItems: "center", gap: "6px" }} 
-            onClick={() => handleSaveFlowWithStatus(false)} 
+          <button
+            className="studio-btn"
+            style={{ background: "#64748b", color: "#fff", display: "flex", alignItems: "center", gap: "6px" }}
+            onClick={() => handleSaveFlowWithStatus(false)}
             disabled={isSaving || nodes.length === 0}
           >
             <FileText size={14} /> Save as Draft
           </button>
 
-          <button 
-            className="studio-btn primary" 
-            onClick={() => handleSaveFlowWithStatus(true)} 
+          <button
+            className="studio-btn primary"
+            onClick={() => handleSaveFlowWithStatus(true)}
             disabled={isSaving || nodes.length === 0}
           >
             <CheckCircle2 size={14} /> Publish Flow
@@ -3516,12 +3516,12 @@ export default function WhatsAppChatbotBuilderPage() {
                             node.assignmentMode === 'DIRECT' && node.agentId
                               ? (availableAgents.find((a: any) => a.id === node.agentId)?.user?.name || 'Agent')
                               : (
-                                  (node.assignmentMode !== 'DIRECT' && node.roundRobinTarget === 'TEAM' && node.teamId)
-                                    ? `Team: ${availableTeams.find((t: any) => t.id === node.teamId)?.name || 'Unknown'}`
-                                    : (node.assignmentMode !== 'DIRECT' && node.roundRobinTarget === 'AGENTS' && node.agentIds?.length > 0)
-                                      ? `${node.agentIds.length} Agents`
-                                      : 'Auto (Round Robin)'
-                                ) + (node.assignmentMode !== 'DIRECT' ? (node.distributionMethod === 'EQUAL_DISTRIBUTION' ? ' • Equal' : ' • Workload') : '')
+                                (node.assignmentMode !== 'DIRECT' && node.roundRobinTarget === 'TEAM' && node.teamId)
+                                  ? `Team: ${availableTeams.find((t: any) => t.id === node.teamId)?.name || 'Unknown'}`
+                                  : (node.assignmentMode !== 'DIRECT' && node.roundRobinTarget === 'AGENTS' && node.agentIds?.length > 0)
+                                    ? `${node.agentIds.length} Agents`
+                                    : 'Auto (Round Robin)'
+                              ) + (node.assignmentMode !== 'DIRECT' ? (node.distributionMethod === 'EQUAL_DISTRIBUTION' ? ' • Equal' : ' • Workload') : '')
                           }</span>
                         </div>
                       </div>
@@ -3589,8 +3589,8 @@ export default function WhatsAppChatbotBuilderPage() {
                               className="node-choice-item"
                               onMouseDown={(e) => e.stopPropagation()}
                               onClick={(e) => e.stopPropagation()}
-                              style={{ 
-                                border: isLimitExceeded ? "1px solid #ef4444" : undefined, 
+                              style={{
+                                border: isLimitExceeded ? "1px solid #ef4444" : undefined,
                                 position: "relative",
                                 background: isLimitExceeded ? "#fef2f2" : undefined
                               }}
@@ -4027,55 +4027,55 @@ export default function WhatsAppChatbotBuilderPage() {
                 )}
 
                 {selectedNode.type === "TRIGGER" ? (
-                    <div>
-                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#475569" }}>Trigger Keywords (Comma Separated)</label>
-                      <textarea
-                        rows={3}
-                        value={triggerKeyword}
+                  <div>
+                    <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#475569" }}>Trigger Keywords (Comma Separated)</label>
+                    <textarea
+                      rows={3}
+                      value={triggerKeyword}
+                      onChange={(e) => {
+                        setTriggerKeyword(e.target.value.toUpperCase());
+                        setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, text: `Incoming Message matches: ${e.target.value.toUpperCase()}` } : n)));
+                      }}
+                      style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px", resize: "none" }}
+                    />
+                  </div>
+                ) : (selectedNode.type !== "CRM_LEAD" && !["META_CAPI", "META_CTWA_AD", "META_CUSTOM_AUDIENCE", "META_TEMPLATE"].includes((selectedNode.type || "").toUpperCase()) && !(selectedNode.title || "").toLowerCase().includes("meta")) ? (
+                  <div>
+                    <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#475569" }}>Message / Description</label>
+                    <textarea
+                      rows={3}
+                      value={selectedNode.text || ""}
+                      onChange={(e) =>
+                        setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, text: e.target.value } : n)))
+                      }
+                      style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px", resize: "none" }}
+                    />
+                    <div style={{ marginTop: '8px' }}>
+                      <label style={{ fontSize: "10px", fontWeight: 700, color: "#64748b" }}>Insert Variable</label>
+                      <select
+                        style={{ width: "100%", padding: "4px 8px", fontSize: "11px", border: "1px dashed #cbd5e1", borderRadius: "6px", marginTop: "2px", background: "#f8fafc" }}
+                        value=""
                         onChange={(e) => {
-                          setTriggerKeyword(e.target.value.toUpperCase());
-                          setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, text: `Incoming Message matches: ${e.target.value.toUpperCase()}` } : n)));
+                          if (!e.target.value) return;
+                          const varTag = `{{${e.target.value}}}`;
+                          setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, text: (n.text || '') + varTag } : n)));
                         }}
-                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px", resize: "none" }}
-                      />
+                      >
+                        <option value="">-- Select Variable --</option>
+                        <option value="name">Customer Name</option>
+                        <option value="businessName">Business Name</option>
+                        <option value="mobile">Mobile Number</option>
+                        <option value="whatsappNumber">WhatsApp Number</option>
+                        <option value="email">Email</option>
+                        <option value="city">City</option>
+                        <option value="state">State</option>
+                        <option value="tags">Tags</option>
+                        <option value="leadStage">Lead Stage</option>
+                        <option value="customerType">Customer Type</option>
+                      </select>
                     </div>
-                  ) : (selectedNode.type !== "CRM_LEAD" && !["META_CAPI", "META_CTWA_AD", "META_CUSTOM_AUDIENCE", "META_TEMPLATE"].includes((selectedNode.type || "").toUpperCase()) && !(selectedNode.title || "").toLowerCase().includes("meta")) ? (
-                    <div>
-                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#475569" }}>Message / Description</label>
-                      <textarea
-                        rows={3}
-                        value={selectedNode.text || ""}
-                        onChange={(e) =>
-                          setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, text: e.target.value } : n)))
-                        }
-                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px", resize: "none" }}
-                      />
-                      <div style={{ marginTop: '8px' }}>
-                        <label style={{ fontSize: "10px", fontWeight: 700, color: "#64748b" }}>Insert Variable</label>
-                        <select 
-                          style={{ width: "100%", padding: "4px 8px", fontSize: "11px", border: "1px dashed #cbd5e1", borderRadius: "6px", marginTop: "2px", background: "#f8fafc" }}
-                          value=""
-                          onChange={(e) => {
-                             if (!e.target.value) return;
-                             const varTag = `{{${e.target.value}}}`;
-                             setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, text: (n.text || '') + varTag } : n)));
-                          }}
-                        >
-                           <option value="">-- Select Variable --</option>
-                           <option value="name">Customer Name</option>
-                           <option value="businessName">Business Name</option>
-                           <option value="mobile">Mobile Number</option>
-                           <option value="whatsappNumber">WhatsApp Number</option>
-                           <option value="email">Email</option>
-                           <option value="city">City</option>
-                           <option value="state">State</option>
-                           <option value="tags">Tags</option>
-                           <option value="leadStage">Lead Stage</option>
-                           <option value="customerType">Customer Type</option>
-                        </select>
-                      </div>
-                    </div>
-                  ) : null}
+                  </div>
+                ) : null}
 
                 {(selectedNode.type || "").toUpperCase() === "CATALOG" && (
                   <div>
@@ -4185,13 +4185,13 @@ export default function WhatsAppChatbotBuilderPage() {
                       onPaste={async (e) => {
                         const items = e.clipboardData?.items;
                         if (!items) return;
-                        
+
                         for (let i = 0; i < items.length; i++) {
                           if (items[i].type.indexOf("image") !== -1) {
                             e.preventDefault();
                             const file = items[i].getAsFile();
                             if (!file) continue;
-                            
+
                             if (file.size > 5 * 1024 * 1024) {
                               setToastMsg("❌ Image size must be less than 5MB");
                               setTimeout(() => setToastMsg(null), 3000);
@@ -4720,7 +4720,7 @@ export default function WhatsAppChatbotBuilderPage() {
                             <option value="ROUND_ROBIN">Auto (Round Robin)</option>
                           </select>
                         </div>
-                        
+
                         {selectedNode.assignmentMode === "DIRECT" && (
                           <div>
                             <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#475569" }}>Assign To Agent</label>
@@ -4750,7 +4750,7 @@ export default function WhatsAppChatbotBuilderPage() {
                                 <option value="AGENTS">Multiple Agents</option>
                               </select>
                             </div>
-                            
+
                             {(!selectedNode.roundRobinTarget || selectedNode.roundRobinTarget === "TEAM") && (
                               <div>
                                 <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#475569" }}>Select Team</label>
@@ -4778,8 +4778,8 @@ export default function WhatsAppChatbotBuilderPage() {
                                     const isSelected = (selectedNode.agentIds || []).includes(ag.id);
                                     return (
                                       <label key={ag.id} style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
-                                        <input 
-                                          type="checkbox" 
+                                        <input
+                                          type="checkbox"
                                           checked={isSelected}
                                           onChange={(e) => {
                                             const checked = e.target.checked;
@@ -4790,7 +4790,7 @@ export default function WhatsAppChatbotBuilderPage() {
                                             }));
                                           }}
                                         />
-                                        <span>{ag.user?.name || "Agent"} <span style={{opacity: 0.5}}>- {ag.team?.name || 'No team'}</span></span>
+                                        <span>{ag.user?.name || "Agent"} <span style={{ opacity: 0.5 }}>- {ag.team?.name || 'No team'}</span></span>
                                       </label>
                                     );
                                   })}
@@ -4809,7 +4809,7 @@ export default function WhatsAppChatbotBuilderPage() {
                                 <option value="EQUAL_DISTRIBUTION">Equal Distribution (Turn-by-Turn Sequential)</option>
                               </select>
                               <span style={{ fontSize: "10px", color: "#64748b", marginTop: "4px", display: "block" }}>
-                                {selectedNode.distributionMethod === "EQUAL_DISTRIBUTION" 
+                                {selectedNode.distributionMethod === "EQUAL_DISTRIBUTION"
                                   ? "Chats are evenly rotated turn-by-turn among agents."
                                   : "Assigns to whoever currently has the lowest active open chat load."}
                               </span>
