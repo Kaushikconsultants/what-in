@@ -790,6 +790,177 @@ const BOT_TEMPLATES = [
   }
 ];
 
+export function autoOrganizeNodes(nodes: any[]): any[] {
+  if (!Array.isArray(nodes) || nodes.length === 0) return nodes;
+
+  const adj = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+  const nodeMap = new Map<string, any>();
+
+  nodes.forEach((n) => {
+    nodeMap.set(n.id, n);
+    adj.set(n.id, []);
+    inDegree.set(n.id, 0);
+  });
+
+  nodes.forEach((n) => {
+    const targets: string[] = [];
+    if (n.outputPort && nodeMap.has(n.outputPort)) {
+      targets.push(n.outputPort);
+    }
+    if (Array.isArray(n.choices)) {
+      n.choices.forEach((c: any) => {
+        const tId = c.targetNode || c.outputPort;
+        if (tId && nodeMap.has(tId)) {
+          targets.push(tId);
+        }
+      });
+    }
+    targets.forEach((tId) => {
+      adj.get(n.id)?.push(tId);
+      inDegree.set(tId, (inDegree.get(tId) || 0) + 1);
+    });
+  });
+
+  // Find roots: TRIGGER first, then inDegree === 0, or first node
+  let roots = nodes.filter((n) => (n.type || "").toUpperCase() === "TRIGGER");
+  if (roots.length === 0) {
+    roots = nodes.filter((n) => (inDegree.get(n.id) || 0) === 0);
+  }
+  if (roots.length === 0 && nodes.length > 0) {
+    roots = [nodes[0]];
+  }
+
+  // Assign levels (BFS)
+  const levels = new Map<string, number>();
+  const visited = new Set<string>();
+  const queue: string[] = [];
+
+  roots.forEach((r) => {
+    levels.set(r.id, 0);
+    visited.add(r.id);
+    queue.push(r.id);
+  });
+
+  while (queue.length > 0) {
+    const currId = queue.shift()!;
+    const currLevel = levels.get(currId) || 0;
+    const neighbors = adj.get(currId) || [];
+
+    neighbors.forEach((nextId) => {
+      if (!visited.has(nextId)) {
+        visited.add(nextId);
+        levels.set(nextId, currLevel + 1);
+        queue.push(nextId);
+      } else {
+        const existingLevel = levels.get(nextId) || 0;
+        if (currLevel + 1 > existingLevel) {
+          levels.set(nextId, currLevel + 1);
+        }
+      }
+    });
+  }
+
+  // Any disconnected nodes get assigned to sequential columns
+  let maxLevel = 0;
+  levels.forEach((lvl) => {
+    if (lvl > maxLevel) maxLevel = lvl;
+  });
+
+  nodes.forEach((n) => {
+    if (!visited.has(n.id)) {
+      maxLevel += 1;
+      levels.set(n.id, maxLevel);
+      visited.add(n.id);
+    }
+  });
+
+  // Group nodes by level
+  const levelGroups = new Map<number, any[]>();
+  nodes.forEach((n) => {
+    const lvl = levels.get(n.id) || 0;
+    if (!levelGroups.has(lvl)) levelGroups.set(lvl, []);
+    levelGroups.get(lvl)!.push(n);
+  });
+
+  // Calculate coordinates with generous, clean spacing
+  const HORIZONTAL_GAP = 340;
+  const VERTICAL_GAP = 220;
+  const START_X = 60;
+  const START_Y = 80;
+
+  return nodes.map((n) => {
+    const lvl = levels.get(n.id) || 0;
+    const group = levelGroups.get(lvl) || [n];
+    const indexInGroup = group.findIndex((item) => item.id === n.id);
+
+    const x = START_X + lvl * HORIZONTAL_GAP;
+    const y = START_Y + indexInGroup * VERTICAL_GAP;
+
+    return {
+      ...n,
+      x,
+      y
+    };
+  });
+}
+
+export function sanitizeWorkflowNodes(rawNodes: any[]): any[] {
+  if (!Array.isArray(rawNodes) || rawNodes.length === 0) return [];
+
+  const sanitized = rawNodes.map((n: any, idx: number) => {
+    let nx: number | null = null;
+    let ny: number | null = null;
+
+    if (typeof n.x === "number" && !isNaN(n.x)) nx = n.x;
+    else if (typeof n.position?.x === "number" && !isNaN(n.position.x)) nx = n.position.x;
+    else if (typeof n.x === "string" && !isNaN(parseFloat(n.x))) nx = parseFloat(n.x);
+    else if (typeof n.position?.x === "string" && !isNaN(parseFloat(n.position.x))) nx = parseFloat(n.position.x);
+
+    if (typeof n.y === "number" && !isNaN(n.y)) ny = n.y;
+    else if (typeof n.position?.y === "number" && !isNaN(n.position.y)) ny = n.position.y;
+    else if (typeof n.y === "string" && !isNaN(parseFloat(n.y))) ny = parseFloat(n.y);
+    else if (typeof n.position?.y === "string" && !isNaN(parseFloat(n.position.y))) ny = parseFloat(n.position.y);
+
+    const rawType = String(n.type || (idx === 0 ? "TRIGGER" : "TEXT")).toUpperCase();
+
+    let mappedChoices = n.choices;
+    if (!mappedChoices && n.data?.buttons && Array.isArray(n.data.buttons)) {
+      mappedChoices = n.data.buttons.map((b: any, bi: number) =>
+        typeof b === "string" ? { id: `c_${bi}`, text: b } : b
+      );
+    }
+    if (Array.isArray(mappedChoices)) {
+      mappedChoices = mappedChoices.map((c: any, ci: number) => ({
+        id: c.id || `c_${ci}`,
+        text: c.text || c.title || `Option ${ci + 1}`,
+        targetNode: c.targetNode || c.outputPort || c.targetBlockId || null
+      }));
+    }
+
+    return {
+      ...n,
+      id: n.id || `node_${Date.now()}_${idx}`,
+      type: rawType,
+      category: n.category || (rawType === "START" ? "start" : rawType === "CHOICE" || rawType === "BUTTONS" || rawType === "LIST_MENU" || rawType === "QUESTION" ? "choice" : (rawType === "TRIGGER" ? "trigger" : "message")),
+      title: n.title || n.name || (rawType === "TRIGGER" ? "FLOW TRIGGER" : `Step ${idx + 1}`),
+      x: nx !== null ? nx : (idx * 340 + 60),
+      y: ny !== null ? ny : 100,
+      text: n.text ?? n.data?.text ?? "",
+      imageUrl: n.imageUrl ?? n.data?.imageUrl ?? undefined,
+      choices: mappedChoices || [],
+      outputPort: n.outputPort ?? (n.data?.targetNode || undefined)
+    };
+  });
+
+  const isStacked = sanitized.length > 1 && sanitized.every((n: any, i: number) => {
+    if (i === 0) return true;
+    return Math.abs(n.x - sanitized[0].x) < 25 && Math.abs(n.y - sanitized[0].y) < 25;
+  });
+
+  return isStacked ? autoOrganizeNodes(sanitized) : sanitized;
+}
+
 export default function WhatsAppChatbotBuilderPage() {
   // DB Saved Flow State
   const [savedFlows, setSavedFlows] = useState<any[]>([]);
@@ -1312,31 +1483,46 @@ export default function WhatsAppChatbotBuilderPage() {
         } else if (parsed && typeof parsed === "object") {
           if (Array.isArray(parsed.nodes)) {
             importedNodes = parsed.nodes;
+          } else if (parsed.flow && Array.isArray(parsed.flow.nodes)) {
+            importedNodes = parsed.flow.nodes;
+          } else if (parsed.data && Array.isArray(parsed.data.nodes)) {
+            importedNodes = parsed.data.nodes;
           }
           if (typeof parsed.name === "string") {
             importedName = parsed.name;
+          } else if (typeof parsed.flow?.name === "string") {
+            importedName = parsed.flow.name;
           }
           if (typeof parsed.triggerKeyword === "string") {
             importedKeyword = parsed.triggerKeyword;
+          } else if (typeof parsed.flow?.triggerKeyword === "string") {
+            importedKeyword = parsed.flow.triggerKeyword;
           }
         }
 
-        if (!importedNodes || !importedNodes.every((n: any) => n.id && n.type)) {
-          alert("Invalid chatbot flow JSON structure. Missing nodes, node IDs, or node types.");
+        if (!importedNodes || !Array.isArray(importedNodes) || importedNodes.length === 0) {
+          alert("Invalid chatbot flow JSON structure. No valid nodes list found.");
           return;
         }
 
-        setNodes(importedNodes);
-        setHistoryStack([importedNodes]);
+        const finalNodes = sanitizeWorkflowNodes(importedNodes);
+
+        setNodes(finalNodes);
+        setHistoryStack([finalNodes]);
         setHistoryIndex(0);
         setSelectedNodeId(null);
+        setSelectedNodeIds(new Set());
         setIsDrawerOpen(false);
+
+        // Reset view pan/zoom so full flow is neatly framed
+        setPan({ x: 30, y: 30 });
+        setZoom(0.75);
 
         if (importedName) setFlowName(importedName);
         if (importedKeyword) setTriggerKeyword(importedKeyword);
 
-        setToastMsg("✓ Chatbot flow imported successfully! Click Save to publish.");
-        setTimeout(() => setToastMsg(null), 4000);
+        setToastMsg(`✓ Chatbot flow (${finalNodes.length} steps) imported & organized successfully! Click Save to publish.`);
+        setTimeout(() => setToastMsg(null), 4500);
       } catch (err: any) {
         alert("Failed to parse JSON file: " + err.message);
       }
@@ -1411,24 +1597,16 @@ export default function WhatsAppChatbotBuilderPage() {
           if (Array.isArray(parsed)) {
             loadedNodes = parsed;
           } else if (parsed && Array.isArray(parsed.nodes)) {
-            loadedNodes = parsed.nodes.map((n: any) => ({
-              id: n.id,
-              type: n.type || "TEXT",
-              category: n.category || (n.type === "START" ? "start" : n.type === "CHOICE" || n.type === "QUESTION" ? "choice" : "message"),
-              title: n.title || "Step",
-              x: n.position?.x ?? n.x ?? 100,
-              y: n.position?.y ?? n.y ?? 100,
-              text: n.data?.text ?? n.text ?? "",
-              imageUrl: n.data?.imageUrl ?? n.imageUrl,
-              choices: n.data?.buttons ? n.data.buttons.map((b: string, i: number) => ({ id: `c_${i}`, text: b })) : (n.choices || []),
-              outputPort: n.outputPort
-            }));
+            loadedNodes = parsed.nodes;
+          } else if (parsed && Array.isArray(parsed.flow?.nodes)) {
+            loadedNodes = parsed.flow.nodes;
           }
           if (loadedNodes.length > 0) {
-            setNodes(loadedNodes);
-            setHistoryStack([loadedNodes]);
+            const finalLoaded = sanitizeWorkflowNodes(loadedNodes);
+            setNodes(finalLoaded);
+            setHistoryStack([finalLoaded]);
             setHistoryIndex(0);
-            setLastSavedNodesJson(JSON.stringify(loadedNodes));
+            setLastSavedNodesJson(JSON.stringify(finalLoaded));
           }
         } catch (e) {
           console.error("Failed to parse nodesJson:", e);
@@ -1522,26 +1700,19 @@ export default function WhatsAppChatbotBuilderPage() {
       if (Array.isArray(parsed)) {
         loadedNodes = parsed;
       } else if (parsed && Array.isArray(parsed.nodes)) {
-        loadedNodes = parsed.nodes.map((n: any) => ({
-          id: n.id,
-          type: n.type || "TEXT",
-          category: n.category || (n.type === "START" ? "start" : n.type === "CHOICE" || n.type === "QUESTION" ? "choice" : "message"),
-          title: n.title || "Step",
-          x: n.position?.x ?? n.x ?? 100,
-          y: n.position?.y ?? n.y ?? 100,
-          text: n.data?.text ?? n.text ?? "",
-          imageUrl: n.data?.imageUrl ?? n.imageUrl,
-          choices: n.data?.buttons ? n.data.buttons.map((b: string, i: number) => ({ id: `c_${i}`, text: b })) : (n.choices || []),
-          outputPort: n.outputPort
-        }));
+        loadedNodes = parsed.nodes;
+      } else if (parsed && Array.isArray(parsed.flow?.nodes)) {
+        loadedNodes = parsed.flow.nodes;
       }
       if (loadedNodes.length > 0) {
-        setNodes(loadedNodes);
-        setHistoryStack([loadedNodes]);
+        const finalLoaded = sanitizeWorkflowNodes(loadedNodes);
+        setNodes(finalLoaded);
+        setHistoryStack([finalLoaded]);
         setHistoryIndex(0);
         setSelectedNodeId(null);
+        setSelectedNodeIds(new Set());
         setIsDrawerOpen(false);
-        setLastSavedNodesJson(JSON.stringify(loadedNodes));
+        setLastSavedNodesJson(JSON.stringify(finalLoaded));
       }
     } catch (e) {
       console.error("Error loading selected flow nodes:", e);
@@ -2049,6 +2220,21 @@ export default function WhatsAppChatbotBuilderPage() {
 
   const handleMouseDownNode = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    const target = e.target as HTMLElement;
+    if (
+      target.closest("button") ||
+      target.closest("input") ||
+      target.closest("textarea") ||
+      target.closest("select") ||
+      target.closest(".node-input-port") ||
+      target.closest(".node-output-port") ||
+      target.closest(".choice-option-port") ||
+      target.closest(".delete-connection-btn") ||
+      target.getAttribute("role") === "button"
+    ) {
+      return;
+    }
+
     setDragStartPos({ x: e.clientX, y: e.clientY });
     setDraggingNodeId(id);
 
@@ -2065,12 +2251,13 @@ export default function WhatsAppChatbotBuilderPage() {
     }
 
     const targetNode = nodes.find((n) => n.id === id);
-    if (targetNode) {
-      setDragOffset({
-        x: e.clientX - (targetNode.x * zoom + pan.x),
-        y: e.clientY - (targetNode.y * zoom + pan.y)
-      });
-    }
+    const nodeX = typeof targetNode?.x === "number" && !isNaN(targetNode.x) ? targetNode.x : 100;
+    const nodeY = typeof targetNode?.y === "number" && !isNaN(targetNode.y) ? targetNode.y : 100;
+
+    setDragOffset({
+      x: e.clientX - (nodeX * zoom + pan.x),
+      y: e.clientY - (nodeY * zoom + pan.y)
+    });
   };
 
   const handleOpenNodeSettings = (id: string, e: React.MouseEvent) => {
@@ -2177,9 +2364,34 @@ export default function WhatsAppChatbotBuilderPage() {
     const newX = (e.clientX - dragOffset.x - pan.x) / zoom;
     const newY = (e.clientY - dragOffset.y - pan.y) / zoom;
 
-    setNodes((prev) =>
-      prev.map((n) => (n.id === draggingNodeId ? { ...n, x: Math.max(10, newX), y: Math.max(10, newY) } : n))
-    );
+    if (isNaN(newX) || isNaN(newY)) return;
+
+    const clampedX = Math.max(10, Math.round(newX));
+    const clampedY = Math.max(10, Math.round(newY));
+
+    const targetNode = nodes.find((n) => n.id === draggingNodeId);
+    if (!targetNode) return;
+    const curTargetX = typeof targetNode.x === "number" && !isNaN(targetNode.x) ? targetNode.x : clampedX;
+    const curTargetY = typeof targetNode.y === "number" && !isNaN(targetNode.y) ? targetNode.y : clampedY;
+    const dx = clampedX - curTargetX;
+    const dy = clampedY - curTargetY;
+
+    if (selectedNodeIds.has(draggingNodeId) && selectedNodeIds.size > 1) {
+      setNodes((prev) =>
+        prev.map((n) => {
+          if (selectedNodeIds.has(n.id)) {
+            const curX = typeof n.x === "number" && !isNaN(n.x) ? n.x : 100;
+            const curY = typeof n.y === "number" && !isNaN(n.y) ? n.y : 100;
+            return { ...n, x: Math.max(10, Math.round(curX + dx)), y: Math.max(10, Math.round(curY + dy)) };
+          }
+          return n;
+        })
+      );
+    } else {
+      setNodes((prev) =>
+        prev.map((n) => (n.id === draggingNodeId ? { ...n, x: clampedX, y: clampedY } : n))
+      );
+    }
   };
 
   const handleMouseUpCanvas = (e: React.MouseEvent) => {
@@ -2193,12 +2405,105 @@ export default function WhatsAppChatbotBuilderPage() {
 
     if (draggingNodeId) {
       const dist = Math.hypot(e.clientX - dragStartPos.x, e.clientY - dragStartPos.y);
-      if (dist < 4) {
+      if (dist < 5) {
         setSelectedNodeId(draggingNodeId);
       }
-      pushHistory(nodes);
+      setNodes((latest) => {
+        pushHistory(latest);
+        return latest;
+      });
+      setDraggingNodeId(null);
     }
-    setDraggingNodeId(null);
+  };
+
+  // Global mousemove/mouseup listener for ultra-smooth drag feel
+  useEffect(() => {
+    if (!draggingNodeId && !isPanning && !connectingFrom) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      if (isPanning) {
+        setPan({
+          x: e.clientX - panStart.x,
+          y: e.clientY - panStart.y
+        });
+        return;
+      }
+
+      if (connectingFrom) {
+        const container = document.querySelector(".infinite-canvas-wrapper");
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const mx = (e.clientX - rect.left - pan.x) / zoom;
+          const my = (e.clientY - rect.top - pan.y) / zoom;
+          setConnectingMousePos({ x: mx, y: my });
+        }
+        return;
+      }
+
+      if (draggingNodeId) {
+        const newX = (e.clientX - dragOffset.x - pan.x) / zoom;
+        const newY = (e.clientY - dragOffset.y - pan.y) / zoom;
+        if (isNaN(newX) || isNaN(newY)) return;
+
+        const clampedX = Math.max(10, Math.round(newX));
+        const clampedY = Math.max(10, Math.round(newY));
+
+        setNodes((prev) => {
+          const targetNode = prev.find((n) => n.id === draggingNodeId);
+          if (!targetNode) return prev;
+          const curTargetX = typeof targetNode.x === "number" && !isNaN(targetNode.x) ? targetNode.x : clampedX;
+          const curTargetY = typeof targetNode.y === "number" && !isNaN(targetNode.y) ? targetNode.y : clampedY;
+          const dx = clampedX - curTargetX;
+          const dy = clampedY - curTargetY;
+
+          if (selectedNodeIds.has(draggingNodeId) && selectedNodeIds.size > 1) {
+            return prev.map((n) => {
+              if (selectedNodeIds.has(n.id)) {
+                const curX = typeof n.x === "number" && !isNaN(n.x) ? n.x : 100;
+                const curY = typeof n.y === "number" && !isNaN(n.y) ? n.y : 100;
+                return { ...n, x: Math.max(10, Math.round(curX + dx)), y: Math.max(10, Math.round(curY + dy)) };
+              }
+              return n;
+            });
+          } else {
+            return prev.map((n) => (n.id === draggingNodeId ? { ...n, x: clampedX, y: clampedY } : n));
+          }
+        });
+      }
+    };
+
+    const handleWindowMouseUp = () => {
+      setIsPanning(false);
+      if (connectingFrom) {
+        setConnectingFrom(null);
+        setConnectingMousePos(null);
+        setHoveredTargetNodeId(null);
+      }
+      if (draggingNodeId) {
+        setNodes((latest) => {
+          pushHistory(latest);
+          return latest;
+        });
+        setDraggingNodeId(null);
+      }
+    };
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [draggingNodeId, isPanning, connectingFrom, dragOffset, panStart, pan, zoom, selectedNodeIds]);
+
+  const handleAutoOrganize = () => {
+    if (nodes.length === 0) return;
+    const organized = autoOrganizeNodes(nodes);
+    setNodes(organized);
+    pushHistory(organized);
+    setToastMsg("✨ Workflow nodes auto-organized into clean layout!");
+    setTimeout(() => setToastMsg(null), 3000);
   };
 
   const handleWheelCanvas = (e: React.WheelEvent) => {
@@ -2653,6 +2958,16 @@ export default function WhatsAppChatbotBuilderPage() {
           <button className="circular-history-btn" onClick={handleRedo} title="Redo"><RotateCw size={15} /></button>
 
           <button
+            className="studio-btn"
+            onClick={handleAutoOrganize}
+            disabled={nodes.length === 0}
+            title="Auto-organize workflow nodes into clean visual layout"
+            style={{ color: "#7c3aed", borderColor: "#ddd6fe", background: "#f5f3ff", display: "inline-flex", alignItems: "center", gap: "5px", fontWeight: 600 }}
+          >
+            <Sparkles size={14} color="#7c3aed" /> Auto Layout
+          </button>
+
+          <button
             className="studio-btn fullscreen-btn"
             onClick={() => setIsFullScreenStudio(!isFullScreenStudio)}
             title="Toggle Full Screen Studio Mode"
@@ -3062,8 +3377,8 @@ export default function WhatsAppChatbotBuilderPage() {
                   key={node.id}
                   className={`canvas-node-card ${isSelected ? "selected" : ""} ${isConnectingHover ? "connecting-target-hover" : ""} ${isNodeLocked ? "locked-node" : ""} ${hasContentError ? "error-node" : ""}`}
                   style={{
-                    left: `${node.x}px`,
-                    top: `${node.y}px`
+                    left: `${typeof node.x === "number" && !isNaN(node.x) ? node.x : 100}px`,
+                    top: `${typeof node.y === "number" && !isNaN(node.y) ? node.y : 100}px`
                   }}
                   onMouseDown={(e) => handleMouseDownNode(e, node.id)}
                   onMouseUp={(e) => {

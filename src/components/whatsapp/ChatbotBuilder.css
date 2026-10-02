@@ -364,8 +364,15 @@
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   z-index: 2;
-  cursor: move;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
   transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.canvas-node-card:active {
+  cursor: grabbing;
 }
 
 .canvas-node-card:hover {
