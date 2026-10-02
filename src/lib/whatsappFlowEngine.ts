@@ -335,6 +335,46 @@ async function dispatchNode(
       }
       return; // Handled
 
+    } else if (type === 'WHATSAPP_FLOW' || type === 'META_FLOW') {
+      const targetFlowId = node.flowId || '979379797763203';
+      const screenName = node.screenName || 'PINCODE_SCREEN';
+      const ctaText = String(inter(node.ctaText || 'Open Form')).slice(0, 20);
+      const bodyText = inter(node.bodyText || node.text || 'Please complete the form below:');
+      const flowToken = `flow_${node.id}_${Date.now()}`;
+
+      payload.type = 'interactive';
+      payload.interactive = {
+        type: 'flow',
+        body: { text: bodyText },
+        action: {
+          name: 'flow',
+          parameters: {
+            flow_message_version: '3',
+            flow_token: flowToken,
+            flow_id: String(targetFlowId).trim(),
+            flow_cta: ctaText,
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen: screenName,
+              data: {}
+            }
+          }
+        }
+      };
+
+      if (node.headerText) {
+        payload.interactive.header = {
+          type: 'text',
+          text: String(inter(node.headerText)).slice(0, 60)
+        };
+      }
+
+      if (node.footerText) {
+        payload.interactive.footer = {
+          text: String(inter(node.footerText)).slice(0, 60)
+        };
+      }
+
     } else if (type === 'DELAY') {
       const ms = Math.min((parseInt(node.seconds) || 1) * 1000, 4000);
       await new Promise(r => setTimeout(r, ms));
@@ -389,6 +429,9 @@ async function dispatchNode(
           mediaUrlVal = inter(node.imageUrl);
         }
         metaJsonStr = JSON.stringify(choices.map((c: any) => c.text));
+      } else if (type === 'WHATSAPP_FLOW' || type === 'META_FLOW') {
+        textToSend = `[WhatsApp Flow Form]: ${inter(node.bodyText || node.text || '')} (Button: ${inter(node.ctaText || 'Open Form')})`;
+        mType = 'FLOW';
       }
 
       if (textToSend || mediaUrlVal) {
@@ -1148,7 +1191,7 @@ async function runNodes(
     }
 
     // Pause at interactive nodes
-    const isPause = ['CHOICE', 'INPUT_PHONE', 'INPUT_NAME', 'INPUT_EMAIL', 'INPUT_DATE'].includes(type);
+    const isPause = ['CHOICE', 'INPUT_PHONE', 'INPUT_NAME', 'INPUT_EMAIL', 'INPUT_DATE', 'WHATSAPP_FLOW', 'META_FLOW'].includes(type);
     if (isPause) {
       return { status: 'paused', nodeId: node.id };
     }
@@ -1169,7 +1212,8 @@ export async function executeFlowEngine(
   conversationId: string, 
   wasClosed: boolean = false,
   clientId?: string,
-  interactiveId?: string
+  interactiveId?: string,
+  flowData?: Record<string, any>
 ): Promise<boolean> {
   try {
     let effectiveClientId = clientId;
@@ -1355,6 +1399,13 @@ export async function executeFlowEngine(
         }
       }
 
+      // If user completed a WhatsApp Flow (Native form)
+      if (type === 'WHATSAPP_FLOW' || type === 'META_FLOW') {
+        if (flowData && typeof flowData === 'object') {
+          Object.assign(vars, flowData);
+        }
+      }
+
       // Route based on interactive choice clicked or typed
       let nextNodeId = null;
       if (type === 'CHOICE' || type === 'BUTTONS' || type === 'LIST_MENU') {
@@ -1395,6 +1446,9 @@ export async function executeFlowEngine(
           await prisma.whatsAppFlowState.delete({ where: { id: userState.id } });
           return false; // Let AI handle this
         }
+      } else if (type === 'WHATSAPP_FLOW' || type === 'META_FLOW') {
+        // WhatsApp Flow completed: follow outputPort to next step
+        nextNodeId = currentNode.outputPort || null;
       }
 
       // If no interactive match, follow default output port

@@ -78,6 +78,7 @@ import {
   getTeamsWithMembersAction,
   getProductsAction,
   getWhatsAppTemplates,
+  getWhatsAppMetaFlows,
   getWhatsAppChatbotLogsAction,
   clearWhatsAppChatbotLogsAction
 } from "@/app/actions/whatsAppPlatformActions";
@@ -106,7 +107,7 @@ export interface BlockCategoryConfig {
 const blockCategories: BlockCategoryConfig[] = [
   {
     name: "Messages",
-    count: 11,
+    count: 12,
     requiredModule: "CHATBOT",
     blocks: [
       { id: "text", name: "Text", icon: MessageSquare },
@@ -119,16 +120,18 @@ const blockCategories: BlockCategoryConfig[] = [
       { id: "contact", name: "Contact", icon: User },
       { id: "link", name: "Link", icon: LinkIcon },
       { id: "carousel", name: "Media Carousel", icon: Layers },
-      { id: "request", name: "Request", icon: HelpCircle }
+      { id: "request", name: "Request", icon: HelpCircle },
+      { id: "whatsapp_flow", name: "WhatsApp Flow", icon: Sparkles }
     ]
   },
   {
     name: "Choices",
-    count: 2,
+    count: 3,
     requiredModule: "CHATBOT",
     blocks: [
       { id: "buttons", name: "Buttons", icon: List },
-      { id: "list_menu", name: "List Menu", icon: Layers }
+      { id: "list_menu", name: "List Menu", icon: Layers },
+      { id: "whatsapp_flow", name: "WhatsApp Flow (Form)", icon: Sparkles }
     ]
   },
   {
@@ -194,9 +197,10 @@ const blockCategories: BlockCategoryConfig[] = [
   },
   {
     name: "Meta Suite & Ads",
-    count: 4,
+    count: 5,
     requiredModule: "META_PIXEL_CAPI",
     blocks: [
+      { id: "whatsapp_flow", name: "WhatsApp Flow (Native Form)", icon: Sparkles, requiredModule: "META_PIXEL_CAPI" },
       { id: "meta_capi", name: "Meta CAPI Event", icon: Target, requiredModule: "META_PIXEL_CAPI" },
       { id: "meta_ctwa_ad", name: "CTWA Ad Attribution", icon: Sparkles, requiredModule: "META_PIXEL_CAPI" },
       { id: "meta_custom_audience", name: "Meta Audience Sync", icon: Users, requiredModule: "META_PIXEL_CAPI" },
@@ -983,6 +987,7 @@ export default function WhatsAppChatbotBuilderPage() {
   const [availableCollections, setAvailableCollections] = useState<string[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [integrations, setIntegrations] = useState<any[]>([]);
+  const [metaFlows, setMetaFlows] = useState<any[]>([]);
 
   // JSON File Import/Export Ref
   const jsonFileInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -1652,6 +1657,11 @@ export default function WhatsAppChatbotBuilderPage() {
         const uniqueCats = Array.from(new Set(prodRes.products.map((p: any) => p.category))).filter(Boolean) as string[];
         setAvailableCollections(uniqueCats);
       }
+
+      const flowsRes = await getWhatsAppMetaFlows().catch(() => []);
+      if (flowsRes && Array.isArray(flowsRes)) {
+        setMetaFlows(flowsRes);
+      }
     } catch (err) {
       console.error("Failed to load live data for chatbot builder", err);
     }
@@ -2085,6 +2095,22 @@ export default function WhatsAppChatbotBuilderPage() {
             { id: "item_1", title: "Product Category A", subtitle: "Special Offer Available", imageUrl: "https://images.unsplash.com/photo-1581655353564-df123a1eb820?w=400", buttonText: "Inquire Now" },
             { id: "item_2", title: "Product Category B", subtitle: "Top Trending Item", imageUrl: "https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=400", buttonText: "Inquire Now" }
           ]
+        };
+        break;
+      case "whatsapp_flow":
+      case "meta_flow":
+        newNode = {
+          ...newNode,
+          category: "choice",
+          type: "WHATSAPP_FLOW",
+          title: "WhatsApp Flow (Native Form)",
+          headerText: "Order & Address Form",
+          text: "Please click below to fill out your details:",
+          bodyText: "Please click below to fill out your details:",
+          ctaText: "Place Order 🛍️",
+          flowId: metaFlows[0]?.flowId || "979379797763203",
+          screenName: metaFlows[0]?.screenName || "PINCODE_SCREEN",
+          footerText: "Fast & Secure Checkout"
         };
         break;
       case "request":
@@ -3499,6 +3525,33 @@ export default function WhatsAppChatbotBuilderPage() {
                       </div>
                     )}
 
+                    {((node.type || "").toUpperCase() === "WHATSAPP_FLOW" || (node.type || "").toUpperCase() === "META_FLOW" || (node.title || "").toLowerCase().includes("flow (native")) && (
+                      <div style={{ background: "#ecfdf5", border: "1.5px solid #6ee7b7", color: "#065f46", padding: "10px", borderRadius: "8px", fontSize: "11px", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: "5px", fontWeight: 800, color: "#047857" }}>
+                            <Sparkles size={13} color="#059669" />
+                            WhatsApp Native Flow
+                          </span>
+                          <span style={{ fontSize: "9px", background: "#059669", color: "#fff", padding: "2px 6px", borderRadius: "4px", fontWeight: 800, letterSpacing: "0.5px" }}>
+                            FORM
+                          </span>
+                        </div>
+                        {node.headerText && <div style={{ fontWeight: 700, fontSize: "11.5px", color: "#0f172a", marginBottom: "3px" }}>{node.headerText}</div>}
+                        <div style={{ color: "#334155", fontSize: "11px", marginBottom: "6px", lineHeight: "1.3" }}>
+                          {node.bodyText || node.text || "Click below to fill the interactive form"}
+                        </div>
+                        <div style={{ background: "#fff", border: "1.5px solid #10b981", color: "#047857", padding: "6px 10px", borderRadius: "6px", textAlign: "center", fontWeight: 800, fontSize: "11.5px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+                          📋 {node.ctaText || "Open Form"}
+                        </div>
+                        {node.flowId && (
+                          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "6px", display: "flex", alignItems: "center", gap: "4px" }}>
+                            <span>Flow ID:</span>
+                            <code style={{ background: "#d1fae5", color: "#065f46", padding: "1px 4px", borderRadius: "3px", fontWeight: 700 }}>{node.flowId}</code>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {(node.type === "CRM_CONTACT" || node.type === "CRM_LEAD" || (node.type || "").toUpperCase() === "META_CAPI" || (node.title || "").toLowerCase().includes("meta capi")) && (
                       <div style={{ background: "#e0e7ff", border: "1px solid #c7d2fe", color: "#3730a3", padding: "6px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, marginBottom: "6px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
@@ -4536,6 +4589,124 @@ export default function WhatsAppChatbotBuilderPage() {
                       />
                     </div>
                   </>
+                )}
+
+                {((selectedNode.type || "").toUpperCase() === "WHATSAPP_FLOW" || (selectedNode.type || "").toUpperCase() === "META_FLOW" || (selectedNode.title || "").toLowerCase().includes("flow (native")) && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "10px", padding: "14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Sparkles size={16} style={{ color: "#059669" }} />
+                        <span style={{ fontSize: "13px", fontWeight: 800, color: "#065f46" }}>WhatsApp Native Flow Form</span>
+                      </div>
+                      <span style={{ fontSize: "10px", background: "#059669", color: "#fff", padding: "2px 8px", borderRadius: "999px", fontWeight: 700 }}>
+                        Meta Interactive
+                      </span>
+                    </div>
+
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Select Meta Flow</label>
+                        <a href="/whatsapp/flows" target="_blank" rel="noreferrer" style={{ fontSize: "10.5px", color: "#059669", fontWeight: 700, textDecoration: "underline" }}>
+                          Manage Flows ↗
+                        </a>
+                      </div>
+                      {metaFlows && metaFlows.length > 0 ? (
+                        <select
+                          value={selectedNode.flowId || metaFlows[0]?.flowId || metaFlows[0]?.id || ""}
+                          onChange={(e) => {
+                            const chosen = metaFlows.find((f: any) => (f.flowId || f.id) === e.target.value);
+                            setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? {
+                              ...n,
+                              flowId: e.target.value,
+                              flowName: chosen?.name || n.flowName,
+                              screenName: chosen?.screenName || n.screenName || "PINCODE_SCREEN"
+                            } : n)));
+                          }}
+                          style={{ width: "100%", padding: "8px 10px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px", background: "#fff", fontWeight: 600 }}
+                        >
+                          {metaFlows.map((f: any) => (
+                            <option key={f.id || f.flowId} value={f.flowId || f.id}>
+                              {f.name} ({f.flowId || f.id}) {f.status ? `[${f.status}]` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+                          No flows synced yet or enter Meta Flow ID manually below.
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Flow ID (Meta Unique ID)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 979379797763203"
+                        value={selectedNode.flowId || ""}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, flowId: e.target.value.trim() } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px", fontFamily: "monospace" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Initial Screen Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. PINCODE_SCREEN"
+                        value={selectedNode.screenName || "PINCODE_SCREEN"}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, screenName: e.target.value.trim() } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px", fontFamily: "monospace" }}
+                      />
+                      <span style={{ fontSize: "10px", color: "#64748b", marginTop: "2px", display: "block" }}>
+                        The first screen identifier defined in your Meta Flow JSON (default: PINCODE_SCREEN).
+                      </span>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>CTA Button Label (Max 20 chars)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Place Order 🛍️"
+                        maxLength={20}
+                        value={selectedNode.ctaText || "Place Order 🛍️"}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, ctaText: e.target.value } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Header Title (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Order & Delivery Details"
+                        value={selectedNode.headerText || ""}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, headerText: e.target.value } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Message Body Content</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Please tap below to fill out your details:"
+                        value={selectedNode.bodyText !== undefined ? selectedNode.bodyText : (selectedNode.text || "")}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, bodyText: e.target.value, text: e.target.value } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Footer Note (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Fast & Secure Checkout"
+                        value={selectedNode.footerText || ""}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, footerText: e.target.value } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                      />
+                    </div>
+                  </div>
                 )}
 
                 {(selectedNode.type || "").toUpperCase().startsWith("CRM_") && (

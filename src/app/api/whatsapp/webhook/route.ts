@@ -890,6 +890,21 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
               }
             }
           }
+
+          // Automatically resume active Chatbot Flow if waiting at a WHATSAPP_FLOW node
+          try {
+            await executeFlowEngine(
+              fromPhone,
+              "FLOW_SUBMITTED",
+              conversation.id,
+              false,
+              clientId,
+              undefined,
+              answers
+            );
+          } catch (flowResumeErr) {
+            console.error("[Webhook Flow Resume Error]:", flowResumeErr);
+          }
         }
       } catch (err) {
         console.error("Failed to process form submission in webhook:", err);
