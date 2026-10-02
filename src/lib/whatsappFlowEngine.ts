@@ -1168,7 +1168,8 @@ export async function executeFlowEngine(
   userText: string, 
   conversationId: string, 
   wasClosed: boolean = false,
-  clientId?: string
+  clientId?: string,
+  interactiveId?: string
 ): Promise<boolean> {
   try {
     let effectiveClientId = clientId;
@@ -1234,12 +1235,18 @@ export async function executeFlowEngine(
       }
     }
 
+    const cleanLast10 = senderPhone.replace(/\D/g, '').slice(-10);
+
     if (matchedFlow && matchedNextNodeId) {
       // Clear any existing/stuck flow states for this phone so it triggers fresh!
       await prisma.whatsAppFlowState.deleteMany({
         where: { 
-          phone: senderPhone,
-          ...(effectiveClientId ? { clientId: effectiveClientId } : {})
+          ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
+          OR: [
+            { phone: senderPhone },
+            { phone: `91${cleanLast10}` },
+            { phone: cleanLast10 }
+          ]
         }
       });
 
@@ -1281,8 +1288,12 @@ export async function executeFlowEngine(
       if (result.status === 'ended') {
         await prisma.whatsAppFlowState.deleteMany({
           where: { 
-            phone: senderPhone,
-            ...(effectiveClientId ? { clientId: effectiveClientId } : {})
+            ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
+            OR: [
+              { phone: senderPhone },
+              { phone: `91${cleanLast10}` },
+              { phone: cleanLast10 }
+            ]
           }
         });
       } else {
@@ -1303,8 +1314,12 @@ export async function executeFlowEngine(
     // 2. If it is NOT a trigger keyword, process existing flow state if present
     const userState = await prisma.whatsAppFlowState.findFirst({
       where: { 
-        phone: senderPhone,
-        ...(effectiveClientId ? { clientId: effectiveClientId } : {})
+        ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
+        OR: [
+          { phone: senderPhone },
+          { phone: `91${cleanLast10}` },
+          { phone: cleanLast10 }
+        ]
       },
       orderBy: { updatedAt: 'desc' }
     });
@@ -1340,18 +1355,38 @@ export async function executeFlowEngine(
         }
       }
 
-      // Route based on interactive choice clicked
+      // Route based on interactive choice clicked or typed
       let nextNodeId = null;
       if (type === 'CHOICE' || type === 'BUTTONS' || type === 'LIST_MENU') {
         const choices = currentNode.choices || [];
-        const matchIndex = choices.findIndex((c: any) =>
-          c.text &&
-          (
-            userText.toLowerCase().includes(String(c.text).toLowerCase()) ||
-            String(c.text).toLowerCase().includes(userText.toLowerCase()) ||
-            String(c.text).toLowerCase().slice(0, 20) === userText.toLowerCase()
-          )
-        );
+        const cleanUserText = userText.toLowerCase().trim();
+        const cleanInterId = (interactiveId || '').toLowerCase().trim();
+
+        const matchIndex = choices.findIndex((c: any) => {
+          if (!c) return false;
+          const choiceId = String(c.id || '').toLowerCase().trim();
+          const choiceText = String(c.text || '').toLowerCase().trim();
+
+          // 1. Match by interactive ID (from button_reply.id or list_reply.id)
+          if (cleanInterId && choiceId) {
+            if (cleanInterId === choiceId || cleanInterId.endsWith(`_${choiceId}`) || cleanInterId.includes(choiceId)) {
+              return true;
+            }
+          }
+
+          // 2. Match by text
+          if (choiceText && cleanUserText) {
+            if (cleanUserText === choiceText) return true;
+            if (cleanUserText.includes(choiceText) || choiceText.includes(cleanUserText)) return true;
+            if (cleanUserText.slice(0, 20) === choiceText.slice(0, 20)) return true;
+            if (cleanUserText.slice(0, 24) === choiceText.slice(0, 24)) return true;
+          }
+
+          // 3. Fallback: match choice ID in text
+          if (choiceId && cleanUserText === choiceId) return true;
+
+          return false;
+        });
 
         if (matchIndex !== -1) {
           nextNodeId = choices[matchIndex].targetNode;

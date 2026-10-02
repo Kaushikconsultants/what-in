@@ -1661,9 +1661,23 @@ export async function processWebhookPayload(body: any, clientIdOverride?: string
       }
     }
 
+    const isInteractiveMessage = Boolean(
+      msg.type === "interactive" ||
+      msg.type === "button" ||
+      msg.button ||
+      msg.interactive?.button_reply ||
+      msg.interactive?.list_reply
+    );
+    const interactiveId = msg.interactive?.button_reply?.id || 
+                          msg.interactive?.list_reply?.id || 
+                          msg.button?.payload || 
+                          undefined;
+
+    const isFlowEligible = (isTextMessage || isInteractiveMessage || (Boolean(textContent) && textContent !== "[Message]" && !textContent.startsWith("["))) && !addressStepHandled;
+
     // Chatbot Flow Engine Execution (Client Scoped)
-    if (isTextMessage && !addressStepHandled) {
-      const flowHandled = await executeFlowEngine(fromPhone, textContent, conversation.id, wasClosed, clientId);
+    if (isFlowEligible) {
+      const flowHandled = await executeFlowEngine(fromPhone, textContent, conversation.id, wasClosed, clientId, interactiveId);
 
       if (!flowHandled && conversation.aiHandled) {
         // AI Execution with Client Quota & Credentials
