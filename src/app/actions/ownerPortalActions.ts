@@ -463,10 +463,23 @@ export async function updateClientPlanAction(clientId: string, data: {
       hashedPassword = await bcrypt.hash(adminPassword.trim(), 10);
     }
 
+    const updatePayload: any = { ...rest };
+    if (
+      updatePayload.metaAccessToken === undefined ||
+      updatePayload.metaAccessToken === null ||
+      typeof updatePayload.metaAccessToken !== "string" ||
+      updatePayload.metaAccessToken.includes("•") ||
+      updatePayload.metaAccessToken.trim() === ""
+    ) {
+      delete updatePayload.metaAccessToken;
+    } else {
+      updatePayload.metaAccessToken = updatePayload.metaAccessToken.trim();
+    }
+
     const client = await prisma.whatsAppClient.update({
       where: { id: clientId },
       data: {
-        ...rest,
+        ...updatePayload,
         ...(hashedPassword ? { adminPassword: hashedPassword } : {})
       }
     });

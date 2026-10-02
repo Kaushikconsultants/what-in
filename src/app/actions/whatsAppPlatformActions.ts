@@ -1648,24 +1648,31 @@ export async function saveWhatsAppApiCredentialsAction(data: {
       const brandSlug = (client.businessName || "client").toLowerCase().replace(/[^a-z0-9]/g, '_');
       const tokenToSave = data.webhookVerifyToken?.trim() || client.webhookVerifyToken || `${brandSlug}_whatsapp_secure_webhook_token_2026`;
 
+      const resolvedAccessToken = (
+        data.accessToken && 
+        !data.accessToken.includes("•") && 
+        !data.accessToken.startsWith("EAAG...meta") &&
+        data.accessToken.trim().length > 20
+      ) ? data.accessToken.trim() : client.metaAccessToken;
+
       await prisma.whatsAppClient.update({
         where: { id: client.id },
         data: {
-          wabaId: data.wabaId,
-          phoneId: data.phoneId,
-          metaAccessToken: data.accessToken,
-          phoneNumber: data.phoneNumber,
+          wabaId: data.wabaId || client.wabaId,
+          phoneId: data.phoneId || client.phoneId,
+          metaAccessToken: resolvedAccessToken,
+          phoneNumber: data.phoneNumber || client.phoneNumber,
           webhookVerifyToken: tokenToSave,
           updatedAt: new Date()
         }
       });
 
       // Attempt auto-registration with Meta Graph API
-      if (data.phoneId && data.accessToken) {
+      if (data.phoneId && resolvedAccessToken) {
         try {
           await fetch(`https://graph.facebook.com/v21.0/${data.phoneId}/register`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.accessToken}` },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${resolvedAccessToken}` },
             body: JSON.stringify({ messaging_product: "whatsapp", pin: "123456" })
           });
         } catch (regErr) {
