@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { getAuthenticatedUser, isOwnerAuthenticated } from '@/lib/authSession';
 
-export async function getPaymentGatewaySettings() {
+export async function getPaymentGatewaySettings(clientOverrideId?: string) {
   const user = await getAuthenticatedUser();
   const isOwner = await isOwnerAuthenticated();
 
@@ -25,21 +25,25 @@ export async function getPaymentGatewaySettings() {
     (user && (user.role === 'ADMIN' || user.role === 'OWNER' || user.role === 'SUPER_ADMIN'))
   );
 
-  if (user?.clientId) {
+  const targetClientId = clientOverrideId || user?.clientId;
+
+  if (targetClientId) {
     const client = await prisma.whatsAppClient.findUnique({
-      where: { id: user.clientId }
+      where: { id: targetClientId }
     });
-    return {
-      activeGateway: client?.activeGateway || null,
-      razorpayKeyId: client?.razorpayKeyId || '',
-      razorpayKeySecret: isPrivileged ? (client?.razorpayKeySecret || '') : '',
-      cashfreeAppId: client?.cashfreeAppId || '',
-      cashfreeSecretKey: isPrivileged ? (client?.cashfreeSecretKey || '') : '',
-      merchantUpiId: client?.merchantUpiId || '',
-      merchantUpiName: client?.merchantUpiName || '',
-      webhookClientId: client?.webhookClientId || client?.id || '',
-      clientBusinessName: client?.businessName || ''
-    };
+    if (client) {
+      return {
+        activeGateway: client?.activeGateway || null,
+        razorpayKeyId: client?.razorpayKeyId || '',
+        razorpayKeySecret: isPrivileged ? (client?.razorpayKeySecret || '') : '',
+        cashfreeAppId: client?.cashfreeAppId || '',
+        cashfreeSecretKey: isPrivileged ? (client?.cashfreeSecretKey || '') : '',
+        merchantUpiId: client?.merchantUpiId || '',
+        merchantUpiName: client?.merchantUpiName || '',
+        webhookClientId: client?.webhookClientId || client?.id || '',
+        clientBusinessName: client?.businessName || ''
+      };
+    }
   }
 
   const settings = await prisma.whatsAppSettings.findFirst();
@@ -65,7 +69,7 @@ export async function savePaymentGatewaySettings(data: {
   cashfreeSecretKey?: string;
   merchantUpiId?: string;
   merchantUpiName?: string;
-}) {
+}, clientOverrideId?: string) {
   const user = await getAuthenticatedUser();
   const isOwner = await isOwnerAuthenticated();
 
@@ -73,11 +77,13 @@ export async function savePaymentGatewaySettings(data: {
     return { success: false, error: "Unauthorized: Admin privileges required to update payment gateways" };
   }
 
+  const targetClientId = clientOverrideId || user?.clientId;
+
   // Validate PAYMENT_GATEWAY module if user is setting an active gateway or adding credentials
   if (!isOwner && data.activeGateway && data.activeGateway !== 'NONE') {
-    const targetClientId = user?.clientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
+    const checkId = targetClientId || "8c519684-5a75-45be-b74b-5f9553f7ea32";
     const clientRecord = await prisma.whatsAppClient.findUnique({
-      where: { id: targetClientId },
+      where: { id: checkId },
       select: { enabledModules: true }
     });
     const { parseEnabledModules } = await import("@/lib/moduleRegistry");
@@ -90,9 +96,9 @@ export async function savePaymentGatewaySettings(data: {
     }
   }
 
-  if (user?.clientId) {
+  if (targetClientId) {
     await prisma.whatsAppClient.update({
-      where: { id: user.clientId },
+      where: { id: targetClientId },
       data: {
         activeGateway: data.activeGateway,
         razorpayKeyId: data.razorpayKeyId,

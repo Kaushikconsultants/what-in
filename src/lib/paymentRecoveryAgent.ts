@@ -226,10 +226,11 @@ export function generateMetaCheckoutFlowJson(settings?: any) {
   }
 
   return {
-    version: "7.3",
+    version: "6.3",
     data_api_version: "3.0",
     routing_model: {
-      PINCODE_SCREEN: ["ADDRESS_PAYMENT_SCREEN"]
+      PINCODE_SCREEN: ["ADDRESS_PAYMENT_SCREEN"],
+      ADDRESS_PAYMENT_SCREEN: []
     },
     screens: [
       {

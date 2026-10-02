@@ -166,7 +166,7 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
 
     const appBaseUrl = await getAppBaseUrl();
     const endpointUrl = `${appBaseUrl}/api/whatsapp/flows/endpoint`;
-    const flowJson = generateMetaCheckoutFlowJson(settings);
+    const flowJson = generateMetaCheckoutFlowJsonLib(settings);
 
     // Auto-configure 2048-bit RSA Business Encryption for client phoneId if not already set
     const phoneId = client?.phoneId;
@@ -236,7 +236,8 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
 
     // 2. Upload Flow Asset (flow.json)
     const formData = new FormData();
-    const blob = new Blob([JSON.stringify(flowJson)], { type: "application/json" });
+    const jsonStr = JSON.stringify(flowJson);
+    const blob = new Blob([Buffer.from(jsonStr, "utf-8")], { type: "application/json" });
     formData.append("file", blob, "flow.json");
     formData.append("name", "flow.json");
     formData.append("asset_type", "FLOW_JSON");
@@ -254,17 +255,28 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
       throw new Error(`Meta Flow JSON validation rejected: ${errDetail}`);
     }
 
-    // 3. Publish Flow
-    const pubRes = await fetch(`https://graph.facebook.com/v21.0/${flowId}/publish`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${accessToken}` }
-    });
-    const pubData = await pubRes.json();
-    if (pubData.error) {
-      throw new Error(`Meta Flow publish rejected: ${pubData.error.message || pubData.error.error_user_msg}`);
+    // 3. Publish Flow (or keep in Draft mode if integrity review is pending)
+    let isPublished = false;
+    let publishNotice = "";
+    try {
+      const pubRes = await fetch(`https://graph.facebook.com/v21.0/${flowId}/publish`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${accessToken}` }
+      });
+      const pubData = await pubRes.json();
+      if (pubData.success) {
+        isPublished = true;
+      } else if (pubData.error?.error_subcode === 4233020 || pubData.error?.message?.includes("Integrity")) {
+        publishNotice = "(Flow is active in Draft/Testing mode; Meta requires WABA integrity completion for broadcast publication).";
+      } else if (pubData.error) {
+        publishNotice = `(${pubData.error.message || pubData.error.error_user_msg || "Draft mode active"})`;
+      }
+    } catch {
+      publishNotice = "(Draft mode active)";
     }
 
     // 4. Save to Database & Settings
+    const targetClientId = client.id;
     await prisma.whatsAppMetaFlow.upsert({
       where: { id: `checkout_flow_${flowId}` },
       update: {
@@ -275,7 +287,7 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
       },
       create: {
         id: `checkout_flow_${flowId}`,
-        clientId: clientId || undefined,
+        clientId: targetClientId,
         flowId: String(flowId),
         name: "Catalog Delivery Address & Payment",
         description: "Official Meta Checkout Flow for address collection, pincode auto-fill, and payment preference.",
@@ -285,17 +297,19 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
       }
     }).catch(() => null);
 
-    // Save numeric metaFlowId to Recovery Agent Settings
+    // Save numeric metaFlowId to Recovery Agent Settings for this specific client
     await savePaymentRecoverySettingsAction({
       ...settings,
       metaFlowId: String(flowId)
-    }, clientId);
+    }, targetClientId);
 
     return {
       success: true,
       flowId: String(flowId),
       flowJson: JSON.stringify(flowJson, null, 2),
-      message: `Meta WhatsApp Flow published successfully! Flow ID: ${flowId}`
+      message: isPublished 
+        ? `Meta WhatsApp Flow published successfully! Flow ID: ${flowId}`
+        : `Meta Flow created & validated successfully (Flow ID: ${flowId}) ${publishNotice}`
     };
   } catch (err: any) {
     console.error("[Create/Publish Meta Flow Error]:", err);

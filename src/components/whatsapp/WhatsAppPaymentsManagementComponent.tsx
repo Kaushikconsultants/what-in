@@ -31,9 +31,10 @@ import ModuleGatedView from "@/components/whatsapp/ModuleGatedView";
 
 interface WhatsAppPaymentsManagementComponentProps {
   embedded?: boolean;
+  clientId?: string;
 }
 
-export default function WhatsAppPaymentsManagementComponent({ embedded = false }: WhatsAppPaymentsManagementComponentProps) {
+export default function WhatsAppPaymentsManagementComponent({ embedded = false, clientId }: WhatsAppPaymentsManagementComponentProps) {
   const [links, setLinks] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,9 +153,9 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
     try {
       const [linksRes, gwRes, custRes, recRes, whRes] = await Promise.all([
         getWhatsAppPaymentLinks(),
-        getPaymentGatewaySettings(),
+        getPaymentGatewaySettings(clientId),
         getCRMCustomersAction(),
-        getPaymentRecoverySettingsAction(),
+        getPaymentRecoverySettingsAction(clientId),
         getPaymentWebhookLogsAction(15)
       ]);
 
@@ -196,7 +197,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
 
   useEffect(() => {
     fetchLinksAndSettings();
-  }, []);
+  }, [clientId]);
 
   // Compute stats
   const totalPending = links.filter(l => l.status === "PENDING").reduce((s, l) => s + (l.amount || 0), 0);
@@ -348,7 +349,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
         cashfreeSecretKey,
         merchantUpiId,
         merchantUpiName
-      });
+      }, clientId);
       if (res.success) {
         setPgMsg({ text: "Payment gateway settings saved successfully.", type: "success" });
         setPgActiveGateway(nextGw);
@@ -367,7 +368,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
   const handleSaveRecoverySettings = async () => {
     setSavingRecovery(true);
     try {
-      const res = await savePaymentRecoverySettingsAction(recoverySettings);
+      const res = await savePaymentRecoverySettingsAction(recoverySettings, clientId);
       if (res.success) {
         showToast("Recovery agent settings updated successfully.", "success");
       } else {
@@ -384,7 +385,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
     setSyncingMetaFlow(true);
     setMetaFlowSyncMsg(null);
     try {
-      const res = await createOrPublishMetaCheckoutFlowAction();
+      const res = await createOrPublishMetaCheckoutFlowAction(clientId);
       if (res.success && res.flowId) {
         setRecoverySettings(prev => ({ ...prev, metaFlowId: res.flowId }));
         setMetaFlowSyncMsg({ success: true, text: res.message || `Meta Flow created & published! Flow ID: ${res.flowId}` });
@@ -403,7 +404,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false }
 
   const handleOpenFlowJsonModal = async () => {
     try {
-      const res = await getCheckoutFlowDetailsAction();
+      const res = await getCheckoutFlowDetailsAction(clientId);
       if (res.success && res.flowJson) {
         setFlowJsonContent(res.flowJson);
       } else {

@@ -992,7 +992,7 @@ const reloadTeams = async () => {
 
       {activeTab === "payment" && (
         <ModuleGatedView moduleKey="PAYMENT_GATEWAY">
-          <WhatsAppPaymentsManagementComponent embedded={true} />
+          <WhatsAppPaymentsManagementComponent embedded={true} clientId={activeTenantId || undefined} />
         </ModuleGatedView>
       )}
 
