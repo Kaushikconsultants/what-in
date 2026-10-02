@@ -73,6 +73,7 @@ export default function WhatsAppAPISettingsPage() {
   const [showCfSecret, setShowCfSecret] = useState(false);
 
   // Integrations states
+  const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
   const [wabaId, setWabaId] = useState("");
   const [phoneId, setPhoneId] = useState("");
   const [managerId, setManagerId] = useState("");
@@ -155,6 +156,9 @@ export default function WhatsAppAPISettingsPage() {
       getAllAgentsAction()
     ]).then(([resWA, resShopify, resSettings, resBrand, resTeams, resAgents]) => {
       if (resWA.success && resWA.credentials) {
+        if (resWA.credentials.id) {
+          setActiveTenantId(resWA.credentials.id);
+        }
         setWabaId(resWA.credentials.businessAccountId || "");
         setPhoneId(resWA.credentials.phoneId || "");
         setManagerId(resWA.credentials.businessManagerId || "");
@@ -289,6 +293,7 @@ export default function WhatsAppAPISettingsPage() {
     setSaving(true);
     setResultMsg(null);
     const res = await saveWhatsAppApiCredentialsAction({
+      clientId: activeTenantId || undefined,
       wabaId, phoneId, managerId, accessToken: token, phoneNumber, webhookVerifyToken: webhookToken
     });
     if (res.success) {

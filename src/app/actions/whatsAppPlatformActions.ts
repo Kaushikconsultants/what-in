@@ -1485,14 +1485,15 @@ export async function checkIntegrationHealthAction() {
   }
 }
 
-export async function getWhatsAppApiCredentialsAction() {
+export async function getWhatsAppApiCredentialsAction(clientIdOverride?: string) {
   await ensureSeeded();
   try {
     const user = await getAuthenticatedUser();
     let client: any = null;
 
-    if (user?.clientId) {
-      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    const targetClientId = clientIdOverride || user?.clientId;
+    if (targetClientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId } });
     } else if (user?.email) {
       client = await prisma.whatsAppClient.findFirst({
         where: {
@@ -1570,6 +1571,7 @@ export async function getWhatsAppApiCredentialsAction() {
 }
 
 export async function saveWhatsAppApiCredentialsAction(data: {
+  clientId?: string;
   wabaId: string;
   phoneId: string;
   managerId?: string;
@@ -1581,8 +1583,9 @@ export async function saveWhatsAppApiCredentialsAction(data: {
     const user = await getAuthenticatedUser();
     let client: any = null;
 
-    if (user?.clientId) {
-      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    const targetClientId = data.clientId || user?.clientId;
+    if (targetClientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId } });
     } else if (user?.email) {
       client = await prisma.whatsAppClient.findFirst({
         where: {
@@ -10277,9 +10280,7 @@ export async function getWhatsAppBrandDetailsAction() {
       const knowledgeLength = aiKnowledgeBase.length;
 
       const [productsCount, combosCount] = await Promise.all([
-        prisma.product.count({ where: { status: 'Active', clientId: client.id } }).catch(() => 
-          prisma.product.count({ where: { status: 'Active' } }).catch(() => 0)
-        ),
+        prisma.product.count({ where: { status: 'Active' } }).catch(() => 0),
         prisma.shopifyCombo.count({ where: { is_active: true } }).catch(() => 0)
       ]);
 
