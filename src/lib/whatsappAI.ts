@@ -373,20 +373,30 @@ export function recommendSize(userText: string) {
     `🩳 Shorts/Tracks: M (28-30"), L (30-32"), XL (32-34"), XXL (34-36"+)`;
 }
 
-export async function sendWhatsAppProductCards(toPhone: string, cards: any[]) {
-  let phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1189183190949431';
-  let token = process.env.WHATSAPP_TOKEN || '';
+export async function sendWhatsAppProductCards(toPhone: string, cards: any[], clientId?: string) {
+  let phoneId = '';
+  let token = '';
   
-  const account = await prisma.whatsAppAccount.findFirst({ where: { accessToken: { not: null } } });
-  if (account && account.phoneId && account.accessToken) {
-    phoneId = account.phoneId;
-    token = account.accessToken;
-  } else {
-    const settings = await prisma.whatsAppLegacySetting.findFirst();
-    if (settings?.whatsapp_token) token = settings.whatsapp_token;
+  if (clientId) {
+    const client = await prisma.whatsAppClient.findUnique({ where: { id: clientId } });
+    if (client?.metaAccessToken && client?.phoneId) {
+      phoneId = client.phoneId;
+      token = client.metaAccessToken;
+    }
   }
 
-  if (!token) return;
+  if (!token || !phoneId) {
+    const account = await prisma.whatsAppAccount.findFirst({ where: { accessToken: { not: null } } });
+    if (account && account.phoneId && account.accessToken) {
+      phoneId = account.phoneId;
+      token = account.accessToken;
+    } else {
+      const settings = await prisma.whatsAppLegacySetting.findFirst();
+      if (settings?.whatsapp_token) token = settings.whatsapp_token;
+    }
+  }
+
+  if (!token || !phoneId) return;
 
   const url = `https://graph.facebook.com/v20.0/${phoneId}/messages`;
   const cardsToSend = cards.slice(0, 5);
@@ -684,7 +694,7 @@ ${userText}`;
     }
 
     if (sendCarousel && carouselCards.length > 0) {
-      await sendWhatsAppProductCards(senderPhone, carouselCards);
+      await sendWhatsAppProductCards(senderPhone, carouselCards, isClientTenant ? clientRecord?.id : undefined);
     }
     
     return aiReply;

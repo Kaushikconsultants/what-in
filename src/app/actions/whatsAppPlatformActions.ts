@@ -38,6 +38,27 @@ export async function getMetaApiCredentials(clientIdOverride?: string) {
     const targetClientId = clientIdOverride || user?.clientId;
     if (targetClientId) {
       client = await prisma.whatsAppClient.findUnique({ where: { id: targetClientId } });
+      if (client) {
+        const isConnected = Boolean(
+          client.metaAccessToken &&
+          client.phoneId &&
+          !client.metaAccessToken.startsWith("EAAG...meta")
+        );
+        return {
+          phoneId: client.phoneId || '',
+          token: client.metaAccessToken || '',
+          accessToken: client.metaAccessToken || '',
+          wabaId: client.wabaId || '',
+          businessAccountId: client.wabaId || '',
+          phoneNumber: client.phoneNumber || '',
+          businessName: client.businessName || '',
+          isConnected,
+          isClientTenant: true,
+          clientId: client.id
+        };
+      }
+      // Strict multi-tenant isolation: Never fallback to global account if a specific tenant was requested!
+      return { phoneId: '', token: '', accessToken: '', wabaId: '', businessAccountId: '', phoneNumber: '', businessName: '', isConnected: false, isClientTenant: true, clientId: targetClientId };
     } else if (user?.email) {
       client = await prisma.whatsAppClient.findFirst({
         where: {
@@ -47,28 +68,28 @@ export async function getMetaApiCredentials(clientIdOverride?: string) {
           ]
         }
       });
+      if (client) {
+        const isConnected = Boolean(
+          client.metaAccessToken &&
+          client.phoneId &&
+          !client.metaAccessToken.startsWith("EAAG...meta")
+        );
+        return {
+          phoneId: client.phoneId || '',
+          token: client.metaAccessToken || '',
+          accessToken: client.metaAccessToken || '',
+          wabaId: client.wabaId || '',
+          businessAccountId: client.wabaId || '',
+          phoneNumber: client.phoneNumber || '',
+          businessName: client.businessName || '',
+          isConnected,
+          isClientTenant: true,
+          clientId: client.id
+        };
+      }
     }
 
-    if (client) {
-      const isConnected = Boolean(
-        client.metaAccessToken &&
-        client.phoneId &&
-        !client.metaAccessToken.startsWith("EAAG...meta")
-      );
-      return {
-        phoneId: client.phoneId || '',
-        token: client.metaAccessToken || '',
-        accessToken: client.metaAccessToken || '',
-        wabaId: client.wabaId || '',
-        businessAccountId: client.wabaId || '',
-        phoneNumber: client.phoneNumber || '',
-        businessName: client.businessName || '',
-        isConnected,
-        isClientTenant: true,
-        clientId: client.id
-      };
-    }
-
+    // Platform Root / Owner fallback (when not in a tenant context)
     const account = await prisma.whatsAppAccount.findFirst();
     return {
       phoneId: account?.phoneId || '',
@@ -405,30 +426,39 @@ export async function sendWhatsAppMessageAction(data: {
 
     // Call Meta API if it's an outbound message and not an internal note
     if (!data.isInternalNote && data.senderType !== 'CUSTOMER') {
-      let token = conversation.client?.metaAccessToken || conversation.account?.accessToken;
-      let phoneId = conversation.client?.phoneId || conversation.account?.phoneId;
+      let token = '';
+      let phoneId = '';
 
-      if ((!token || !phoneId || token.length < 20) && conversation.clientId) {
-        const client = await prisma.whatsAppClient.findUnique({ where: { id: conversation.clientId } });
+      if (conversation.clientId) {
+        // Strict tenant credentials
+        const client = conversation.client || await prisma.whatsAppClient.findUnique({ where: { id: conversation.clientId } });
         if (client?.metaAccessToken && client?.phoneId) {
           token = client.metaAccessToken;
           phoneId = client.phoneId;
+        } else {
+          const creds = await getMetaApiCredentials(conversation.clientId);
+          if (creds?.isConnected) {
+            token = creds.accessToken;
+            phoneId = creds.phoneId;
+          }
         }
-      }
-
-      if (!token || !phoneId || token.length < 20) {
-        const account = await prisma.whatsAppAccount.findFirst();
-        if (account?.accessToken && account?.phoneId) {
-          token = account.accessToken;
-          phoneId = account.phoneId;
+      } else {
+        // Global / root account
+        token = conversation.account?.accessToken || '';
+        phoneId = conversation.account?.phoneId || '';
+        if (!token || !phoneId || token.length < 20) {
+          const account = await prisma.whatsAppAccount.findFirst();
+          if (account?.accessToken && account?.phoneId) {
+            token = account.accessToken;
+            phoneId = account.phoneId;
+          }
         }
-      }
-
-      if (!token || !phoneId || token.length < 20) {
-        const creds = await getMetaApiCredentials();
-        if (creds && creds.isConnected) {
-          token = creds.accessToken;
-          phoneId = creds.phoneId;
+        if (!token || !phoneId || token.length < 20) {
+          const creds = await getMetaApiCredentials();
+          if (creds && creds.isConnected) {
+            token = creds.accessToken;
+            phoneId = creds.phoneId;
+          }
         }
       }
 
@@ -746,14 +776,30 @@ export async function retryFailedWhatsAppMessageAction(messageId: string) {
     }
 
     const conversation = existing.conversation;
-    let token = conversation.client?.metaAccessToken || conversation.account?.accessToken;
-    let phoneId = conversation.client?.phoneId || conversation.account?.phoneId;
+    let token = '';
+    let phoneId = '';
 
-    if (!token || !phoneId || token.length < 20) {
-      const creds = await getMetaApiCredentials();
-      if (creds && creds.isConnected) {
-        token = creds.accessToken;
-        phoneId = creds.phoneId;
+    if (conversation.clientId) {
+      const client = conversation.client || await prisma.whatsAppClient.findUnique({ where: { id: conversation.clientId } });
+      if (client?.metaAccessToken && client?.phoneId) {
+        token = client.metaAccessToken;
+        phoneId = client.phoneId;
+      } else {
+        const creds = await getMetaApiCredentials(conversation.clientId);
+        if (creds?.isConnected) {
+          token = creds.accessToken;
+          phoneId = creds.phoneId;
+        }
+      }
+    } else {
+      token = conversation.account?.accessToken || '';
+      phoneId = conversation.account?.phoneId || '';
+      if (!token || !phoneId || token.length < 20) {
+        const creds = await getMetaApiCredentials();
+        if (creds && creds.isConnected) {
+          token = creds.accessToken;
+          phoneId = creds.phoneId;
+        }
       }
     }
 
@@ -2051,10 +2097,19 @@ export async function sendWhatsAppTemplateAction(
   languageCode = "en_US", 
   components: any[] = [],
   conversationId?: string,
-  senderName?: string
+  senderName?: string,
+  clientIdOverride?: string
 ) {
   try {
-    const creds = await getMetaApiCredentials();
+    let targetClientId = clientIdOverride;
+    if (!targetClientId && conversationId) {
+      const conv = await prisma.whatsAppConversation.findUnique({
+        where: { id: conversationId },
+        select: { clientId: true }
+      });
+      if (conv?.clientId) targetClientId = conv.clientId;
+    }
+    const creds = await getMetaApiCredentials(targetClientId);
     let cleanPhone = toPhone.replace(/\D/g, "");
     // If standard 10-digit Indian mobile number is provided without country code, prepend 91
     if (cleanPhone.length === 10) {
@@ -3775,7 +3830,7 @@ export async function generateAITemplateAction(prompt: string, context?: {
       prisma.whatsAppLegacySetting.findFirst().catch(() => null),
       prisma.organization.findFirst().catch(() => null),
       prisma.product.findMany({ 
-        where: clientRec ? { status: 'Active', clientId: clientRec.id } : { status: 'Active' }, 
+        where: { status: 'Active' }, 
         take: 30, 
         orderBy: [{ stockQuantity: 'desc' }, { createdAt: 'desc' }],
         select: { id: true, name: true, sku: true, sellingPrice: true, mrp: true, category: true, subCategory: true, images: true, stockQuantity: true, description: true } 

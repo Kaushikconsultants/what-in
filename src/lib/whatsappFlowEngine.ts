@@ -102,7 +102,23 @@ async function resolveMetaImageHeader(imageUrl: string, creds: { token: string; 
 }
 
 // Dispatch a single flow node as a WhatsApp message
-async function dispatchNode(toPhone: string, node: any, vars: Record<string, string>, conversationId?: string, enabledModules?: string[]) {
+async function dispatchNode(
+  toPhone: string, 
+  node: any, 
+  vars: Record<string, string>, 
+  conversationId?: string, 
+  enabledModules?: string[],
+  clientId?: string
+) {
+  let effectiveClientId = clientId;
+  if (!effectiveClientId && conversationId) {
+    const conv = await prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+      select: { clientId: true }
+    });
+    if (conv?.clientId) effectiveClientId = conv.clientId;
+  }
+
   const inter = (s: string) => interpolate(s, vars);
   const type = (node.type || '').toUpperCase();
 
@@ -112,10 +128,12 @@ async function dispatchNode(toPhone: string, node: any, vars: Record<string, str
     return;
   }
 
-
   try {
-    const creds = await getCreds();
-    if (!creds) return;
+    const creds = await getCreds(effectiveClientId);
+    if (!creds) {
+      console.warn(`[FlowEngine] No Meta API credentials available for client "${effectiveClientId || 'global'}". Message dispatch skipped.`);
+      return;
+    }
 
     const url = `https://graph.facebook.com/v20.0/${creds.phoneId}/messages`;
     const headers = { 'Authorization': `Bearer ${creds.token}`, 'Content-Type': 'application/json' };
@@ -125,7 +143,10 @@ async function dispatchNode(toPhone: string, node: any, vars: Record<string, str
     if (!resolvedConvId) {
       const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
       const conv = await prisma.whatsAppConversation.findFirst({
-        where: { customer: { OR: [{ mobile: { contains: cleanPhone } }, { whatsappNumber: { contains: cleanPhone } }] } },
+        where: { 
+          ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
+          customer: { OR: [{ mobile: { contains: cleanPhone } }, { whatsappNumber: { contains: cleanPhone } }] } 
+        },
         orderBy: { updatedAt: 'desc' }
       });
       if (conv) resolvedConvId = conv.id;
@@ -400,13 +421,23 @@ async function dispatchNode(toPhone: string, node: any, vars: Record<string, str
   }
 }
 
-// Get Meta API credentials from DB
-async function getCreds() {
+// Get Meta API credentials from DB with strict multi-tenant isolation
+async function getCreds(clientId?: string) {
+  if (clientId) {
+    const client = await prisma.whatsAppClient.findUnique({
+      where: { id: clientId }
+    });
+    if (client?.metaAccessToken && client?.phoneId) {
+      return { token: client.metaAccessToken, phoneId: client.phoneId, wabaId: client.wabaId };
+    }
+    // Strict isolation: if clientId is provided but not found or not connected, NEVER fallback to another tenant
+    return null;
+  }
   const account = await prisma.whatsAppAccount.findFirst({
     where: { accessToken: { not: null } }
   });
   if (!account?.accessToken || !account?.phoneId) return null;
-  return { token: account.accessToken, phoneId: account.phoneId };
+  return { token: account.accessToken, phoneId: account.phoneId, wabaId: account.businessAccountId };
 }
 
 // Run nodes sequentially until a pause point or end
@@ -417,8 +448,18 @@ async function runNodes(
   toPhone: string, 
   conversationId?: string, 
   wasClosed: boolean = false,
-  enabledModules?: string[]
+  enabledModules?: string[],
+  clientId?: string
 ) {
+  let effectiveClientId = clientId;
+  if (!effectiveClientId && conversationId) {
+    const conv = await prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+      select: { clientId: true }
+    });
+    if (conv?.clientId) effectiveClientId = conv.clientId;
+  }
+
   let nextNodeId: string | null = startNodeId;
 
   while (nextNodeId) {
@@ -442,7 +483,7 @@ async function runNodes(
       });
     } catch(e) {}
 
-    await dispatchNode(toPhone, node, vars, conversationId, enabledModules);
+    await dispatchNode(toPhone, node, vars, conversationId, enabledModules, effectiveClientId);
 
     // CRM Logic
     if (type === 'CRM_CONTACT' || type === 'CRM_LEAD') {
@@ -1013,7 +1054,7 @@ async function runNodes(
             const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiLink)}`;
             const qrMsgText = `🏦 UPI ID: *${upiId}*\n\nScan this QR to pay, or click the Pay Now button below.`;
 
-            const acct = await getCreds();
+            const acct = await getCreds(effectiveClientId);
             if (acct) {
               const imgPayload = {
                 messaging_product: 'whatsapp', to: `91${cleanPhone}`, type: 'image',
@@ -1030,7 +1071,7 @@ async function runNodes(
 
           if (payUrl) {
             // Send CTA button with payment link
-            const acct = await getCreds();
+            const acct = await getCreds(effectiveClientId);
             if (acct) {
               const msgText = `💳 *Payment Request*\n\nAmount: ₹${amount}\nDescription: ${desc}\n\nClick below to pay securely:`;
               const ctaPayload = {
@@ -1050,7 +1091,13 @@ async function runNodes(
               });
 
               // Log as BOT message
-              const resolvedConvId = conversationId || (await prisma.whatsAppConversation.findFirst({ where: { customer: { OR: [{ mobile: { contains: cleanPhone } }, { whatsappNumber: { contains: cleanPhone } }] } }, orderBy: { updatedAt: 'desc' } }))?.id;
+              const resolvedConvId = conversationId || (await prisma.whatsAppConversation.findFirst({ 
+                where: { 
+                  ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
+                  customer: { OR: [{ mobile: { contains: cleanPhone } }, { whatsappNumber: { contains: cleanPhone } }] } 
+                }, 
+                orderBy: { updatedAt: 'desc' } 
+              }))?.id;
               if (resolvedConvId) {
                 await prisma.whatsAppMessage.create({
                   data: {
@@ -1075,7 +1122,7 @@ async function runNodes(
         console.warn(`[UPI_QR] Blocked at runtime: PAYMENT_GATEWAY module is locked on client plan.`);
       } else {
         try {
-          const acct = await getCreds();
+          const acct = await getCreds(effectiveClientId);
           const cleanPhone = toPhone.replace(/\D/g, '').slice(-10);
           const upiId = node.upiId || '';
           const amount = node.amount || '';
@@ -1212,7 +1259,10 @@ export async function executeFlowEngine(
       // Load customer profile variables for interpolation
       const cleanPhoneForVars = senderPhone.replace(/\D/g, '').slice(-10);
       const customerForVars = await prisma.customer.findFirst({
-        where: { OR: [{ mobile: { contains: cleanPhoneForVars } }, { whatsappNumber: { contains: cleanPhoneForVars } }] }
+        where: { 
+          ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
+          OR: [{ mobile: { contains: cleanPhoneForVars } }, { whatsappNumber: { contains: cleanPhoneForVars } }] 
+        }
       });
       const profileVars: Record<string, string> = {
         name: customerForVars?.contactPerson || customerForVars?.businessName || '',
@@ -1226,7 +1276,7 @@ export async function executeFlowEngine(
         customerType: customerForVars?.customerType || '',
       };
       
-      const result = await runNodes(nodes, matchedNextNodeId, profileVars, senderPhone, conversationId, wasClosed, enabledModules);
+      const result = await runNodes(nodes, matchedNextNodeId, profileVars, senderPhone, conversationId, wasClosed, enabledModules, effectiveClientId);
 
       if (result.status === 'ended') {
         await prisma.whatsAppFlowState.deleteMany({
@@ -1323,7 +1373,7 @@ export async function executeFlowEngine(
         return true; 
       }
 
-      const result = await runNodes(nodes, nextNodeId, vars, senderPhone, conversationId, false, enabledModules);
+      const result = await runNodes(nodes, nextNodeId, vars, senderPhone, conversationId, false, enabledModules, effectiveClientId);
 
       if (result.status === 'ended') {
         await prisma.whatsAppFlowState.delete({ where: { id: userState.id } });

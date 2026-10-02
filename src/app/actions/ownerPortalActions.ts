@@ -85,12 +85,12 @@ export async function getOwnerClientsAction() {
 }
 
 // Auto-register webhook and phone number with Meta Graph API for a client
-async function registerMetaWebhook(wabaId: string, accessToken: string, webhookClientId: string, phoneId?: string): Promise<{ success: boolean; error?: string }> {
+async function registerMetaWebhook(wabaId: string, accessToken: string, webhookClientId?: string | null, phoneId?: string | null): Promise<{ success: boolean; error?: string }> {
   if (!wabaId || !accessToken) return { success: false, error: "Missing WABA ID or access token" };
   try {
     const appUrl = "https://what-in.tinkal.in";
-    const callbackUrl = `${appUrl}/api/whatsapp/webhook/${webhookClientId}`;
-    const verifyToken = `wm_${webhookClientId.slice(0, 8)}`;
+    const callbackUrl = webhookClientId ? `${appUrl}/api/whatsapp/webhook/${webhookClientId}` : `${appUrl}/api/whatsapp/webhook`;
+    const verifyToken = webhookClientId ? `wm_${webhookClientId.slice(0, 8)}` : "whatmore_secret_verify_token_2025";
     
     // 1. Subscribe the WABA to webhook via Meta Graph API
     await fetch(
@@ -479,7 +479,7 @@ export async function updateClientPlanAction(clientId: string, data: {
     }
 
     if (client.wabaId && client.metaAccessToken) {
-      await registerMetaWebhook(client.wabaId, client.metaAccessToken, client.webhookClientId, client.phoneId);
+      await registerMetaWebhook(client.wabaId, client.metaAccessToken, client.webhookClientId || undefined, client.phoneId || undefined);
     }
 
     return { success: true, client };
