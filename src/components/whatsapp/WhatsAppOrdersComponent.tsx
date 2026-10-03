@@ -53,6 +53,7 @@ import {
   getPaymentRecoverySettingsAction,
   savePaymentRecoverySettingsAction,
   createOrPublishMetaCheckoutFlowAction,
+  publishMetaFlowDirectAction,
   getCheckoutFlowDetailsAction
 } from "@/app/actions/paymentRecoveryActions";
 import { generateMetaCheckoutFlowJson } from "@/lib/paymentRecoveryAgent";
@@ -270,6 +271,7 @@ export default function WhatsAppOrdersComponent() {
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [syncingMetaFlow, setSyncingMetaFlow] = useState(false);
+  const [publishingMetaFlow, setPublishingMetaFlow] = useState(false);
   const [metaFlowSyncMsg, setMetaFlowSyncMsg] = useState<{ success: boolean; text: string } | null>(null);
   const [showFlowJsonModal, setShowFlowJsonModal] = useState(false);
   const [flowJsonContent, setFlowJsonContent] = useState("");
@@ -436,6 +438,31 @@ export default function WhatsAppOrdersComponent() {
       showToast(e.message, "error");
     } finally {
       setSyncingMetaFlow(false);
+    }
+  };
+
+  // Direct Publish Meta Flow
+  const handlePublishMetaFlow = async () => {
+    if (!recoverySettings.metaFlowId) {
+      showToast("Please enter or sync a Meta Flow ID first.", "error");
+      return;
+    }
+    setPublishingMetaFlow(true);
+    setMetaFlowSyncMsg(null);
+    try {
+      const res = await publishMetaFlowDirectAction(recoverySettings.metaFlowId);
+      if (res.success && res.isPublished) {
+        setMetaFlowSyncMsg({ success: true, text: res.message || "Meta Flow published live on Meta!" });
+        showToast("🎉 Flow is now LIVE and Published on Meta!", "success");
+      } else {
+        setMetaFlowSyncMsg({ success: false, text: res.error || "Failed to publish Flow on Meta." });
+        showToast(res.error || "Failed to publish Flow to Meta.", "error");
+      }
+    } catch (e: any) {
+      setMetaFlowSyncMsg({ success: false, text: e.message });
+      showToast(e.message, "error");
+    } finally {
+      setPublishingMetaFlow(false);
     }
   };
 
@@ -1144,11 +1171,21 @@ export default function WhatsAppOrdersComponent() {
                 <button
                   type="button"
                   onClick={handleSyncMetaFlow}
-                  disabled={syncingMetaFlow}
+                  disabled={syncingMetaFlow || publishingMetaFlow}
                   className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-xs"
                 >
                   {syncingMetaFlow ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
                   <span>{syncingMetaFlow ? "Deploying..." : "🚀 1-Click Sync to Meta"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePublishMetaFlow}
+                  disabled={publishingMetaFlow || syncingMetaFlow || !recoverySettings.metaFlowId}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-xs"
+                >
+                  {publishingMetaFlow ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
+                  <span>{publishingMetaFlow ? "Publishing Live..." : "⚡ Publish to Live"}</span>
                 </button>
 
                 <button

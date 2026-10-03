@@ -319,3 +319,104 @@ export async function createOrPublishMetaCheckoutFlowAction(clientOverrideId?: s
     };
   }
 }
+
+// ---------------------------------------------------------
+// DIRECT PUBLISH META FLOW TO LIVE (CALLS POST /{flow-id}/publish)
+// ---------------------------------------------------------
+export async function publishMetaFlowDirectAction(flowIdToPublish?: string, explicitClientId?: string) {
+  try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    let client: any = null;
+    if (explicitClientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: explicitClientId } });
+    } else if (user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } });
+    } else if (user?.email) {
+      client = await prisma.whatsAppClient.findFirst({
+        where: {
+          OR: [
+            { contactEmail: user.email },
+            { adminEmail: user.email },
+            { agents: { some: { email: user.email } } }
+          ]
+        }
+      });
+    }
+
+    if (!client || !client.metaAccessToken) {
+      return { success: false, error: "Meta Access Token not found. Please connect your API credentials in API Settings first." };
+    }
+
+    const accessToken = client.metaAccessToken;
+    let targetFlowId = flowIdToPublish;
+    if (!targetFlowId) {
+      let customLimits: any = {};
+      try {
+        if (client.customLimitsJson) customLimits = JSON.parse(client.customLimitsJson);
+      } catch {}
+      targetFlowId = customLimits?.recoverySettings?.metaFlowId;
+    }
+
+    if (!targetFlowId || isNaN(Number(targetFlowId))) {
+      return { success: false, error: "No valid numeric Meta Flow ID provided to publish." };
+    }
+
+    // Call Meta's Publish Endpoint
+    const pubRes = await fetch(`https://graph.facebook.com/v21.0/${targetFlowId}/publish`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${accessToken}` }
+    });
+    const pubData = await pubRes.json();
+
+    // Query Real-Time Status on Meta
+    const statusRes = await fetch(`https://graph.facebook.com/v21.0/${targetFlowId}?fields=id,name,status,categories,validation_errors`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${accessToken}` }
+    }).catch(() => null);
+    const statusData = statusRes ? await statusRes.json().catch(() => ({})) : {};
+
+    const liveStatus = statusData?.status || (pubData?.success ? "PUBLISHED" : "DRAFT");
+
+    if (pubData.success || liveStatus === "PUBLISHED") {
+      await prisma.whatsAppMetaFlow.updateMany({
+        where: { flowId: String(targetFlowId) },
+        data: { name: statusData?.name || "Catalog Delivery Address & Payment" }
+      }).catch(() => null);
+
+      return {
+        success: true,
+        isPublished: true,
+        status: "PUBLISHED",
+        flowId: String(targetFlowId),
+        message: `🎉 Meta Flow (ID: ${targetFlowId}) is now LIVE and PUBLISHED on Meta!`
+      };
+    }
+
+    const errMsg = pubData.error?.message || pubData.error?.error_user_msg || "Meta rejected publish request";
+    const subcode = pubData.error?.error_subcode;
+
+    if (subcode === 4233020 || errMsg.includes("Integrity")) {
+      return {
+        success: false,
+        isPublished: false,
+        status: "DRAFT",
+        flowId: String(targetFlowId),
+        error: `Meta Integrity Hold: Meta requires WABA verification or messaging tier maturity before public broadcast of Flow ${targetFlowId}. The Flow is currently in active DRAFT / Testing mode.`
+      };
+    }
+
+    return {
+      success: false,
+      isPublished: false,
+      status: liveStatus,
+      flowId: String(targetFlowId),
+      error: `Meta Publish Error: ${errMsg}`
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err.message || "Failed to publish Flow on Meta"
+    };
+  }
+}
+

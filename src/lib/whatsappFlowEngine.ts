@@ -336,7 +336,37 @@ async function dispatchNode(
       return; // Handled
 
     } else if (type === 'WHATSAPP_FLOW' || type === 'META_FLOW') {
-      const targetFlowId = node.flowId || '979379797763203';
+      let targetFlowId = node.flowId;
+      if (!targetFlowId || targetFlowId === '979379797763203') {
+        try {
+          if (effectiveClientId) {
+            const clientRec = await prisma.whatsAppClient.findUnique({
+              where: { id: effectiveClientId },
+              select: { customLimitsJson: true }
+            });
+            if (clientRec?.customLimitsJson) {
+              const parsedLimits = JSON.parse(clientRec.customLimitsJson);
+              if (parsedLimits.recoverySettings?.metaFlowId && !isNaN(Number(parsedLimits.recoverySettings.metaFlowId))) {
+                targetFlowId = parsedLimits.recoverySettings.metaFlowId;
+              }
+            }
+          }
+          if (!targetFlowId || targetFlowId === '979379797763203') {
+            const dbFlow = await prisma.whatsAppMetaFlow.findFirst({
+              where: {
+                ...(effectiveClientId ? { clientId: effectiveClientId } : {}),
+                flowId: { not: 'flow_catalog_checkout_v1' }
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+            if (dbFlow?.flowId && !isNaN(Number(dbFlow.flowId))) {
+              targetFlowId = dbFlow.flowId;
+            }
+          }
+        } catch {}
+      }
+      if (!targetFlowId) targetFlowId = '907265652466254';
+
       const screenName = node.screenName || 'PINCODE_SCREEN';
       const ctaText = String(inter(node.ctaText || 'Open Form')).slice(0, 20);
       const bodyText = inter(node.bodyText || node.text || 'Please complete the form below:');
