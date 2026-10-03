@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS: RecoveryAgentSettings = {
 
   flowCheckoutEnabled: true,
   metaFlowId: "",
-  allowedPaymentModes: ['PREPAID', 'PARTIAL_COD', 'FULL_COD'],
+  allowedPaymentModes: ['PREPAID', 'PARTIAL_COD'],
   partialCodMode: 'PERCENTAGE',
   partialCodValue: 10,
   minOrderValueForCod: 0,

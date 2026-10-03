@@ -14,7 +14,11 @@ export async function GET(
       return NextResponse.json({ success: false, ...result }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json({
+      success: true,
+      ...result,
+      postOffices: (result.cities || []).map((c: any) => c.title || c.id || c),
+    });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || "Failed to lookup pincode" },

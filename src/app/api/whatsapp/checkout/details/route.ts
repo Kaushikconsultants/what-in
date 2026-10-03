@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
         orderTotal,
         orderDesc,
         recoverySettings: {
-          allowedPaymentModes: recoverySettings.allowedPaymentModes || ["PREPAID", "PARTIAL_COD", "FULL_COD"],
+          allowedPaymentModes: recoverySettings.allowedPaymentModes || ["PREPAID", "PARTIAL_COD"],
           partialCodMode: recoverySettings.partialCodMode || "PERCENTAGE",
           partialCodValue: recoverySettings.partialCodValue || 10,
           prepaidDiscountPercent: recoverySettings.prepaidDiscountPercent || 5,
