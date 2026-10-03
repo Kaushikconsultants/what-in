@@ -350,7 +350,7 @@ async function dispatchNode(
       if (customData && typeof customData === 'object' && Object.keys(customData).length > 0) {
         flowActionPayload.data = customData;
       } else if (screenName === 'PINCODE_SCREEN') {
-        const cleanPhone = String(to || '').replace(/\D/g, '');
+        const cleanPhone = String(toPhone || '').replace(/\D/g, '');
         const phone10 = cleanPhone.length === 12 && cleanPhone.startsWith('91') ? cleanPhone.slice(2) : cleanPhone;
         flowActionPayload.data = {
           full_name: '',

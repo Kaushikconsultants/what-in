@@ -673,14 +673,13 @@ export default function WhatsAppAPISettingsPage() {
 
                 <div>
                   <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1.5 uppercase tracking-wider">
-                    Online Store / Website Domain <span className="text-rose-500">*</span>
+                    Online Store / Website Domain
                   </label>
                   <input
                     type="text"
-                    required
                     value={brandDomain}
                     onChange={(e) => setBrandDomain(e.target.value)}
-                    placeholder="e.g. www.esponsports.com"
+                    placeholder="e.g. www.esponsports.com (Optional)"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                   <span className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 block">
