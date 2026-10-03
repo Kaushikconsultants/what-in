@@ -340,7 +340,25 @@ async function dispatchNode(
       const screenName = node.screenName || 'PINCODE_SCREEN';
       const ctaText = String(inter(node.ctaText || 'Open Form')).slice(0, 20);
       const bodyText = inter(node.bodyText || node.text || 'Please complete the form below:');
-      const flowToken = `flow_${node.id}_${Date.now()}`;
+      const flowToken = `flow_${node.id}_${resolvedConvId || 'conv'}_${Date.now()}`;
+
+      const flowActionPayload: Record<string, any> = {
+        screen: screenName
+      };
+
+      const customData = node.flowData || node.flowActionPayload || node.data;
+      if (customData && typeof customData === 'object' && Object.keys(customData).length > 0) {
+        flowActionPayload.data = customData;
+      } else if (screenName === 'PINCODE_SCREEN') {
+        const cleanPhone = String(to || '').replace(/\D/g, '');
+        const phone10 = cleanPhone.length === 12 && cleanPhone.startsWith('91') ? cleanPhone.slice(2) : cleanPhone;
+        flowActionPayload.data = {
+          full_name: '',
+          phone: phone10 || '',
+          pincode: '',
+          pincode_error: ''
+        };
+      }
 
       payload.type = 'interactive';
       payload.interactive = {
@@ -354,10 +372,7 @@ async function dispatchNode(
             flow_id: String(targetFlowId).trim(),
             flow_cta: ctaText,
             flow_action: 'navigate',
-            flow_action_payload: {
-              screen: screenName,
-              data: {}
-            }
+            flow_action_payload: flowActionPayload
           }
         }
       };
@@ -397,6 +412,9 @@ async function dispatchNode(
 
     const wasSuccess = response.ok;
     const metaMessageId = responseData?.messages?.[0]?.id || null;
+    if (!wasSuccess) {
+      console.error(`[Flow Engine] WhatsApp message dispatch failed for node ${node.id} (${node.type}) status ${response.status}:`, JSON.stringify(responseData));
+    }
     if (wasSuccess && resolvedConvId) {
       let textToSend = '';
       let mType = 'TEXT';
