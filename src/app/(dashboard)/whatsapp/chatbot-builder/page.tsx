@@ -126,11 +126,12 @@ const blockCategories: BlockCategoryConfig[] = [
   },
   {
     name: "Choices",
-    count: 3,
+    count: 4,
     requiredModule: "CHATBOT",
     blocks: [
       { id: "buttons", name: "Buttons", icon: List },
       { id: "list_menu", name: "List Menu", icon: Layers },
+      { id: "1tap_checkout", name: "1-Tap Address Form (0-Doc)", icon: MapPin },
       { id: "whatsapp_flow", name: "WhatsApp Flow (Form)", icon: Sparkles }
     ]
   },
@@ -160,9 +161,10 @@ const blockCategories: BlockCategoryConfig[] = [
   },
   {
     name: "Payments",
-    count: 3,
+    count: 4,
     requiredModule: "PAYMENT_GATEWAY",
     blocks: [
+      { id: "1tap_checkout", name: "1-Tap Address & Checkout", icon: MapPin, requiredModule: "CHATBOT" },
       { id: "pay_link", name: "Payment Link", icon: CreditCard, requiredModule: "PAYMENT_GATEWAY" },
       { id: "pay_qr", name: "UPI QR Code", icon: QrCode, requiredModule: "PAYMENT_GATEWAY" },
       { id: "pay_collect", name: "Collect Payment", icon: DollarSign, requiredModule: "PAYMENT_GATEWAY" }
@@ -170,9 +172,10 @@ const blockCategories: BlockCategoryConfig[] = [
   },
   {
     name: "E-Commerce",
-    count: 2,
+    count: 3,
     requiredModule: "META_CATALOG",
     blocks: [
+      { id: "1tap_checkout", name: "1-Tap Address & Order Form", icon: MapPin, requiredModule: "CHATBOT" },
       { id: "catalog", name: "Product Catalog", icon: ShoppingBag, requiredModule: "META_CATALOG" },
       { id: "order", name: "Multi-Item Order", icon: ShoppingCart, requiredModule: "META_CATALOG" }
     ]
@@ -2097,6 +2100,20 @@ export default function WhatsAppChatbotBuilderPage() {
           ]
         };
         break;
+      case "1tap_checkout":
+      case "address_checkout":
+        newNode = {
+          ...newNode,
+          category: "choice",
+          type: "1TAP_CHECKOUT",
+          title: "1-Tap Address & Order Form",
+          headerText: "Delivery & Order Details",
+          text: "Please tap below to fill out your delivery address and choose payment preference:",
+          bodyText: "Please tap below to fill out your delivery address and choose payment preference:",
+          ctaText: "Enter Address 📍",
+          footerText: "Fast & Secure 1-Tap Delivery"
+        };
+        break;
       case "whatsapp_flow":
       case "meta_flow":
         newNode = {
@@ -3525,6 +3542,30 @@ export default function WhatsAppChatbotBuilderPage() {
                       </div>
                     )}
 
+                    {((node.type || "").toUpperCase() === "1TAP_CHECKOUT" || (node.type || "").toUpperCase() === "ADDRESS_CHECKOUT" || (node.title || "").toLowerCase().includes("1-tap address")) && (
+                      <div style={{ background: "#f0fdf4", border: "1.5px solid #34d399", color: "#065f46", padding: "10px", borderRadius: "8px", fontSize: "11px", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: "5px", fontWeight: 800, color: "#047857" }}>
+                            <MapPin size={13} color="#059669" />
+                            1-Tap Address Form
+                          </span>
+                          <span style={{ fontSize: "9px", background: "#059669", color: "#fff", padding: "2px 6px", borderRadius: "4px", fontWeight: 800, letterSpacing: "0.5px" }}>
+                            0-DOC FORM
+                          </span>
+                        </div>
+                        {node.headerText && <div style={{ fontWeight: 700, fontSize: "11.5px", color: "#0f172a", marginBottom: "3px" }}>{node.headerText}</div>}
+                        <div style={{ color: "#334155", fontSize: "11px", marginBottom: "6px", lineHeight: "1.3" }}>
+                          {node.bodyText || node.text || "Tap below to enter delivery address"}
+                        </div>
+                        <div style={{ background: "#059669", color: "#fff", padding: "6px 10px", borderRadius: "6px", textAlign: "center", fontWeight: 800, fontSize: "11.5px", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
+                          📍 {node.ctaText || "Enter Address 📍"}
+                        </div>
+                        <div style={{ fontSize: "9.5px", color: "#047857", marginTop: "6px", background: "#d1fae5", padding: "4px 6px", borderRadius: "4px", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
+                          <span>💬 Auto-sends UPI QR / Payment Link in WhatsApp on submit</span>
+                        </div>
+                      </div>
+                    )}
+
                     {((node.type || "").toUpperCase() === "WHATSAPP_FLOW" || (node.type || "").toUpperCase() === "META_FLOW" || (node.title || "").toLowerCase().includes("flow (native")) && (
                       <div style={{ background: "#ecfdf5", border: "1.5px solid #6ee7b7", color: "#065f46", padding: "10px", borderRadius: "8px", fontSize: "11px", marginBottom: "8px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
@@ -4589,6 +4630,69 @@ export default function WhatsAppChatbotBuilderPage() {
                       />
                     </div>
                   </>
+                )}
+
+                {((selectedNode.type || "").toUpperCase() === "1TAP_CHECKOUT" || (selectedNode.type || "").toUpperCase() === "ADDRESS_CHECKOUT" || (selectedNode.title || "").toLowerCase().includes("1-tap address")) && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "10px", padding: "14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <MapPin size={16} style={{ color: "#059669" }} />
+                        <span style={{ fontSize: "13px", fontWeight: 800, color: "#065f46" }}>1-Tap Address & Order Form</span>
+                      </div>
+                      <span style={{ fontSize: "10px", background: "#059669", color: "#fff", padding: "2px 8px", borderRadius: "999px", fontWeight: 700 }}>
+                        0-DOC READY
+                      </span>
+                    </div>
+
+                    <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "8px", padding: "8px 10px", fontSize: "11px", color: "#065f46", lineHeight: "1.4" }}>
+                      💡 <strong>No Payment on Link:</strong> Customer fills their delivery address on a mobile web form. On submit, order confirmation & dynamic UPI Payment Link / QR are automatically sent to their <strong>WhatsApp chat</strong>!
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>CTA Button Label (Max 20 chars)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Enter Address 📍"
+                        maxLength={20}
+                        value={selectedNode.ctaText || "Enter Address 📍"}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, ctaText: e.target.value } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Header Title (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Delivery & Order Details"
+                        value={selectedNode.headerText || ""}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, headerText: e.target.value } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Message Body Content</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Please tap below to fill out your delivery address and choose payment preference:"
+                        value={selectedNode.bodyText !== undefined ? selectedNode.bodyText : (selectedNode.text || "")}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, bodyText: e.target.value, text: e.target.value } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Footer Note (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Fast & Secure 1-Tap Delivery"
+                        value={selectedNode.footerText || ""}
+                        onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, footerText: e.target.value } : n)))}
+                        style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                      />
+                    </div>
+                  </div>
                 )}
 
                 {((selectedNode.type || "").toUpperCase() === "WHATSAPP_FLOW" || (selectedNode.type || "").toUpperCase() === "META_FLOW" || (selectedNode.title || "").toLowerCase().includes("flow (native")) && (

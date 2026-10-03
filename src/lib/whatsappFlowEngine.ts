@@ -420,6 +420,38 @@ async function dispatchNode(
         };
       }
 
+    } else if (type === '1TAP_CHECKOUT' || type === 'ADDRESS_CHECKOUT' || type === 'CHECKOUT_ADDRESS') {
+      const bodyText = inter(node.bodyText || node.text || "Please click below to enter your delivery address and confirm your order:");
+      const ctaLabel = String(inter(node.ctaText || "Enter Address 📍")).slice(0, 20);
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://what-in.tinkal.in";
+      const checkoutUrl = `${appUrl}/order/checkout?conv=${resolvedConvId || ''}&client=${effectiveClientId || ''}`;
+
+      payload.type = 'interactive';
+      payload.interactive = {
+        type: 'cta_url',
+        body: { text: bodyText },
+        action: {
+          name: 'cta_url',
+          parameters: {
+            display_text: ctaLabel,
+            url: checkoutUrl
+          }
+        }
+      };
+
+      if (node.headerText) {
+        payload.interactive.header = {
+          type: 'text',
+          text: String(inter(node.headerText)).slice(0, 60)
+        };
+      }
+
+      if (node.footerText) {
+        payload.interactive.footer = {
+          text: String(inter(node.footerText)).slice(0, 60)
+        };
+      }
+
     } else if (type === 'DELAY') {
       const ms = Math.min((parseInt(node.seconds) || 1) * 1000, 4000);
       await new Promise(r => setTimeout(r, ms));
@@ -445,7 +477,8 @@ async function dispatchNode(
       console.warn(`[Flow Engine] Native WhatsApp Flow blocked by Meta Integrity (${responseData?.error?.code || response.status}). Dispatching resilient fallback checkout action...`);
       const bodyText = inter(node.bodyText || node.text || "Please click below to fill out your details and place your order:");
       const ctaLabel = String(inter(node.ctaText || "Place Order 🛍️")).slice(0, 20);
-      const fallbackUrl = `https://what-in.tinkal.in/pay/link_${resolvedConvId ? resolvedConvId.slice(-6) : Date.now().toString().slice(-6)}`;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://what-in.tinkal.in";
+      const fallbackUrl = `${appUrl}/order/checkout?conv=${resolvedConvId || ''}&client=${effectiveClientId || ''}`;
 
       const fallbackCtaPayload = {
         messaging_product: 'whatsapp',
