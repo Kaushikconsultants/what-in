@@ -18,7 +18,7 @@ export interface UnifiedOrderItem {
 export interface UnifiedOrder {
   id: string;
   orderNumber: string;
-  source: "WHATSAPP_CATALOG" | "SHOPIFY" | "DIRECT_CRM";
+  source: "WHATSAPP_CATALOG" | "SHOPIFY" | "DIRECT_CRM" | "WHATSAPP_CHECKOUT";
   createdAt: string;
   customer: {
     id?: string;
@@ -95,14 +95,31 @@ export async function getUnifiedOrdersAction(filters?: {
       take: filters?.limit || 100
     });
 
-    // Also fetch recent Payment Links for these conversations to attach payment details
-    const convIds = catalogMessages.map(m => m.conversationId).filter(Boolean);
-    const paymentLinks = convIds.length > 0
-      ? await prisma.whatsAppPaymentLink.findMany({
-          where: { conversationId: { in: convIds } },
-          orderBy: { createdAt: "desc" }
-        })
-      : [];
+    // 2. Fetch all WhatsApp Payment Links & Proofs for this client
+    const paymentLinks = await prisma.whatsAppPaymentLink.findMany({
+      where: clientId
+        ? {
+            OR: [
+              { clientId },
+              { conversation: { clientId } },
+              { customer: { clientId } }
+            ]
+          }
+        : {},
+      include: {
+        conversation: {
+          include: {
+            customer: true
+          }
+        },
+        customer: true
+      },
+      orderBy: { createdAt: "desc" },
+      take: filters?.limit || 100
+    });
+
+    const processedConvIds = new Set<string>();
+    const processedPaymentLinkIds = new Set<string>();
 
     for (const msg of catalogMessages) {
       const conv = msg.conversation;
@@ -128,6 +145,13 @@ export async function getUnifiedOrdersAction(filters?: {
 
       // Find matching payment link
       const pLink = paymentLinks.find(pl => pl.conversationId === msg.conversationId);
+      if (pLink) {
+        processedPaymentLinkIds.add(pLink.id);
+      }
+      if (msg.conversationId) {
+        processedConvIds.add(msg.conversationId);
+      }
+
       const isPaid = pLink?.status === "PAID";
       const isUnderReview = pLink?.status === "PAYMENT_UNDER_REVIEW";
       const pLinkAmount = pLink ? Number(pLink.amount) : 0;
@@ -191,11 +215,11 @@ export async function getUnifiedOrdersAction(filters?: {
       if (pinMatch && !pincode) pincode = pinMatch[0];
 
       if (!city && custNotes) {
-        const cityMatch = custNotes.match(/City:\s*([^,\n]+)/i);
+        const cityMatch = custNotes.match(/City:\s*([^,\n|]+)/i);
         if (cityMatch) city = cityMatch[1].trim();
       }
       if (!state && custNotes) {
-        const stateMatch = custNotes.match(/State:\s*([^,\n]+)/i);
+        const stateMatch = custNotes.match(/State:\s*([^,\n|]+)/i);
         if (stateMatch) state = stateMatch[1].trim();
       }
       if (!pincode && custNotes) {
@@ -266,6 +290,102 @@ export async function getUnifiedOrdersAction(filters?: {
           dispatchDate: orderData.dispatchDate || undefined
         },
         notes: orderData.customerNote || custNotes || undefined
+      });
+    }
+
+    // 3. Unify standalone WhatsApp Payment Links & Proofs (Web checkout, manual UPI proof submissions)
+    for (const pl of paymentLinks) {
+      if (processedPaymentLinkIds.has(pl.id)) continue;
+
+      const conv = pl.conversation;
+      const cust = pl.customer || conv?.customer;
+      const custNotes = cust?.notes || "";
+      const isUnderReview = pl.status === "PAYMENT_UNDER_REVIEW";
+      const isPaid = pl.status === "PAID";
+      const pLinkAmount = Number(pl.amount) || 0;
+
+      let extractedScreenshot = (isUnderReview || pl.paymentUrl?.includes("product-image")) ? pl.paymentUrl : undefined;
+      let extractedUtr = pl.transactionId || undefined;
+
+      if (!extractedScreenshot && custNotes.includes("[PROOF UPLOADED]")) {
+        const ssMatch = custNotes.match(/SS:\s*(https?:\/\/[^\s|]+)/i);
+        if (ssMatch) extractedScreenshot = ssMatch[1];
+        const utrMatch = custNotes.match(/UTR:\s*([^|]+)/i);
+        if (utrMatch) extractedUtr = utrMatch[1].trim();
+      }
+
+      const fullAddress = cust?.shippingAddress || cust?.billingAddress || custNotes || "Address on File";
+      let city = "";
+      let state = "";
+      let pincode = "";
+
+      const pinMatch = fullAddress.match(/\b\d{6}\b/);
+      if (pinMatch) pincode = pinMatch[0];
+      if (custNotes) {
+        const cityMatch = custNotes.match(/City:\s*([^,\n|]+)/i);
+        if (cityMatch) city = cityMatch[1].trim();
+        const stateMatch = custNotes.match(/State:\s*([^,\n|]+)/i);
+        if (stateMatch) state = stateMatch[1].trim();
+        const pinM = custNotes.match(/Pincode:\s*(\d{6})/i);
+        if (pinM && !pincode) pincode = pinM[1];
+      }
+
+      const isFullCod = custNotes.toUpperCase().includes("FULL COD") || custNotes.toUpperCase().includes("CASH ON DELIVERY");
+      const isPartialCod = custNotes.toUpperCase().includes("PARTIAL") || custNotes.toUpperCase().includes("TOKEN");
+
+      let paymentMode: "PREPAID" | "PARTIAL_COD" | "FULL_COD" | "ONLINE" = isPartialCod ? "PARTIAL_COD" : (isFullCod ? "FULL_COD" : "PREPAID");
+      let paymentStatus: "PAID" | "PARTIALLY_PAID" | "PENDING" | "PAYMENT_UNDER_REVIEW" | "FAILED" = isUnderReview
+        ? "PAYMENT_UNDER_REVIEW"
+        : (isPaid ? (isPartialCod ? "PARTIALLY_PAID" : "PAID") : "PENDING");
+
+      const shortId = pl.id.slice(-6).toUpperCase();
+
+      orders.push({
+        id: pl.id,
+        orderNumber: `WA-${shortId}`,
+        source: "WHATSAPP_CHECKOUT",
+        createdAt: pl.createdAt ? pl.createdAt.toISOString() : new Date().toISOString(),
+        customer: {
+          id: cust?.id,
+          name: cust?.contactPerson || cust?.businessName || "WhatsApp Customer",
+          phone: cust?.mobile || cust?.whatsappNumber || "",
+          email: "",
+          whatsappPhone: cust?.whatsappNumber || cust?.mobile || "",
+          conversationId: conv?.id,
+          fullAddress,
+          city,
+          state,
+          pincode,
+          landmark: cust?.landmark || ""
+        },
+        items: [{
+          id: `item-${pl.id.slice(-6)}`,
+          name: isPartialCod ? `Partial Advance Token (₹${pLinkAmount})` : `Order Package / Product (₹${pLinkAmount})`,
+          quantity: 1,
+          price: pLinkAmount,
+          total: pLinkAmount
+        }],
+        financials: {
+          subtotal: pLinkAmount,
+          discountPercent: 0,
+          discountAmount: 0,
+          shippingFee: 0,
+          tax: 0,
+          totalAmount: pLinkAmount,
+          paymentMode,
+          advanceAmountPaid: isPaid ? pLinkAmount : (isUnderReview ? pLinkAmount : 0),
+          codBalanceDue: 0,
+          paymentStatus,
+          paymentLinkUrl: pl.paymentUrl,
+          transactionId: extractedUtr,
+          paymentScreenshotUrl: extractedScreenshot,
+          utrNumber: extractedUtr,
+          proofUploadedAt: pl.updatedAt ? pl.updatedAt.toISOString() : undefined,
+        },
+        fulfillment: {
+          status: isPaid ? "PACKED" : "PROCESSING",
+        },
+        notes: custNotes || undefined
       });
     }
 
@@ -527,7 +647,7 @@ export async function sendOrderWhatsAppMessageAction(params: {
 
 export interface UpdateUnifiedOrderInput {
   orderId: string;
-  source: "WHATSAPP_CATALOG" | "SHOPIFY" | "DIRECT_CRM";
+  source: "WHATSAPP_CATALOG" | "SHOPIFY" | "DIRECT_CRM" | "WHATSAPP_CHECKOUT";
   items: UnifiedOrderItem[];
   customer?: {
     name?: string;
@@ -549,7 +669,7 @@ export interface UpdateUnifiedOrderInput {
     paymentMode?: "PREPAID" | "PARTIAL_COD" | "FULL_COD" | "ONLINE";
     advanceAmountPaid?: number;
     codBalanceDue?: number;
-    paymentStatus?: "PAID" | "PARTIALLY_PAID" | "PENDING" | "FAILED" | "REFUNDED";
+    paymentStatus?: "PAID" | "PARTIALLY_PAID" | "PENDING" | "PAYMENT_UNDER_REVIEW" | "FAILED" | "REFUNDED";
   };
   notes?: string;
 }

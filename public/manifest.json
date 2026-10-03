@@ -3,7 +3,7 @@
   "short_name": "What-In",
   "description": "Enterprise WhatsApp Commerce & Multi-Agent Team Inbox",
   "start_url": "/whatsapp/inbox",
-  "scope": "/",
+  "scope": "/whatsapp/",
   "display": "standalone",
   "background_color": "#090d16",
   "theme_color": "#10b981",

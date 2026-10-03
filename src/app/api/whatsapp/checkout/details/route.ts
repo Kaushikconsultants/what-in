@@ -90,7 +90,8 @@ export async function GET(req: NextRequest) {
 
     // Parse existing address parts if available
     let housePart = "";
-    let streetPart = customer?.landmark || "";
+    let streetPart = "";
+    let postOfficePart = "";
     let pincodePart = "";
     let cityPart = "";
     let statePart = "";
@@ -100,14 +101,33 @@ export async function GET(req: NextRequest) {
       const pinMatch = rawAddr.match(/\b\d{6}\b/);
       if (pinMatch) pincodePart = pinMatch[0];
     }
+
+    if (customer?.landmark) {
+      const poM = customer.landmark.match(/PO:\s*([^,\n|]+)/i);
+      if (poM) {
+        postOfficePart = poM[1].trim();
+        streetPart = customer.landmark.replace(/PO:\s*[^,\n|]+/i, "").trim();
+      } else {
+        streetPart = customer.landmark.trim();
+      }
+    }
+
     if (customer?.notes) {
       const pinM = customer.notes.match(/Pincode:\s*(\d{6})/i);
       if (pinM) pincodePart = pinM[1];
-      const cityM = customer.notes.match(/City:\s*([^,\n]+)/i);
+      const cityM = customer.notes.match(/City:\s*([^,\n|]+)/i);
       if (cityM) cityPart = cityM[1].trim();
-      const stateM = customer.notes.match(/State:\s*([^,\n]+)/i);
+      const stateM = customer.notes.match(/State:\s*([^,\n|]+)/i);
       if (stateM) statePart = stateM[1].trim();
+      const poM = customer.notes.match(/PO:\s*([^,\n|]+)/i);
+      if (poM && !postOfficePart) {
+        const extractedPo = poM[1].trim();
+        if (extractedPo && extractedPo !== "N/A") postOfficePart = extractedPo;
+      }
     }
+
+    // Clean streetPart from any residual [PO: ...] or PO: tags
+    streetPart = streetPart.replace(/\[PO:.*?\]/gi, "").replace(/PO:\s*[^,\n|]+/gi, "").trim();
 
     const cleanPhone = (customer?.whatsappNumber || customer?.mobile || "").replace(/\D/g, "");
     const phone10 = cleanPhone.length === 12 && cleanPhone.startsWith("91") ? cleanPhone.slice(2) : cleanPhone;
@@ -124,6 +144,7 @@ export async function GET(req: NextRequest) {
         customerPhone: phone10 || "",
         houseFlat: housePart,
         streetLandmark: streetPart,
+        postOffice: postOfficePart,
         pincode: pincodePart,
         city: cityPart,
         state: statePart,

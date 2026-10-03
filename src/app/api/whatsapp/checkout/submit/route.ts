@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
           shippingAddress: formattedAddress || undefined,
           billingAddress: formattedAddress || undefined,
           contactPerson: cleanName || customer.contactPerson,
-          landmark: [cleanPO ? `PO: ${cleanPO}` : "", cleanStreet].filter(Boolean).join(" ") || undefined,
+          landmark: cleanStreet || undefined, // Store pure street / landmark without PO prefix
           notes: cleanPin
             ? `Pincode: ${cleanPin}, City: ${city}, State: ${state} | PO: ${cleanPO || 'N/A'} | Payment Preference: ${paymentMode || "COD"}`
             : customer.notes,
@@ -106,13 +106,27 @@ export async function POST(req: NextRequest) {
     const recSettings = await getRecoveryAgentSettings(effectiveClientId || undefined);
     const chosenMode = String(paymentMode || "FULL_COD").toUpperCase();
     const isFullCod = chosenMode === "FULL_COD" || chosenMode.includes("FULL COD") || chosenMode === "COD";
-    const isPartialCod = chosenMode === "PARTIAL_COD" || chosenMode.includes("PARTIAL") || chosenMode.includes("TOKEN");
+
+    // Create / ensure a WhatsAppPaymentLink record exists for this checkout
+    if (conv?.id && customer?.id) {
+      await prisma.whatsAppPaymentLink.create({
+        data: {
+          clientId: effectiveClientId,
+          conversationId: conv.id,
+          customerId: customer.id,
+          amount: orderTotal || 0,
+          paymentUrl: "",
+          status: isFullCod ? "PENDING" : "PENDING",
+          transactionId: isFullCod ? `COD_${Date.now()}` : undefined,
+        }
+      }).catch(() => null);
+    }
 
     if (conv?.id) {
       const recipientPhone = customer?.whatsappNumber || customer?.mobile || phone || "";
 
       if (isFullCod) {
-        // 1. Full COD: No advance required. Immediate Order Confirmation.
+        // Full COD: Immediate Order Confirmation text dispatched to WhatsApp
         const confirmText =
           `🎉 *Order Confirmed (Cash on Delivery)!*\n\n` +
           `👤 *Recipient:* ${cleanName}\n` +
@@ -130,87 +144,7 @@ export async function POST(req: NextRequest) {
           messageType: "TEXT",
           content: confirmText,
           senderName: "Order System",
-        });
-      } else if (isPartialCod) {
-        // 2. Partial COD: Calculate advance token based on tenant admin setting
-        let advanceAmount = 0;
-        if (recSettings.partialCodMode === "FIXED") {
-          advanceAmount = Math.min(orderTotal || 200, recSettings.partialCodValue || 200);
-        } else {
-          advanceAmount = Math.max(1, Math.round(((orderTotal || 1000) * (recSettings.partialCodValue || 10)) / 100));
-        }
-        const codBalance = Math.max(0, (orderTotal || advanceAmount) - advanceAmount);
-
-        const summaryNotice =
-          `✅ *Order & Delivery Details Confirmed!*\n\n` +
-          `👤 *Recipient:* ${cleanName}\n` +
-          `📞 *Contact Phone:* ${phone || recipientPhone}\n` +
-          `📍 *Delivery Address:* ${streetCombined || "Delivery Address"}\n` +
-          `📮 *Area / City:* ${areaCombined || city || "India"}${cleanPin ? ` - ${cleanPin}` : ""}\n\n` +
-          `📦 *Items / Plan:* ${orderDesc}\n` +
-          `💰 *Total Order Value:* ₹${orderTotal > 0 ? orderTotal.toLocaleString("en-IN") : (advanceAmount + codBalance).toLocaleString("en-IN")}\n` +
-          `🪙 *Payment Preference:* Partial Advance COD\n` +
-          `• Advance Token (Pay Now): *₹${advanceAmount.toLocaleString("en-IN")}*\n` +
-          `• Balance on Delivery: *₹${codBalance.toLocaleString("en-IN")}*\n\n` +
-          `Kripya apna order dispatch confirm karne ke liye niche diye gaye UPI QR / Payment Link se *₹${advanceAmount.toLocaleString("en-IN")}* token advance pay karein:`;
-
-        await sendWhatsAppMessageAction({
-          conversationId: conv.id,
-          senderId: "system",
-          senderType: "SYSTEM",
-          messageType: "TEXT",
-          content: summaryNotice,
-          senderName: "Order System",
-        });
-
-        if (customer?.id && advanceAmount > 0) {
-          await generateWhatsAppPaymentLinkAction({
-            conversationId: conv.id,
-            customerId: customer.id,
-            amount: advanceAmount,
-            description: `Token Advance (₹${advanceAmount}) for ${orderDesc}. Balance ₹${codBalance} on COD`,
-            deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both",
-          });
-        }
-      } else {
-        // 3. Full Prepaid: Apply optional prepaid discount if configured
-        let finalAmount = orderTotal;
-        let discountSaved = 0;
-        if (recSettings.prepaidDiscountPercent > 0 && orderTotal > 0) {
-          discountSaved = Math.round((orderTotal * recSettings.prepaidDiscountPercent) / 100);
-          finalAmount = Math.max(1, orderTotal - discountSaved);
-        }
-
-        const summaryNotice =
-          `✅ *Order & Delivery Details Confirmed!*\n\n` +
-          `👤 *Recipient:* ${cleanName}\n` +
-          `📞 *Contact Phone:* ${phone || recipientPhone}\n` +
-          `📍 *Delivery Address:* ${streetCombined || "Delivery Address"}\n` +
-          `📮 *Area / City:* ${areaCombined || city || "India"}${cleanPin ? ` - ${cleanPin}` : ""}\n\n` +
-          `📦 *Items / Plan:* ${orderDesc}\n` +
-          (discountSaved > 0 ? `🎉 *Instant Prepaid Offer:* Saved ₹${discountSaved} (${recSettings.prepaidDiscountPercent}% Instant Discount)\n` : "") +
-          `💰 *Total Payable:* *₹${finalAmount > 0 ? finalAmount.toLocaleString("en-IN") : "As per Selected Plan"}*\n` +
-          `🪙 *Payment Method:* 100% Online UPI\n\n` +
-          `Kripya niche diye gaye UPI QR / Payment Link se secure online payment complete karein:`;
-
-        await sendWhatsAppMessageAction({
-          conversationId: conv.id,
-          senderId: "system",
-          senderType: "SYSTEM",
-          messageType: "TEXT",
-          content: summaryNotice,
-          senderName: "Order System",
-        });
-
-        if (customer?.id && finalAmount > 0) {
-          await generateWhatsAppPaymentLinkAction({
-            conversationId: conv.id,
-            customerId: customer.id,
-            amount: finalAmount,
-            description: orderDesc,
-            deliveryMethod: recSettings.autoCatalogDeliveryMethod || "both",
-          });
-        }
+        }).catch((e) => console.warn("[Send COD Confirmation Error]:", e.message));
       }
 
       // Resume active chatbot flow if any
@@ -241,7 +175,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Delivery address submitted successfully. Order confirmation and payment link sent to WhatsApp.",
+      message: "Delivery address submitted successfully.",
     });
   } catch (err: any) {
     console.error("[Checkout Submit Error]:", err);

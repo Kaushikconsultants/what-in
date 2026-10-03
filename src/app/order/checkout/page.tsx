@@ -78,7 +78,17 @@ function CheckoutContent() {
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [showProofUploader, setShowProofUploader] = useState(true);
 
-  const fetchPostOfficesForPincode = async (code: string) => {
+  // Prevent Chrome PWA install banner on customer checkout
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      return false;
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const fetchPostOfficesForPincode = async (code: string, preselectedPo?: string) => {
     const cleanPin = String(code || '').replace(/\D/g, '').slice(0, 6);
     if (cleanPin.length === 6) {
       setPincodeLoading(true);
@@ -90,8 +100,10 @@ function CheckoutContent() {
           if (data.state) setState(data.state);
           const list = data.postOffices || (data.cities || []).map((c: any) => c.title || c.id || c) || [];
           setPostOffices(list);
-          if (list.length > 0 && !selectedPostOffice) {
-            setSelectedPostOffice(list[0]);
+          if (preselectedPo && list.includes(preselectedPo)) {
+            setSelectedPostOffice(preselectedPo);
+          } else if (list.length > 0 && !selectedPostOffice) {
+            setSelectedPostOffice(preselectedPo || list[0]);
           }
         }
       } catch (_) {}
@@ -118,6 +130,9 @@ function CheckoutContent() {
           setPhone(d.customerPhone || '');
           setHouseFlat(d.houseFlat || '');
           setStreetLandmark(d.streetLandmark || '');
+          if (d.postOffice) {
+            setSelectedPostOffice(d.postOffice);
+          }
           setPincode(d.pincode || '');
           setCity(d.city || '');
           setState(d.state || '');
@@ -130,7 +145,7 @@ function CheckoutContent() {
           }
 
           if (d.pincode && d.pincode.length === 6) {
-            fetchPostOfficesForPincode(d.pincode);
+            fetchPostOfficesForPincode(d.pincode, d.postOffice);
           }
 
           if (d.recoverySettings) {
@@ -518,25 +533,17 @@ function CheckoutContent() {
               </div>
             </div>
 
-            {/* Direct Quick Action Buttons */}
-            <div className="grid grid-cols-2 gap-2.5">
+            {/* Download QR Action Button */}
+            <div className="flex items-center justify-center">
               <a
                 href={qrImageSrc}
                 download="Payment_QR.png"
                 target="_blank"
                 rel="noreferrer"
-                className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-all cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-all cursor-pointer shadow-xs"
               >
                 <Download size={14} className="text-slate-600" />
-                <span>Download QR</span>
-              </a>
-
-              <a
-                href={upiDeepLink}
-                className="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
-              >
-                <ExternalLink size={14} />
-                <span>Open UPI App</span>
+                <span>Download Payment QR Code</span>
               </a>
             </div>
 
