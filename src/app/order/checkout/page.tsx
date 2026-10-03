@@ -152,11 +152,6 @@ function CheckoutContent() {
     setSubmitting(true);
     setErrorMsg('');
 
-    const resolvedStreetLandmark = [
-      selectedPostOffice ? `[PO: ${selectedPostOffice}]` : '',
-      streetLandmark
-    ].filter(Boolean).join(' ');
-
     try {
       const res = await fetch('/api/whatsapp/checkout/submit', {
         method: 'POST',
@@ -168,7 +163,8 @@ function CheckoutContent() {
           fullName,
           phone,
           houseFlat,
-          streetLandmark: resolvedStreetLandmark,
+          streetLandmark: streetLandmark.trim(),
+          postOffice: selectedPostOffice,
           pincode,
           city,
           state,

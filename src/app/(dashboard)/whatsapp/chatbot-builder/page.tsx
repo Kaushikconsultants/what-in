@@ -3677,6 +3677,20 @@ export default function WhatsAppChatbotBuilderPage() {
                         <div style={{ color: "#334155", fontSize: "11px", marginBottom: "6px", lineHeight: "1.3" }}>
                           {node.bodyText || node.text || "Tap below to enter delivery address"}
                         </div>
+                        {(node.amount || node.productName) && (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px", flexWrap: "wrap" }}>
+                            {node.amount && (
+                              <span style={{ fontSize: "10px", background: "#dcfce7", color: "#166534", border: "1px solid #86efac", padding: "1px 6px", borderRadius: "4px", fontWeight: 800 }}>
+                                💰 Total: ₹{node.amount}
+                              </span>
+                            )}
+                            {node.productName && (
+                              <span style={{ fontSize: "10px", background: "#e0e7ff", color: "#3730a3", border: "1px solid #c7d2fe", padding: "1px 6px", borderRadius: "4px", fontWeight: 700 }}>
+                                📦 {node.productName}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div style={{ background: "#059669", color: "#fff", padding: "6px 10px", borderRadius: "6px", textAlign: "center", fontWeight: 800, fontSize: "11.5px", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
                           📍 {node.ctaText || "Enter Address 📍"}
                         </div>

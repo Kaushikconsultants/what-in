@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
       phone,
       houseFlat,
       streetLandmark,
+      postOffice,
       pincode,
       city: rawCity,
       state: rawState,
@@ -55,10 +56,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const fullAddrParts = [houseFlat, streetLandmark].filter(Boolean).join(", ");
-    const formattedAddress = [fullAddrParts, city, state, cleanPin ? `PIN: ${cleanPin}` : ""]
-      .filter(Boolean)
-      .join(", ");
+    const cleanName = (fullName || customer?.contactPerson || "Customer").trim();
+    const cleanHouse = (houseFlat || "").trim();
+    const cleanStreet = (streetLandmark || "").replace(/\[PO:.*?\]/gi, "").trim();
+    const cleanPO = (postOffice || "").replace(/\[PO:.*?\]/gi, "").trim();
+
+    const streetCombined = [cleanHouse, cleanStreet].filter(Boolean).join(", ");
+    const areaCombined = [cleanPO ? cleanPO : "", city, state].filter(Boolean).join(", ");
+    const formattedAddress = [streetCombined, areaCombined, cleanPin ? `PIN: ${cleanPin}` : ""].filter(Boolean).join(", ");
 
     // Update Customer record with verified delivery address
     if (customer?.id) {
@@ -67,10 +72,10 @@ export async function POST(req: NextRequest) {
         data: {
           shippingAddress: formattedAddress || undefined,
           billingAddress: formattedAddress || undefined,
-          contactPerson: fullName || customer.contactPerson,
-          landmark: streetLandmark || undefined,
+          contactPerson: cleanName || customer.contactPerson,
+          landmark: [cleanPO ? `PO: ${cleanPO}` : "", cleanStreet].filter(Boolean).join(" ") || undefined,
           notes: cleanPin
-            ? `Pincode: ${cleanPin}, City: ${city}, State: ${state} | Payment Preference: ${paymentMode || "COD"}`
+            ? `Pincode: ${cleanPin}, City: ${city}, State: ${state} | PO: ${cleanPO || 'N/A'} | Payment Preference: ${paymentMode || "COD"}`
             : customer.notes,
         },
       }).catch((e) => console.error("[Checkout Address Save Error]:", e.message));
@@ -110,11 +115,12 @@ export async function POST(req: NextRequest) {
         // 1. Full COD: No advance required. Immediate Order Confirmation.
         const confirmText =
           `🎉 *Order Confirmed (Cash on Delivery)!*\n\n` +
-          `📦 *Items:* ${orderDesc}\n` +
+          `👤 *Recipient:* ${cleanName}\n` +
+          `📞 *Contact Phone:* ${phone || recipientPhone}\n` +
+          `📍 *Delivery Address:* ${streetCombined || "Standard Delivery Address"}\n` +
+          `📮 *Area / City:* ${areaCombined || city || "India"}${cleanPin ? ` - ${cleanPin}` : ""}\n\n` +
+          `📦 *Items / Plan:* ${orderDesc}\n` +
           `💵 *Total Payable on Delivery:* ₹${orderTotal > 0 ? orderTotal.toLocaleString("en-IN") : "COD"}\n\n` +
-          `📍 *Delivery Address:*\n${fullAddrParts}${city ? ", " + city : ""}${state ? ", " + state : ""} - ${cleanPin}\n` +
-          `👤 *Recipient:* ${fullName || customer?.contactPerson || "Customer"}\n` +
-          `📞 *Contact Phone:* ${phone || recipientPhone}\n\n` +
           `🚚 Our dispatch team is packaging your order. You will receive live courier tracking as soon as it ships!`;
 
         await sendWhatsAppMessageAction({
@@ -136,13 +142,17 @@ export async function POST(req: NextRequest) {
         const codBalance = Math.max(0, (orderTotal || advanceAmount) - advanceAmount);
 
         const summaryNotice =
-          `✅ *Delivery Address Confirmed!*\n` +
-          `📍 ${fullAddrParts}${city ? ", " + city : ""}${state ? ", " + state : ""} - ${cleanPin}\n\n` +
-          `🪙 *Payment Preference: Partial COD*\n` +
-          `• Total Order Value: *₹${orderTotal.toLocaleString("en-IN")}*\n` +
-          `• Advance Token (to confirm dispatch): *₹${advanceAmount.toLocaleString("en-IN")}*\n` +
-          `• Balance COD (payable on delivery): *₹${codBalance.toLocaleString("en-IN")}*\n\n` +
-          `Kripya apna order dispatch confirm karne ke liye niche diye gaye UPI QR / Payment Link se ₹${advanceAmount} token advance pay karein:`;
+          `✅ *Order & Delivery Details Confirmed!*\n\n` +
+          `👤 *Recipient:* ${cleanName}\n` +
+          `📞 *Contact Phone:* ${phone || recipientPhone}\n` +
+          `📍 *Delivery Address:* ${streetCombined || "Delivery Address"}\n` +
+          `📮 *Area / City:* ${areaCombined || city || "India"}${cleanPin ? ` - ${cleanPin}` : ""}\n\n` +
+          `📦 *Items / Plan:* ${orderDesc}\n` +
+          `💰 *Total Order Value:* ₹${orderTotal > 0 ? orderTotal.toLocaleString("en-IN") : (advanceAmount + codBalance).toLocaleString("en-IN")}\n` +
+          `🪙 *Payment Preference:* Partial Advance COD\n` +
+          `• Advance Token (Pay Now): *₹${advanceAmount.toLocaleString("en-IN")}*\n` +
+          `• Balance on Delivery: *₹${codBalance.toLocaleString("en-IN")}*\n\n` +
+          `Kripya apna order dispatch confirm karne ke liye niche diye gaye UPI QR / Payment Link se *₹${advanceAmount.toLocaleString("en-IN")}* token advance pay karein:`;
 
         await sendWhatsAppMessageAction({
           conversationId: conv.id,
@@ -153,7 +163,7 @@ export async function POST(req: NextRequest) {
           senderName: "Order System",
         });
 
-        if (customer?.id) {
+        if (customer?.id && advanceAmount > 0) {
           await generateWhatsAppPaymentLinkAction({
             conversationId: conv.id,
             customerId: customer.id,
@@ -165,17 +175,22 @@ export async function POST(req: NextRequest) {
       } else {
         // 3. Full Prepaid: Apply optional prepaid discount if configured
         let finalAmount = orderTotal;
-        let discountNotice = "";
+        let discountSaved = 0;
         if (recSettings.prepaidDiscountPercent > 0 && orderTotal > 0) {
-          const discount = Math.round((orderTotal * recSettings.prepaidDiscountPercent) / 100);
-          finalAmount = Math.max(1, orderTotal - discount);
-          discountNotice = `\n🎁 *Prepaid Privilege Offer:* Saved ₹${discount} (${recSettings.prepaidDiscountPercent}% OFF applied!)`;
+          discountSaved = Math.round((orderTotal * recSettings.prepaidDiscountPercent) / 100);
+          finalAmount = Math.max(1, orderTotal - discountSaved);
         }
 
         const summaryNotice =
-          `✅ *Delivery Address Confirmed!*\n` +
-          `📍 ${fullAddrParts}${city ? ", " + city : ""}${state ? ", " + state : ""} - ${cleanPin}${discountNotice}\n` +
-          `• Total Payable: *₹${finalAmount > 0 ? finalAmount.toLocaleString("en-IN") : "Online"}*\n\n` +
+          `✅ *Order & Delivery Details Confirmed!*\n\n` +
+          `👤 *Recipient:* ${cleanName}\n` +
+          `📞 *Contact Phone:* ${phone || recipientPhone}\n` +
+          `📍 *Delivery Address:* ${streetCombined || "Delivery Address"}\n` +
+          `📮 *Area / City:* ${areaCombined || city || "India"}${cleanPin ? ` - ${cleanPin}` : ""}\n\n` +
+          `📦 *Items / Plan:* ${orderDesc}\n` +
+          (discountSaved > 0 ? `🎉 *Instant Prepaid Offer:* Saved ₹${discountSaved} (${recSettings.prepaidDiscountPercent}% Instant Discount)\n` : "") +
+          `💰 *Total Payable:* *₹${finalAmount > 0 ? finalAmount.toLocaleString("en-IN") : "As per Selected Plan"}*\n` +
+          `🪙 *Payment Method:* 100% Online UPI\n\n` +
           `Kripya niche diye gaye UPI QR / Payment Link se secure online payment complete karein:`;
 
         await sendWhatsAppMessageAction({
@@ -187,7 +202,7 @@ export async function POST(req: NextRequest) {
           senderName: "Order System",
         });
 
-        if (customer?.id) {
+        if (customer?.id && finalAmount > 0) {
           await generateWhatsAppPaymentLinkAction({
             conversationId: conv.id,
             customerId: customer.id,
