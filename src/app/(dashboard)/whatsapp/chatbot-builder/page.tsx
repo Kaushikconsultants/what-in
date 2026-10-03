@@ -1028,6 +1028,7 @@ export default function WhatsAppChatbotBuilderPage() {
   const [openCategories, setOpenCategories] = useState<{ [key: string]: boolean }>({ Messages: true, Choices: true });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [blockSearch, setBlockSearch] = useState<string>("");
+  const [showActionsDropdown, setShowActionsDropdown] = useState<boolean>(false);
 
   // Dragging Node state
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
@@ -2825,47 +2826,121 @@ export default function WhatsAppChatbotBuilderPage() {
     return `M ${startX} ${startY} C ${cx1} ${startY}, ${cx2} ${endY}, ${endX} ${endY}`;
   };
 
-  const handleStartSimTest = () => {
-    const startNode = nodes.find((n) => n.type === "CHOICE" || n.type === "START") || nodes[0];
-    setSimMessages([
-      {
+  const buildSimBotMessagesForNode = (node: any): any[] => {
+    if (!node) {
+      return [{
         sender: "bot",
-        text: startNode?.text || "Welcome to WhatsApp Assistant!",
-        imageUrl: startNode?.imageUrl,
-        choices: startNode?.choices || []
+        text: "Thank you! Your request has been recorded. Our team will contact you shortly."
+      }];
+    }
+
+    const messages: any[] = [];
+    let currentNode: any = node;
+    const visited = new Set<string>();
+
+    while (currentNode && !visited.has(currentNode.id)) {
+      visited.add(currentNode.id);
+      const nodeType = (currentNode.type || "").toUpperCase();
+
+      if (nodeType === "1TAP_CHECKOUT" || nodeType === "ADDRESS_CHECKOUT" || (currentNode.title || "").toLowerCase().includes("1-tap address")) {
+        messages.push({
+          sender: "bot",
+          headerText: currentNode.headerText,
+          text: currentNode.bodyText || currentNode.text || "Please tap below to fill out your delivery address and choose payment preference:",
+          footerText: currentNode.footerText,
+          is1TapCheckout: true,
+          ctaText: currentNode.ctaText || "Enter Address 📍"
+        });
+        break;
       }
-    ]);
+
+      if (nodeType === "WHATSAPP_FLOW" || nodeType === "META_FLOW") {
+        messages.push({
+          sender: "bot",
+          headerText: currentNode.headerText,
+          text: currentNode.bodyText || currentNode.text || "Please click below to fill the interactive form:",
+          footerText: currentNode.footerText,
+          isMetaFlow: true,
+          ctaText: currentNode.ctaText || "Place Order 🛍️"
+        });
+        break;
+      }
+
+      if (nodeType === "CHOICE" || nodeType === "BUTTONS" || nodeType === "LIST_MENU") {
+        messages.push({
+          sender: "bot",
+          text: currentNode.text || currentNode.title || "Please choose an option:",
+          imageUrl: currentNode.imageUrl,
+          choices: currentNode.choices || []
+        });
+        break;
+      }
+
+      if (nodeType === "IMAGE") {
+        messages.push({
+          sender: "bot",
+          imageUrl: currentNode.imageUrl,
+          text: currentNode.caption || currentNode.text || ""
+        });
+      } else if (nodeType === "TEXT" || nodeType === "START" || nodeType === "TRIGGER" || nodeType === "END") {
+        const textVal = currentNode.text || currentNode.title;
+        if (textVal && !nodeType.includes("TRIGGER")) {
+          messages.push({
+            sender: "bot",
+            text: textVal,
+            buttonText: currentNode.buttonText
+          });
+        }
+      } else if (nodeType.startsWith("CRM")) {
+        messages.push({
+          sender: "bot",
+          text: `⚡ [CRM Action]: ${currentNode.title || 'Contact updated in CRM'}`
+        });
+      }
+
+      if (currentNode.outputPort) {
+        currentNode = nodes.find((n: any) => n.id === currentNode.outputPort);
+      } else {
+        break;
+      }
+    }
+
+    if (messages.length === 0) {
+      messages.push({
+        sender: "bot",
+        text: node.text || node.title || "Thank you! How can we assist you today?",
+        choices: node.choices || []
+      });
+    }
+
+    return messages;
+  };
+
+  const handleStartSimTest = () => {
+    const triggerNode = nodes.find((n) => (n.type || "").toUpperCase() === "TRIGGER");
+    const startNode = triggerNode?.outputPort
+      ? nodes.find((n) => n.id === triggerNode.outputPort)
+      : (nodes.find((n) => n.type === "CHOICE" || n.type === "START") || nodes[0]);
+
+    const initialMsgs = buildSimBotMessagesForNode(startNode);
+    setSimMessages(initialMsgs);
     setShowSimModal(true);
   };
 
   const handleSimChoiceSelect = (choice: any) => {
     const userMsg = { sender: "user", text: choice.text };
     const targetNode = nodes.find((n) => n.id === choice.targetNode);
+    const botReplies = buildSimBotMessagesForNode(targetNode);
+    setSimMessages((prev) => [...prev, userMsg, ...botReplies]);
+  };
 
-    let botReplyMsg = null;
-    if (targetNode) {
-      if (targetNode.type.startsWith("CRM") && targetNode.outputPort) {
-        const nextEndNode = nodes.find((n) => n.id === targetNode.outputPort);
-        botReplyMsg = {
-          sender: "bot",
-          text: (targetNode.text ? `[CRM Log]: ${targetNode.text}\n\n` : "") + (nextEndNode?.text || "Thank you for reaching out!"),
-          buttonText: nextEndNode?.buttonText
-        };
-      } else {
-        botReplyMsg = {
-          sender: "bot",
-          text: targetNode.text || targetNode.title,
-          buttonText: targetNode.buttonText
-        };
-      }
-    } else {
-      botReplyMsg = {
-        sender: "bot",
-        text: "Thank you! Our executive will contact you shortly regarding your request."
-      };
-    }
-
-    setSimMessages((prev) => [...prev, userMsg, botReplyMsg]);
+  const handleSimCtaClick = (msg: any) => {
+    const userMsg = { sender: "user", text: `📍 [Submitted Address]: Flat 402, Green Valley, Sector 14, Gurgaon - 122001 (Partial COD)` };
+    const botReply = {
+      sender: "bot",
+      text: `✅ *Delivery Address Confirmed!*\n📍 Flat 402, Green Valley, Sector 14, Gurgaon - 122001\n\n🪙 *Payment Preference: Partial COD*\n• Advance Token: *₹200*\n• Balance on Delivery: *₹699*\n\n👉 *UPI Payment Link*: https://what-in.tinkal.in/pay/demo_order_102`
+    };
+    setSimMessages((prev) => [...prev, userMsg, botReply]);
   };
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
@@ -2958,26 +3033,95 @@ export default function WhatsAppChatbotBuilderPage() {
           </span>
         </div>
 
-        <div className="studio-actions-group">
+        <div className="studio-actions-group" style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "nowrap" }}>
           <button className="studio-btn primary" onClick={() => setShowCreateModal(true)} title="Create New Chatbot">
-            <Plus size={15} /> ＋ New Chatbot
+            <Plus size={14} /> <span>New Bot</span>
           </button>
 
-          <button className="studio-btn" onClick={handleDuplicateCurrentBot} disabled={!currentFlowId} title="Duplicate Current Chatbot">
-            <Copy size={14} /> Duplicate
+          <button
+            className="studio-btn"
+            onClick={handleAutoOrganize}
+            disabled={nodes.length === 0}
+            title="Auto-organize workflow nodes into clean visual layout"
+            style={{ color: "#7c3aed", borderColor: "#ddd6fe", background: "#f5f3ff" }}
+          >
+            <Sparkles size={13} color="#7c3aed" /> <span>Layout</span>
           </button>
 
-          <button className="studio-btn" onClick={() => jsonFileInputRef.current?.click()} title="Import Chatbot Flow from JSON file">
-            <Layers size={14} /> Import JSON
-          </button>
+          <button className="circular-history-btn" onClick={handleUndo} title="Undo"><RotateCcw size={14} /></button>
+          <button className="circular-history-btn" onClick={handleRedo} title="Redo"><RotateCw size={14} /></button>
 
-          <button className="studio-btn" onClick={handleExportJsonFlow} disabled={nodes.length === 0} title="Export Current Chatbot Flow as JSON file">
-            <Layers size={14} style={{ transform: "rotate(180deg)" }} /> Export JSON
-          </button>
+          {/* ACTIONS DROPDOWN */}
+          <div className="actions-dropdown-container">
+            <button
+              className="studio-btn"
+              onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+              title="More Actions (Import, Export, Duplicate, Manage)"
+              style={{ display: "flex", alignItems: "center", gap: "4px" }}
+            >
+              <FolderOpen size={13} />
+              <span>Actions</span>
+              <ChevronDown size={12} style={{ opacity: 0.7 }} />
+            </button>
 
-          <button className="studio-btn" onClick={handleCopyJsonFlow} disabled={nodes.length === 0} title="Copy Current Chatbot Flow as JSON">
-            <Copy size={14} /> Copy JSON
-          </button>
+            {showActionsDropdown && (
+              <>
+                <div
+                  style={{ position: "fixed", inset: 0, zIndex: 999 }}
+                  onClick={() => setShowActionsDropdown(false)}
+                />
+                <div className="actions-dropdown-menu">
+                  <button
+                    className="actions-dropdown-item"
+                    onClick={() => { setShowActionsDropdown(false); handleDuplicateCurrentBot(); }}
+                    disabled={!currentFlowId}
+                  >
+                    <Copy size={13} /> Duplicate Bot
+                  </button>
+
+                  <button
+                    className="actions-dropdown-item"
+                    onClick={() => { setShowActionsDropdown(false); jsonFileInputRef.current?.click(); }}
+                  >
+                    <Layers size={13} /> Import JSON
+                  </button>
+
+                  <button
+                    className="actions-dropdown-item"
+                    onClick={() => { setShowActionsDropdown(false); handleExportJsonFlow(); }}
+                    disabled={nodes.length === 0}
+                  >
+                    <Layers size={13} style={{ transform: "rotate(180deg)" }} /> Export JSON
+                  </button>
+
+                  <button
+                    className="actions-dropdown-item"
+                    onClick={() => { setShowActionsDropdown(false); handleCopyJsonFlow(); }}
+                    disabled={nodes.length === 0}
+                  >
+                    <Copy size={13} /> Copy JSON
+                  </button>
+
+                  <div style={{ height: "1px", background: "#f1f5f9", margin: "2px 0" }} />
+
+                  <button
+                    className="actions-dropdown-item"
+                    onClick={() => { setShowActionsDropdown(false); setShowManageModal(true); }}
+                  >
+                    <FolderOpen size={13} /> All Bots ({savedFlows.length})
+                  </button>
+
+                  <button
+                    className="actions-dropdown-item danger"
+                    onClick={() => { setShowActionsDropdown(false); setShowDeleteModal(true); }}
+                    disabled={!currentFlowId}
+                  >
+                    <Trash2 size={13} /> Delete Bot
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           <input
             type="file"
@@ -2987,41 +3131,6 @@ export default function WhatsAppChatbotBuilderPage() {
             onChange={handleImportJsonFlow}
           />
 
-          <button className="studio-btn" onClick={() => setShowManageModal(true)} title="Manage All Chatbots">
-            <FolderOpen size={14} /> All Bots ({savedFlows.length})
-          </button>
-
-          <button className="studio-btn danger" onClick={() => setShowDeleteModal(true)} disabled={!currentFlowId} title="Delete Current Chatbot">
-            <Trash2 size={14} /> Delete Bot
-          </button>
-
-          <div className="w-[1px] h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
-
-          <button className="circular-history-btn" onClick={handleUndo} title="Undo"><RotateCcw size={15} /></button>
-          <button className="circular-history-btn" onClick={handleRedo} title="Redo"><RotateCw size={15} /></button>
-
-          <button
-            className="studio-btn"
-            onClick={handleAutoOrganize}
-            disabled={nodes.length === 0}
-            title="Auto-organize workflow nodes into clean visual layout"
-            style={{ color: "#7c3aed", borderColor: "#ddd6fe", background: "#f5f3ff", display: "inline-flex", alignItems: "center", gap: "5px", fontWeight: 600 }}
-          >
-            <Sparkles size={14} color="#7c3aed" /> Auto Layout
-          </button>
-
-          <button
-            className="studio-btn fullscreen-btn"
-            onClick={() => setIsFullScreenStudio(!isFullScreenStudio)}
-            title="Toggle Full Screen Studio Mode"
-          >
-            {isFullScreenStudio ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-
-          <button className="studio-btn test-btn" onClick={handleStartSimTest} disabled={nodes.length === 0} title="Interactive Phone Simulator">
-            <Play size={14} /> Preview & Test
-          </button>
-
           <button
             className="studio-btn"
             onClick={() => {
@@ -3029,9 +3138,9 @@ export default function WhatsAppChatbotBuilderPage() {
               fetchFlowLogs();
             }}
             title="View Live Flow Execution Logs & Telemetry"
-            style={{ background: "#0f172a", color: "#38bdf8", border: "1px solid #1e293b", display: "inline-flex", alignItems: "center", gap: "5px" }}
+            style={{ background: "#0f172a", color: "#38bdf8", border: "1px solid #1e293b" }}
           >
-            <Activity size={14} /> Flow Logs
+            <Activity size={13} /> <span>Logs</span>
           </button>
 
           {(() => {
@@ -3047,45 +3156,56 @@ export default function WhatsAppChatbotBuilderPage() {
                   background: hasErrors ? "#fef2f2" : hasWarnings ? "#fffbeb" : "#f0fdf4",
                   color: hasErrors ? "#b91c1c" : hasWarnings ? "#b45309" : "#15803d",
                   border: `1px solid ${hasErrors ? "#fca5a5" : hasWarnings ? "#fcd34d" : "#86efac"}`,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "5px",
                   fontWeight: 700
                 }}
               >
                 {hasErrors ? (
-                  <AlertTriangle size={14} color="#ef4444" />
+                  <AlertTriangle size={13} color="#ef4444" />
                 ) : hasWarnings ? (
-                  <AlertCircle size={14} color="#f59e0b" />
+                  <AlertCircle size={13} color="#f59e0b" />
                 ) : (
-                  <ShieldCheck size={14} color="#10b981" />
+                  <ShieldCheck size={13} color="#10b981" />
                 )}
                 <span>
                   {hasErrors
                     ? `Issues (${diag.errorCount})`
                     : hasWarnings
                       ? `Warnings (${diag.warningCount})`
-                      : `✓ Flow Healthy`}
+                      : `Healthy`}
                 </span>
               </button>
             );
           })()}
 
+          <button className="studio-btn test-btn" onClick={handleStartSimTest} disabled={nodes.length === 0} title="Interactive Phone Simulator">
+            <Play size={13} /> <span>Preview & Test</span>
+          </button>
+
           <button
             className="studio-btn"
-            style={{ background: "#64748b", color: "#fff", display: "flex", alignItems: "center", gap: "6px" }}
+            style={{ background: "#64748b", color: "#fff" }}
             onClick={() => handleSaveFlowWithStatus(false)}
             disabled={isSaving || nodes.length === 0}
+            title="Save as Inactive Draft"
           >
-            <FileText size={14} /> Save as Draft
+            <FileText size={13} /> <span>Draft</span>
           </button>
 
           <button
             className="studio-btn primary"
             onClick={() => handleSaveFlowWithStatus(true)}
             disabled={isSaving || nodes.length === 0}
+            title="Save and Activate Live"
           >
-            <CheckCircle2 size={14} /> Publish Flow
+            <CheckCircle2 size={14} /> <span>Publish Live</span>
+          </button>
+
+          <button
+            className="studio-btn fullscreen-btn"
+            onClick={() => setIsFullScreenStudio(!isFullScreenStudio)}
+            title="Toggle Full Screen Studio Mode"
+          >
+            {isFullScreenStudio ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
           </button>
         </div>
       </div>
@@ -5604,7 +5724,9 @@ export default function WhatsAppChatbotBuilderPage() {
                   <Bot size={18} color="#fff" />
                 </div>
                 <div>
-                  <strong style={{ fontSize: "13px", display: "block" }}>Espon AI Assistant</strong>
+                  <strong style={{ fontSize: "13px", display: "block" }}>
+                    {clientPlanInfo?.businessName || clientPlanInfo?.client?.businessName || "Sonify ayurveda"} Assistant
+                  </strong>
                   <span style={{ fontSize: "10.5px", opacity: 0.9 }}>Online · Live Flow Simulator</span>
                 </div>
                 <button onClick={() => setShowSimModal(false)} style={{ marginLeft: "auto", background: "none", border: "none", color: "#fff", fontSize: "18px", cursor: "pointer" }}>×</button>
@@ -5614,18 +5736,53 @@ export default function WhatsAppChatbotBuilderPage() {
                 {simMessages.map((msg, idx) => (
                   <div key={idx} className={`sim-msg-row ${msg.sender}`}>
                     <div className="sim-bubble">
+                      {msg.headerText && (
+                        <div style={{ fontWeight: 700, fontSize: "12px", marginBottom: "4px", color: "#0f172a" }}>
+                          {msg.headerText}
+                        </div>
+                      )}
                       {msg.imageUrl && (
                         <img src={msg.imageUrl} alt="Bot Header" style={{ width: "100%", borderRadius: "6px", marginBottom: "6px" }} />
                       )}
                       <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{msg.text}</p>
 
-                      {msg.choices && (
-                        <div className="sim-buttons-list">
+                      {msg.choices && msg.choices.length > 0 && (
+                        <div className="sim-buttons-list" style={{ marginTop: "6px" }}>
                           {msg.choices.map((c: any) => (
                             <button key={c.id} className="sim-choice-btn" onClick={() => handleSimChoiceSelect(c)}>
                               {c.text}
                             </button>
                           ))}
+                        </div>
+                      )}
+
+                      {msg.is1TapCheckout && (
+                        <div className="sim-buttons-list" style={{ marginTop: "8px" }}>
+                          <button
+                            className="sim-choice-btn"
+                            style={{ background: "#059669", color: "#ffffff", fontWeight: 700, borderColor: "#047857" }}
+                            onClick={() => handleSimCtaClick(msg)}
+                          >
+                            📍 {msg.ctaText || "Enter Address 📍"}
+                          </button>
+                        </div>
+                      )}
+
+                      {msg.isMetaFlow && (
+                        <div className="sim-buttons-list" style={{ marginTop: "8px" }}>
+                          <button
+                            className="sim-choice-btn"
+                            style={{ background: "#0284c7", color: "#ffffff", fontWeight: 700, borderColor: "#0369a1" }}
+                            onClick={() => handleSimCtaClick(msg)}
+                          >
+                            📋 {msg.ctaText || "Place Order 🛍️"}
+                          </button>
+                        </div>
+                      )}
+
+                      {msg.footerText && (
+                        <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "4px" }}>
+                          {msg.footerText}
                         </div>
                       )}
                     </div>

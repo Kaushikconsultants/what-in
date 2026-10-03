@@ -2,13 +2,13 @@
 .studio-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 145px);
-  min-height: 650px;
+  height: calc(100vh - 75px);
+  min-height: 580px;
   background: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #eaecf0;
+  border-radius: 0px;
+  border: none;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  box-shadow: none;
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   transition: all 0.2s ease-in-out;
@@ -33,12 +33,75 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 18px;
+  padding: 6px 14px;
   background: #ffffff;
   border-bottom: 1px solid #eaecf0;
-  gap: 12px;
-  flex-wrap: wrap;
-  z-index: 10;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-height: 48px;
+  z-index: 20;
+}
+
+.bot-selector-dropdown {
+  max-width: 220px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  cursor: pointer;
+}
+
+.actions-dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.actions-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  min-width: 180px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.actions-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all 0.12s;
+}
+
+.actions-dropdown-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.actions-dropdown-item.danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .studio-title-block {
