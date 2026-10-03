@@ -164,6 +164,7 @@ export async function GET(req: NextRequest) {
           partialCodMode: recoverySettings.partialCodMode || "PERCENTAGE",
           partialCodValue: recoverySettings.partialCodValue || 10,
           prepaidDiscountPercent: recoverySettings.prepaidDiscountPercent || 5,
+          paymentDeliveryMethod: recoverySettings.paymentDeliveryMethod || "web_url",
         },
       },
     });

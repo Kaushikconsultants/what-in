@@ -12,6 +12,7 @@ export interface RecoveryAgentSettings {
 
   // NEW: In-WhatsApp Flow Address Collection & Customizable Partial COD
   flowCheckoutEnabled: boolean; // default: true (ask address via Flow before payment)
+  paymentDeliveryMethod?: 'web_url' | 'whatsapp_qr' | 'both'; // Whether payment is completed on Web URL, direct WhatsApp QR, or both
   metaFlowId?: string; // Real Meta Flow ID (e.g. 104829103948192)
   allowedPaymentModes: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[]; // e.g. ['PREPAID', 'PARTIAL_COD']
   partialCodMode: 'PERCENTAGE' | 'FIXED'; // e.g. 'PERCENTAGE' (10%) or 'FIXED' (₹200)
@@ -38,6 +39,7 @@ const DEFAULT_SETTINGS: RecoveryAgentSettings = {
   autoCatalogDeliveryMethod: "both",
 
   flowCheckoutEnabled: true,
+  paymentDeliveryMethod: "web_url",
   metaFlowId: "",
   allowedPaymentModes: ['PREPAID', 'PARTIAL_COD'],
   partialCodMode: 'PERCENTAGE',
@@ -100,6 +102,7 @@ export async function saveRecoveryAgentSettings(settings: Partial<RecoveryAgentS
     autoCatalogPaymentEnabled: settings.autoCatalogPaymentEnabled !== undefined ? Boolean(settings.autoCatalogPaymentEnabled) : current.autoCatalogPaymentEnabled,
     autoCatalogDeliveryMethod: settings.autoCatalogDeliveryMethod || current.autoCatalogDeliveryMethod || 'both',
     flowCheckoutEnabled: settings.flowCheckoutEnabled !== undefined ? Boolean(settings.flowCheckoutEnabled) : current.flowCheckoutEnabled,
+    paymentDeliveryMethod: settings.paymentDeliveryMethod || current.paymentDeliveryMethod || 'web_url',
     allowedPaymentModes: settings.allowedPaymentModes || current.allowedPaymentModes || ['PREPAID', 'PARTIAL_COD', 'FULL_COD'],
     partialCodMode: settings.partialCodMode || current.partialCodMode || 'PERCENTAGE',
     partialCodValue: settings.partialCodValue !== undefined ? Number(settings.partialCodValue) : current.partialCodValue,

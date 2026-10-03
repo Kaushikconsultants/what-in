@@ -89,6 +89,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
     autoCatalogPaymentEnabled: boolean;
     autoCatalogDeliveryMethod: 'both' | 'qr' | 'link';
     flowCheckoutEnabled?: boolean;
+    paymentDeliveryMethod?: 'web_url' | 'whatsapp_qr' | 'both';
     metaFlowId?: string;
     allowedPaymentModes?: ('PREPAID' | 'PARTIAL_COD' | 'FULL_COD')[];
     partialCodMode?: 'PERCENTAGE' | 'FIXED';
@@ -107,6 +108,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
     autoCatalogPaymentEnabled: true,
     autoCatalogDeliveryMethod: "both",
     flowCheckoutEnabled: true,
+    paymentDeliveryMethod: "web_url",
     metaFlowId: "",
     allowedPaymentModes: ['PREPAID', 'PARTIAL_COD', 'FULL_COD'],
     partialCodMode: 'PERCENTAGE',
@@ -1741,6 +1743,80 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
                               className="rounded text-amber-600 focus:ring-amber-500 w-3.5 h-3.5"
                             />
                             <span>Full Cash on Delivery</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Payment Collection & Delivery Channel */}
+                      <div className="flex flex-col gap-2">
+                        <label className="text-[11.5px] font-bold text-slate-800 dark:text-slate-200 block">
+                          Payment Collection &amp; QR Delivery Method (After Address Submission)
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          {/* 1. Web URL Checkout */}
+                          <label className={`flex flex-col p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                            (recoverySettings.paymentDeliveryMethod || 'web_url') === 'web_url'
+                              ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-400 dark:border-indigo-600 text-indigo-950 dark:text-indigo-200 ring-1 ring-indigo-400/50"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
+                          }`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <input
+                                type="radio"
+                                name="pm_paymentDeliveryMethod"
+                                value="web_url"
+                                checked={(recoverySettings.paymentDeliveryMethod || 'web_url') === 'web_url'}
+                                onChange={() => setRecoverySettings({ ...recoverySettings, paymentDeliveryMethod: 'web_url' })}
+                                className="text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                              />
+                              <span className="font-bold">🌐 Web Checkout Screen</span>
+                            </div>
+                            <span className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug">
+                              Customer stays on browser checkout page with live QR code &amp; screenshot uploader.
+                            </span>
+                          </label>
+
+                          {/* 2. Direct WhatsApp QR */}
+                          <label className={`flex flex-col p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                            recoverySettings.paymentDeliveryMethod === 'whatsapp_qr'
+                              ? "bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-400 dark:border-emerald-600 text-emerald-950 dark:text-emerald-200 ring-1 ring-emerald-400/50"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
+                          }`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <input
+                                type="radio"
+                                name="pm_paymentDeliveryMethod"
+                                value="whatsapp_qr"
+                                checked={recoverySettings.paymentDeliveryMethod === 'whatsapp_qr'}
+                                onChange={() => setRecoverySettings({ ...recoverySettings, paymentDeliveryMethod: 'whatsapp_qr' })}
+                                className="text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                              />
+                              <span className="font-bold">📲 Direct WhatsApp QR</span>
+                            </div>
+                            <span className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug">
+                              Dispatches dynamic UPI QR image + exact order bill directly into customer's WhatsApp chat.
+                            </span>
+                          </label>
+
+                          {/* 3. Both Web & WhatsApp */}
+                          <label className={`flex flex-col p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                            recoverySettings.paymentDeliveryMethod === 'both'
+                              ? "bg-purple-50/80 dark:bg-purple-950/50 border-purple-400 dark:border-purple-600 text-purple-950 dark:text-purple-200 ring-1 ring-purple-400/50"
+                              : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300"
+                          }`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <input
+                                type="radio"
+                                name="pm_paymentDeliveryMethod"
+                                value="both"
+                                checked={recoverySettings.paymentDeliveryMethod === 'both'}
+                                onChange={() => setRecoverySettings({ ...recoverySettings, paymentDeliveryMethod: 'both' })}
+                                className="text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                              />
+                              <span className="font-bold">⚡ Both (Web &amp; WhatsApp)</span>
+                            </div>
+                            <span className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug">
+                              Displays QR on web checkout AND sends the QR image to WhatsApp simultaneously.
+                            </span>
                           </label>
                         </div>
                       </div>

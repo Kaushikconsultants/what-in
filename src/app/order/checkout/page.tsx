@@ -34,7 +34,7 @@ function CheckoutContent() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [checkoutStep, setCheckoutStep] = useState<'ADDRESS' | 'PAYMENT_QR' | 'PROOF_SUBMITTED' | 'COD_CONFIRMED' | 'RAZORPAY_SUCCESS'>('ADDRESS');
+  const [checkoutStep, setCheckoutStep] = useState<'ADDRESS' | 'PAYMENT_QR' | 'PROOF_SUBMITTED' | 'COD_CONFIRMED' | 'RAZORPAY_SUCCESS' | 'WHATSAPP_QR_DISPATCHED'>('ADDRESS');
   const [errorMsg, setErrorMsg] = useState('');
 
   // Form Fields
@@ -275,14 +275,23 @@ function CheckoutContent() {
               };
               const rzp = new (window as any).Razorpay(options);
               rzp.open();
+            } else if (json.paymentDeliveryMethod === 'whatsapp_qr' || recoverySettings.paymentDeliveryMethod === 'whatsapp_qr') {
+              setCheckoutStep('WHATSAPP_QR_DISPATCHED');
             } else {
               setCheckoutStep('PAYMENT_QR');
             }
           } catch {
-            setCheckoutStep('PAYMENT_QR');
+            if (json.paymentDeliveryMethod === 'whatsapp_qr' || recoverySettings.paymentDeliveryMethod === 'whatsapp_qr') {
+              setCheckoutStep('WHATSAPP_QR_DISPATCHED');
+            } else {
+              setCheckoutStep('PAYMENT_QR');
+            }
           }
+        } else if (json.paymentDeliveryMethod === 'whatsapp_qr' || recoverySettings.paymentDeliveryMethod === 'whatsapp_qr') {
+          // Direct WhatsApp QR mode: QR already sent to customer's WhatsApp chat
+          setCheckoutStep('WHATSAPP_QR_DISPATCHED');
         } else {
-          // Default: Manual Dynamic UPI QR with Screenshot Verification
+          // Default / Both: Manual Dynamic UPI QR with Screenshot Verification on Web
           setCheckoutStep('PAYMENT_QR');
         }
       } else {
@@ -486,7 +495,61 @@ function CheckoutContent() {
     );
   }
 
-  // SCREEN 4: Dynamic Manual UPI QR & Screenshot Uploader
+  // SCREEN 4: Direct WhatsApp QR Dispatched
+  if (checkoutStep === 'WHATSAPP_QR_DISPATCHED') {
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-900 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl shadow-slate-200/60 relative overflow-hidden">
+          <div className="w-20 h-20 bg-emerald-100 border border-emerald-200 rounded-full flex items-center justify-center mx-auto mb-5 text-emerald-600">
+            <MessageSquare size={42} className="animate-bounce" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 mb-2">Delivery Address Confirmed!</h1>
+          <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+            Aapka address successfully save ho chuka hai. Payment UPI QR Code aur order details aapke <span className="text-emerald-600 font-bold">WhatsApp</span> par bhej di gayi hain.
+          </p>
+
+          <div className="bg-slate-50 rounded-2xl p-4 text-left border border-slate-200 mb-6 space-y-2.5">
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Customer:</span>
+              <span className="font-semibold text-slate-800">{fullName}</span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Delivery Area:</span>
+              <span className="font-semibold text-slate-800">{selectedPostOffice ? `${selectedPostOffice}, ` : ''}{pincode} ({city || 'India'})</span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Amount Sent on WhatsApp:</span>
+              <span className="font-black text-emerald-600">₹{payableAmount.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Payment Mode:</span>
+              <span className="font-bold text-slate-800">{paymentMode === 'PARTIAL_COD' ? 'Partial Advance Token' : '100% Prepaid'}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <a
+              href={waLink}
+              className="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+            >
+              <MessageSquare size={18} />
+              <span>Open WhatsApp &amp; Pay QR</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setCheckoutStep('PAYMENT_QR')}
+              className="w-full py-2 px-4 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all cursor-pointer"
+            >
+              Or Pay &amp; Upload Screenshot on this screen →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN 5: Dynamic Manual UPI QR & Screenshot Uploader
   if (checkoutStep === 'PAYMENT_QR') {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 text-slate-900 flex flex-col items-center justify-start p-4 sm:p-6 font-sans">

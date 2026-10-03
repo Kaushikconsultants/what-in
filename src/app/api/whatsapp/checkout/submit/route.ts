@@ -146,6 +146,59 @@ export async function POST(req: NextRequest) {
           content: confirmText,
           senderName: "Order System",
         }).catch((e) => console.warn("[Send COD Confirmation Error]:", e.message));
+      } else {
+        // Calculate payable amount (Partial COD token or Prepaid discounted total)
+        let payableAmount = orderTotal;
+        let discountAmount = 0;
+        if (chosenMode === "PARTIAL_COD") {
+          if (recSettings.partialCodMode === "FIXED") {
+            payableAmount = Math.min(orderTotal || 200, recSettings.partialCodValue || 200);
+          } else {
+            payableAmount = Math.max(1, Math.round(((orderTotal || 1000) * (recSettings.partialCodValue || 10)) / 100));
+          }
+        } else if (chosenMode === "PREPAID") {
+          if (recSettings.prepaidDiscountPercent > 0 && orderTotal > 0) {
+            discountAmount = Math.round((orderTotal * recSettings.prepaidDiscountPercent) / 100);
+            payableAmount = Math.max(1, orderTotal - discountAmount);
+          }
+        }
+
+        const deliveryMode = recSettings.paymentDeliveryMethod || "web_url";
+
+        // If client selected direct WhatsApp QR or both: dispatch QR code image + bill on WhatsApp
+        if (deliveryMode === "whatsapp_qr" || deliveryMode === "both" || recSettings.autoCatalogDeliveryMethod === "qr") {
+          const clientRecord = effectiveClientId ? await prisma.whatsAppClient.findUnique({ where: { id: effectiveClientId } }).catch(() => null) : null;
+          const payeeUpi = clientRecord?.merchantUpiId || "8447109898@PTYES";
+          const payeeName = clientRecord?.merchantUpiName || clientRecord?.businessName || "Store";
+          const upiDeepLink = `upi://pay?pa=${encodeURIComponent(payeeUpi)}&pn=${encodeURIComponent(payeeName)}&am=${payableAmount}&cu=INR&tn=${encodeURIComponent(`Order for ${orderDesc}`.slice(0, 40))}`;
+          const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(upiDeepLink)}`;
+
+          const qrMessage =
+            `🛍️ *Order Address Confirmed! Complete Payment to Dispatch*\n\n` +
+            `👤 *Recipient:* ${cleanName}\n` +
+            `📍 *Delivery Address:* ${streetCombined || "Address on file"}, ${areaCombined || city || ""}${cleanPin ? ` - ${cleanPin}` : ""}\n` +
+            `📦 *Order / Plan:* ${orderDesc}\n\n` +
+            `💰 *Amount Payable:* *₹${payableAmount.toLocaleString("en-IN")}* (${chosenMode === "PARTIAL_COD" ? "Advance Token" : "100% Prepaid with Discount"})\n` +
+            (chosenMode === "PARTIAL_COD" ? `💵 *COD Balance on Delivery:* ₹${(orderTotal - payableAmount).toLocaleString("en-IN")}\n` : "") +
+            (discountAmount > 0 ? `🎁 *Prepaid Discount:* Saved ₹${discountAmount.toLocaleString("en-IN")}\n` : "") +
+            `📱 *UPI ID:* \`${payeeUpi}\`\n` +
+            `🏷️ *Payee Name:* ${payeeName}\n\n` +
+            `📲 *How to Pay:* \n` +
+            `1. Scan the attached QR code or copy the UPI ID above.\n` +
+            `2. Pay *₹${payableAmount.toLocaleString("en-IN")}* from your UPI app (GPay / PhonePe / Paytm / BHIM).\n` +
+            `3. Take a screenshot of the payment receipt and reply right here in this chat!\n\n` +
+            `⚡ Our billing team will verify your screenshot and confirm your dispatch instantly!`;
+
+          await sendWhatsAppMessageAction({
+            conversationId: conv.id,
+            senderId: "system",
+            senderType: "SYSTEM",
+            messageType: "IMAGE",
+            mediaUrl: qrImageUrl,
+            content: qrMessage,
+            senderName: "Order System",
+          }).catch((e) => console.warn("[Send WhatsApp Payment QR Error]:", e.message));
+        }
       }
 
       // Resume active chatbot flow if any
@@ -174,9 +227,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let payableAmount = orderTotal;
+    if (chosenMode === "PARTIAL_COD") {
+      if (recSettings.partialCodMode === "FIXED") {
+        payableAmount = Math.min(orderTotal || 200, recSettings.partialCodValue || 200);
+      } else {
+        payableAmount = Math.max(1, Math.round(((orderTotal || 1000) * (recSettings.partialCodValue || 10)) / 100));
+      }
+    } else if (chosenMode === "PREPAID") {
+      if (recSettings.prepaidDiscountPercent > 0 && orderTotal > 0) {
+        const discountAmount = Math.round((orderTotal * recSettings.prepaidDiscountPercent) / 100);
+        payableAmount = Math.max(1, orderTotal - discountAmount);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Delivery address submitted successfully.",
+      paymentDeliveryMethod: recSettings.paymentDeliveryMethod || "web_url",
+      payableAmount,
+      orderTotal,
+      paymentMode: chosenMode,
     });
   } catch (err: any) {
     console.error("[Checkout Submit Error]:", err);
