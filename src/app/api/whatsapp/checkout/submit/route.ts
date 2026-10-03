@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
           paymentUrl: "",
           status: isFullCod ? "PENDING" : "PENDING",
           transactionId: isFullCod ? `COD_${Date.now()}` : undefined,
+          orderId: orderDesc || "Order Items",
         }
       }).catch(() => null);
     }

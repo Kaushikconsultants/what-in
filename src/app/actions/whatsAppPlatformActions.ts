@@ -4819,7 +4819,19 @@ export async function getWhatsAppRealAnalytics() {
 // ---------------------------------------------------------
 export async function getWhatsAppPaymentLinks() {
   try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    const clientId = user?.clientId;
+
     const links = await prisma.whatsAppPaymentLink.findMany({
+      where: clientId
+        ? {
+            OR: [
+              { clientId },
+              { conversation: { clientId } },
+              { customer: { clientId } }
+            ]
+          }
+        : {},
       orderBy: { createdAt: 'desc' },
       take: 200,
       include: {

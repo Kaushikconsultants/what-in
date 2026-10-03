@@ -151,11 +151,11 @@ export default function WhatsAppTemplatesComponent() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "most_used" | "highest_read" | "alphabetical">("newest");
   
   // Dynamic Brand Details & Intelligence from Database
-  const [brandName, setBrandName] = useState("Espon Clothing Private Limited");
-  const [whatsAppDisplayName, setWhatsAppDisplayName] = useState("Espon");
-  const [brandDomain, setBrandDomain] = useState("www.esponsports.com");
-  const [brandPhone, setBrandPhone] = useState("+91 7206066678");
-  const [brandEmail, setBrandEmail] = useState("clothingespon@gmail.com");
+  const [brandName, setBrandName] = useState("Official Store");
+  const [whatsAppDisplayName, setWhatsAppDisplayName] = useState("Store");
+  const [brandDomain, setBrandDomain] = useState("www.store.com");
+  const [brandPhone, setBrandPhone] = useState("+91 98765 43210");
+  const [brandEmail, setBrandEmail] = useState("support@store.com");
   const [hasAiKnowledge, setHasAiKnowledge] = useState(true);
   const [productsCount, setProductsCount] = useState<number>(0);
   const [combosCount, setCombosCount] = useState<number>(0);

@@ -116,17 +116,17 @@ export default function WhatsAppOrdersComponent() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [invoiceModalTab, setInvoiceModalTab] = useState<"invoice" | "packingslip">("invoice");
   const [storeDetails, setStoreDetails] = useState<any>({
-    name: "Espon Clothing",
-    tradeName: "Espon Clothing Pvt Ltd",
+    name: "Official Store",
+    tradeName: "Official Store Pvt Ltd",
     gstin: "07AAACE1234F1Z5",
     pan: "AAACE1234F",
-    phone: "+91 98765 43210",
-    email: "support@esponclothing.com",
-    website: "www.esponclothing.com",
-    address: "Plot No 42, Garment Hub, Industrial Area",
+    phone: "+91 84471 09898",
+    email: "support@what-in.tinkal.in",
+    website: "www.what-in.tinkal.in",
+    address: "Main Commercial Center, Industrial Area",
     city: "New Delhi",
     state: "Delhi",
-    pincode: "110020",
+    pincode: "110001",
     country: "India"
   });
 
@@ -799,11 +799,13 @@ export default function WhatsAppOrdersComponent() {
                               <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                                 {ord.orderNumber}
                                 <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded-md ${
-                                  ord.source === "WHATSAPP_CATALOG"
+                                  ord.source === "WHATSAPP_CATALOG" || ord.source === "WHATSAPP_CHECKOUT"
                                     ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                                    : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                                    : ord.source === "SHOPIFY"
+                                    ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                                    : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                                 }`}>
-                                  {ord.source === "WHATSAPP_CATALOG" ? "WhatsApp" : "Shopify"}
+                                  {ord.source === "WHATSAPP_CATALOG" || ord.source === "WHATSAPP_CHECKOUT" ? "WhatsApp" : (ord.source === "SHOPIFY" ? "Shopify" : "Direct CRM")}
                                 </span>
                               </span>
                               <span className="text-[10.5px] text-slate-400 mt-0.5">
@@ -886,6 +888,21 @@ export default function WhatsAppOrdersComponent() {
                                     ? `Balance ₹${ord.financials.codBalanceDue} on Delivery`
                                     : "Payment Pending"}
                                 </span>
+                              )}
+
+                              {/* Clickable proof thumbnail preview */}
+                              {ord.financials.paymentScreenshotUrl && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setProofPreviewModalUrl(ord.financials.paymentScreenshotUrl!);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/60 self-start"
+                                  title="Click to view payment proof screenshot"
+                                >
+                                  <Eye size={10} /> View Proof SS
+                                </button>
                               )}
                             </div>
                           </td>

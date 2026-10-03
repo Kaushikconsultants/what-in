@@ -304,7 +304,7 @@ export async function getUnifiedOrdersAction(filters?: {
       const isPaid = pl.status === "PAID";
       const pLinkAmount = Number(pl.amount) || 0;
 
-      let extractedScreenshot = (isUnderReview || pl.paymentUrl?.includes("product-image")) ? pl.paymentUrl : undefined;
+      let extractedScreenshot = (isUnderReview || pl.paymentUrl?.includes("product-image") || pl.paymentUrl?.includes("proof_")) ? pl.paymentUrl : undefined;
       let extractedUtr = pl.transactionId || undefined;
 
       if (!extractedScreenshot && custNotes.includes("[PROOF UPLOADED]")) {
@@ -338,6 +338,17 @@ export async function getUnifiedOrdersAction(filters?: {
         ? "PAYMENT_UNDER_REVIEW"
         : (isPaid ? (isPartialCod ? "PARTIALLY_PAID" : "PAID") : "PENDING");
 
+      // Extract clean item name
+      let itemName = "Order Package / Products";
+      if (pl.orderId && !pl.orderId.startsWith("PAY_") && !pl.orderId.startsWith("WA-") && !pl.orderId.startsWith("ORD-")) {
+        itemName = pl.orderId;
+      }
+
+      if (itemName === "Order Package / Products" && custNotes) {
+        const itemMatch = custNotes.match(/Items?:\s*([^,\n|]+)/i) || custNotes.match(/Plan:\s*([^,\n|]+)/i) || custNotes.match(/\[PROOF UPLOADED\]:\s*[^|]+\|([^|]+)/i);
+        if (itemMatch) itemName = itemMatch[1].trim();
+      }
+
       const shortId = pl.id.slice(-6).toUpperCase();
 
       orders.push({
@@ -360,7 +371,7 @@ export async function getUnifiedOrdersAction(filters?: {
         },
         items: [{
           id: `item-${pl.id.slice(-6)}`,
-          name: isPartialCod ? `Partial Advance Token (₹${pLinkAmount})` : `Order Package / Product (₹${pLinkAmount})`,
+          name: itemName,
           quantity: 1,
           price: pLinkAmount,
           total: pLinkAmount
@@ -812,24 +823,39 @@ export async function updateUnifiedOrderAction(params: UpdateUnifiedOrderInput) 
 export async function getStoreDetailsAction() {
   try {
     const user = await getAuthenticatedUser().catch(() => null);
+    const clientId = user?.clientId;
+
+    let client: any = null;
+    if (clientId) {
+      client = await prisma.whatsAppClient.findUnique({
+        where: { id: clientId }
+      }).catch(() => null);
+    }
+
     const org = await prisma.organization.findFirst({
-      where: user?.clientId ? { id: user.clientId } : undefined
-    });
+      where: clientId ? { id: clientId } : undefined
+    }).catch(() => null);
+
+    const storeName = client?.businessName || org?.name || org?.tradeName || "Official Store";
+    const tradeName = client?.businessName ? `${client.businessName} Pvt Ltd` : (org?.tradeName || org?.name || "Official Store Pvt Ltd");
+    const phone = client?.phoneNumber || client?.contactPhone || org?.phone || "+91 84471 09898";
+    const email = client?.contactEmail || client?.adminEmail || org?.email || "support@what-in.tinkal.in";
+    const website = client?.shopifyDomain ? `www.${client.shopifyDomain}` : (org?.website || `www.${storeName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`);
 
     return {
       success: true,
       store: {
-        name: org?.name || org?.tradeName || "Espon Clothing",
-        tradeName: org?.tradeName || org?.name || "Espon Clothing Pvt Ltd",
+        name: storeName,
+        tradeName: tradeName,
         gstin: org?.gstin || "07AAACE1234F1Z5",
         pan: org?.pan || "AAACE1234F",
-        phone: org?.phone || "+91 98765 43210",
-        email: org?.email || "support@esponclothing.com",
-        website: org?.website || "www.esponclothing.com",
-        address: org?.address || "Plot No 42, Garment Hub, Industrial Area",
+        phone: phone,
+        email: email,
+        website: website,
+        address: org?.address || "Main Commercial Center, Industrial Area",
         city: org?.city || "New Delhi",
         state: org?.state || "Delhi",
-        pincode: org?.pincode || "110020",
+        pincode: org?.pincode || "110001",
         country: org?.country || "India"
       }
     };
@@ -837,17 +863,17 @@ export async function getStoreDetailsAction() {
     return {
       success: false,
       store: {
-        name: "Espon Clothing",
-        tradeName: "Espon Clothing Pvt Ltd",
+        name: "Official Store",
+        tradeName: "Official Store Pvt Ltd",
         gstin: "07AAACE1234F1Z5",
         pan: "AAACE1234F",
-        phone: "+91 98765 43210",
-        email: "support@esponclothing.com",
-        website: "www.esponclothing.com",
-        address: "Plot No 42, Garment Hub, Industrial Area",
+        phone: "+91 84471 09898",
+        email: "support@what-in.tinkal.in",
+        website: "www.what-in.tinkal.in",
+        address: "Main Commercial Center, Industrial Area",
         city: "New Delhi",
         state: "Delhi",
-        pincode: "110020",
+        pincode: "110001",
         country: "India"
       }
     };

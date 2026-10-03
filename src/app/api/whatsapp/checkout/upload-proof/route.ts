@@ -129,8 +129,29 @@ export async function POST(req: NextRequest) {
       orderDesc,
     });
 
-    let paymentLink: any = null;
-    if (conversationId && customerId) {
+    // Find existing payment link for this conversation / customer or create new
+    let paymentLink = await prisma.whatsAppPaymentLink.findFirst({
+      where: {
+        OR: [
+          conversationId ? { conversationId } : null,
+          customerId ? { customerId } : null,
+        ].filter(Boolean) as any,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (paymentLink) {
+      paymentLink = await prisma.whatsAppPaymentLink.update({
+        where: { id: paymentLink.id },
+        data: {
+          amount: amount || paymentLink.amount,
+          paymentUrl: publicScreenshotUrl,
+          status: "PAYMENT_UNDER_REVIEW",
+          transactionId: utr || paymentLink.transactionId || `UTR_${Date.now()}`,
+          orderId: orderDesc || paymentLink.orderId || "Order Payment",
+        },
+      });
+    } else if (conversationId && customerId) {
       paymentLink = await prisma.whatsAppPaymentLink.create({
         data: {
           clientId: effectiveClientId,
@@ -140,6 +161,7 @@ export async function POST(req: NextRequest) {
           paymentUrl: publicScreenshotUrl,
           status: "PAYMENT_UNDER_REVIEW",
           transactionId: utr || `UTR_${Date.now()}`,
+          orderId: orderDesc || "Order Payment",
         },
       });
     }

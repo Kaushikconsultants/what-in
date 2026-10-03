@@ -43,6 +43,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
   const [activeFilter, setActiveFilter] = useState<"ALL" | "PENDING" | "PAID" | "MANUAL_UPI" | "GATEWAY">("ALL");
   const [copiedRzp, setCopiedRzp] = useState(false);
   const [copiedCf, setCopiedCf] = useState(false);
+  const [previewScreenshotUrl, setPreviewScreenshotUrl] = useState<string | null>(null);
 
   // Settings & Tenant Webhook Info
   const [gatewaySettings, setGatewaySettings] = useState<{
@@ -202,15 +203,15 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
   }, [clientId]);
 
   // Compute stats
-  const totalPending = links.filter(l => l.status === "PENDING").reduce((s, l) => s + (l.amount || 0), 0);
+  const totalPending = links.filter(l => l.status === "PENDING" || l.status === "PAYMENT_UNDER_REVIEW").reduce((s, l) => s + (l.amount || 0), 0);
   const totalReceived = links.filter(l => l.status === "PAID").reduce((s, l) => s + (l.amount || 0), 0);
-  const manualCount = links.filter(l => l.paymentUrl?.includes("manual") || l.transactionId?.startsWith("MANUAL")).length;
-  const pendingCount = links.filter(l => l.status === "PENDING").length;
+  const manualCount = links.filter(l => l.paymentUrl?.includes("manual") || l.paymentUrl?.includes("product-image") || l.paymentUrl?.includes("proof_") || l.transactionId?.startsWith("MANUAL") || l.transactionId?.startsWith("UTR")).length;
+  const pendingCount = links.filter(l => l.status === "PENDING" || l.status === "PAYMENT_UNDER_REVIEW").length;
 
   // Filter links
   const filteredLinks = links.filter(link => {
-    const isManual = link.paymentUrl?.includes("manual") || link.transactionId?.startsWith("MANUAL");
-    if (activeFilter === "PENDING") return link.status === "PENDING";
+    const isManual = link.paymentUrl?.includes("manual") || link.paymentUrl?.includes("product-image") || link.paymentUrl?.includes("proof_") || link.transactionId?.startsWith("MANUAL") || link.transactionId?.startsWith("UTR");
+    if (activeFilter === "PENDING") return link.status === "PENDING" || link.status === "PAYMENT_UNDER_REVIEW";
     if (activeFilter === "PAID") return link.status === "PAID";
     if (activeFilter === "MANUAL_UPI") return isManual;
     if (activeFilter === "GATEWAY") return !isManual;
@@ -721,10 +722,11 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {filteredLinks.map((link) => {
                       const cust = link.conversation?.customer || link.customer;
-                      const isManual = link.paymentUrl?.includes("manual") || link.transactionId?.startsWith("MANUAL");
+                      const isManual = link.paymentUrl?.includes("manual") || link.paymentUrl?.includes("product-image") || link.paymentUrl?.includes("proof_") || link.transactionId?.startsWith("MANUAL") || link.transactionId?.startsWith("UTR");
                       const isRazorpay = link.paymentUrl?.includes("rzp") || link.transactionId?.startsWith("pay_");
                       const isCashfree = link.paymentUrl?.includes("cashfree") || link.transactionId?.startsWith("CF_");
                       const hasAiOcr = Boolean(link.description && link.description.includes("[AI OCR:"));
+                      const hasProofImage = Boolean(link.paymentUrl && (link.paymentUrl.includes("product-image") || link.paymentUrl.includes("proof_") || link.status === "PAYMENT_UNDER_REVIEW"));
 
                       return (
                         <tr key={link.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
@@ -737,26 +739,48 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            {isManual ? (
-                              <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700/50 inline-flex items-center gap-1">
-                                <Smartphone size={11} /> UPI / QR
-                              </span>
-                            ) : isRazorpay ? (
-                              <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50 inline-flex items-center gap-1">
-                                <CreditCard size={11} /> Razorpay
-                              </span>
-                            ) : isCashfree ? (
-                              <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-cyan-50 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-700/50 inline-flex items-center gap-1">
-                                <ShieldCheck size={11} /> Cashfree
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1">
-                                <LinkIcon size={11} /> Payment Link
+                            <div className="flex flex-col gap-1 items-start">
+                              {isManual ? (
+                                <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700/50 inline-flex items-center gap-1">
+                                  <Smartphone size={11} /> UPI / QR
+                                </span>
+                              ) : isRazorpay ? (
+                                <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50 inline-flex items-center gap-1">
+                                  <CreditCard size={11} /> Razorpay
+                                </span>
+                              ) : isCashfree ? (
+                                <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-cyan-50 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-700/50 inline-flex items-center gap-1">
+                                  <ShieldCheck size={11} /> Cashfree
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1">
+                                  <LinkIcon size={11} /> Payment Link
+                                </span>
+                              )}
+
+                              {/* Clickable Proof Thumbnail / Badge */}
+                              {hasProofImage && link.paymentUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewScreenshotUrl(link.paymentUrl)}
+                                  className="inline-flex items-center gap-1 text-[10.5px] font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/60 cursor-pointer transition-colors"
+                                  title="View uploaded payment screenshot"
+                                >
+                                  <Eye size={10} />
+                                  <span>View Proof SS</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-slate-700 dark:text-slate-300 max-w-[200px]">
+                            <div className="font-medium truncate">
+                              {link.orderId || link.description?.split("[AI OCR")[0].replace(/\[PROOF UPLOADED\]/gi, "").split("|")[0].trim() || "Payment Request"}
+                            </div>
+                            {link.status === "PAYMENT_UNDER_REVIEW" && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 mt-0.5 text-[10px] font-bold rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                📸 Proof Uploaded
                               </span>
                             )}
-                          </td>
-                          <td className="py-3 px-4 text-slate-700 dark:text-slate-300 max-w-[200px] truncate">
-                            <div>{link.orderId || link.description?.split("[AI OCR")[0] || "Payment Request"}</div>
                             {hasAiOcr && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.2 mt-0.5 text-[10px] font-bold rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60">
                                 <Sparkles size={10} /> AI Screenshot Detected
@@ -768,18 +792,29 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
                           </td>
                           <td className="py-3 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
                             {link.transactionId ? (
-                              <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                              <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold">
                                 {link.transactionId}
                               </span>
                             ) : "-"}
                           </td>
                           <td className="py-3 px-4 text-slate-500 dark:text-slate-400">
-                            {new Date(link.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                {new Date(link.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                              </span>
+                              <span className="text-[10.5px] text-slate-400 font-medium">
+                                {new Date(link.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                              </span>
+                            </div>
                           </td>
                           <td className="py-3 px-4">
                             {link.status === "PAID" ? (
                               <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 inline-flex items-center gap-1">
                                 <CheckCircle2 size={11} /> PAID
+                              </span>
+                            ) : link.status === "PAYMENT_UNDER_REVIEW" ? (
+                              <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700 inline-flex items-center gap-1 animate-pulse">
+                                <Clock size={11} /> PROOF UNDER REVIEW
                               </span>
                             ) : link.status === "EXPIRED" ? (
                               <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/60 inline-flex items-center gap-1">
@@ -793,7 +828,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {link.status === "PENDING" && (
+                              {(link.status === "PENDING" || link.status === "PAYMENT_UNDER_REVIEW") && (
                                 <>
                                   <button
                                     onClick={() => handleTriggerRecovery(link.id)}
@@ -807,15 +842,19 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
 
                                   <button
                                     onClick={() => handleOpenVerifyModal(link)}
-                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer shadow-xs"
+                                    className={`px-3 py-1 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer shadow-xs ${
+                                      link.status === "PAYMENT_UNDER_REVIEW" ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
+                                    }`}
                                   >
                                     <ShieldCheck size={13} />
-                                    <span>Verify Payment</span>
+                                    <span>{link.status === "PAYMENT_UNDER_REVIEW" ? "Verify Proof" : "Verify Payment"}</span>
                                   </button>
                                 </>
                               )}
                               {link.status === "PAID" && (
-                                <span className="text-[11px] text-slate-400 font-medium">Verified</span>
+                                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold inline-flex items-center gap-1">
+                                  <CheckCircle2 size={12} /> Verified
+                                </span>
                               )}
                             </div>
                           </td>
@@ -1129,7 +1168,7 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
                       type="text" 
                       value={merchantUpiName} 
                       onChange={(e) => setMerchantUpiName(e.target.value)} 
-                      placeholder="e.g. Espon Clothing Private Limited" 
+                      placeholder="e.g. Sonify Ayurveda Private Limited" 
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-amber-500" 
                     />
                   </div>
@@ -2077,6 +2116,39 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
                 </div>
               )}
 
+              {/* Screenshot Proof Preview if available */}
+              {verifyingLink.paymentUrl && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Eye size={13} className="text-indigo-600 dark:text-indigo-400" />
+                      Uploaded Payment Screenshot Proof
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewScreenshotUrl(verifyingLink.paymentUrl)}
+                      className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      Enlarge Image ↗
+                    </button>
+                  </div>
+                  <div
+                    onClick={() => setPreviewScreenshotUrl(verifyingLink.paymentUrl)}
+                    className="relative w-full h-48 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-850 flex items-center justify-center cursor-pointer group shadow-2xs"
+                    title="Click to view full size"
+                  >
+                    <img
+                      src={verifyingLink.paymentUrl}
+                      alt="Payment Screenshot Proof"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5">
+                      <Eye size={16} /> Click to Enlarge
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl p-3.5">
                 <div className="text-[11px] font-bold text-slate-500 uppercase">Customer</div>
                 <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
@@ -2350,6 +2422,51 @@ export default function WhatsAppPaymentsManagementComponent({ embedded = false, 
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Lightbox Image Modal */}
+      {previewScreenshotUrl && (
+        <div
+          className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[999999] p-4 animate-in fade-in duration-150"
+          onClick={() => setPreviewScreenshotUrl(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[92vh] flex flex-col items-center justify-center bg-slate-900/90 rounded-2xl p-4 border border-slate-800 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800 text-white">
+              <span className="text-xs font-bold flex items-center gap-1.5">
+                <ShieldCheck size={16} className="text-emerald-400" />
+                Customer Payment Screenshot Proof
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewScreenshotUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1"
+                >
+                  <ExternalLink size={12} /> Open Original
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewScreenshotUrl(null)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-3 max-h-[80vh] overflow-auto flex items-center justify-center">
+              <img
+                src={previewScreenshotUrl}
+                alt="Payment Screenshot Preview"
+                className="max-h-[75vh] w-auto object-contain rounded-lg shadow-lg border border-slate-700"
+              />
             </div>
           </div>
         </div>
