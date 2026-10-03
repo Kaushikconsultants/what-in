@@ -440,39 +440,22 @@ function CheckoutContent() {
 
           {/* Payment Preference Selector */}
           <div className="pt-3 border-t border-slate-100">
-            <label className="block text-xs font-bold text-slate-900 mb-2">Select Payment Preference</label>
-            <div className="space-y-2.5">
-              {/* Full COD (Only rendered if enabled in admin settings) */}
-              {showFullCod && (
-                <label
-                  onClick={() => setPaymentMode('FULL_COD')}
-                  className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
-                    paymentMode === 'FULL_COD'
-                      ? 'bg-emerald-50 border-emerald-600 text-slate-900 shadow-sm'
-                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${paymentMode === 'FULL_COD' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400'}`}>
-                      {paymentMode === 'FULL_COD' && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold flex items-center gap-1.5 text-slate-900">
-                        <Truck size={15} className="text-emerald-600" /> Cash on Delivery (Full COD)
-                      </div>
-                      <div className="text-[11px] text-slate-500">Pay ₹{orderTotal > 0 ? orderTotal.toLocaleString('en-IN') : 'Total'} upon parcel delivery</div>
-                    </div>
-                  </div>
-                </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold text-slate-900">Select Payment Preference</label>
+              {Number(recoverySettings?.prepaidDiscountPercent) > 0 && (
+                <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                  <Sparkles size={12} className="text-emerald-600" /> {recoverySettings.prepaidDiscountPercent}% UPI Discount Active
+                </span>
               )}
-
+            </div>
+            <div className="space-y-2.5">
               {/* Partial COD (Only rendered if enabled in admin settings) */}
               {showPartialCod && (
                 <label
                   onClick={() => setPaymentMode('PARTIAL_COD')}
                   className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
                     paymentMode === 'PARTIAL_COD'
-                      ? 'bg-emerald-50 border-emerald-600 text-slate-900 shadow-sm'
+                      ? 'bg-emerald-50/80 border-emerald-600 text-slate-900 shadow-sm ring-1 ring-emerald-500/20'
                       : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                   }`}
                 >
@@ -485,12 +468,16 @@ function CheckoutContent() {
                         <Sparkles size={15} className="text-amber-600" /> Partial COD (Advance Token)
                       </div>
                       <div className="text-[11px] text-slate-500">
-                        Pay ₹{partialCodAdvance} token on WhatsApp + ₹{codBalance} on delivery
+                        {orderTotal > 0 ? (
+                          <>Pay <strong className="text-slate-800">₹{partialCodAdvance.toLocaleString('en-IN')}</strong> token on WhatsApp + <strong className="text-slate-800">₹{codBalance.toLocaleString('en-IN')}</strong> on delivery</>
+                        ) : (
+                          <>Pay {recoverySettings.partialCodMode === 'FIXED' ? `₹${recoverySettings.partialCodValue || 200}` : `${recoverySettings.partialCodValue || 10}%`} token advance online + rest on delivery</>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                    Recommended
+                  <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                    Popular
                   </span>
                 </label>
               )}
@@ -501,7 +488,7 @@ function CheckoutContent() {
                   onClick={() => setPaymentMode('PREPAID')}
                   className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
                     paymentMode === 'PREPAID'
-                      ? 'bg-emerald-50 border-emerald-600 text-slate-900 shadow-sm'
+                      ? 'bg-emerald-50/80 border-emerald-600 text-slate-900 shadow-sm ring-1 ring-emerald-500/20'
                       : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
                   }`}
                 >
@@ -514,15 +501,49 @@ function CheckoutContent() {
                         <CreditCard size={15} className="text-indigo-600" /> Full Prepaid (Instant UPI)
                       </div>
                       <div className="text-[11px] text-slate-500">
-                        {prepaidDiscount > 0 ? `Pay ₹${prepaidTotal.toLocaleString('en-IN')} (Saved ₹${prepaidDiscount})` : `Pay ₹${orderTotal} via WhatsApp UPI`}
+                        {orderTotal > 0 ? (
+                          prepaidDiscount > 0 ? (
+                            <>Pay <strong className="text-emerald-700 font-bold">₹{prepaidTotal.toLocaleString('en-IN')}</strong> (Saved ₹{prepaidDiscount}) via Instant WhatsApp UPI</>
+                          ) : (
+                            <>Pay <strong className="text-slate-800">₹{orderTotal.toLocaleString('en-IN')}</strong> via WhatsApp UPI</>
+                          )
+                        ) : (
+                          <>Pay via Instant WhatsApp UPI {Number(recoverySettings?.prepaidDiscountPercent) > 0 ? `(Get ${recoverySettings.prepaidDiscountPercent}% Extra Instant Discount)` : ''}</>
+                        )}
                       </div>
                     </div>
                   </div>
-                  {prepaidDiscount > 0 && (
+                  {Number(recoverySettings?.prepaidDiscountPercent) > 0 && (
                     <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
                       {recoverySettings.prepaidDiscountPercent}% OFF
                     </span>
                   )}
+                </label>
+              )}
+
+              {/* Full COD (Only rendered if enabled in admin settings) */}
+              {showFullCod && (
+                <label
+                  onClick={() => setPaymentMode('FULL_COD')}
+                  className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                    paymentMode === 'FULL_COD'
+                      ? 'bg-emerald-50/80 border-emerald-600 text-slate-900 shadow-sm ring-1 ring-emerald-500/20'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${paymentMode === 'FULL_COD' ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400'}`}>
+                      {paymentMode === 'FULL_COD' && <div className="w-1.5 h-1.5 rounded-full bg-white"></div>}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold flex items-center gap-1.5 text-slate-900">
+                        <Truck size={15} className="text-emerald-600" /> Cash on Delivery (Full COD)
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {orderTotal > 0 ? `Pay ₹${orderTotal.toLocaleString('en-IN')} upon parcel delivery` : 'Pay 100% in cash upon parcel delivery'}
+                      </div>
+                    </div>
+                  </div>
                 </label>
               )}
             </div>

@@ -77,6 +77,17 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const productParam = searchParams.get("p") || searchParams.get("product") || searchParams.get("item") || searchParams.get("desc") || "";
+    if (items.length === 0 && (orderTotal > 0 || productParam)) {
+      items = [{
+        name: productParam || "Selected Package / Product",
+        quantity: 1,
+        price: orderTotal || 0,
+        image: "",
+      }];
+      if (productParam) orderDesc = productParam;
+    }
+
     // Parse existing address parts if available
     let housePart = "";
     let streetPart = customer?.landmark || "";

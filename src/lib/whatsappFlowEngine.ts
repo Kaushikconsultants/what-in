@@ -424,7 +424,9 @@ async function dispatchNode(
       const bodyText = inter(node.bodyText || node.text || "Please click below to enter your delivery address and confirm your order:");
       const ctaLabel = String(inter(node.ctaText || "Enter Address 📍")).slice(0, 20);
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://what-in.tinkal.in";
-      const checkoutUrl = `${appUrl}/order/checkout?conv=${resolvedConvId || ''}&client=${effectiveClientId || ''}`;
+      const amtParam = node.amount || node.orderTotal || node.orderAmount ? `&amt=${encodeURIComponent(node.amount || node.orderTotal || node.orderAmount)}` : '';
+      const prodParam = node.productName || node.product || node.orderDesc ? `&p=${encodeURIComponent(node.productName || node.product || node.orderDesc)}` : '';
+      const checkoutUrl = `${appUrl}/order/checkout?conv=${resolvedConvId || ''}&client=${effectiveClientId || ''}${amtParam}${prodParam}`;
 
       payload.type = 'interactive';
       payload.interactive = {

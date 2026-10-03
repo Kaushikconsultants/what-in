@@ -4802,6 +4802,29 @@ export default function WhatsAppChatbotBuilderPage() {
                       />
                     </div>
 
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      <div>
+                        <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Order Amount (₹)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 999"
+                          value={selectedNode.amount !== undefined ? selectedNode.amount : (selectedNode.orderTotal || "")}
+                          onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, amount: e.target.value, orderTotal: e.target.value } : n)))}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Product / Plan</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Wellness Kit"
+                          value={selectedNode.productName !== undefined ? selectedNode.productName : (selectedNode.product || "")}
+                          onChange={(e) => setNodes((prev) => prev.map((n) => (n.id === selectedNode.id ? { ...n, productName: e.target.value, product: e.target.value } : n)))}
+                          style={{ width: "100%", padding: "6px 8px", fontSize: "12px", border: "1px solid #cbd5e1", borderRadius: "6px", marginTop: "4px" }}
+                        />
+                      </div>
+                    </div>
+
                     <div>
                       <label style={{ fontSize: "11.5px", fontWeight: 700, color: "#374151" }}>Footer Note (Optional)</label>
                       <input
