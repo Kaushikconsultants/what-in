@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     const isPartialCod = chosenMode === "PARTIAL_COD" || chosenMode.includes("PARTIAL") || chosenMode.includes("TOKEN");
 
     if (conv?.id) {
-      const recipientPhone = customer?.whatsappNumber || customer?.mobile || conv.customerPhone || "";
+      const recipientPhone = customer?.whatsappNumber || customer?.mobile || phone || "";
 
       if (isFullCod) {
         // 1. Full COD: No advance required. Immediate Order Confirmation.
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
 
       // Resume active chatbot flow if any
       try {
-        const fromPhone = customer?.whatsappNumber || customer?.mobile || conv.customerPhone || "";
+        const fromPhone = customer?.whatsappNumber || customer?.mobile || phone || "";
         await executeFlowEngine(
           fromPhone,
           "FLOW_SUBMITTED",
