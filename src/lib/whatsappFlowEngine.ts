@@ -432,12 +432,59 @@ async function dispatchNode(
     let response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
     let responseData = await response.json().catch(() => ({}));
     
-    // Resilient Fallback: If interactive message failed with an image header, retry without the header
+    // Resilient Fallback 1: If interactive message failed with a header, retry without the header
     if (!response.ok && payload.type === 'interactive' && payload.interactive?.header) {
       console.warn(`[Flow Engine] Interactive message with header failed (${response.status} ${JSON.stringify(responseData)}). Retrying without header...`);
       delete payload.interactive.header;
       response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
       responseData = await response.json().catch(() => ({}));
+    }
+
+    // Resilient Fallback 2: If native WhatsApp Flow is blocked by Meta Integrity Hold (Error 139000), dispatch seamless web checkout fallback
+    if (!response.ok && (type === 'WHATSAPP_FLOW' || type === 'META_FLOW')) {
+      console.warn(`[Flow Engine] Native WhatsApp Flow blocked by Meta Integrity (${responseData?.error?.code || response.status}). Dispatching resilient fallback checkout action...`);
+      const bodyText = inter(node.bodyText || node.text || "Please click below to fill out your details and place your order:");
+      const ctaLabel = String(inter(node.ctaText || "Place Order 🛍️")).slice(0, 20);
+      const fallbackUrl = `https://what-in.tinkal.in/pay/link_${resolvedConvId ? resolvedConvId.slice(-6) : Date.now().toString().slice(-6)}`;
+
+      const fallbackCtaPayload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: toPhone,
+        type: 'interactive',
+        interactive: {
+          type: 'cta_url',
+          header: { type: 'text', text: String(inter(node.headerText || "Order & Address Form")).slice(0, 60) },
+          body: { text: bodyText },
+          footer: { text: String(inter(node.footerText || "Fast & Secure Checkout")).slice(0, 60) },
+          action: {
+            name: 'cta_url',
+            parameters: {
+              display_text: ctaLabel,
+              url: fallbackUrl
+            }
+          }
+        }
+      };
+
+      const ctaRes = await fetch(url, { method: 'POST', headers, body: JSON.stringify(fallbackCtaPayload) });
+      if (ctaRes.ok) {
+        response = ctaRes;
+        responseData = await ctaRes.json().catch(() => ({}));
+      } else {
+        const textPayload = {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: toPhone,
+          type: 'text',
+          text: { body: `${bodyText}\n\n👉 *${ctaLabel}*: ${fallbackUrl}` }
+        };
+        const textRes = await fetch(url, { method: 'POST', headers, body: JSON.stringify(textPayload) });
+        if (textRes.ok) {
+          response = textRes;
+          responseData = await textRes.json().catch(() => ({}));
+        }
+      }
     }
 
     const wasSuccess = response.ok;
