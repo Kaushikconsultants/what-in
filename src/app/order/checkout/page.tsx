@@ -14,7 +14,15 @@ import {
   ArrowRight,
   MessageSquare,
   AlertCircle,
-  Building
+  Building,
+  QrCode,
+  Download,
+  ExternalLink,
+  UploadCloud,
+  Check,
+  Copy,
+  Clock,
+  ArrowLeft
 } from 'lucide-react';
 
 function CheckoutContent() {
@@ -26,7 +34,7 @@ function CheckoutContent() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<'ADDRESS' | 'PAYMENT_QR' | 'PROOF_SUBMITTED' | 'COD_CONFIRMED' | 'RAZORPAY_SUCCESS'>('ADDRESS');
   const [errorMsg, setErrorMsg] = useState('');
 
   // Form Fields
@@ -48,12 +56,27 @@ function CheckoutContent() {
   const [items, setItems] = useState<any[]>([]);
   const [orderTotal, setOrderTotal] = useState<number>(0);
   const [orderDesc, setOrderDesc] = useState('Order Items');
+  const [gateway, setGateway] = useState<any>({
+    activeGateway: 'MANUAL_UPI',
+    merchantUpiId: '',
+    merchantUpiName: '',
+    razorpayKeyId: '',
+    cashfreeAppId: ''
+  });
   const [recoverySettings, setRecoverySettings] = useState<any>({
     allowedPaymentModes: ['PREPAID', 'PARTIAL_COD'],
     partialCodMode: 'PERCENTAGE',
     partialCodValue: 10,
     prepaidDiscountPercent: 5
   });
+
+  // Proof Upload State
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string>('');
+  const [utrNumber, setUtrNumber] = useState('');
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [showProofUploader, setShowProofUploader] = useState(true);
 
   const fetchPostOfficesForPincode = async (code: string) => {
     const cleanPin = String(code || '').replace(/\D/g, '').slice(0, 6);
@@ -102,6 +125,10 @@ function CheckoutContent() {
           setOrderTotal(Number(d.orderTotal) || Number(amountParam) || 0);
           setOrderDesc(d.orderDesc || 'Order Items');
 
+          if (d.gateway) {
+            setGateway(d.gateway);
+          }
+
           if (d.pincode && d.pincode.length === 6) {
             fetchPostOfficesForPincode(d.pincode);
           }
@@ -134,7 +161,32 @@ function CheckoutContent() {
     fetchPostOfficesForPincode(val);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Calculate Partial COD and Prepaid calculations
+  let partialCodAdvance = 0;
+  if (recoverySettings.partialCodMode === 'FIXED') {
+    partialCodAdvance = Math.min(orderTotal || 200, recoverySettings.partialCodValue || 200);
+  } else {
+    partialCodAdvance = Math.max(1, Math.round(((orderTotal || 1000) * (recoverySettings.partialCodValue || 10)) / 100));
+  }
+  const codBalance = Math.max(0, (orderTotal || partialCodAdvance) - partialCodAdvance);
+
+  const prepaidDiscount = recoverySettings.prepaidDiscountPercent > 0 && orderTotal > 0
+    ? Math.round((orderTotal * recoverySettings.prepaidDiscountPercent) / 100)
+    : 0;
+  const prepaidTotal = Math.max(1, orderTotal - prepaidDiscount);
+
+  const payableAmount = paymentMode === 'PREPAID' ? prepaidTotal : (paymentMode === 'PARTIAL_COD' ? partialCodAdvance : orderTotal);
+
+  // Dynamic UPI URL & QR
+  const upiId = gateway?.merchantUpiId || '';
+  const payeeName = gateway?.merchantUpiName || storeName || 'Official Store';
+  const upiDeepLink = upiId
+    ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${payableAmount}&cu=INR&tn=${encodeURIComponent(`Order for ${orderDesc}`)}`
+    : `upi://pay?pn=${encodeURIComponent(payeeName)}&am=${payableAmount}&cu=INR&tn=${encodeURIComponent(`Order for ${orderDesc}`)}`;
+  const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=450x450&data=${encodeURIComponent(upiDeepLink)}`;
+
+  // Handle Address Submit
+  const handleSubmitAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
       setErrorMsg('Please enter your full name.');
@@ -176,7 +228,48 @@ function CheckoutContent() {
 
       const json = await res.json();
       if (json.success) {
-        setSubmitted(true);
+        if (paymentMode === 'FULL_COD') {
+          setCheckoutStep('COD_CONFIRMED');
+        } else if (gateway.activeGateway === 'RAZORPAY' && gateway.razorpayKeyId) {
+          // Razorpay Checkout integration
+          try {
+            const rzpScriptLoaded = await new Promise((resolve) => {
+              if ((window as any).Razorpay) return resolve(true);
+              const script = document.createElement('script');
+              script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+              script.onload = () => resolve(true);
+              script.onerror = () => resolve(false);
+              document.body.appendChild(script);
+            });
+
+            if (rzpScriptLoaded && (window as any).Razorpay) {
+              const options = {
+                key: gateway.razorpayKeyId,
+                amount: Math.round(payableAmount * 100),
+                currency: 'INR',
+                name: storeName,
+                description: orderDesc,
+                prefill: {
+                  name: fullName,
+                  contact: phone,
+                },
+                theme: { color: '#059669' },
+                handler: async function (response: any) {
+                  setCheckoutStep('RAZORPAY_SUCCESS');
+                }
+              };
+              const rzp = new (window as any).Razorpay(options);
+              rzp.open();
+            } else {
+              setCheckoutStep('PAYMENT_QR');
+            }
+          } catch {
+            setCheckoutStep('PAYMENT_QR');
+          }
+        } else {
+          // Default: Manual Dynamic UPI QR with Screenshot Verification
+          setCheckoutStep('PAYMENT_QR');
+        }
       } else {
         setErrorMsg(json.error || 'Failed to submit address. Please try again.');
       }
@@ -187,6 +280,75 @@ function CheckoutContent() {
     }
   };
 
+  // Handle Screenshot file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const f = e.target.files[0];
+      setProofFile(f);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProofPreview(reader.result as string);
+      };
+      reader.readAsDataURL(f);
+    }
+  };
+
+  // Submit Payment Proof Screenshot
+  const handleUploadProof = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!proofFile && !proofPreview) {
+      setErrorMsg('Please select or capture a payment screenshot first.');
+      return;
+    }
+
+    setUploadingProof(true);
+    setErrorMsg('');
+
+    try {
+      const formData = new FormData();
+      if (proofFile) {
+        formData.append('file', proofFile);
+      } else {
+        formData.append('fileDataUrl', proofPreview);
+      }
+      formData.append('conversationId', convId);
+      formData.append('customerId', customerId);
+      formData.append('clientId', clientId);
+      formData.append('amount', String(payableAmount));
+      formData.append('paymentMode', paymentMode);
+      formData.append('utr', utrNumber.trim());
+      formData.append('orderDescription', orderDesc);
+      formData.append('customerName', fullName);
+      formData.append('customerPhone', phone);
+
+      const res = await fetch('/api/whatsapp/checkout/upload-proof', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setCheckoutStep('PROOF_SUBMITTED');
+      } else {
+        setErrorMsg(json.error || 'Failed to submit payment screenshot.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Proof upload failed.');
+    } finally {
+      setUploadingProof(false);
+    }
+  };
+
+  const copyUpiToClipboard = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(upiId);
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2500);
+    }
+  };
+
+  const waLink = clientPhone ? `https://wa.me/${clientPhone.replace(/\D/g, '')}` : 'https://wa.me';
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col items-center justify-center p-4 font-sans">
@@ -196,39 +358,45 @@ function CheckoutContent() {
     );
   }
 
-  if (submitted) {
-    const waLink = clientPhone ? `https://wa.me/${clientPhone.replace(/\D/g, '')}` : 'https://wa.me';
+  // SCREEN 1: Payment Proof Submitted & Queued for Verification
+  if (checkoutStep === 'PROOF_SUBMITTED') {
     return (
       <div className="min-h-screen bg-slate-100 text-slate-900 flex items-center justify-center p-4 font-sans">
         <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl shadow-slate-200/60 relative overflow-hidden">
           <div className="w-20 h-20 bg-emerald-100 border border-emerald-200 rounded-full flex items-center justify-center mx-auto mb-5 text-emerald-600">
             <CheckCircle2 size={42} className="animate-bounce" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 mb-2">Delivery Details Saved!</h1>
+          <h1 className="text-2xl font-black text-slate-900 mb-2">Payment Proof Received!</h1>
           <p className="text-slate-600 text-sm mb-6 leading-relaxed">
-            Aapki delivery address successfully receive ho chuki hai. Order confirmation & payment link aapke <span className="text-emerald-600 font-bold">WhatsApp</span> par bhej di gayi hai.
+            Aapka payment screenshot successfully receive ho chuka hai. Hamari team isko verify karke aapka order dispatch karegi aur <span className="text-emerald-600 font-bold">WhatsApp</span> par notification bhejegi.
           </p>
 
-          <div className="bg-slate-50 rounded-2xl p-4 text-left border border-slate-200 mb-6 space-y-2">
+          <div className="bg-slate-50 rounded-2xl p-4 text-left border border-slate-200 mb-6 space-y-2.5">
             <div className="flex justify-between text-xs text-slate-500">
               <span>Customer:</span>
               <span className="font-semibold text-slate-800">{fullName}</span>
             </div>
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Delivery Area:</span>
-              <span className="font-semibold text-slate-800">{selectedPostOffice ? `${selectedPostOffice}, ` : ''}{pincode} ({city || 'India'})</span>
+              <span>Amount Paid:</span>
+              <span className="font-black text-slate-900">₹{payableAmount.toLocaleString('en-IN')}</span>
             </div>
+            {utrNumber && (
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>UTR / Ref No:</span>
+                <span className="font-mono font-bold text-slate-800">{utrNumber}</span>
+              </div>
+            )}
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Payment Mode:</span>
-              <span className="font-bold text-emerald-700">
-                {paymentMode === 'FULL_COD' ? 'Cash on Delivery (Full COD)' : paymentMode === 'PARTIAL_COD' ? 'Partial COD (Token Advance)' : 'Prepaid Online'}
+              <span>Verification Status:</span>
+              <span className="font-bold text-amber-600 flex items-center gap-1">
+                <Clock size={13} /> Under Admin Review
               </span>
             </div>
           </div>
 
           <a
             href={waLink}
-            className="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all active:scale-95"
+            className="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
           >
             <MessageSquare size={18} />
             <span>Open WhatsApp Chat</span>
@@ -238,21 +406,221 @@ function CheckoutContent() {
     );
   }
 
-  // Calculate Partial COD and Prepaid calculations
-  let partialCodAdvance = 0;
-  if (recoverySettings.partialCodMode === 'FIXED') {
-    partialCodAdvance = Math.min(orderTotal || 200, recoverySettings.partialCodValue || 200);
-  } else {
-    partialCodAdvance = Math.max(1, Math.round(((orderTotal || 1000) * (recoverySettings.partialCodValue || 10)) / 100));
+  // SCREEN 2: COD Immediate Confirmed
+  if (checkoutStep === 'COD_CONFIRMED') {
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-900 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl shadow-slate-200/60 relative overflow-hidden">
+          <div className="w-20 h-20 bg-emerald-100 border border-emerald-200 rounded-full flex items-center justify-center mx-auto mb-5 text-emerald-600">
+            <CheckCircle2 size={42} className="animate-bounce" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 mb-2">Order Confirmed (Cash on Delivery)!</h1>
+          <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+            Aapki delivery details successfully save ho chuki hain. Full COD order confirmation aapke <span className="text-emerald-600 font-bold">WhatsApp</span> par bhej di gayi hai.
+          </p>
+
+          <div className="bg-slate-50 rounded-2xl p-4 text-left border border-slate-200 mb-6 space-y-2">
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Recipient:</span>
+              <span className="font-semibold text-slate-800">{fullName}</span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Delivery Area:</span>
+              <span className="font-semibold text-slate-800">{selectedPostOffice ? `${selectedPostOffice}, ` : ''}{pincode} ({city || 'India'})</span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Payable on Delivery:</span>
+              <span className="font-bold text-emerald-700">₹{orderTotal > 0 ? orderTotal.toLocaleString('en-IN') : 'COD'}</span>
+            </div>
+          </div>
+
+          <a
+            href={waLink}
+            className="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <MessageSquare size={18} />
+            <span>Open WhatsApp Chat</span>
+          </a>
+        </div>
+      </div>
+    );
   }
-  const codBalance = Math.max(0, (orderTotal || partialCodAdvance) - partialCodAdvance);
 
-  const prepaidDiscount = recoverySettings.prepaidDiscountPercent > 0 && orderTotal > 0
-    ? Math.round((orderTotal * recoverySettings.prepaidDiscountPercent) / 100)
-    : 0;
-  const prepaidTotal = Math.max(1, orderTotal - prepaidDiscount);
+  // SCREEN 3: Razorpay / Automated Gateway Success
+  if (checkoutStep === 'RAZORPAY_SUCCESS') {
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-900 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl shadow-slate-200/60 relative overflow-hidden">
+          <div className="w-20 h-20 bg-emerald-100 border border-emerald-200 rounded-full flex items-center justify-center mx-auto mb-5 text-emerald-600">
+            <CheckCircle2 size={42} className="animate-bounce" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 mb-2">Payment Successful!</h1>
+          <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+            Aapka online payment successfully complete ho chuka hai. Order confirmation receipt aapke <span className="text-emerald-600 font-bold">WhatsApp</span> par deliver kar di gayi hai.
+          </p>
 
-  // Check allowed modes strictly
+          <a
+            href={waLink}
+            className="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <MessageSquare size={18} />
+            <span>Open WhatsApp Chat</span>
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN 4: Dynamic Manual UPI QR & Screenshot Uploader
+  if (checkoutStep === 'PAYMENT_QR') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 text-slate-900 flex flex-col items-center justify-start p-4 sm:p-6 font-sans">
+        <div className="w-full max-w-md">
+          {/* Header Branding */}
+          <div className="flex items-center justify-between py-3 mb-3 border-b border-slate-200">
+            <button
+              onClick={() => setCheckoutStep('ADDRESS')}
+              className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-semibold cursor-pointer"
+            >
+              <ArrowLeft size={14} /> Back to Address
+            </button>
+            <span className="text-[10.5px] bg-emerald-50 text-emerald-800 font-bold px-3 py-1 rounded-full border border-emerald-200">
+              Step 2: Instant UPI Payment
+            </span>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-7 shadow-xl shadow-slate-200/40 text-center space-y-4">
+            <div>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Payable Amount</span>
+              <h2 className="text-3xl font-black text-slate-900 mt-0.5">₹{payableAmount.toLocaleString('en-IN')}</h2>
+              <p className="text-xs text-emerald-700 font-bold mt-1 flex items-center justify-center gap-1">
+                <Sparkles size={13} /> {paymentMode === 'PARTIAL_COD' ? 'Token Advance to Confirm Dispatch' : '100% Online UPI Payment (Discount Applied)'}
+              </p>
+            </div>
+
+            {/* Dynamic High-Res QR Code Card */}
+            <div className="bg-slate-50 border-2 border-dashed border-emerald-200 rounded-3xl p-4 flex flex-col items-center justify-center relative">
+              <img
+                src={qrImageSrc}
+                alt="Dynamic UPI QR Code"
+                className="w-56 h-56 rounded-2xl shadow-md border border-slate-200/80 bg-white p-2 object-contain"
+              />
+              <div className="mt-3 flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-xs">
+                <span className="text-xs font-mono font-bold text-slate-700">{upiId}</span>
+                <button
+                  type="button"
+                  onClick={copyUpiToClipboard}
+                  className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-0.5 cursor-pointer"
+                >
+                  {copiedUpi ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                  <span>{copiedUpi ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Direct Quick Action Buttons */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <a
+                href={qrImageSrc}
+                download="Payment_QR.png"
+                target="_blank"
+                rel="noreferrer"
+                className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-all cursor-pointer"
+              >
+                <Download size={14} className="text-slate-600" />
+                <span>Download QR</span>
+              </a>
+
+              <a
+                href={upiDeepLink}
+                className="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+              >
+                <ExternalLink size={14} />
+                <span>Open UPI App</span>
+              </a>
+            </div>
+
+            {/* Screenshot Upload Form */}
+            <form onSubmit={handleUploadProof} className="pt-3 border-t border-slate-100 text-left space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <UploadCloud size={15} className="text-emerald-600" />
+                  Upload Payment Screenshot *
+                </label>
+              </div>
+
+              {errorMsg && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 flex items-start gap-2 text-xs text-red-700">
+                  <AlertCircle size={14} className="text-red-500 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {/* Upload Input / Drag Box */}
+              <div className="relative border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 bg-slate-50 text-center transition-all">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                {proofPreview ? (
+                  <div className="flex flex-col items-center">
+                    <img src={proofPreview} alt="Screenshot Preview" className="max-h-36 rounded-xl border border-slate-200 object-contain mb-2 shadow-xs" />
+                    <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                      <Check size={13} /> Screenshot Selected (Tap to change)
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center py-2 text-slate-500">
+                    <UploadCloud size={28} className="text-emerald-600 mb-1" />
+                    <span className="text-xs font-bold text-slate-700">Tap to upload / capture screenshot</span>
+                    <span className="text-[10.5px] text-slate-400 mt-0.5">JPG, PNG or WEBP from GPay / PhonePe / Paytm</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Optional UTR / Reference Number */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">UPI Reference / UTR Number (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 12-digit UTR (402910394819)"
+                  value={utrNumber}
+                  onChange={(e) => setUtrNumber(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 focus:outline-none text-xs text-slate-900 placeholder-slate-400 font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={uploadingProof || (!proofFile && !proofPreview)}
+                className="w-full py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              >
+                {uploadingProof ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Submitting Payment Proof...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} />
+                    <span>Submit Payment Proof & Confirm</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          <p className="text-center text-[11px] text-slate-400 mt-4">
+            100% Encrypted & Verified by {storeName}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // SCREEN 0: Address Collection & Preference Selector (Default)
   const allowedModes: string[] = Array.isArray(recoverySettings?.allowedPaymentModes) && recoverySettings.allowedPaymentModes.length > 0
     ? recoverySettings.allowedPaymentModes
     : ['PREPAID', 'PARTIAL_COD'];
@@ -307,7 +675,7 @@ function CheckoutContent() {
         )}
 
         {/* Address Form */}
-        <form onSubmit={handleSubmit} className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-7 shadow-xl shadow-slate-200/40 space-y-4">
+        <form onSubmit={handleSubmitAddress} className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-7 shadow-xl shadow-slate-200/40 space-y-4">
           <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
             <MapPin size={17} className="text-emerald-600" />
             <h3 className="text-sm font-bold text-slate-900">Delivery Address</h3>
@@ -445,7 +813,7 @@ function CheckoutContent() {
               )}
             </div>
             <div className="space-y-2.5">
-              {/* Partial COD (Only rendered if enabled in admin settings) */}
+              {/* Partial COD */}
               {showPartialCod && (
                 <label
                   onClick={() => setPaymentMode('PARTIAL_COD')}
@@ -465,7 +833,7 @@ function CheckoutContent() {
                       </div>
                       <div className="text-[11px] text-slate-500">
                         {orderTotal > 0 ? (
-                          <>Pay <strong className="text-slate-800">₹{partialCodAdvance.toLocaleString('en-IN')}</strong> token on WhatsApp + <strong className="text-slate-800">₹{codBalance.toLocaleString('en-IN')}</strong> on delivery</>
+                          <>Pay <strong className="text-slate-800">₹{partialCodAdvance.toLocaleString('en-IN')}</strong> token online + <strong className="text-slate-800">₹{codBalance.toLocaleString('en-IN')}</strong> on delivery</>
                         ) : (
                           <>Pay {recoverySettings.partialCodMode === 'FIXED' ? `₹${recoverySettings.partialCodValue || 200}` : `${recoverySettings.partialCodValue || 10}%`} token advance online + rest on delivery</>
                         )}
@@ -478,7 +846,7 @@ function CheckoutContent() {
                 </label>
               )}
 
-              {/* Prepaid Online (Only rendered if enabled in admin settings) */}
+              {/* Prepaid Online */}
               {showPrepaid && (
                 <label
                   onClick={() => setPaymentMode('PREPAID')}
@@ -499,12 +867,12 @@ function CheckoutContent() {
                       <div className="text-[11px] text-slate-500">
                         {orderTotal > 0 ? (
                           prepaidDiscount > 0 ? (
-                            <>Pay <strong className="text-emerald-700 font-bold">₹{prepaidTotal.toLocaleString('en-IN')}</strong> (Saved ₹{prepaidDiscount}) via Instant WhatsApp UPI</>
+                            <>Pay <strong className="text-emerald-700 font-bold">₹{prepaidTotal.toLocaleString('en-IN')}</strong> (Saved ₹{prepaidDiscount}) via Instant UPI</>
                           ) : (
-                            <>Pay <strong className="text-slate-800">₹{orderTotal.toLocaleString('en-IN')}</strong> via WhatsApp UPI</>
+                            <>Pay <strong className="text-slate-800">₹{orderTotal.toLocaleString('en-IN')}</strong> via Instant UPI</>
                           )
                         ) : (
-                          <>Pay via Instant WhatsApp UPI {Number(recoverySettings?.prepaidDiscountPercent) > 0 ? `(Get ${recoverySettings.prepaidDiscountPercent}% Extra Instant Discount)` : ''}</>
+                          <>Pay via Instant UPI {Number(recoverySettings?.prepaidDiscountPercent) > 0 ? `(Get ${recoverySettings.prepaidDiscountPercent}% Extra Instant Discount)` : ''}</>
                         )}
                       </div>
                     </div>
@@ -517,7 +885,7 @@ function CheckoutContent() {
                 </label>
               )}
 
-              {/* Full COD (Only rendered if enabled in admin settings) */}
+              {/* Full COD */}
               {showFullCod && (
                 <label
                   onClick={() => setPaymentMode('FULL_COD')}
@@ -545,14 +913,6 @@ function CheckoutContent() {
             </div>
           </div>
 
-          {/* Zero-Payment Guarantee Notice */}
-          <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-slate-600">
-            <ShieldCheck size={16} className="text-blue-600 shrink-0 mt-0.5" />
-            <p className="leading-tight text-[11.5px]">
-              <strong className="text-slate-800">No payment collected on this form:</strong> Order confirmation & WhatsApp UPI link will be sent to your chat immediately upon submission.
-            </p>
-          </div>
-
           <button
             type="submit"
             disabled={submitting}
@@ -561,11 +921,11 @@ function CheckoutContent() {
             {submitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Submitting Address...</span>
+                <span>Processing Order...</span>
               </>
             ) : (
               <>
-                <span>Confirm Address & Place Order</span>
+                <span>{paymentMode === 'FULL_COD' ? 'Confirm Address & Place COD Order' : 'Proceed to Payment (₹' + payableAmount.toLocaleString('en-IN') + ')'}</span>
                 <ArrowRight size={16} />
               </>
             )}

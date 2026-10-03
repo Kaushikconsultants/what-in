@@ -45,9 +45,12 @@ export interface UnifiedOrder {
     paymentMode: "PREPAID" | "PARTIAL_COD" | "FULL_COD" | "ONLINE";
     advanceAmountPaid: number;
     codBalanceDue: number;
-    paymentStatus: "PAID" | "PARTIALLY_PAID" | "PENDING" | "FAILED" | "REFUNDED";
+    paymentStatus: "PAID" | "PARTIALLY_PAID" | "PENDING" | "PAYMENT_UNDER_REVIEW" | "FAILED" | "REFUNDED";
     paymentLinkUrl?: string;
     transactionId?: string;
+    paymentScreenshotUrl?: string;
+    utrNumber?: string;
+    proofUploadedAt?: string;
   };
   fulfillment: {
     status: "PROCESSING" | "PACKED" | "DISPATCHED" | "DELIVERED" | "CANCELLED";
@@ -126,21 +129,38 @@ export async function getUnifiedOrdersAction(filters?: {
       // Find matching payment link
       const pLink = paymentLinks.find(pl => pl.conversationId === msg.conversationId);
       const isPaid = pLink?.status === "PAID";
+      const isUnderReview = pLink?.status === "PAYMENT_UNDER_REVIEW";
       const pLinkAmount = pLink ? Number(pLink.amount) : 0;
+
+      // Extract proof details if available
+      let extractedScreenshot = isUnderReview ? pLink?.paymentUrl : undefined;
+      let extractedUtr = pLink?.transactionId || undefined;
+
+      const custNotes = cust?.notes || "";
+      if (!extractedScreenshot && custNotes.includes("[PROOF UPLOADED]")) {
+        const ssMatch = custNotes.match(/SS:\s*(https?:\/\/[^\s|]+)/i);
+        if (ssMatch) extractedScreenshot = ssMatch[1];
+        const utrMatch = custNotes.match(/UTR:\s*([^|]+)/i);
+        if (utrMatch) extractedUtr = utrMatch[1].trim();
+      }
 
       // Determine Payment Mode & Financials
       let paymentMode: "PREPAID" | "PARTIAL_COD" | "FULL_COD" | "ONLINE" = "PREPAID";
       let advancePaid = 0;
       let codBalance = 0;
-      let paymentStatus: "PAID" | "PARTIALLY_PAID" | "PENDING" | "FAILED" = "PENDING";
+      let paymentStatus: "PAID" | "PARTIALLY_PAID" | "PENDING" | "PAYMENT_UNDER_REVIEW" | "FAILED" = "PENDING";
       let discountAmount = 0;
       let discountPercent = 0;
 
-      const custNotes = cust?.notes || "";
       const isFullCod = custNotes.toUpperCase().includes("FULL COD") || custNotes.toUpperCase().includes("CASH ON DELIVERY");
       const isPartialCod = pLink && pLinkAmount < totalAmt && pLinkAmount > 0;
 
-      if (isFullCod) {
+      if (isUnderReview) {
+        paymentStatus = "PAYMENT_UNDER_REVIEW";
+        paymentMode = isPartialCod ? "PARTIAL_COD" : "PREPAID";
+        advancePaid = 0;
+        codBalance = isPartialCod ? Math.max(0, totalAmt - pLinkAmount) : 0;
+      } else if (isFullCod) {
         paymentMode = "FULL_COD";
         advancePaid = 0;
         codBalance = totalAmt;
@@ -195,7 +215,7 @@ export async function getUnifiedOrdersAction(filters?: {
       const computedPaymentMode = orderData.paymentMode || paymentMode;
       const computedAdvancePaid = orderData.advanceAmountPaid !== undefined ? Number(orderData.advanceAmountPaid) : advancePaid;
       const computedCodBalance = orderData.codBalanceDue !== undefined ? Number(orderData.codBalanceDue) : (computedPaymentMode === "PREPAID" ? 0 : Math.max(0, computedTotal - computedAdvancePaid));
-      const computedPaymentStatus = orderData.paymentStatus || (computedPaymentMode === "PREPAID" ? (isPaid ? "PAID" : "PENDING") : (computedAdvancePaid > 0 ? "PARTIALLY_PAID" : "PENDING"));
+      const computedPaymentStatus = orderData.paymentStatus || (isUnderReview ? "PAYMENT_UNDER_REVIEW" : (computedPaymentMode === "PREPAID" ? (isPaid ? "PAID" : "PENDING") : (computedAdvancePaid > 0 ? "PARTIALLY_PAID" : "PENDING")));
 
       orders.push({
         id: msg.id,
@@ -234,7 +254,9 @@ export async function getUnifiedOrdersAction(filters?: {
           codBalanceDue: computedCodBalance,
           paymentStatus: computedPaymentStatus,
           paymentLinkUrl: pLink?.paymentUrl,
-          transactionId: pLink?.transactionId || undefined
+          transactionId: extractedUtr,
+          paymentScreenshotUrl: extractedScreenshot,
+          utrNumber: extractedUtr,
         },
         fulfillment: {
           status: orderData.fulfillmentStatus || "PROCESSING",
@@ -711,3 +733,143 @@ export async function getStoreDetailsAction() {
     };
   }
 }
+
+/**
+ * Server Action: Admin verifies or rejects uploaded manual UPI payment screenshot
+ */
+export async function verifyOrderPaymentScreenshotAction(params: {
+  orderId: string;
+  conversationId?: string;
+  customerId?: string;
+  status: "APPROVED" | "REJECTED";
+  note?: string;
+}) {
+  try {
+    const user = await getAuthenticatedUser().catch(() => null);
+    const { orderId, conversationId, customerId, status, note } = params;
+
+    // Find payment link or conversation
+    let pLink = await prisma.whatsAppPaymentLink.findFirst({
+      where: {
+        OR: [
+          { id: orderId },
+          { orderId: orderId },
+          ...(conversationId ? [{ conversationId }] : [])
+        ]
+      },
+      include: {
+        conversation: { include: { customer: true, client: true } },
+        customer: true,
+        client: true
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    let convId = conversationId || pLink?.conversationId;
+    let cust = pLink?.customer;
+    let client = pLink?.client || pLink?.conversation?.client;
+
+    if (!cust && customerId) {
+      cust = await prisma.customer.findUnique({ where: { id: customerId } }) as any;
+    }
+
+    if (!client && user?.clientId) {
+      client = await prisma.whatsAppClient.findUnique({ where: { id: user.clientId } }) as any;
+    }
+
+    if (pLink) {
+      await prisma.whatsAppPaymentLink.update({
+        where: { id: pLink.id },
+        data: {
+          status: status === "APPROVED" ? "PAID" : "FAILED",
+          paidAt: status === "APPROVED" ? new Date() : undefined,
+        }
+      });
+    }
+
+    // Update catalog order message metadata if exists
+    if (convId) {
+      const orderMsg = await prisma.whatsAppMessage.findFirst({
+        where: { conversationId: convId, messageType: "ORDER" },
+        orderBy: { sentAt: "desc" }
+      });
+
+      if (orderMsg?.metadata) {
+        try {
+          const meta = JSON.parse(orderMsg.metadata);
+          if (meta.order) {
+            meta.order.paymentStatus = status === "APPROVED" ? "PAID" : "FAILED";
+            if (status === "APPROVED") {
+              meta.order.advanceAmountPaid = meta.order.totalAmount || pLink?.amount || 0;
+              meta.order.codBalanceDue = 0;
+            }
+            await prisma.whatsAppMessage.update({
+              where: { id: orderMsg.id },
+              data: { metadata: JSON.stringify(meta) }
+            });
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (status === "APPROVED") {
+      const amount = pLink?.amount || 0;
+      const customerName = cust?.contactPerson || cust?.businessName || "Valued Customer";
+      const storeName = client?.businessName || "Official Store";
+
+      if (convId) {
+        const approvalMsg =
+          `🎉 *Payment Verified & Order Confirmed!*\n\n` +
+          `Dear ${customerName},\n` +
+          `Your payment of *₹${amount > 0 ? amount.toLocaleString("en-IN") : "your order"}* has been successfully verified by our billing team.\n\n` +
+          `📦 *Status:* Confirmed & Packaging for Dispatch\n` +
+          `🚚 Our logistics team will share your live courier tracking link as soon as your parcel ships.\n\n` +
+          `Thank you for shopping with *${storeName}*!`;
+
+        await sendWhatsAppMessageAction({
+          conversationId: convId,
+          senderId: "system",
+          senderType: "SYSTEM",
+          messageType: "TEXT",
+          content: approvalMsg,
+          senderName: storeName,
+        });
+      }
+
+      return {
+        success: true,
+        message: "Payment successfully verified and confirmation sent to customer WhatsApp.",
+      };
+    } else {
+      const customerName = cust?.contactPerson || cust?.businessName || "Customer";
+      const storeName = client?.businessName || "Billing Support";
+
+      if (convId) {
+        const rejectionMsg =
+          `⚠️ *Payment Proof Verification Notice*\n\n` +
+          `Dear ${customerName},\n` +
+          `We were unable to verify your uploaded payment screenshot.\n` +
+          (note ? `*Note:* ${note}\n\n` : "\n") +
+          `Please check your banking / UPI transaction or contact our support team for assistance.`;
+
+        await sendWhatsAppMessageAction({
+          conversationId: convId,
+          senderId: "system",
+          senderType: "SYSTEM",
+          messageType: "TEXT",
+          content: rejectionMsg,
+          senderName: storeName,
+        });
+      }
+
+      return {
+        success: true,
+        message: "Payment proof marked as rejected and customer notified on WhatsApp.",
+      };
+    }
+  } catch (err: any) {
+    console.error("[Verify Payment Proof Error]:", err);
+    return { success: false, error: err.message };
+  }
+}
+

@@ -131,6 +131,13 @@ export async function GET(req: NextRequest) {
         items,
         orderTotal,
         orderDesc,
+        gateway: {
+          activeGateway: client?.activeGateway || "MANUAL_UPI",
+          merchantUpiId: client?.merchantUpiId || "",
+          merchantUpiName: client?.merchantUpiName || client?.businessName || "Official Store",
+          razorpayKeyId: client?.razorpayKeyId || "",
+          cashfreeAppId: client?.cashfreeAppId || "",
+        },
         recoverySettings: {
           allowedPaymentModes: recoverySettings.allowedPaymentModes || ["PREPAID", "PARTIAL_COD"],
           partialCodMode: recoverySettings.partialCodMode || "PERCENTAGE",

@@ -38,7 +38,8 @@ import {
   Plus,
   Trash2,
   Save,
-  Tag
+  Tag,
+  QrCode
 } from "lucide-react";
 import {
   getUnifiedOrdersAction,
@@ -46,6 +47,7 @@ import {
   sendOrderWhatsAppMessageAction,
   updateUnifiedOrderAction,
   getStoreDetailsAction,
+  verifyOrderPaymentScreenshotAction,
   UnifiedOrder,
   UnifiedOrderItem
 } from "@/app/actions/whatsAppOrderActions";
@@ -84,6 +86,12 @@ export default function WhatsAppOrdersComponent() {
   // Quick WhatsApp Message from Drawer
   const [quickMsg, setQuickMsg] = useState("");
   const [sendingQuickMsg, setSendingQuickMsg] = useState(false);
+
+  // Payment Proof Verification (Manual UPI)
+  const [verifyingProof, setVerifyingProof] = useState(false);
+  const [proofPreviewModalUrl, setProofPreviewModalUrl] = useState<string | null>(null);
+  const [showProofRejectModal, setShowProofRejectModal] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   // Editing Order State (Shopify style)
   const [isEditingOrder, setIsEditingOrder] = useState(false);
@@ -399,6 +407,49 @@ export default function WhatsAppOrdersComponent() {
       showToast(e.message, "error");
     } finally {
       setSendingQuickMsg(false);
+    }
+  };
+
+  // Verify / Reject Payment Proof (Manual UPI)
+  const handleVerifyPaymentProof = async (status: "APPROVED" | "REJECTED") => {
+    if (!selectedOrder) return;
+    setVerifyingProof(true);
+    try {
+      const res = await verifyOrderPaymentScreenshotAction({
+        orderId: selectedOrder.id,
+        status,
+        note: status === "REJECTED" ? rejectionReason : undefined,
+      });
+      if (res.success) {
+        showToast(
+          res.message || (status === "APPROVED" ? "Payment approved and customer notified!" : "Payment rejected."),
+          "success"
+        );
+        setSelectedOrder((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            financials: {
+              ...prev.financials,
+              paymentStatus: status === "APPROVED" ? "PAID" : "FAILED",
+              advanceAmountPaid:
+                status === "APPROVED"
+                  ? (prev.financials.totalAmount || prev.financials.advanceAmountPaid)
+                  : prev.financials.advanceAmountPaid,
+              codBalanceDue: status === "APPROVED" ? 0 : prev.financials.codBalanceDue,
+            },
+          };
+        });
+        setShowProofRejectModal(false);
+        setRejectionReason("");
+        await loadOrders();
+      } else {
+        showToast(res.error || "Failed to verify payment proof", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Failed to verify proof", "error");
+    } finally {
+      setVerifyingProof(false);
     }
   };
 
@@ -815,20 +866,27 @@ export default function WhatsAppOrdersComponent() {
                               </span>
 
                               {/* Status Sub-badge */}
-                              <span className="text-[10.5px] text-slate-500 flex items-center gap-1 font-medium">
-                                <span className={`w-1.5 h-1.5 rounded-full ${
-                                  ord.financials.paymentStatus === "PAID"
-                                    ? "bg-emerald-500"
+                              {ord.financials.paymentStatus === "PAYMENT_UNDER_REVIEW" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-300 dark:border-amber-700 animate-pulse">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                  📸 Proof Under Review
+                                </span>
+                              ) : (
+                                <span className="text-[10.5px] text-slate-500 flex items-center gap-1 font-medium">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    ord.financials.paymentStatus === "PAID"
+                                      ? "bg-emerald-500"
+                                      : ord.financials.paymentStatus === "PARTIALLY_PAID"
+                                      ? "bg-indigo-500"
+                                      : "bg-amber-500"
+                                  }`}></span>
+                                  {ord.financials.paymentStatus === "PAID"
+                                    ? "Paid Online"
                                     : ord.financials.paymentStatus === "PARTIALLY_PAID"
-                                    ? "bg-indigo-500"
-                                    : "bg-amber-500"
-                                }`}></span>
-                                {ord.financials.paymentStatus === "PAID"
-                                  ? "Paid Online"
-                                  : ord.financials.paymentStatus === "PARTIALLY_PAID"
-                                  ? `Balance ₹${ord.financials.codBalanceDue} on Delivery`
-                                  : "Payment Pending"}
-                              </span>
+                                    ? `Balance ₹${ord.financials.codBalanceDue} on Delivery`
+                                    : "Payment Pending"}
+                                </span>
+                              )}
                             </div>
                           </td>
 
@@ -1754,6 +1812,124 @@ export default function WhatsAppOrdersComponent() {
                   </div>
                 </div>
 
+                {/* 1.5. Manual UPI Payment Proof & Verification Card */}
+                {(selectedOrder.financials.paymentScreenshotUrl ||
+                  selectedOrder.financials.paymentStatus === "PAYMENT_UNDER_REVIEW" ||
+                  selectedOrder.financials.utrNumber) && (
+                  <div
+                    className={`p-4 rounded-xl border flex flex-col gap-3 text-xs transition-all ${
+                      selectedOrder.financials.paymentStatus === "PAYMENT_UNDER_REVIEW"
+                        ? "bg-amber-50/60 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 shadow-xs"
+                        : selectedOrder.financials.paymentStatus === "PAID"
+                        ? "bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700/60"
+                        : "bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <QrCode size={14} className="text-indigo-600 dark:text-indigo-400" />
+                        Manual UPI Payment Proof &amp; Verification
+                      </span>
+                      <span
+                        className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${
+                          selectedOrder.financials.paymentStatus === "PAYMENT_UNDER_REVIEW"
+                            ? "bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 border border-amber-300 animate-pulse"
+                            : selectedOrder.financials.paymentStatus === "PAID"
+                            ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300"
+                            : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        {selectedOrder.financials.paymentStatus === "PAYMENT_UNDER_REVIEW"
+                          ? "⏳ Needs Verification"
+                          : selectedOrder.financials.paymentStatus === "PAID"
+                          ? "✅ Verified & Paid"
+                          : "Verification Done"}
+                      </span>
+                    </div>
+
+                    {selectedOrder.financials.paymentScreenshotUrl ? (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <div
+                          onClick={() => setProofPreviewModalUrl(selectedOrder.financials.paymentScreenshotUrl!)}
+                          className="relative w-20 h-24 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shrink-0 cursor-pointer group shadow-xs"
+                          title="Click to view full screenshot"
+                        >
+                          <img
+                            src={selectedOrder.financials.paymentScreenshotUrl}
+                            alt="Payment Screenshot Proof"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <Eye size={16} />
+                          </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col gap-1.5 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">UTR / Ref:</span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[11px]">
+                              {selectedOrder.financials.utrNumber || selectedOrder.financials.transactionId || "Not Provided"}
+                            </span>
+                          </div>
+                          {selectedOrder.financials.proofUploadedAt && (
+                            <div className="text-[11px] text-slate-500">
+                              Uploaded: {new Date(selectedOrder.financials.proofUploadedAt).toLocaleString("en-IN")}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setProofPreviewModalUrl(selectedOrder.financials.paymentScreenshotUrl!)}
+                              className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <Eye size={12} /> View Full Image
+                            </button>
+                            <span className="text-slate-300">|</span>
+                            <a
+                              href={selectedOrder.financials.paymentScreenshotUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:underline flex items-center gap-1"
+                            >
+                              <Download size={12} /> Download
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-slate-500 italic text-[11px] p-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-800">
+                        Customer reported manual UPI payment (UTR: {selectedOrder.financials.utrNumber || "N/A"}).
+                      </div>
+                    )}
+
+                    {/* Approve / Reject Controls */}
+                    {selectedOrder.financials.paymentStatus === "PAYMENT_UNDER_REVIEW" && (
+                      <div className="flex items-center gap-2 pt-2 border-t border-amber-200/80 dark:border-amber-800/60">
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyPaymentProof("APPROVED")}
+                          disabled={verifyingProof}
+                          className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {verifyingProof ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                          <span>Verify &amp; Approve Payment</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowProofRejectModal(true)}
+                          disabled={verifyingProof}
+                          className="py-2 px-3 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          <X size={13} />
+                          <span>Reject Proof</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* 2. Line Items Table */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
@@ -2082,6 +2258,116 @@ export default function WhatsAppOrdersComponent() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Payment Proof Screenshot Full-Size Lightbox Modal */}
+      {proofPreviewModalUrl && (
+        <div
+          onClick={() => setProofPreviewModalUrl(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 cursor-zoom-out"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-2xl max-h-[90vh] bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col cursor-default"
+          >
+            <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/60">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <Eye size={13} className="text-indigo-600" />
+                Customer Payment Screenshot Proof
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={proofPreviewModalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="p-1 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg"
+                  title="Download Image"
+                >
+                  <Download size={14} />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setProofPreviewModalUrl(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="p-2 overflow-auto flex items-center justify-center bg-slate-950/20">
+              <img
+                src={proofPreviewModalUrl}
+                alt="Payment Proof Full"
+                className="max-h-[75vh] w-auto object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Payment Proof Prompt Modal */}
+      {showProofRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md shadow-xl overflow-hidden p-5 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={18} className="text-rose-600" />
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white m-0">
+                  Reject Payment Screenshot
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProofRejectModal(false);
+                  setRejectionReason("");
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-400 m-0">
+              Please enter the reason for rejection. This note will be automatically sent to the customer on WhatsApp so they can provide the correct payment proof or retry.
+            </p>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                Reason for Rejection (Optional)
+              </label>
+              <textarea
+                rows={3}
+                placeholder="e.g. Screenshot is unreadable / Amount does not match / Bank transaction was declined"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProofRejectModal(false);
+                  setRejectionReason("");
+                }}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleVerifyPaymentProof("REJECTED")}
+                disabled={verifyingProof}
+                className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {verifyingProof ? <RefreshCw size={13} className="animate-spin" /> : <X size={13} />}
+                <span>Confirm Rejection</span>
+              </button>
             </div>
           </div>
         </div>
